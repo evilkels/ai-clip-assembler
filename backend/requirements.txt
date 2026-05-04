@@ -1,0 +1,25 @@
+# AI Clip Assembler — Backend Dependencies
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Video Processing
+ffmpeg-python==0.2.0
+opencv-python==4.11.0.86
+scenedetect==0.6.5
+
+# AI / ML
+ollama==0.4.0
+httpx==0.28.0
+
+# Data / Utils
+numpy==2.2.0
+pillow==11.1.0
+pydantic==2.10.0
+python-dotenv==1.0.0
+
+# Testing
+pytest==8.3.0
+pytest-asyncio==0.25.0

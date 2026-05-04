@@ -1,0 +1,17 @@
+{
+  "id": "local_qwen",
+  "name": "Local Qwen Vision",
+  "type": "local",
+  "enabled": true,
+  "version": "1.0.0",
+  "interface_version": "1.0",
+  "config": {
+    "model": "qwen2.5-vl:7b",
+    "provider": "ollama",
+    "provider_url": "http://localhost:11434",
+    "batch_size": 8,
+    "max_frames_per_video": 100,
+    "prompt_template": "You are a video quality analyst. Score this video frame (0-10) for: 1) smoothness/stability (is there camera shake?), 2) visual interest (composition, lighting, subject). Respond ONLY in JSON format: {\"smoothness\": N, \"visual_interest\": N, \"reason\": \"brief explanation\"}",
+    "temperature": 0.2
+  }
+}

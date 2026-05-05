@@ -17,7 +17,13 @@ from pydantic import BaseModel
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
+from .motion_analysis import (
+    FFmpegVidstabError,
+    FFmpegVidstabUnavailableError,
+    run_vidstabdetect,
+)
 from .quality_scoring import score_samples_from_images
+from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
 app = FastAPI(
@@ -109,6 +115,10 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
     sample_fps = sample_fps_from_request(request.preferences)
     for video in projects[project_id]["videos"]:
         try:
+            run_vidstabdetect(
+                input_path=Path(video["file_path"]),
+                transforms_path=project_dir(project_id) / "motion" / f"{video['file_id']}.trf",
+            )
             samples = extract_frames(
                 input_path=Path(video["file_path"]),
                 frames_dir=project_dir(project_id) / "frames" / video["file_id"],
@@ -116,6 +126,12 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
                 sample_fps=sample_fps,
                 max_width=int(request.preferences.get("max_width", 960)),
             )
+            scenes = detect_scenes(Path(video["file_path"]))
+            samples = assign_scene_ids(samples, scenes)
+        except FFmpegVidstabUnavailableError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except FFmpegVidstabError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except FFmpegUnavailableError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except FFmpegError as exc:

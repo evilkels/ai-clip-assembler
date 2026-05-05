@@ -16,6 +16,7 @@ class VideoMetadata(BaseModel):
 class FrameSample(BaseModel):
     timestamp: float
     frame_path: str
+    scene_id: int = 0
     is_keyframe: bool = True
 
 

@@ -95,7 +95,7 @@ def score_samples_from_images(samples: List[FrameSample]) -> List[FrameScore]:
                 blur_laplacian_variance=blur_laplacian_variance,
                 brightness=brightness,
                 contrast=contrast,
-                scene_id=index,
+                scene_id=sample.scene_id,
                 frame_path=sample.frame_path,
             )
         )

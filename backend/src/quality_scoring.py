@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 
 from .models import FrameSample, FrameScore
+from .scoring_weights import DRONE_SCORE_WEIGHTS
 
 
 def clamp_score(value: float) -> float:
@@ -21,10 +22,10 @@ def normalize_frame_metrics(
     exposure_score = clamp_score(10.0 - (abs(brightness - 0.5) * 25.0))
     contrast_score = clamp_score(contrast * 20.0)
     overall_score = clamp_score(
-        smoothness_score * 0.55
-        + sharpness_score * 0.25
-        + exposure_score * 0.10
-        + contrast_score * 0.10
+        smoothness_score * DRONE_SCORE_WEIGHTS["smoothness"]
+        + sharpness_score * DRONE_SCORE_WEIGHTS["sharpness"]
+        + exposure_score * DRONE_SCORE_WEIGHTS["exposure"]
+        + contrast_score * DRONE_SCORE_WEIGHTS["contrast"]
     )
     return {
         "smoothness_score": smoothness_score,

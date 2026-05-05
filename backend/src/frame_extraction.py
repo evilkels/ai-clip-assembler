@@ -9,6 +9,10 @@ class FFmpegUnavailableError(RuntimeError):
     pass
 
 
+class FFmpegError(RuntimeError):
+    pass
+
+
 Runner = Callable[..., subprocess.CompletedProcess]
 
 
@@ -49,8 +53,14 @@ def extract_frames(
     max_width: int = 960,
     runner: Runner = subprocess.run,
 ) -> List[FrameSample]:
+    if sample_fps <= 0:
+        raise ValueError("sample_fps must be greater than 0")
+
+    if frames_dir.exists():
+        for old_frame in frames_dir.glob(f"{file_id}_*.jpg"):
+            old_frame.unlink()
     frames_dir.mkdir(parents=True, exist_ok=True)
-    output_pattern = frames_dir / f"{file_id}_%06d.jpg"
+    output_pattern = frames_dir / f"{file_id}_raw_%06d.jpg"
     try:
         runner(
             build_frame_extract_command(input_path, output_pattern, sample_fps, max_width),
@@ -60,13 +70,20 @@ def extract_frames(
         )
     except FileNotFoundError as exc:
         raise FFmpegUnavailableError("ffmpeg is required for frame extraction") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr or str(exc)
+        raise FFmpegError(f"ffmpeg frame extraction failed for {input_path}: {detail}") from exc
 
-    frame_paths = sorted(frames_dir.glob(f"{file_id}_*.jpg"))
-    return [
-        FrameSample(
-            timestamp=index / sample_fps,
-            frame_path=str(frame_path),
-            is_keyframe=True,
+    samples = []
+    for index, raw_path in enumerate(sorted(frames_dir.glob(f"{file_id}_raw_*.jpg"))):
+        timestamp = index / sample_fps
+        timestamped_path = frame_output_path(frames_dir, file_id, timestamp)
+        raw_path.replace(timestamped_path)
+        samples.append(
+            FrameSample(
+                timestamp=timestamp,
+                frame_path=str(timestamped_path),
+                is_keyframe=True,
+            )
         )
-        for index, frame_path in enumerate(frame_paths)
-    ]
+    return samples

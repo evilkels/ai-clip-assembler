@@ -2,7 +2,7 @@
 AI Clip Assembler - FastAPI Backend
 
 Provides REST endpoints for local video ingestion, smooth drone clip analysis,
-timeline assembly, and export generation.
+and timeline assembly. Export generation is still a placeholder endpoint.
 """
 
 import shutil
@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
-from .frame_extraction import extract_frames
+from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .quality_scoring import score_samples_from_images
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
@@ -69,7 +69,7 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
 
     file_id = str(uuid.uuid4())
     safe_name = Path(file.filename or f"{file_id}.mp4").name
-    video_path = project_dir(project_id) / "videos" / safe_name
+    video_path = project_dir(project_id) / "videos" / f"{file_id}_{safe_name}"
     video_path.parent.mkdir(parents=True, exist_ok=True)
     with video_path.open("wb") as output:
         shutil.copyfileobj(file.file, output)
@@ -77,11 +77,15 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
     try:
         metadata = probe_video(video_path)
     except FFprobeUnavailableError as exc:
+        video_path.unlink(missing_ok=True)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except FFprobeError as exc:
+        video_path.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     metadata.file_id = file_id
+    metadata.file_name = safe_name
+    metadata.file_path = str(video_path)
     video = {
         "file_id": file_id,
         "file_name": safe_name,
@@ -101,29 +105,36 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         raise HTTPException(status_code=400, detail="Only manual harness is available in the drone MVP")
 
     all_clips = []
-    sequence_clip_ids = []
-    total_duration = 0.0
+    preferences = preferences_from_request(request.preferences)
+    sample_fps = sample_fps_from_request(request.preferences)
     for video in projects[project_id]["videos"]:
-        samples = extract_frames(
-            input_path=Path(video["file_path"]),
-            frames_dir=project_dir(project_id) / "frames" / video["file_id"],
-            file_id=video["file_id"],
-            sample_fps=float(request.preferences.get("sample_fps", 1.0)),
-            max_width=int(request.preferences.get("max_width", 960)),
-        )
+        try:
+            samples = extract_frames(
+                input_path=Path(video["file_path"]),
+                frames_dir=project_dir(project_id) / "frames" / video["file_id"],
+                file_id=video["file_id"],
+                sample_fps=sample_fps,
+                max_width=int(request.preferences.get("max_width", 960)),
+            )
+        except FFmpegUnavailableError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except FFmpegError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         frame_scores = score_samples_rule_based(samples)
         result = assemble_smooth_clips(
             file_id=video["file_id"],
             file_name=video["file_name"],
             frames=frame_scores,
-            preferences=preferences_from_request(request.preferences),
+            preferences=preferences,
         )
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
-        sequence_clip_ids.extend(result.sequence.clips)
-        total_duration += result.sequence.total_duration_sec
 
-    projects[project_id]["clips"] = all_clips
+    ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
+    sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
+    total_duration = sum(clip["duration_sec"] for clip in ranked_clips)
+
+    projects[project_id]["clips"] = ranked_clips
     projects[project_id]["timeline"] = {
         "total_duration_sec": round(total_duration, 3),
         "clips": sequence_clip_ids,
@@ -132,7 +143,7 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "project_id": project_id,
         "harness_id": request.harness_id,
         "status": "complete",
-        "clips": all_clips,
+        "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
     }
 
@@ -181,6 +192,13 @@ def preferences_from_request(preferences: dict) -> AssemblyPreferences:
         smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
     )
+
+
+def sample_fps_from_request(preferences: dict) -> float:
+    sample_fps = float(preferences.get("sample_fps", 1.0))
+    if sample_fps <= 0:
+        raise HTTPException(status_code=422, detail="sample_fps must be greater than 0")
+    return sample_fps
 
 
 def score_samples_rule_based(samples: list) -> list:

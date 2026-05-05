@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Iterable, List
 
 from .models import AssemblyResult, ClipSuggestion, FrameScore, TimelineSequence
+from .scoring_weights import DRONE_SCORE_WEIGHTS
 
 
 @dataclass(frozen=True)
@@ -22,10 +23,10 @@ def average(values: Iterable[float]) -> float:
 
 def weighted_overall(frames: List[FrameScore]) -> float:
     return round(
-        average(frame.smoothness_score for frame in frames) * 0.60
-        + average(frame.sharpness_score for frame in frames) * 0.25
-        + average(frame.exposure_score for frame in frames) * 0.10
-        + average(frame.contrast_score for frame in frames) * 0.05,
+        average(frame.smoothness_score for frame in frames) * DRONE_SCORE_WEIGHTS["smoothness"]
+        + average(frame.sharpness_score for frame in frames) * DRONE_SCORE_WEIGHTS["sharpness"]
+        + average(frame.exposure_score for frame in frames) * DRONE_SCORE_WEIGHTS["exposure"]
+        + average(frame.contrast_score for frame in frames) * DRONE_SCORE_WEIGHTS["contrast"],
         2,
     )
 

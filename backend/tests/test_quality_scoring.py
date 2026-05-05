@@ -56,3 +56,14 @@ def test_score_samples_from_images_uses_image_quality_and_motion(tmp_path):
     assert scores[1].sharpness_score >= 9.0
     assert scores[2].smoothness_score < scores[1].smoothness_score
     assert scores[2].exposure_score < scores[1].exposure_score
+
+
+def test_score_samples_from_images_preserves_scene_ids(tmp_path):
+    frame_path = tmp_path / "scene.jpg"
+    cv2.imwrite(str(frame_path), np.full((20, 20), 127, dtype="uint8"))
+
+    scores = score_samples_from_images(
+        [FrameSample(timestamp=12.0, frame_path=str(frame_path), scene_id=4)]
+    )
+
+    assert scores[0].scene_id == 4

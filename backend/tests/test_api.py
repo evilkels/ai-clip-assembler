@@ -105,6 +105,8 @@ def test_analyze_manual_harness_extracts_scores_and_stores_clips(monkeypatch, tm
             "status": "ready",
         }
     )
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
 
     monkeypatch.setattr(
         api,
@@ -164,6 +166,60 @@ def test_analyze_manual_harness_extracts_scores_and_stores_clips(monkeypatch, tm
     assert api.projects[project_id]["clips"][0]["clip_id"] == "clip-1"
 
 
+def test_analyze_runs_motion_and_scene_detection_before_scoring(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0},
+            "status": "ready",
+        }
+    )
+    calls = {"vidstab": False}
+
+    def fake_vidstab(**kwargs):
+        calls["vidstab"] = True
+
+    monkeypatch.setattr(api, "run_vidstabdetect", fake_vidstab)
+    monkeypatch.setattr(
+        api,
+        "detect_scenes",
+        lambda video_path: [api.SceneBoundary(scene_id=7, start_sec=0, end_sec=5)],
+    )
+    monkeypatch.setattr(
+        api,
+        "extract_frames",
+        lambda **kwargs: [FrameSample(timestamp=1, frame_path="/tmp/1.jpg")],
+    )
+
+    def fake_score(samples):
+        assert samples[0].scene_id == 7
+        return []
+
+    monkeypatch.setattr(api, "score_samples_rule_based", fake_score)
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences: AssemblyResult(
+            clips=[],
+            sequence=TimelineSequence(total_duration_sec=0, clips=[]),
+        ),
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+
+    assert response.status_code == 200
+    assert calls["vidstab"] is True
+
+
 def test_analyze_rejects_invalid_sample_fps(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
@@ -193,6 +249,7 @@ def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_pat
             "status": "ready",
         }
     )
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
     monkeypatch.setattr(api, "extract_frames", lambda **kwargs: (_ for _ in ()).throw(api.FFmpegUnavailableError("ffmpeg missing")))
 
     response = client.post(
@@ -216,6 +273,8 @@ def test_analyze_ranks_clips_globally_across_videos(monkeypatch, tmp_path):
         ]
     )
 
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
     monkeypatch.setattr(api, "extract_frames", lambda **kwargs: [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")])
     monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: [])
 

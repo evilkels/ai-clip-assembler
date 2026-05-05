@@ -87,13 +87,52 @@ Pass criteria:
 - Final Cut Pro imports FCPXML without errors.
 - EDL edit events have plausible source and timeline timecodes.
 
+### 6. DaVinci Resolve EDL Validation
+
+1. Run `scripts/backend_smoke_test.py` against a real local drone MP4 or MOV.
+2. Import the original source video into DaVinci Resolve's Media Pool.
+3. Import the generated `timeline.edl` with **File > Import > Timeline > Import AAF, EDL, XML...**.
+4. Inspect the imported timeline on the Edit page.
+
+Pass criteria:
+- Resolve imports the EDL without an error dialog.
+- The imported timeline clip count matches the smoke-test output.
+- Clip durations and source positions are plausible.
+- Media is online or can be relinked to the original/copy without changing edit points.
+- Playback timing is plausible for the source frame rate.
+- Vertical media orientation is recorded as pass/fail.
+
+Known limitation:
+- Source frame rate and vertical orientation preservation is tracked separately in #19.
+
+## Issue #10 Closeout Checklist
+
+Before closing #10, capture validation notes for:
+
+- One smooth drone clip, ideally 10-60 seconds.
+- One shaky drone clip, ideally 10-60 seconds.
+- One mixed smooth/shaky source, ideally 1-3 minutes.
+- One longer source, ideally 5-10 minutes as a practical MVP performance check, or a full 1-hour 4K run if available.
+- At least one H.264 MP4 and one HEVC/H.265 MP4 or MOV.
+- EDL import into DaVinci Resolve.
+- FCPXML generation, with FCP import if Final Cut Pro is available.
+- Known limitations linked to follow-up issues, especially #19 for FPS/orientation export metadata.
+
+Minimum closeout evidence:
+- Source filename, duration, codec, FPS, and resolution for each clip.
+- Smoke-test command and result.
+- Candidate clip count and total timeline duration.
+- Whether the selected clips match expected smooth/shaky behavior.
+- Editor import result and relink/orientation notes.
+- Processing time for the longer source.
+
 ## Regression Checks
 
 Run these after the backend and frontend MVP branches are present locally:
 
 ```bash
 cd backend
-python -m pytest
+PYTHONPATH=. .venv/bin/python -m pytest
 ```
 
 ```bash

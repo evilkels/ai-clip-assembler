@@ -1,16 +1,19 @@
 {
   "name": "ai-clip-assembler",
   "version": "0.1.0",
-  "description": "Local-first AI video editor",
-  "main": "src/main.js",
+  "description": "Local-first AI video editor — Electron + React frontend",
+  "main": "out/main/index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "electron-vite dev",
+    "dev:renderer": "vite --config vite.renderer.config.ts",
+    "dev:with-backend": "concurrently \"npm run dev:backend\" \"npm run dev\"",
     "dev:backend": "cd ../backend && uvicorn src.api:app --reload --port 8000",
-    "dev:frontend": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "postinstall": "electron-builder install-app-deps",
-    "dist": "electron-builder"
+    "dist": "npm run build && electron-builder"
   },
   "dependencies": {
     "react": "^19.0.0",

@@ -309,3 +309,39 @@ def test_analyze_ranks_clips_globally_across_videos(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert [clip["clip_id"] for clip in response.json()["clips"]] == ["high-clip", "low-clip"]
     assert response.json()["sequence"]["clips"] == ["high-clip", "low-clip"]
+
+
+def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0, "fps": 30, "resolution": [1920, 1080]},
+            "status": "ready",
+        }
+    )
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+
+    response = client.post(f"/projects/{project_id}/export?format=edl")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "generated"
+    assert body["file_path"].endswith("timeline.edl")
+    assert "TITLE:" in Path(body["file_path"]).read_text()

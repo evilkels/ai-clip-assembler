@@ -10,6 +10,7 @@ function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
 export function ReviewPage() {
   const {
     loading,
+    error,
     clips,
     decisions,
     acceptedOrder,
@@ -28,10 +29,12 @@ export function ReviewPage() {
   );
 
   const acceptedClips = useMemo(
-    () =>
-      acceptedOrder
-        .map((id) => clips.find((c) => c.clip_id === id))
-        .filter((c): c is ClipCandidate => Boolean(c)),
+    () => {
+      const clipsById = new Map(clips.map((clip) => [clip.clip_id, clip]));
+      return acceptedOrder
+        .map((id) => clipsById.get(id))
+        .filter((c): c is ClipCandidate => Boolean(c));
+    },
     [acceptedOrder, clips],
   );
 
@@ -116,6 +119,8 @@ export function ReviewPage() {
 
         {loading ? (
           <div className="empty-state">Loading candidates…</div>
+        ) : error ? (
+          <div className="empty-state">{error}</div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             No candidates above smoothness {smoothnessThreshold}. Lower the threshold to see more.

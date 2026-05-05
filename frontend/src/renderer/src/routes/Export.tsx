@@ -6,10 +6,12 @@ export function ExportPage() {
   const { clips, acceptedOrder } = useReview();
 
   const acceptedClips = useMemo(
-    () =>
-      acceptedOrder
-        .map((id) => clips.find((c) => c.clip_id === id))
-        .filter((c): c is ClipCandidate => Boolean(c)),
+    () => {
+      const clipsById = new Map(clips.map((clip) => [clip.clip_id, clip]));
+      return acceptedOrder
+        .map((id) => clipsById.get(id))
+        .filter((c): c is ClipCandidate => Boolean(c));
+    },
     [acceptedOrder, clips],
   );
 

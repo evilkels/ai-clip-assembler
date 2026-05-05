@@ -23,7 +23,14 @@ function createWindow(): void {
   win.on('ready-to-show', () => win.show());
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(url);
+      }
+    } catch {
+      // Deny malformed URLs.
+    }
     return { action: 'deny' };
   });
 

@@ -12,6 +12,7 @@ import { getClips } from '../api/client';
 
 interface ReviewState {
   loading: boolean;
+  error: string | null;
   clips: ClipCandidate[];
   decisions: Record<string, ClipDecision>;
   acceptedOrder: string[];
@@ -30,17 +31,27 @@ const Ctx = createContext<ReviewState | null>(null);
 export function ReviewProvider({ children }: { children: ReactNode }) {
   const [clips, setClips] = useState<ClipCandidate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Record<string, ClipDecision>>({});
   const [acceptedOrder, setAcceptedOrder] = useState<string[]>([]);
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
 
   useEffect(() => {
     let alive = true;
-    getClips({ useMock: true }).then((loaded) => {
-      if (!alive) return;
-      setClips(loaded);
-      setLoading(false);
-    });
+    getClips({ useMock: true })
+      .then((loaded) => {
+        if (!alive) return;
+        setClips(loaded);
+        setError(null);
+      })
+      .catch((reason: unknown) => {
+        if (!alive) return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load clip candidates');
+      })
+      .finally(() => {
+        if (!alive) return;
+        setLoading(false);
+      });
     return () => {
       alive = false;
     };
@@ -80,6 +91,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ReviewState>(
     () => ({
       loading,
+      error,
       clips,
       decisions,
       acceptedOrder,
@@ -94,6 +106,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading,
+      error,
       clips,
       decisions,
       acceptedOrder,

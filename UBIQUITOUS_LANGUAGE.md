@@ -32,7 +32,7 @@
 | **Candidate Clip** | A proposed time range from a source video that may be worth keeping. | Suggested clip, AI clip, segment |
 | **Accepted Clip** | A candidate clip the editor has chosen to keep for export. | Included clip, selected clip |
 | **Rejected Clip** | A candidate clip the editor has chosen not to use. | Excluded clip, hidden clip |
-| **Clip Reason** | A short explanation of why a candidate clip was suggested or ranked. | AI reason, rationale |
+| **Clip Reason** | A short explanation of why a candidate clip was suggested or ranked; currently serialized as `ai_reason` in the harness/API contract. | AI reason, rationale |
 | **Review Board** | The first MVP interface for filtering, comparing, accepting, rejecting, and ordering candidate clips. | Clip cards, timeline, dashboard |
 | **Timeline** | The ordered sequence of accepted clips intended for export. | Sequence, assembly |
 | **Trim** | A manual adjustment to a candidate clip's start or end time. | Cut, crop |

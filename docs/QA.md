@@ -89,11 +89,11 @@ Pass criteria:
 
 ## Regression Checks
 
-Run these before merging MVP PRs:
+Run these after the backend and frontend MVP branches are present locally:
 
 ```bash
 cd backend
-python -m pytest tests
+python -m pytest
 ```
 
 ```bash
@@ -102,6 +102,8 @@ npm install
 npm run typecheck
 npm run build
 ```
+
+If `npm run typecheck` is unavailable, the frontend MVP branch has not been merged or checked out yet.
 
 Add a real-video smoke test whenever `ffmpeg` and `ffprobe` are installed:
 

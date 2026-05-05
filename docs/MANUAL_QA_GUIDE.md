@@ -86,6 +86,17 @@ Use a short local drone MP4 or MOV. Replace the path below.
 VIDEO_PATH="/absolute/path/to/your/drone-footage.mp4"
 ```
 
+The easiest full backend smoke test is:
+
+```bash
+cd /Users/elvijs/DEV/personal/ai-clip-assembler
+python3 scripts/backend_smoke_test.py "$VIDEO_PATH"
+```
+
+The script creates a project, uploads the video, runs manual analysis, and generates both EDL and FCPXML exports.
+
+The equivalent manual API steps are below.
+
 Create a project:
 
 ```bash

@@ -1,57 +1,41 @@
 """
-AI Clip Assembler — FastAPI Backend
+AI Clip Assembler - FastAPI Backend
 
-Provides REST endpoints for:
-- Video ingestion and analysis
-- AI harness clip suggestions
-- Timeline assembly
-- Export generation (FCPXML, EDL)
+Provides REST endpoints for local video ingestion, smooth drone clip analysis,
+and timeline assembly. Export generation is still a placeholder endpoint.
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+import shutil
+import uuid
+from pathlib import Path
+from typing import Literal
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Literal
-import uuid
-import json
-from pathlib import Path
+
+from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
+from .models import FrameSample
+from .quality_scoring import score_samples_from_images
+from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
 app = FastAPI(
     title="AI Clip Assembler API",
     version="0.1.0",
-    description="Local-first video analysis and AI clip assembly backend"
+    description="Local-first video analysis and AI clip assembly backend",
 )
 
-# CORS for Electron frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# In-memory store (replace with SQLite/JSON later)
 projects = {}
-
-
-class VideoMetadata(BaseModel):
-    file_id: str
-    file_name: str
-    duration_sec: float
-    fps: float
-    resolution: List[int]
-
-
-class ClipSuggestion(BaseModel):
-    clip_id: str
-    file_id: str
-    start_sec: float
-    end_sec: float
-    smoothness_score: float
-    visual_interest_score: float
-    overall_score: float
-    ai_reason: str
+PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 
 
 class AnalysisRequest(BaseModel):
@@ -67,90 +51,165 @@ async def root():
 
 @app.post("/projects")
 async def create_project():
-    """Create a new project."""
     project_id = str(uuid.uuid4())
+    project_dir(project_id).mkdir(parents=True, exist_ok=True)
     projects[project_id] = {
         "project_id": project_id,
         "videos": [],
         "clips": [],
-        "timeline": None
+        "timeline": None,
     }
     return {"project_id": project_id}
 
 
 @app.post("/projects/{project_id}/videos")
 async def upload_video(project_id: str, file: UploadFile = File(...)):
-    """Upload a video file for analysis."""
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # TODO: Save file, run FFmpeg probe, extract metadata
+
     file_id = str(uuid.uuid4())
+    safe_name = Path(file.filename or f"{file_id}.mp4").name
+    video_path = project_dir(project_id) / "videos" / f"{file_id}_{safe_name}"
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+    with video_path.open("wb") as output:
+        shutil.copyfileobj(file.file, output)
+
+    try:
+        metadata = probe_video(video_path)
+    except FFprobeUnavailableError as exc:
+        video_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except FFprobeError as exc:
+        video_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    metadata.file_id = file_id
+    metadata.file_name = safe_name
+    metadata.file_path = str(video_path)
     video = {
         "file_id": file_id,
-        "file_name": file.filename,
-        "status": "uploaded",
-        "metadata": None
+        "file_name": safe_name,
+        "file_path": str(video_path),
+        "status": "ready",
+        "metadata": metadata.model_dump(),
     }
     projects[project_id]["videos"].append(video)
-    return {"file_id": file_id, "status": "uploaded"}
+    return {"file_id": file_id, "status": "ready", "metadata": metadata.model_dump()}
 
 
 @app.post("/projects/{project_id}/analyze")
 async def analyze_videos(project_id: str, request: AnalysisRequest):
-    """Run AI harness analysis on all videos in project."""
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # TODO: Run FFmpeg frame extraction, OpenCV analysis, harness routing
+    if request.harness_id != "manual":
+        raise HTTPException(status_code=400, detail="Only manual harness is available in the drone MVP")
+
+    all_clips = []
+    preferences = preferences_from_request(request.preferences)
+    sample_fps = sample_fps_from_request(request.preferences)
+    for video in projects[project_id]["videos"]:
+        try:
+            samples = extract_frames(
+                input_path=Path(video["file_path"]),
+                frames_dir=project_dir(project_id) / "frames" / video["file_id"],
+                file_id=video["file_id"],
+                sample_fps=sample_fps,
+                max_width=int(request.preferences.get("max_width", 960)),
+            )
+        except FFmpegUnavailableError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except FFmpegError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        frame_scores = score_samples_rule_based(samples)
+        result = assemble_smooth_clips(
+            file_id=video["file_id"],
+            file_name=video["file_name"],
+            frames=frame_scores,
+            preferences=preferences,
+        )
+        clips = [clip.model_dump() for clip in result.clips]
+        all_clips.extend(clips)
+
+    ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
+    sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
+    total_duration = sum(clip["duration_sec"] for clip in ranked_clips)
+
+    projects[project_id]["clips"] = ranked_clips
+    projects[project_id]["timeline"] = {
+        "total_duration_sec": round(total_duration, 3),
+        "clips": sequence_clip_ids,
+    }
     return {
         "project_id": project_id,
         "harness_id": request.harness_id,
-        "status": "analyzing",
-        "clips": []
+        "status": "complete",
+        "clips": ranked_clips,
+        "sequence": projects[project_id]["timeline"],
     }
 
 
 @app.get("/projects/{project_id}/clips")
 async def get_clips(project_id: str):
-    """Get all suggested clips for a project."""
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"clips": projects[project_id].get("clips", [])}
 
 
 @app.post("/projects/{project_id}/export")
-async def export_timeline(
-    project_id: str,
-    format: Literal["fcpxml", "edl", "resolve_xml"]
-):
-    """Export assembled timeline to professional editor format."""
+async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "resolve_xml"]):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # TODO: Generate FCPXML / EDL / Resolve XML
+
     return {
         "project_id": project_id,
         "format": format,
         "status": "generated",
-        "file_path": None
+        "file_path": None,
     }
 
 
 @app.get("/harnesses")
 async def list_harnesses():
-    """List available AI harnesses."""
     return {
         "harnesses": [
-            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": True},
+            {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True},
+            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": False},
             {"id": "claude_code", "name": "Claude Code", "type": "agent", "enabled": False},
             {"id": "codex", "name": "Codex", "type": "agent", "enabled": False},
             {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": False},
-            {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True}
         ]
     }
 
 
+def project_dir(project_id: str) -> Path:
+    return PROJECTS_DIR / project_id
+
+
+def preferences_from_request(preferences: dict) -> AssemblyPreferences:
+    return AssemblyPreferences(
+        min_clip_duration_sec=float(preferences.get("min_clip_duration_sec", 3.0)),
+        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 15.0)),
+        smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
+        target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
+    )
+
+
+def sample_fps_from_request(preferences: dict) -> float:
+    sample_fps = float(preferences.get("sample_fps", 1.0))
+    if sample_fps <= 0:
+        raise HTTPException(status_code=422, detail="sample_fps must be greater than 0")
+    return sample_fps
+
+
+def score_samples_rule_based(samples: list) -> list:
+    frame_samples = [
+        sample if isinstance(sample, FrameSample) else FrameSample.model_validate(sample)
+        for sample in samples
+    ]
+    return score_samples_from_images(frame_samples)
+
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8000)

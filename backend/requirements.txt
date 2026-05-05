@@ -12,10 +12,10 @@ scenedetect==0.6.5
 
 # AI / ML
 ollama==0.4.0
-httpx==0.28.0
+httpx==0.27.2
 
 # Data / Utils
-numpy==2.2.0
+numpy==2.0.2
 pillow==11.1.0
 pydantic==2.10.0
 python-dotenv==1.0.0

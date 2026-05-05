@@ -7,7 +7,8 @@ This guide launches the current drone-first MVP on macOS for manual QA.
 - The Electron frontend launches and shows the drone **Review Board** with mock candidate clips.
 - The FastAPI backend can create projects, upload source videos, probe metadata, extract frames, score frame samples, and assemble rule-based smooth **Candidate Clips**.
 - The frontend API client is not fully wired to real backend project/video analysis yet; use the backend API smoke test below for real footage analysis.
-- Export is still a placeholder. FCPXML/EDL export remains issue #9.
+- The backend can export analyzed timelines as FCPXML or EDL files.
+- The frontend Export tab still shows a JSON preview and is not yet wired to call the backend export endpoint.
 
 ## Prerequisites
 
@@ -127,6 +128,28 @@ Expected backend behavior:
 - Analysis returns `status: "complete"`.
 - Smooth footage should produce one or more candidate clips when enough frames pass the 7+ smoothness threshold.
 - If `ffmpeg` or `ffprobe` is missing, the API should return an actionable error instead of a traceback.
+
+Export EDL:
+
+```bash
+curl -s \
+  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/export?format=edl" \
+  | python3 -m json.tool
+```
+
+Export FCPXML:
+
+```bash
+curl -s \
+  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/export?format=fcpxml" \
+  | python3 -m json.tool
+```
+
+Expected export behavior:
+
+- The response includes `status: "generated"` and a local `file_path`.
+- The EDL file opens as readable text with edit events.
+- The FCPXML file can be inspected as XML and should be tried in Final Cut Pro during manual QA.
 
 ## QA Notes To Capture
 

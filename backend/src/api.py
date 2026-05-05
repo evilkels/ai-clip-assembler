@@ -2,7 +2,7 @@
 AI Clip Assembler - FastAPI Backend
 
 Provides REST endpoints for local video ingestion, smooth drone clip analysis,
-and timeline assembly. Export generation is still a placeholder endpoint.
+timeline assembly, and editor export files.
 """
 
 import shutil
@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .export_engine import generate_edl, generate_fcpxml
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -175,12 +176,28 @@ async def get_clips(project_id: str):
 async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "resolve_xml"]):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
+    if not projects[project_id].get("clips"):
+        raise HTTPException(status_code=400, detail="No clips available to export")
+
+    export_dir = project_dir(project_id) / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    videos_by_id = {video["file_id"]: video for video in projects[project_id]["videos"]}
+    clips = clips_in_timeline_order(projects[project_id])
+
+    if format == "edl":
+        file_path = export_dir / "timeline.edl"
+        file_path.write_text(generate_edl("AI Clip Assembler", clips), encoding="utf-8")
+    elif format == "fcpxml":
+        file_path = export_dir / "timeline.fcpxml"
+        file_path.write_text(generate_fcpxml("AI Clip Assembler", clips, videos_by_id), encoding="utf-8")
+    else:
+        raise HTTPException(status_code=400, detail="Resolve XML export is not implemented yet")
 
     return {
         "project_id": project_id,
         "format": format,
         "status": "generated",
-        "file_path": None,
+        "file_path": str(file_path),
     }
 
 
@@ -199,6 +216,14 @@ async def list_harnesses():
 
 def project_dir(project_id: str) -> Path:
     return PROJECTS_DIR / project_id
+
+
+def clips_in_timeline_order(project: dict) -> list:
+    clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
+    timeline_ids = (project.get("timeline") or {}).get("clips", [])
+    if not timeline_ids:
+        return project.get("clips", [])
+    return [clips_by_id[clip_id] for clip_id in timeline_ids if clip_id in clips_by_id]
 
 
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:

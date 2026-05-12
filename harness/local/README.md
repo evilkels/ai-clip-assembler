@@ -1,7 +1,7 @@
 # Local Model Harness
 
 Optional harness that enhances rule-based candidate clips using a locally-run
-vision model (Qwen2.5-VL) via Ollama.
+vision model (Qwen3-VL) via Ollama.
 
 > **The manual / rule-based harness remains the default reliable mode.**
 > The local Qwen harness is an optional enhancement. If Ollama or the model is
@@ -25,7 +25,7 @@ vision model (Qwen2.5-VL) via Ollama.
 ## Prerequisites
 
 - [Ollama](https://ollama.com) installed and running locally
-- A vision-capable model pulled (e.g. `qwen2.5-vl:7b`)
+- A vision-capable model pulled (e.g. `qwen3-vl:8b`)
 
 ## Setup
 
@@ -34,7 +34,7 @@ vision model (Qwen2.5-VL) via Ollama.
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull the vision model
-ollama pull qwen2.5-vl:7b
+ollama pull qwen3-vl:8b
 
 # Verify the model is available
 ollama list
@@ -47,29 +47,9 @@ Environment variables (with sensible defaults):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
-| `OLLAMA_MODEL` | `qwen2.5-vl:7b` | Model tag to use |
+| `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
 
-You can also edit `harness/local/config.json` for non-env overrides:
-
-```json
-{
-  "id": "local_qwen",
-  "name": "Local Qwen Vision",
-  "type": "local",
-  "enabled": true,
-  "version": "1.0.0",
-  "interface_version": "1.0",
-  "config": {
-    "model": "qwen2.5-vl:7b",
-    "provider": "ollama",
-    "provider_url": "http://localhost:11434",
-    "batch_size": 8,
-    "max_frames_per_video": 100,
-    "prompt_template": "You are a video quality analyst. Analyze these {frame_count} video frames and score each one (0-10) for: 1) smoothness/stability (is there camera shake?), 2) visual interest (composition, lighting, subject). Respond ONLY with a JSON array in this exact format, with one object per frame in order: [{\"smoothness\": N, \"visual_interest\": N, \"reason\": \"brief explanation\"}, ...]",
-    "temperature": 0.2
-  }
-}
-```
+You can also override settings via environment variables (see table above).
 
 ## API Usage
 
@@ -111,9 +91,10 @@ If Ollama is not running or the model is missing, the API still returns HTTP
 
 ## MLX Path (Apple Silicon)
 
-For faster inference on Apple Silicon you can point `OLLAMA_URL` at a local
-MLX-served endpoint, or simply use Ollama on macOS which automatically uses
-MLX under the hood for supported models.
+Ollama on macOS automatically uses Apple's MLX/Metal framework for GPU
+acceleration on Apple Silicon. No separate MLX installation is needed.
+
+For direct MLX usage (advanced), see `docs/LOCAL_QWEN_SETUP.md`.
 
 ## Troubleshooting
 

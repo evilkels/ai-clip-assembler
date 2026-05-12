@@ -34,8 +34,9 @@ def fcpx_frame_duration(fps: float) -> str:
 
 def choose_timeline_fps(videos_by_id: Dict[str, dict]) -> float:
     rates = [
-        float((video.get("metadata") or {}).get("fps") or 0)
+        float(fps)
         for video in videos_by_id.values()
+        if (fps := (video.get("metadata") or {}).get("fps")) and float(fps) > 0
     ]
     return max(rates) if rates else 30.0
 

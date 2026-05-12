@@ -254,7 +254,7 @@ class TestEnhanceClipsWithLocalQwen:
         assert low_clip.visual_interest_score == 2.0
         assert "AI: great composition" in high_clip.ai_reason
         assert "AI: boring" in low_clip.ai_reason
-        assert result.metadata["model_used"] == "qwen2.5-vl:7b"
+        assert result.metadata["model_used"] == "qwen3-vl:8b"
 
     def test_fallback_when_ollama_unavailable(self, monkeypatch, tmp_path):
         (tmp_path / "frame_0.jpg").write_bytes(b"fake")

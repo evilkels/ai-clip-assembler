@@ -113,7 +113,9 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         raise HTTPException(status_code=400, detail="Only manual and local_qwen harnesses are available in the drone MVP")
 
     all_clips = []
-    harness_metadata = {}
+    harness_warnings = []
+    harness_model_used = None
+    harness_local = False
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     for video in projects[project_id]["videos"]:
@@ -149,12 +151,14 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         if request.harness_id == "local_qwen":
             result, used_ai = enhance_clips_with_local_qwen(result, frame_scores)
             if not used_ai:
-                harness_metadata["warning"] = result.metadata.get(
+                harness_warnings.append(result.metadata.get(
                     "warning", "Local Qwen fallback: Ollama/model unavailable"
-                )
+                ))
             else:
-                harness_metadata["model_used"] = result.metadata.get("model_used")
-                harness_metadata["local"] = True
+                model_from_result = result.metadata.get("model_used")
+                if model_from_result:
+                    harness_model_used = model_from_result
+                harness_local = True
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
 
@@ -175,6 +179,13 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "sequence": projects[project_id]["timeline"],
     }
     if request.harness_id == "local_qwen":
+        harness_metadata = {}
+        if harness_warnings:
+            harness_metadata["warning"] = "; ".join(harness_warnings)
+            harness_local = False
+        if harness_model_used:
+            harness_metadata["model_used"] = harness_model_used
+        harness_metadata["local"] = harness_local and not bool(harness_warnings)
         response["metadata"] = harness_metadata
     return response
 

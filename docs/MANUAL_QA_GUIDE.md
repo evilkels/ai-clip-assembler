@@ -15,13 +15,12 @@ This guide launches the current drone-first MVP on macOS for manual QA.
 Install system tools:
 
 ```bash
-brew install python@3.11 ffmpeg-full node
+brew install python@3.11 ffmpeg node
 ```
 
 Verify:
 
 ```bash
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
 which ffmpeg
 ffmpeg -version
 ffprobe -version
@@ -31,9 +30,16 @@ node --version
 npm --version
 ```
 
-The backend MVP requires `vidstabdetect`. The regular Homebrew `ffmpeg`
-formula may not include it, so start the backend from a shell where
-`/opt/homebrew/opt/ffmpeg-full/bin` appears before `/opt/homebrew/bin`.
+If `vidstabdetect` is missing from the filter list, install libvidstab
+and rebuild ffmpeg:
+
+```bash
+brew install libvidstab
+brew reinstall ffmpeg --with-libvidstab 2>/dev/null || brew upgrade ffmpeg
+```
+
+On modern Homebrew (Apple Silicon), the default `ffmpeg` formula includes
+vidstabdetect. The steps above are only needed on older setups.
 
 ## Install Dependencies
 
@@ -68,7 +74,6 @@ Terminal 1, backend:
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler/backend
 source .venv/bin/activate
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
 PYTHONPATH=. uvicorn src.api:app --reload --port 8000
 ```
 
@@ -99,7 +104,6 @@ The easiest full backend smoke test is:
 
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
 backend/.venv/bin/python scripts/backend_smoke_test.py "$VIDEO_PATH"
 ```
 
@@ -161,7 +165,7 @@ Install and start Ollama (macOS):
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen2.5-vl:7b
+ollama pull qwen3-vl:8b
 ollama serve
 ```
 
@@ -190,7 +194,7 @@ Environment variables (optional):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
-| `OLLAMA_MODEL` | `qwen2.5-vl:7b` | Model tag to use |
+| `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
 
 If Ollama is not running, the response will still be HTTP 200 with manual
 results and a metadata warning such as:

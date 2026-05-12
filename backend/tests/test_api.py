@@ -421,7 +421,7 @@ def test_analyze_local_qwen_harness_returns_enhanced_clips(monkeypatch, tmp_path
                         }
                     )
                 ],
-                "metadata": {"model_used": "qwen2.5-vl:7b", "local": True},
+                "metadata": {"model_used": "qwen3-vl:8b", "local": True},
                 "harness_id": "local_qwen",
             }
         )
@@ -439,7 +439,7 @@ def test_analyze_local_qwen_harness_returns_enhanced_clips(monkeypatch, tmp_path
     assert body["status"] == "complete"
     assert body["harness_id"] == "local_qwen"
     assert body["clips"][0]["clip_id"] == "clip-1"
-    assert body["metadata"]["model_used"] == "qwen2.5-vl:7b"
+    assert body["metadata"]["model_used"] == "qwen3-vl:8b"
     assert body["metadata"]["local"] is True
     assert "warning" not in body["metadata"]
 

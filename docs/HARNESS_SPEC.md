@@ -86,7 +86,7 @@
     "clips": ["clip_id_1", "clip_id_2", "clip_id_3"]
   },
   "metadata": {
-    "model_used": "qwen2.5-vl-7b-instruct",
+    "model_used": "qwen3-vl-8b",
     "tokens_used": 15234,
     "local": true
   }
@@ -116,7 +116,7 @@
 **Config:**
 ```json
 {
-  "model": "qwen2.5-vl-7b-instruct",
+  "model": "qwen3-vl-8b",
   "provider": "ollama",
   "provider_url": "http://localhost:11434",
   "batch_size": 8,

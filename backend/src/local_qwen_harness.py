@@ -1,7 +1,7 @@
-"""Local Qwen2.5-VL harness for enhancing rule-based clips with vision AI.
+"""Local Qwen3-VL harness for enhancing rule-based clips with vision AI.
 
 Enhances existing manual/rule-based candidate clips by sampling representative
-frames and asking a local Ollama-hosted vision model (Qwen2.5-VL) to score
+frames and asking a local Ollama-hosted vision model (Qwen3-VL) to score
 visual interest. Falls back gracefully to the original rule-based results when
 Ollama or the model is unavailable.
 """
@@ -17,7 +17,7 @@ from .clip_assembly import AssemblyResult
 from .models import ClipSuggestion, FrameScore
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-vl:7b")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3-vl:8b")
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_TIMEOUT = 30.0
 
@@ -207,10 +207,32 @@ def enhance_clips_with_local_qwen(
                 base_url=base_url,
                 timeout_sec=timeout_sec,
             )
+            if len(batch_scores) != len(batch_paths):
+                raise OllamaUnavailableError(
+                    f"Score count mismatch: expected {len(batch_paths)}, got {len(batch_scores)}"
+                )
             all_scores.extend(batch_scores)
     except OllamaUnavailableError:
         metadata = dict(manual_result.metadata)
         metadata["warning"] = "Local Qwen fallback: Ollama/model unavailable"
+        return (
+            AssemblyResult(
+                clips=manual_result.clips,
+                sequence=manual_result.sequence,
+                metadata=metadata,
+                harness_id="local_qwen",
+                harness_version="1.0.0",
+                processing_time_sec=manual_result.processing_time_sec,
+            ),
+            False,
+        )
+
+    if len(all_scores) != len(all_frame_paths):
+        metadata = dict(manual_result.metadata)
+        metadata["warning"] = (
+            f"Local Qwen fallback: score/frame mismatch "
+            f"({len(all_scores)} scores for {len(all_frame_paths)} frames)"
+        )
         return (
             AssemblyResult(
                 clips=manual_result.clips,
@@ -228,6 +250,22 @@ def enhance_clips_with_local_qwen(
     for clip_index, score in zip(frame_to_clip_index, all_scores):
         if isinstance(score, dict):
             clip_scores[clip_index].append(score)
+
+    usable_scores = sum(1 for scores in clip_scores if scores)
+    if usable_scores == 0:
+        metadata = dict(manual_result.metadata)
+        metadata["warning"] = "Local Qwen fallback: model returned no usable scores"
+        return (
+            AssemblyResult(
+                clips=manual_result.clips,
+                sequence=manual_result.sequence,
+                metadata=metadata,
+                harness_id="local_qwen",
+                harness_version="1.0.0",
+                processing_time_sec=manual_result.processing_time_sec,
+            ),
+            False,
+        )
 
     # Build enhanced clips
     enhanced_clips: List[ClipSuggestion] = []

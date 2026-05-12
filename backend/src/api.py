@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
-from .export_engine import generate_edl, generate_fcpxml
+from .export_engine import choose_timeline_fps, generate_edl, generate_fcpxml
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -219,7 +219,10 @@ async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "res
 
     if format == "edl":
         file_path = export_dir / "timeline.edl"
-        file_path.write_text(generate_edl("AI Clip Assembler", clips), encoding="utf-8")
+        file_path.write_text(
+            generate_edl("AI Clip Assembler", clips, fps=round_edl_fps(choose_timeline_fps(videos_by_id))),
+            encoding="utf-8",
+        )
     elif format == "fcpxml":
         file_path = export_dir / "timeline.fcpxml"
         file_path.write_text(generate_fcpxml("AI Clip Assembler", clips, videos_by_id), encoding="utf-8")
@@ -255,9 +258,13 @@ def project_dir(project_id: str) -> Path:
 
 def clips_in_timeline_order(project: dict) -> list:
     clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
-    timeline_entries = (project.get("timeline") or {}).get("clips", [])
-    if not timeline_entries:
+    timeline = project.get("timeline")
+    if timeline is None or "clips" not in timeline:
         return project.get("clips", [])
+
+    timeline_entries = timeline.get("clips") or []
+    if not timeline_entries:
+        return []
 
     if isinstance(timeline_entries[0], str):
         return [clips_by_id[clip_id] for clip_id in timeline_entries if clip_id in clips_by_id]
@@ -319,6 +326,10 @@ def resolve_timeline_entries(clips_by_id: dict, timeline_entries: list[dict]) ->
             }
         )
     return resolved_clips
+
+
+def round_edl_fps(fps: float) -> int:
+    return int(round(fps or 30))
 
 
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:

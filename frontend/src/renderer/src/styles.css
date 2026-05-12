@@ -15,6 +15,10 @@
   --green: #3ecf8e;
   --yellow: #e6b450;
   --red: #f06b6b;
+  --bg-warning: rgba(230, 180, 80, 0.1);
+  --border-warning: rgba(230, 180, 80, 0.4);
+  --text-error: var(--red);
+  --text-success: var(--green);
 
   color-scheme: dark;
 }

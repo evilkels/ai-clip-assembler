@@ -58,6 +58,10 @@ node --version
 npm --version
 ```
 
+The backend MVP requires `vidstabdetect`. The regular Homebrew `ffmpeg`
+formula may not include it, so start the backend from a shell where
+`/opt/homebrew/opt/ffmpeg-full/bin` appears before `/opt/homebrew/bin`.
+
 ## Install Dependencies
 
 From the repo root:

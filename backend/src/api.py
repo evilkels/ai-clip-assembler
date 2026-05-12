@@ -51,6 +51,17 @@ class AnalysisRequest(BaseModel):
     preferences: dict
 
 
+class TimelineClipUpdate(BaseModel):
+    clip_id: str
+    start_sec: float
+    end_sec: float
+    included: bool = True
+
+
+class TimelineUpdateRequest(BaseModel):
+    clips: list[TimelineClipUpdate]
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "version": "0.1.0"}
@@ -172,6 +183,28 @@ async def get_clips(project_id: str):
     return {"clips": projects[project_id].get("clips", [])}
 
 
+@app.put("/projects/{project_id}/timeline")
+async def update_timeline(project_id: str, request: TimelineUpdateRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project = projects[project_id]
+    if not project.get("clips"):
+        raise HTTPException(status_code=400, detail="No analyzed clips available to update")
+
+    resolved_clips = resolve_timeline_clips(project, request.clips)
+    total_duration_sec = round(sum(clip["duration_sec"] for clip in resolved_clips), 3)
+    project["timeline"] = {
+        "clips": resolved_clips,
+        "total_duration_sec": total_duration_sec,
+    }
+    return {
+        "project_id": project_id,
+        "clips": resolved_clips,
+        "total_duration_sec": total_duration_sec,
+    }
+
+
 @app.post("/projects/{project_id}/export")
 async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "resolve_xml"]):
     if project_id not in projects:
@@ -198,6 +231,8 @@ async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "res
         "format": format,
         "status": "generated",
         "file_path": str(file_path),
+        "clip_count": len(clips),
+        "total_duration_sec": round(sum(clip["duration_sec"] for clip in clips), 3),
     }
 
 
@@ -220,10 +255,70 @@ def project_dir(project_id: str) -> Path:
 
 def clips_in_timeline_order(project: dict) -> list:
     clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
-    timeline_ids = (project.get("timeline") or {}).get("clips", [])
-    if not timeline_ids:
+    timeline_entries = (project.get("timeline") or {}).get("clips", [])
+    if not timeline_entries:
         return project.get("clips", [])
-    return [clips_by_id[clip_id] for clip_id in timeline_ids if clip_id in clips_by_id]
+
+    if isinstance(timeline_entries[0], str):
+        return [clips_by_id[clip_id] for clip_id in timeline_entries if clip_id in clips_by_id]
+
+    return resolve_timeline_entries(clips_by_id, timeline_entries)
+
+
+def resolve_timeline_clips(project: dict, updates: list[TimelineClipUpdate]) -> list[dict]:
+    clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
+    seen_clip_ids = set()
+    timeline_entries = []
+
+    for update in updates:
+        if update.clip_id in seen_clip_ids:
+            raise HTTPException(status_code=422, detail=f"Duplicate clip_id: {update.clip_id}")
+        seen_clip_ids.add(update.clip_id)
+
+        if update.clip_id not in clips_by_id:
+            raise HTTPException(status_code=422, detail=f"Unknown clip_id: {update.clip_id}")
+
+        if update.start_sec >= update.end_sec:
+            raise HTTPException(status_code=422, detail=f"Timeline clip must satisfy start_sec < end_sec for {update.clip_id}")
+
+        original_clip = clips_by_id[update.clip_id]
+        if update.start_sec < original_clip["start_sec"] or update.end_sec > original_clip["end_sec"]:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Timeline trim is outside original clip bounds for {update.clip_id}",
+            )
+
+        if not update.included:
+            continue
+
+        timeline_entries.append(
+            {
+                "clip_id": update.clip_id,
+                "start_sec": update.start_sec,
+                "end_sec": update.end_sec,
+                "duration_sec": round(update.end_sec - update.start_sec, 3),
+                "included": True,
+            }
+        )
+
+    return resolve_timeline_entries(clips_by_id, timeline_entries)
+
+
+def resolve_timeline_entries(clips_by_id: dict, timeline_entries: list[dict]) -> list[dict]:
+    resolved_clips = []
+    for timeline_entry in timeline_entries:
+        clip_id = timeline_entry["clip_id"]
+        if clip_id not in clips_by_id:
+            continue
+        resolved_clips.append(
+            {
+                **clips_by_id[clip_id],
+                "start_sec": timeline_entry["start_sec"],
+                "end_sec": timeline_entry["end_sec"],
+                "duration_sec": round(timeline_entry["end_sec"] - timeline_entry["start_sec"], 3),
+            }
+        )
+    return resolved_clips
 
 
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:

@@ -15,7 +15,35 @@ This guide launches the current drone-first MVP on macOS for manual QA.
 Install system tools:
 
 ```bash
-brew install python@3.11 ffmpeg node
+brew install python@3.11 node
+```
+
+FFmpeg is required. On macOS, the default Homebrew `ffmpeg` formula includes the
+`vidstabdetect` filter needed for motion analysis:
+
+```bash
+brew install ffmpeg
+```
+
+Verify `vidstabdetect` is available:
+
+```bash
+ffmpeg -hide_banner -filters | grep vidstabdetect
+```
+
+If `vidstabdetect` is missing (older Homebrew installs or custom builds), install
+libvidstab and rebuild:
+
+```bash
+brew install libvidstab
+brew reinstall ffmpeg
+```
+
+Alternatively, use Homebrew's `ffmpeg-full` tap which bundles more filters:
+
+```bash
+brew tap homebrew-ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg
 ```
 
 Verify:
@@ -29,17 +57,6 @@ python3.11 --version
 node --version
 npm --version
 ```
-
-If `vidstabdetect` is missing from the filter list, install libvidstab
-and rebuild ffmpeg:
-
-```bash
-brew install libvidstab
-brew reinstall ffmpeg --with-libvidstab 2>/dev/null || brew upgrade ffmpeg
-```
-
-On modern Homebrew (Apple Silicon), the default `ffmpeg` formula includes
-vidstabdetect. The steps above are only needed on older setups.
 
 ## Install Dependencies
 
@@ -195,6 +212,9 @@ Environment variables (optional):
 |----------|---------|-------------|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
 | `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
+| `OLLAMA_TEMPERATURE` | `0.2` | Model sampling temperature (fixed at 0.2 by default) |
+
+Configuration is via environment variables only. No config file is required.
 
 If Ollama is not running, the response will still be HTTP 200 with manual
 results and a metadata warning such as:

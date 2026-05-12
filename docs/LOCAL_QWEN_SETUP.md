@@ -160,6 +160,16 @@ Or for a remote Ollama instance:
 OLLAMA_URL=http://other-machine:11434 OLLAMA_MODEL=qwen3-vl:8b PYTHONPATH=. uvicorn src.api:app --reload --port 8000
 ```
 
+### Override Temperature
+
+The default temperature is 0.2 for deterministic scoring. Override if needed:
+
+```bash
+OLLAMA_TEMPERATURE=0.4 PYTHONPATH=. uvicorn src.api:app --reload --port 8000
+```
+
+Note: Configuration is via environment variables only (`OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_TEMPERATURE`). No config file is loaded.
+
 ## Step 6: Validate Output
 
 Check the response for:

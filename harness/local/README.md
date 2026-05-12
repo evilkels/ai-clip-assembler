@@ -48,8 +48,9 @@ Environment variables (with sensible defaults):
 |----------|---------|-------------|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
 | `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
+| `OLLAMA_TEMPERATURE` | `0.2` | Model sampling temperature. Fixed at 0.2 by default for deterministic scoring. Override for experimentation only. |
 
-You can also override settings via environment variables (see table above).
+Configuration is via environment variables only. No config file is required or loaded.
 
 ## API Usage
 

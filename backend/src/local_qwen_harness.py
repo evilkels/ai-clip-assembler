@@ -18,9 +18,10 @@ from .models import ClipSuggestion, FrameScore
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3-vl:8b")
-DEFAULT_TEMPERATURE = 0.2
+DEFAULT_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_TIMEOUT = 30.0
+REQUIRED_SCORE_KEYS = {"smoothness", "visual_interest"}
 
 DEFAULT_PROMPT_TEMPLATE = (
     "You are a video quality analyst. Analyze these {frame_count} video frames and score each one "
@@ -177,6 +178,7 @@ def enhance_clips_with_local_qwen(
 
     if not clip_samples:
         metadata = dict(manual_result.metadata)
+        metadata["used_ai"] = False
         metadata["warning"] = "Local Qwen fallback: no frames available for analysis"
         return (
             AssemblyResult(
@@ -218,6 +220,7 @@ def enhance_clips_with_local_qwen(
             all_scores.extend(batch_scores)
     except OllamaUnavailableError:
         metadata = dict(manual_result.metadata)
+        metadata["used_ai"] = False
         metadata["warning"] = "Local Qwen fallback: Ollama/model unavailable"
         return (
             AssemblyResult(
@@ -233,6 +236,7 @@ def enhance_clips_with_local_qwen(
 
     if len(all_scores) != len(all_frame_paths):
         metadata = dict(manual_result.metadata)
+        metadata["used_ai"] = False
         metadata["warning"] = (
             f"Local Qwen fallback: score/frame mismatch "
             f"({len(all_scores)} scores for {len(all_frame_paths)} frames)"
@@ -249,15 +253,19 @@ def enhance_clips_with_local_qwen(
             False,
         )
 
-    # Map scores back to clips
+    # Map scores back to clips, validating each score object
     clip_scores: List[List[dict]] = [[] for _ in clip_samples]
+    invalid_count = 0
     for clip_index, score in zip(frame_to_clip_index, all_scores):
-        if isinstance(score, dict):
-            clip_scores[clip_index].append(score)
+        if not isinstance(score, dict) or not REQUIRED_SCORE_KEYS.issubset(score):
+            invalid_count += 1
+            continue
+        clip_scores[clip_index].append(score)
 
-    usable_scores = sum(1 for scores in clip_scores if scores)
-    if usable_scores == 0:
+    usable_clips = sum(1 for scores in clip_scores if scores)
+    if usable_clips == 0:
         metadata = dict(manual_result.metadata)
+        metadata["used_ai"] = False
         metadata["warning"] = "Local Qwen fallback: model returned no usable scores"
         return (
             AssemblyResult(
@@ -270,6 +278,8 @@ def enhance_clips_with_local_qwen(
             ),
             False,
         )
+
+    partial = invalid_count > 0
 
     # Build enhanced clips
     enhanced_clips: List[ClipSuggestion] = []
@@ -316,6 +326,14 @@ def enhance_clips_with_local_qwen(
     metadata = dict(manual_result.metadata)
     metadata["model_used"] = model
     metadata["local"] = True
+    metadata["used_ai"] = True
+    metadata["clips_enhanced"] = usable_clips
+    metadata["clips_total"] = len(clip_samples)
+    if partial:
+        metadata["partial_enhancement"] = True
+        metadata["warning"] = (
+            f"Local Qwen partial enhancement: {usable_clips}/{len(clip_samples)} clips enhanced"
+        )
 
     return (
         AssemblyResult(

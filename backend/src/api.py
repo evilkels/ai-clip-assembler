@@ -113,9 +113,7 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         raise HTTPException(status_code=400, detail="Only manual and local_qwen harnesses are available in the drone MVP")
 
     all_clips = []
-    harness_warnings = []
-    harness_model_used = None
-    harness_local = False
+    per_video_results = []
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     for video in projects[project_id]["videos"]:
@@ -148,17 +146,19 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
             frames=frame_scores,
             preferences=preferences,
         )
+        video_metadata = {}
         if request.harness_id == "local_qwen":
             result, used_ai = enhance_clips_with_local_qwen(result, frame_scores)
-            if not used_ai:
-                harness_warnings.append(result.metadata.get(
-                    "warning", "Local Qwen fallback: Ollama/model unavailable"
-                ))
-            else:
-                model_from_result = result.metadata.get("model_used")
-                if model_from_result:
-                    harness_model_used = model_from_result
-                harness_local = True
+            video_metadata["used_ai"] = used_ai
+            video_metadata["model_used"] = result.metadata.get("model_used")
+            video_metadata["file_id"] = video["file_id"]
+            if result.metadata.get("warning"):
+                video_metadata["warning"] = result.metadata["warning"]
+            if result.metadata.get("partial_enhancement"):
+                video_metadata["partial_enhancement"] = True
+                video_metadata["clips_enhanced"] = result.metadata.get("clips_enhanced")
+                video_metadata["clips_total"] = result.metadata.get("clips_total")
+        per_video_results.append(video_metadata)
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
 
@@ -179,13 +179,29 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "sequence": projects[project_id]["timeline"],
     }
     if request.harness_id == "local_qwen":
-        harness_metadata = {}
-        if harness_warnings:
-            harness_metadata["warning"] = "; ".join(harness_warnings)
-            harness_local = False
-        if harness_model_used:
-            harness_metadata["model_used"] = harness_model_used
-        harness_metadata["local"] = harness_local and not bool(harness_warnings)
+        harness_metadata = {"per_video": per_video_results}
+        all_ai = all(v.get("used_ai") for v in per_video_results)
+        any_ai = any(v.get("used_ai") for v in per_video_results)
+        any_fallback = any(v.get("warning") for v in per_video_results)
+        if any_fallback or not all_ai:
+            harness_metadata["used_ai"] = any_ai
+            fallback_videos = [
+                v["file_id"] for v in per_video_results if v.get("warning")
+            ]
+            harness_metadata["warning"] = (
+                f"Local Qwen fallback for video(s): {', '.join(fallback_videos)}"
+                if fallback_videos else "Local Qwen fallback"
+            )
+        else:
+            harness_metadata["used_ai"] = True
+        models_used = list({
+            v["model_used"] for v in per_video_results if v.get("model_used")
+        })
+        if len(models_used) == 1:
+            harness_metadata["model_used"] = models_used[0]
+        elif models_used:
+            harness_metadata["models_used"] = models_used
+        harness_metadata["local"] = True
         response["metadata"] = harness_metadata
     return response
 

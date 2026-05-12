@@ -509,7 +509,7 @@ def test_analyze_local_qwen_fallback_when_ollama_unavailable(monkeypatch, tmp_pa
     def fake_enhance(result, frames, **kwargs):
         fallback = result.model_copy(
             update={
-                "metadata": {"warning": "Local Qwen fallback: Ollama/model unavailable"},
+                "metadata": {"warning": "Local Qwen fallback: Ollama/model unavailable", "used_ai": False},
                 "harness_id": "local_qwen",
             }
         )
@@ -527,7 +527,7 @@ def test_analyze_local_qwen_fallback_when_ollama_unavailable(monkeypatch, tmp_pa
     assert body["status"] == "complete"
     assert body["harness_id"] == "local_qwen"
     assert body["clips"][0]["overall_score"] == 8
-    assert body["metadata"]["warning"] == "Local Qwen fallback: Ollama/model unavailable"
+    assert "file-1" in body["metadata"]["warning"]
 
 
 def test_list_harnesses_shows_local_qwen_enabled():

@@ -1,10 +1,5 @@
 /**
  * Clip and project types — frontend mirror of backend shapes.
- *
- * These match issue #5's expected output: rule-based ranked clip candidates
- * with smoothness-focused scores and a human-readable reason. The backend's
- * current `ClipSuggestion` only carries `smoothness_score` / `visual_interest_score`
- * / `overall_score`; we extend with sharpness/exposure/contrast that #5 will add.
  */
 
 export interface ClipScores {
@@ -32,6 +27,25 @@ export interface VideoMetadata {
   duration_sec: number;
   fps: number;
   resolution: [number, number];
+  codec: string;
+}
+
+export interface UploadedVideo {
+  file_id: string;
+  file_name: string;
+  status: string;
+  metadata: VideoMetadata;
+}
+
+export interface AnalysisResult {
+  project_id: string;
+  harness_id: string;
+  status: string;
+  clips: ClipCandidate[];
+  sequence: {
+    total_duration_sec: number;
+    clips: string[];
+  };
 }
 
 export interface ProjectClipsResponse {
@@ -39,3 +53,13 @@ export interface ProjectClipsResponse {
 }
 
 export type ClipDecision = 'pending' | 'included' | 'excluded';
+
+export interface Trim {
+  start_sec: number;
+  end_sec: number;
+}
+
+export interface AnalysisStatus {
+  phase: 'idle' | 'analyzing' | 'complete' | 'error';
+  error?: string;
+}

@@ -7,6 +7,64 @@ function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
   return [...clips].sort((a, b) => b.scores.overall - a.scores.overall);
 }
 
+function TrimEditor({
+  start,
+  end,
+  minStart,
+  maxEnd,
+  onChange,
+}: {
+  start: number;
+  end: number;
+  minStart: number;
+  maxEnd: number;
+  onChange: (start: number, end: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        fontSize: 11,
+        padding: '4px 0',
+      }}
+    >
+      <label style={{ color: 'var(--text-muted)' }}>Trim</label>
+      <input
+        type="number"
+        min={minStart}
+        max={end - 0.1}
+        step={0.1}
+        value={start}
+        style={{ width: 60 }}
+        onChange={(e) => {
+          const s = Number(e.target.value);
+          if (s < minStart || s >= end - 0.1) return;
+          onChange(s, end);
+        }}
+      />
+      <span style={{ color: 'var(--text-muted)' }}>→</span>
+      <input
+        type="number"
+        min={start + 0.1}
+        max={maxEnd}
+        step={0.1}
+        value={end}
+        style={{ width: 60 }}
+        onChange={(e) => {
+          const e2 = Number(e.target.value);
+          if (e2 <= start + 0.1 || e2 > maxEnd) return;
+          onChange(start, e2);
+        }}
+      />
+      <span style={{ color: 'var(--text-muted)' }}>
+        ({(end - start).toFixed(1)}s)
+      </span>
+    </div>
+  );
+}
+
 export function ReviewPage() {
   const {
     loading,
@@ -14,12 +72,14 @@ export function ReviewPage() {
     clips,
     decisions,
     acceptedOrder,
+    trims,
     smoothnessThreshold,
     setSmoothnessThreshold,
     include,
     exclude,
     resetDecision,
     moveAccepted,
+    setTrim,
   } = useReview();
 
   const ranked = useMemo(() => rankClips(clips), [clips]);
@@ -42,7 +102,7 @@ export function ReviewPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Review · Drone candidates</h1>
+          <h1>Review</h1>
           <p>
             Ranked by overall score. Filter by smoothness, then include the keepers.
           </p>
@@ -79,40 +139,52 @@ export function ReviewPage() {
           <div className="accepted-strip">
             <h2>Accepted order — sent to export</h2>
             <div className="accepted-list">
-              {acceptedClips.map((clip, idx) => (
-                <div key={clip.clip_id} className="accepted-pill">
-                  <span className="pill-rank">#{idx + 1}</span>
-                  <span>{clip.file_name}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    {clip.start_sec.toFixed(1)}s · {(clip.end_sec - clip.start_sec).toFixed(1)}s
-                  </span>
-                  <div className="accepted-pill-controls">
-                    <button
-                      className="btn subtle"
-                      onClick={() => moveAccepted(clip.clip_id, -1)}
-                      disabled={idx === 0}
-                      title="Move earlier"
-                    >
-                      ←
-                    </button>
-                    <button
-                      className="btn subtle"
-                      onClick={() => moveAccepted(clip.clip_id, 1)}
-                      disabled={idx === acceptedClips.length - 1}
-                      title="Move later"
-                    >
-                      →
-                    </button>
-                    <button
-                      className="btn subtle"
-                      onClick={() => resetDecision(clip.clip_id)}
-                      title="Remove from accepted"
-                    >
-                      ×
-                    </button>
+              {acceptedClips.map((clip, idx) => {
+                const trim = trims[clip.clip_id];
+                const start = trim?.start_sec ?? clip.start_sec;
+                const end = trim?.end_sec ?? clip.end_sec;
+                return (
+                  <div key={clip.clip_id} className="accepted-pill">
+                    <span className="pill-rank">#{idx + 1}</span>
+                    <span>{clip.file_name}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {start.toFixed(1)}s · {(end - start).toFixed(1)}s
+                    </span>
+                    <TrimEditor
+                      start={start}
+                      end={end}
+                      minStart={clip.start_sec}
+                      maxEnd={clip.end_sec}
+                      onChange={(s, e) => setTrim(clip.clip_id, { start_sec: s, end_sec: e })}
+                    />
+                    <div className="accepted-pill-controls">
+                      <button
+                        className="btn subtle"
+                        onClick={() => moveAccepted(clip.clip_id, -1)}
+                        disabled={idx === 0}
+                        title="Move earlier"
+                      >
+                        ←
+                      </button>
+                      <button
+                        className="btn subtle"
+                        onClick={() => moveAccepted(clip.clip_id, 1)}
+                        disabled={idx === acceptedClips.length - 1}
+                        title="Move later"
+                      >
+                        →
+                      </button>
+                      <button
+                        className="btn subtle"
+                        onClick={() => resetDecision(clip.clip_id)}
+                        title="Remove from accepted"
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

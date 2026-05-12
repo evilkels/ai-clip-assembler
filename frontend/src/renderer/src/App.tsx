@@ -7,7 +7,7 @@ import { ReviewProvider, useReview } from './state/ReviewContext';
 import { pingBackend } from './api/client';
 
 function StatusBar() {
-  const { acceptedCount, totalCount } = useReview();
+  const { acceptedCount, totalCount, analysisStatus, uploadedVideos } = useReview();
   const [online, setOnline] = useState(false);
   const [version, setVersion] = useState<string | undefined>();
 
@@ -27,11 +27,19 @@ function StatusBar() {
     };
   }, []);
 
+  let statusText = 'Offline';
+  if (online) {
+    if (analysisStatus.phase === 'analyzing') statusText = 'Analyzing…';
+    else if (uploadedVideos.length > 0 && analysisStatus.phase === 'idle') statusText = 'Ready to analyze';
+    else if (analysisStatus.phase === 'complete') statusText = 'Analysis complete';
+    else statusText = `Online · v${version ?? ''}`;
+  }
+
   return (
     <div className="statusbar">
       <span>
         <span className={`status-dot ${online ? 'online' : 'offline'}`} />
-        Backend {online ? `online${version ? ` · v${version}` : ''}` : 'offline (mock data)'}
+        {statusText}
       </span>
       <span style={{ marginLeft: 'auto' }}>
         {acceptedCount} accepted / {totalCount} candidates
@@ -59,7 +67,7 @@ function Shell() {
       </header>
       <main className="main">
         <Routes>
-          <Route path="/" element={<Navigate to="/review" replace />} />
+          <Route path="/" element={<Navigate to="/import" replace />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/export" element={<ExportPage />} />

@@ -57,7 +57,7 @@ interface BackendClipSuggestion {
   tags?: string[];
 }
 
-function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
+export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
   return {
     clip_id: c.clip_id,
     file_id: c.file_id,
@@ -170,10 +170,27 @@ export interface UpdateTimelineOptions {
 }
 
 export async function updateTimeline(
-  _projectId: string,
-  _options: UpdateTimelineOptions,
+  projectId: string,
+  options: UpdateTimelineOptions,
 ): Promise<{ ok: boolean }> {
-  return { ok: false };
+  try {
+    const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, ...options }),
+    });
+    if (!res.ok) {
+      if (res.status === 404) return { ok: false };
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail ?? `Timeline sync failed: ${res.status}`);
+    }
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Timeline sync failed')) {
+      throw err;
+    }
+    return { ok: false };
+  }
 }
 
 export async function getClipsWithFallback(

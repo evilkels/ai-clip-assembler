@@ -8,7 +8,7 @@ timeline assembly, and editor export files.
 import shutil
 import uuid
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -163,6 +163,25 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
     }
+
+
+class TimelineUpdateRequest(BaseModel):
+    project_id: str
+    order: Optional[list[str]] = None
+    trims: Optional[dict[str, dict[str, float]]] = None
+
+
+@app.put("/projects/{project_id}/timeline")
+async def update_timeline(project_id: str, request: TimelineUpdateRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if projects[project_id].get("timeline") is None:
+        raise HTTPException(status_code=400, detail="No timeline to update")
+    if request.order is not None:
+        projects[project_id]["timeline"]["clips"] = request.order
+    if request.trims is not None:
+        projects[project_id]["timeline"]["trims"] = request.trims
+    return {"ok": True}
 
 
 @app.get("/projects/{project_id}/clips")

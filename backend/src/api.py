@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .export_engine import generate_edl, generate_fcpxml
+from .local_qwen_harness import enhance_clips_with_local_qwen
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -108,10 +109,11 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
 async def analyze_videos(project_id: str, request: AnalysisRequest):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    if request.harness_id != "manual":
-        raise HTTPException(status_code=400, detail="Only manual harness is available in the drone MVP")
+    if request.harness_id not in ("manual", "local_qwen"):
+        raise HTTPException(status_code=400, detail="Only manual and local_qwen harnesses are available in the drone MVP")
 
     all_clips = []
+    harness_metadata = {}
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     for video in projects[project_id]["videos"]:
@@ -144,6 +146,15 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
             frames=frame_scores,
             preferences=preferences,
         )
+        if request.harness_id == "local_qwen":
+            result, used_ai = enhance_clips_with_local_qwen(result, frame_scores)
+            if not used_ai:
+                harness_metadata["warning"] = result.metadata.get(
+                    "warning", "Local Qwen fallback: Ollama/model unavailable"
+                )
+            else:
+                harness_metadata["model_used"] = result.metadata.get("model_used")
+                harness_metadata["local"] = True
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
 
@@ -156,13 +167,16 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "total_duration_sec": round(total_duration, 3),
         "clips": sequence_clip_ids,
     }
-    return {
+    response = {
         "project_id": project_id,
         "harness_id": request.harness_id,
         "status": "complete",
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
     }
+    if request.harness_id == "local_qwen":
+        response["metadata"] = harness_metadata
+    return response
 
 
 @app.get("/projects/{project_id}/clips")
@@ -206,7 +220,7 @@ async def list_harnesses():
     return {
         "harnesses": [
             {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True},
-            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": False},
+            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": True},
             {"id": "claude_code", "name": "Claude Code", "type": "agent", "enabled": False},
             {"id": "codex", "name": "Codex", "type": "agent", "enabled": False},
             {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": False},

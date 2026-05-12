@@ -151,6 +151,58 @@ Expected backend behavior:
 - Smooth footage should produce one or more candidate clips when enough frames pass the 7+ smoothness threshold.
 - If `ffmpeg` or `ffprobe` is missing, the API should return an actionable error instead of a traceback.
 
+## Optional Local Qwen Vision Enhancement
+
+> **The manual / rule-based harness is the default reliable mode.**
+> Local Qwen is an optional enhancement. If Ollama or the model is unavailable,
+> the backend falls back to manual results automatically.
+
+Install and start Ollama (macOS):
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5-vl:7b
+ollama serve
+```
+
+Run analysis with the local vision harness:
+
+```bash
+curl -s \
+  -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/analyze" \
+  -d "{
+    \"project_id\": \"${PROJECT_ID}\",
+    \"harness_id\": \"local_qwen\",
+    \"preferences\": {
+      \"sample_fps\": 1,
+      \"smoothness_threshold\": 7,
+      \"min_clip_duration_sec\": 3,
+      \"max_clip_duration_sec\": 15,
+      \"target_duration_sec\": 120
+    }
+  }" \
+  | python3 -m json.tool
+```
+
+Environment variables (optional):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
+| `OLLAMA_MODEL` | `qwen2.5-vl:7b` | Model tag to use |
+
+If Ollama is not running, the response will still be HTTP 200 with manual
+results and a metadata warning such as:
+
+```json
+{
+  "metadata": {
+    "warning": "Local Qwen fallback: Ollama/model unavailable"
+  }
+}
+```
+
 Export EDL:
 
 ```bash

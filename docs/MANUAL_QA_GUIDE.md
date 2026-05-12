@@ -15,18 +15,25 @@ This guide launches the current drone-first MVP on macOS for manual QA.
 Install system tools:
 
 ```bash
-brew install ffmpeg
+brew install python@3.11 ffmpeg-full node
 ```
 
 Verify:
 
 ```bash
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
+which ffmpeg
 ffmpeg -version
 ffprobe -version
-python3 --version
+ffmpeg -hide_banner -filters | grep vidstabdetect
+python3.11 --version
 node --version
 npm --version
 ```
+
+The backend MVP requires `vidstabdetect`. The regular Homebrew `ffmpeg`
+formula may not include it, so start the backend from a shell where
+`/opt/homebrew/opt/ffmpeg-full/bin` appears before `/opt/homebrew/bin`.
 
 ## Install Dependencies
 
@@ -40,9 +47,9 @@ Backend:
 
 ```bash
 cd backend
-python3 -m venv .venv
+python3.11 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pytest
+PYTHONPATH=. .venv/bin/python -m pytest
 ```
 
 Frontend:
@@ -60,7 +67,9 @@ Terminal 1, backend:
 
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler/backend
-.venv/bin/uvicorn src.api:app --reload --port 8000
+source .venv/bin/activate
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
+PYTHONPATH=. uvicorn src.api:app --reload --port 8000
 ```
 
 Terminal 2, frontend:
@@ -90,10 +99,12 @@ The easiest full backend smoke test is:
 
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler
-python3 scripts/backend_smoke_test.py "$VIDEO_PATH"
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
+backend/.venv/bin/python scripts/backend_smoke_test.py "$VIDEO_PATH"
 ```
 
-The script creates a project, uploads the video, runs manual analysis, and generates both EDL and FCPXML exports.
+The script creates a project, uploads the video, runs manual analysis, prints
+candidate clip timings and scores, and generates both EDL and FCPXML exports.
 
 The equivalent manual API steps are below.
 
@@ -161,6 +172,38 @@ Expected export behavior:
 - The response includes `status: "generated"` and a local `file_path`.
 - The EDL file opens as readable text with edit events.
 - The FCPXML file can be inspected as XML and should be tried in Final Cut Pro during manual QA.
+
+## DaVinci Resolve Validation
+
+DaVinci Resolve Free is a good MVP validation target because it can import EDL
+timelines without requiring Final Cut Pro.
+
+1. Open Resolve and create a new project.
+2. Import the original source MP4/MOV into the Media Pool.
+3. Use **File > Import > Timeline > Import AAF, EDL, XML...**.
+4. Select the generated export, usually:
+
+```bash
+backend/.ai-clip-assembler/projects/<project-id>/exports/timeline.edl
+```
+
+5. If Resolve cannot relink media, import the copied backend media from:
+
+```bash
+backend/.ai-clip-assembler/projects/<project-id>/videos/
+```
+
+Check:
+
+- The timeline imports without an error dialog.
+- The number of clips matches the smoke-test output.
+- Each clip has plausible source timing and duration.
+- Media is online or can be relinked manually.
+- Vertical footage is upright or the orientation issue is recorded.
+- Playback timing is plausible and does not appear sped up or slowed down.
+
+Known limitation: export metadata for non-30fps and rotated vertical media is
+tracked in GitHub issue #19.
 
 ## QA Notes To Capture
 

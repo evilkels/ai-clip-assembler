@@ -10,6 +10,8 @@ class VideoMetadata(BaseModel):
     duration_sec: float
     fps: float
     resolution: List[int]
+    display_resolution: List[int] = Field(default_factory=list)
+    rotation_degrees: int = 0
     codec: str
 
 

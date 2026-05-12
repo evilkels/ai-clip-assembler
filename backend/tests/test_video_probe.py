@@ -24,7 +24,32 @@ def test_parse_ffprobe_metadata_extracts_primary_video_stream():
     assert metadata.duration_sec == 12.5
     assert metadata.fps == 59.94
     assert metadata.resolution == [3840, 2160]
+    assert metadata.display_resolution == [3840, 2160]
+    assert metadata.rotation_degrees == 0
     assert metadata.codec == "h264"
+
+
+def test_parse_ffprobe_metadata_preserves_vertical_rotation_display_shape():
+    payload = {
+        "format": {"duration": "35.936000"},
+        "streams": [
+            {
+                "codec_type": "video",
+                "codec_name": "hevc",
+                "width": 1920,
+                "height": 1080,
+                "avg_frame_rate": "60000/1001",
+                "side_data_list": [{"side_data_type": "Display Matrix", "rotation": 90}],
+            },
+        ],
+    }
+
+    metadata = parse_ffprobe_metadata(Path("/footage/DJI_VERTICAL.MP4"), payload)
+
+    assert metadata.fps == 59.94
+    assert metadata.resolution == [1920, 1080]
+    assert metadata.rotation_degrees == 90
+    assert metadata.display_resolution == [1080, 1920]
 
 
 def test_probe_video_reports_missing_ffprobe_clearly(tmp_path):

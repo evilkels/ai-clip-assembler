@@ -49,6 +49,41 @@ def upload_file(url: str, field_name: str, path: Path) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def format_score(value: object) -> str:
+    if isinstance(value, (int, float)):
+        return f"{float(value):.2f}"
+    return "n/a"
+
+
+def format_seconds(value: object) -> str:
+    if isinstance(value, (int, float)):
+        return f"{float(value):.3f}s"
+    return "n/a"
+
+
+def format_analysis_summary(analysis: dict) -> list[str]:
+    clips = analysis.get("clips", [])
+    total_duration = (analysis.get("sequence") or {}).get("total_duration_sec")
+    lines = [f"Candidate clips: {len(clips)}"]
+    if isinstance(total_duration, (int, float)):
+        lines.append(f"Timeline duration: {float(total_duration):.1f}s")
+
+    if clips:
+        lines.append("Clips:")
+    for index, clip in enumerate(clips, start=1):
+        lines.append(
+            f"  {index}. {format_seconds(clip.get('start_sec'))} -> "
+            f"{format_seconds(clip.get('end_sec'))} "
+            f"({format_seconds(clip.get('duration_sec'))}), "
+            f"overall {format_score(clip.get('overall_score'))}, "
+            f"smoothness {format_score(clip.get('smoothness_score'))}"
+        )
+        reason = clip.get("ai_reason")
+        if reason:
+            lines.append(f"     reason: {reason}")
+    return lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("video_path", type=Path)
@@ -87,7 +122,7 @@ def main() -> int:
                 },
             },
         )
-        print(f"Candidate clips: {len(analysis['clips'])}")
+        print("\n".join(format_analysis_summary(analysis)))
 
         for export_format in ["edl", "fcpxml"]:
             export = post_json(f"{args.base_url}/projects/{project_id}/export?format={export_format}")

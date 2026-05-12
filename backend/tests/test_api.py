@@ -345,3 +345,293 @@ def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
     assert body["status"] == "generated"
     assert body["file_path"].endswith("timeline.edl")
     assert "TITLE:" in Path(body["file_path"]).read_text()
+
+
+def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 5.0,
+            "duration_sec": 5.0,
+            "overall_score": 8,
+        },
+        {
+            "clip_id": "clip-2",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+            "overall_score": 7,
+        },
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1", "clip-2"], "total_duration_sec": 9.0}
+
+    response = client.put(
+        f"/projects/{project_id}/timeline",
+        json={
+            "clips": [
+                {"clip_id": "clip-2", "start_sec": 11.0, "end_sec": 13.5, "included": True},
+                {"clip_id": "clip-1", "start_sec": 1.0, "end_sec": 4.0, "included": True},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [clip["clip_id"] for clip in body["clips"]] == ["clip-2", "clip-1"]
+    assert body["clips"][0]["duration_sec"] == 2.5
+    assert body["clips"][1]["duration_sec"] == 3.0
+    assert body["total_duration_sec"] == 5.5
+
+
+def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 5.0,
+            "duration_sec": 5.0,
+            "overall_score": 8,
+        }
+    ]
+
+    response = client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "missing", "start_sec": 0.0, "end_sec": 2.0, "included": True}]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Unknown clip_id: missing"
+
+
+def test_update_timeline_rejects_duplicate_clip_ids(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 5.0,
+            "duration_sec": 5.0,
+            "overall_score": 8,
+        }
+    ]
+
+    response = client.put(
+        f"/projects/{project_id}/timeline",
+        json={
+            "clips": [
+                {"clip_id": "clip-1", "start_sec": 0.5, "end_sec": 2.0, "included": True},
+                {"clip_id": "clip-1", "start_sec": 2.0, "end_sec": 4.0, "included": True},
+            ]
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Duplicate clip_id: clip-1"
+
+
+def test_update_timeline_rejects_invalid_trim_range(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 5.0,
+            "duration_sec": 5.0,
+            "overall_score": 8,
+        }
+    ]
+
+    response = client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 2.0, "end_sec": 2.0, "included": True}]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Timeline clip must satisfy start_sec < end_sec for clip-1"
+
+
+def test_update_timeline_rejects_missing_project(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+
+    response = client.put(
+        "/projects/missing/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 0.0, "end_sec": 1.0, "included": True}]},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+
+
+def test_update_timeline_rejects_clip_trim_outside_original_bounds(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 3.0,
+            "end_sec": 5.0,
+            "duration_sec": 2.0,
+            "overall_score": 8,
+        }
+    ]
+
+    response = client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 2.5, "end_sec": 4.0, "included": True}]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Timeline trim is outside original clip bounds for clip-1"
+
+
+def test_export_uses_updated_timeline_order_and_trimmed_timings(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 20.0, "fps": 30, "resolution": [1920, 1080]},
+            "status": "ready",
+        }
+    )
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 5.0,
+            "duration_sec": 5.0,
+            "overall_score": 8,
+        },
+        {
+            "clip_id": "clip-2",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+            "overall_score": 7,
+        },
+    ]
+    api.projects[project_id]["timeline"] = {
+        "clips": [
+            {"clip_id": "clip-2", "start_sec": 11.0, "end_sec": 13.5, "duration_sec": 2.5, "included": True},
+            {"clip_id": "clip-1", "start_sec": 1.0, "end_sec": 4.0, "duration_sec": 3.0, "included": True},
+        ],
+        "total_duration_sec": 5.5,
+    }
+
+    response = client.post(f"/projects/{project_id}/export?format=edl")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["clip_count"] == 2
+    assert body["total_duration_sec"] == 5.5
+    edl = Path(body["file_path"]).read_text()
+    assert "00:00:11:00 00:00:13:15 00:00:00:00 00:00:02:15" in edl
+    assert "00:00:01:00 00:00:04:00 00:00:02:15 00:00:05:15" in edl
+
+
+def test_export_timeline_keeps_present_but_empty_edited_timeline_empty(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0, "fps": 30, "resolution": [1920, 1080]},
+            "status": "ready",
+        }
+    )
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": [], "total_duration_sec": 0}
+
+    response = client.post(f"/projects/{project_id}/export?format=edl")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["clip_count"] == 0
+    assert body["total_duration_sec"] == 0
+    assert Path(body["file_path"]).read_text() == "TITLE: AI Clip Assembler\nFCM: NON-DROP FRAME\n"
+
+
+def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0, "fps": 59.94, "resolution": [1920, 1080]},
+            "status": "ready",
+        }
+    )
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 1,
+            "end_sec": 2,
+            "duration_sec": 1,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 1}
+
+    response = client.post(f"/projects/{project_id}/export?format=edl")
+
+    assert response.status_code == 200
+    assert "00:00:01:00 00:00:02:00 00:00:00:00 00:00:01:00" in Path(response.json()["file_path"]).read_text()

@@ -18,6 +18,7 @@ from .models import ClipSuggestion, FrameScore
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3-vl:8b")
+DEFAULT_TEMPERATURE = 0.2
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_TIMEOUT = 30.0
 
@@ -70,6 +71,7 @@ def _call_ollama_for_batch(
     model: str = OLLAMA_MODEL,
     base_url: str = OLLAMA_URL,
     timeout_sec: float = DEFAULT_TIMEOUT,
+    temperature: float = DEFAULT_TEMPERATURE,
 ) -> List[dict]:
     """Send a batch of frame images to Ollama and parse structured JSON scores.
 
@@ -88,7 +90,7 @@ def _call_ollama_for_batch(
         "images": images,
         "stream": False,
         "format": "json",
-        "options": {"temperature": 0.2},
+        "options": {"temperature": temperature},
     }
 
     try:
@@ -144,6 +146,7 @@ def enhance_clips_with_local_qwen(
     model: str = OLLAMA_MODEL,
     base_url: str = OLLAMA_URL,
     timeout_sec: float = DEFAULT_TIMEOUT,
+    temperature: float = DEFAULT_TEMPERATURE,
 ) -> Tuple[AssemblyResult, bool]:
     """Enhance manual rule-based clips with local Qwen vision analysis.
 
@@ -206,6 +209,7 @@ def enhance_clips_with_local_qwen(
                 model=model,
                 base_url=base_url,
                 timeout_sec=timeout_sec,
+                temperature=temperature,
             )
             if len(batch_scores) != len(batch_paths):
                 raise OllamaUnavailableError(

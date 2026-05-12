@@ -50,12 +50,16 @@ def upload_file(url: str, field_name: str, path: Path) -> dict:
 
 
 def format_score(value: object) -> str:
+    if isinstance(value, bool):
+        return "n/a"
     if isinstance(value, (int, float)):
         return f"{float(value):.2f}"
     return "n/a"
 
 
 def format_seconds(value: object) -> str:
+    if isinstance(value, bool):
+        return "n/a"
     if isinstance(value, (int, float)):
         return f"{float(value):.3f}s"
     return "n/a"

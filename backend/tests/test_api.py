@@ -347,6 +347,189 @@ def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
     assert "TITLE:" in Path(body["file_path"]).read_text()
 
 
+def test_analyze_local_qwen_harness_returns_enhanced_clips(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0},
+            "status": "ready",
+        }
+    )
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
+    monkeypatch.setattr(
+        api,
+        "extract_frames",
+        lambda **kwargs: [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")],
+    )
+    monkeypatch.setattr(
+        api,
+        "score_samples_rule_based",
+        lambda samples: [
+            FrameScore(
+                timestamp=0,
+                frame_path="/tmp/0.jpg",
+                motion_stability=8,
+                smoothness_score=8,
+                sharpness_score=8,
+                exposure_score=8,
+                contrast_score=8,
+                overall_score=8,
+                blur_score=8,
+                brightness=0.5,
+                contrast=0.5,
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences: AssemblyResult(
+            clips=[
+                ClipSuggestion(
+                    clip_id="clip-1",
+                    file_id=file_id,
+                    file_name=file_name,
+                    start_sec=0,
+                    end_sec=3,
+                    duration_sec=3,
+                    smoothness_score=8,
+                    visual_interest_score=0,
+                    overall_score=8,
+                    ai_reason="Stable 8.0/10",
+                )
+            ],
+            sequence=TimelineSequence(total_duration_sec=3, clips=["clip-1"]),
+        ),
+    )
+
+    def fake_enhance(result, frames, **kwargs):
+        enhanced = result.model_copy(
+            update={
+                "clips": [
+                    result.clips[0].model_copy(
+                        update={
+                            "visual_interest_score": 9.0,
+                            "overall_score": 8.3,
+                            "ai_reason": "Stable 8.0/10 | AI: great composition",
+                        }
+                    )
+                ],
+                "metadata": {"model_used": "qwen3-vl:8b", "local": True, "used_ai": True, "clips_enhanced": 1, "clips_total": 1},
+                "harness_id": "local_qwen",
+            }
+        )
+        return enhanced, True
+
+    monkeypatch.setattr("src.api.enhance_clips_with_local_qwen", fake_enhance)
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "local_qwen", "preferences": {}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "complete"
+    assert body["harness_id"] == "local_qwen"
+    assert body["clips"][0]["clip_id"] == "clip-1"
+    assert body["metadata"]["model_used"] == "qwen3-vl:8b"
+    assert body["metadata"]["local"] is True
+    assert "warning" not in body["metadata"]
+
+
+def test_analyze_local_qwen_fallback_when_ollama_unavailable(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0},
+            "status": "ready",
+        }
+    )
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
+    monkeypatch.setattr(
+        api,
+        "extract_frames",
+        lambda **kwargs: [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")],
+    )
+    monkeypatch.setattr(
+        api,
+        "score_samples_rule_based",
+        lambda samples: [
+            FrameScore(
+                timestamp=0,
+                frame_path="/tmp/0.jpg",
+                motion_stability=8,
+                smoothness_score=8,
+                sharpness_score=8,
+                exposure_score=8,
+                contrast_score=8,
+                overall_score=8,
+                blur_score=8,
+                brightness=0.5,
+                contrast=0.5,
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences: AssemblyResult(
+            clips=[
+                ClipSuggestion(
+                    clip_id="clip-1",
+                    file_id=file_id,
+                    file_name=file_name,
+                    start_sec=0,
+                    end_sec=3,
+                    duration_sec=3,
+                    smoothness_score=8,
+                    visual_interest_score=0,
+                    overall_score=8,
+                    ai_reason="Stable 8.0/10",
+                )
+            ],
+            sequence=TimelineSequence(total_duration_sec=3, clips=["clip-1"]),
+        ),
+    )
+
+    def fake_enhance(result, frames, **kwargs):
+        fallback = result.model_copy(
+            update={
+                "metadata": {"warning": "Local Qwen fallback: Ollama/model unavailable", "used_ai": False},
+                "harness_id": "local_qwen",
+            }
+        )
+        return fallback, False
+
+    monkeypatch.setattr("src.api.enhance_clips_with_local_qwen", fake_enhance)
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "local_qwen", "preferences": {}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "complete"
+    assert body["harness_id"] == "local_qwen"
+    assert body["clips"][0]["overall_score"] == 8
+    assert "file-1" in body["metadata"]["warning"]
+
+
 def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
@@ -635,3 +818,12 @@ def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path)
 
     assert response.status_code == 200
     assert "00:00:01:00 00:00:02:00 00:00:00:00 00:00:01:00" in Path(response.json()["file_path"]).read_text()
+
+
+def test_list_harnesses_shows_local_qwen_enabled():
+    client = TestClient(api.app)
+    response = client.get("/harnesses")
+    assert response.status_code == 200
+    harnesses = {h["id"]: h for h in response.json()["harnesses"]}
+    assert harnesses["local_qwen"]["enabled"] is True
+    assert harnesses["manual"]["enabled"] is True

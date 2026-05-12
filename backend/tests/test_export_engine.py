@@ -142,3 +142,45 @@ def test_choose_timeline_fps_uses_highest_source_rate():
     }
 
     assert choose_timeline_fps(videos) == 59.94
+
+
+def test_choose_timeline_fps_returns_30_when_no_fps():
+    assert choose_timeline_fps({}) == 30.0
+    assert choose_timeline_fps({"f1": {"metadata": {}}}) == 30.0
+    assert choose_timeline_fps({"f1": {"metadata": None}}) == 30.0
+    assert choose_timeline_fps({"f1": {}}) == 30.0
+
+
+def test_choose_timeline_fps_ignores_zero_and_negative():
+    videos = {
+        "f1": {"metadata": {"fps": 0}},
+        "f2": {"metadata": {"fps": -5}},
+        "f3": {"metadata": {"fps": 29.97}},
+    }
+    assert choose_timeline_fps(videos) == 29.97
+
+
+def test_choose_timeline_fps_ignores_non_numeric_fps():
+    videos = {
+        "f1": {"metadata": {"fps": "not_a_number"}},
+        "f2": {"metadata": {"fps": 29.97}},
+    }
+    assert choose_timeline_fps(videos) == 29.97
+
+
+def test_choose_timeline_fps_ignores_none_fps():
+    videos = {
+        "f1": {"metadata": {"fps": None}},
+        "f2": {"metadata": {"fps": 60}},
+    }
+    assert choose_timeline_fps(videos) == 60.0
+
+
+def test_choose_timeline_fps_all_invalid_defaults_to_30():
+    videos = {
+        "f1": {"metadata": {"fps": 0}},
+        "f2": {"metadata": {"fps": -10}},
+        "f3": {"metadata": {"fps": "abc"}},
+        "f4": {"metadata": {}},
+    }
+    assert choose_timeline_fps(videos) == 30.0

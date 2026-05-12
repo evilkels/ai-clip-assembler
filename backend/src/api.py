@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .export_engine import choose_timeline_fps, generate_edl, generate_fcpxml
+from .local_qwen_harness import enhance_clips_with_local_qwen
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -119,10 +120,11 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
 async def analyze_videos(project_id: str, request: AnalysisRequest):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    if request.harness_id != "manual":
-        raise HTTPException(status_code=400, detail="Only manual harness is available in the drone MVP")
+    if request.harness_id not in ("manual", "local_qwen"):
+        raise HTTPException(status_code=400, detail="Only manual and local_qwen harnesses are available in the drone MVP")
 
     all_clips = []
+    per_video_results = []
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     for video in projects[project_id]["videos"]:
@@ -155,6 +157,19 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
             frames=frame_scores,
             preferences=preferences,
         )
+        video_metadata = {}
+        if request.harness_id == "local_qwen":
+            result, used_ai = enhance_clips_with_local_qwen(result, frame_scores)
+            video_metadata["used_ai"] = used_ai
+            video_metadata["model_used"] = result.metadata.get("model_used")
+            video_metadata["file_id"] = video["file_id"]
+            if result.metadata.get("warning"):
+                video_metadata["warning"] = result.metadata["warning"]
+            if result.metadata.get("partial_enhancement"):
+                video_metadata["partial_enhancement"] = True
+                video_metadata["clips_enhanced"] = result.metadata.get("clips_enhanced")
+                video_metadata["clips_total"] = result.metadata.get("clips_total")
+        per_video_results.append(video_metadata)
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
 
@@ -167,39 +182,39 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "total_duration_sec": round(total_duration, 3),
         "clips": sequence_clip_ids,
     }
-    return {
+    response = {
         "project_id": project_id,
         "harness_id": request.harness_id,
         "status": "complete",
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
     }
-
-
-class TimelineUpdateRequest(BaseModel):
-    project_id: str
-    order: Optional[list[str]] = None
-    trims: Optional[dict[str, dict[str, float]]] = None
-
-
-@app.put("/projects/{project_id}/timeline")
-async def update_timeline(project_id: str, request: TimelineUpdateRequest):
-    if project_id not in projects:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if projects[project_id].get("timeline") is None:
-        raise HTTPException(status_code=400, detail="No timeline to update")
-    if request.order is not None:
-        projects[project_id]["timeline"]["clips"] = request.order
-    if request.trims is not None:
-        projects[project_id]["timeline"]["trims"] = request.trims
-    return {"ok": True}
-
-
-@app.get("/projects/{project_id}/clips")
-async def get_clips(project_id: str):
-    if project_id not in projects:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return {"clips": projects[project_id].get("clips", [])}
+    if request.harness_id == "local_qwen":
+        harness_metadata = {"per_video": per_video_results}
+        all_ai = all(v.get("used_ai") for v in per_video_results)
+        any_ai = any(v.get("used_ai") for v in per_video_results)
+        any_fallback = any(v.get("warning") for v in per_video_results)
+        if any_fallback or not all_ai:
+            harness_metadata["used_ai"] = any_ai
+            fallback_videos = [
+                v["file_id"] for v in per_video_results if v.get("warning")
+            ]
+            harness_metadata["warning"] = (
+                f"Local Qwen fallback for video(s): {', '.join(fallback_videos)}"
+                if fallback_videos else "Local Qwen fallback"
+            )
+        else:
+            harness_metadata["used_ai"] = True
+        models_used = list({
+            v["model_used"] for v in per_video_results if v.get("model_used")
+        })
+        if len(models_used) == 1:
+            harness_metadata["model_used"] = models_used[0]
+        elif models_used:
+            harness_metadata["models_used"] = models_used
+        harness_metadata["local"] = True
+        response["metadata"] = harness_metadata
+    return response
 
 
 @app.put("/projects/{project_id}/timeline")
@@ -222,6 +237,13 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
         "clips": resolved_clips,
         "total_duration_sec": total_duration_sec,
     }
+
+
+@app.get("/projects/{project_id}/clips")
+async def get_clips(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"clips": projects[project_id].get("clips", [])}
 
 
 @app.post("/projects/{project_id}/export")
@@ -263,7 +285,7 @@ async def list_harnesses():
     return {
         "harnesses": [
             {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True},
-            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": False},
+            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": True},
             {"id": "claude_code", "name": "Claude Code", "type": "agent", "enabled": False},
             {"id": "codex", "name": "Codex", "type": "agent", "enabled": False},
             {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": False},

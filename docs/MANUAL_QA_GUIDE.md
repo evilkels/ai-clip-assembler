@@ -15,13 +15,40 @@ This guide launches the current drone-first MVP on macOS for manual QA.
 Install system tools:
 
 ```bash
-brew install python@3.11 ffmpeg-full node
+brew install python@3.11 node
+```
+
+FFmpeg is required. On macOS, the default Homebrew `ffmpeg` formula includes the
+`vidstabdetect` filter needed for motion analysis:
+
+```bash
+brew install ffmpeg
+```
+
+Verify `vidstabdetect` is available:
+
+```bash
+ffmpeg -hide_banner -filters | grep vidstabdetect
+```
+
+If `vidstabdetect` is missing (older Homebrew installs or custom builds), install
+libvidstab and rebuild:
+
+```bash
+brew install libvidstab
+brew reinstall ffmpeg
+```
+
+Alternatively, use Homebrew's `ffmpeg-full` tap which bundles more filters:
+
+```bash
+brew tap homebrew-ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg
 ```
 
 Verify:
 
 ```bash
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
 which ffmpeg
 ffmpeg -version
 ffprobe -version
@@ -68,7 +95,6 @@ Terminal 1, backend:
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler/backend
 source .venv/bin/activate
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
 PYTHONPATH=. uvicorn src.api:app --reload --port 8000
 ```
 
@@ -99,7 +125,6 @@ The easiest full backend smoke test is:
 
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler
-export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"
 backend/.venv/bin/python scripts/backend_smoke_test.py "$VIDEO_PATH"
 ```
 
@@ -150,6 +175,61 @@ Expected backend behavior:
 - Analysis returns `status: "complete"`.
 - Smooth footage should produce one or more candidate clips when enough frames pass the 7+ smoothness threshold.
 - If `ffmpeg` or `ffprobe` is missing, the API should return an actionable error instead of a traceback.
+
+## Optional Local Qwen Vision Enhancement
+
+> **The manual / rule-based harness is the default reliable mode.**
+> Local Qwen is an optional enhancement. If Ollama or the model is unavailable,
+> the backend falls back to manual results automatically.
+
+Install and start Ollama (macOS):
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen3-vl:8b
+ollama serve
+```
+
+Run analysis with the local vision harness:
+
+```bash
+curl -s \
+  -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/analyze" \
+  -d "{
+    \"project_id\": \"${PROJECT_ID}\",
+    \"harness_id\": \"local_qwen\",
+    \"preferences\": {
+      \"sample_fps\": 1,
+      \"smoothness_threshold\": 7,
+      \"min_clip_duration_sec\": 3,
+      \"max_clip_duration_sec\": 15,
+      \"target_duration_sec\": 120
+    }
+  }" \
+  | python3 -m json.tool
+```
+
+Environment variables (optional):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
+| `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
+| `OLLAMA_TEMPERATURE` | `0.2` | Model sampling temperature (fixed at 0.2 by default) |
+
+Configuration is via environment variables only. No config file is required.
+
+If Ollama is not running, the response will still be HTTP 200 with manual
+results and a metadata warning such as:
+
+```json
+{
+  "metadata": {
+    "warning": "Local Qwen fallback: Ollama/model unavailable"
+  }
+}
+```
 
 Export EDL:
 

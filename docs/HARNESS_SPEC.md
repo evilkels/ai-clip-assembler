@@ -86,7 +86,7 @@
     "clips": ["clip_id_1", "clip_id_2", "clip_id_3"]
   },
   "metadata": {
-    "model_used": "qwen2.5-vl-7b-instruct",
+    "model_used": "qwen3-vl-8b",
     "tokens_used": 15234,
     "local": true
   }
@@ -108,21 +108,19 @@
 **ID:** `local_qwen`
 **Input:** Frame images + OpenCV metrics
 **Process:**
-1. Send batch of frames to local Qwen2.5-VL via Ollama/MLX
+1. Send batch of frames to local Qwen3-VL via Ollama/MLX
 2. Prompt: "Score this video frame for smoothness and visual interest. Is there camera shake?"
 3. Parse structured JSON response
 4. Aggregate scores across frames
 
 **Config:**
-```json
-{
-  "model": "qwen2.5-vl-7b-instruct",
-  "provider": "ollama",
-  "provider_url": "http://localhost:11434",
-  "batch_size": 8,
-  "max_frames_per_video": 100
-}
-```
+Configuration is via environment variables only (no config file):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
+| `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
+| `OLLAMA_TEMPERATURE` | `0.2` | Model sampling temperature (fixed at 0.2 by default for deterministic scoring) |
 
 ### 2. Claude Code Harness
 
@@ -182,29 +180,12 @@
 
 ## Harness Registration
 
-Harnesses are registered in `harness/config.json`:
+Harnesses are registered in the `GET /harnesses` API endpoint (see `backend/src/api.py`).
+The endpoint returns the list of available harnesses with their enabled/disabled status.
 
-```json
-{
-  "harnesses": [
-    {
-      "id": "local_qwen",
-      "name": "Local Qwen Vision",
-      "type": "local",
-      "enabled": true,
-      "config_path": "harness/local/config.json"
-    },
-    {
-      "id": "claude_code",
-      "name": "Claude Code",
-      "type": "agent",
-      "enabled": false,
-      "config_path": "harness/claude/config.json"
-    }
-  ],
-  "default": "local_qwen"
-}
-```
+The local Qwen harness reads configuration from environment variables only:
+`OLLAMA_URL`, `OLLAMA_MODEL`, and `OLLAMA_TEMPERATURE`. See the Local Model Harness
+section above for details.
 
 ## Error Handling
 

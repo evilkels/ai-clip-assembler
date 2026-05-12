@@ -4,7 +4,10 @@ from urllib.parse import quote
 import xml.etree.ElementTree as ET
 
 
-def seconds_to_timecode(seconds: float, fps: int = 30) -> str:
+def seconds_to_timecode(seconds: float, fps: float = 30) -> str:
+    fps = int(round(fps))
+    if fps <= 0:
+        fps = 30
     total_frames = int(round(seconds * fps))
     frames = total_frames % fps
     total_seconds = total_frames // fps
@@ -30,10 +33,17 @@ def fcpx_frame_duration(fps: float) -> str:
 
 
 def choose_timeline_fps(videos_by_id: Dict[str, dict]) -> float:
-    rates = [
-        float((video.get("metadata") or {}).get("fps") or 0)
-        for video in videos_by_id.values()
-    ]
+    rates = []
+    for video in videos_by_id.values():
+        fps_val = (video.get("metadata") or {}).get("fps")
+        if fps_val is None:
+            continue
+        try:
+            fps = float(fps_val)
+        except (TypeError, ValueError):
+            continue
+        if fps > 0:
+            rates.append(fps)
     return max(rates) if rates else 30.0
 
 
@@ -50,7 +60,7 @@ def path_to_file_url(path: str) -> str:
     return "file://" + quote(str(Path(path).absolute()))
 
 
-def generate_edl(title: str, clips: List[dict], fps: int = 30) -> str:
+def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
     lines = [f"TITLE: {title}", "FCM: NON-DROP FRAME", ""]
     timeline_cursor = 0.0
     for index, clip in enumerate(clips, start=1):

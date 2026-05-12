@@ -20,6 +20,32 @@ def seconds_to_fcpx_duration(seconds: float) -> str:
     return f"{milliseconds}/1000s"
 
 
+def fcpx_frame_duration(fps: float) -> str:
+    if abs(fps - 29.97) < 0.02:
+        return "1001/30000s"
+    if abs(fps - 59.94) < 0.02:
+        return "1001/60000s"
+    rounded = int(round(fps or 30))
+    return f"100/{rounded * 100}s"
+
+
+def choose_timeline_fps(videos_by_id: Dict[str, dict]) -> float:
+    rates = [
+        float((video.get("metadata") or {}).get("fps") or 0)
+        for video in videos_by_id.values()
+    ]
+    return max(rates) if rates else 30.0
+
+
+def timeline_dimensions(videos_by_id: Dict[str, dict]) -> list[int]:
+    for video in videos_by_id.values():
+        metadata = video.get("metadata") or {}
+        display = metadata.get("display_resolution") or metadata.get("resolution")
+        if display and len(display) == 2:
+            return [int(display[0]), int(display[1])]
+    return [1920, 1080]
+
+
 def path_to_file_url(path: str) -> str:
     return "file://" + quote(str(Path(path).absolute()))
 
@@ -48,15 +74,17 @@ def generate_edl(title: str, clips: List[dict], fps: int = 30) -> str:
 def generate_fcpxml(title: str, clips: List[dict], videos_by_id: Dict[str, dict]) -> str:
     fcpxml = ET.Element("fcpxml", {"version": "1.10"})
     resources = ET.SubElement(fcpxml, "resources")
+    fps = choose_timeline_fps(videos_by_id)
+    width, height = timeline_dimensions(videos_by_id)
     ET.SubElement(
         resources,
         "format",
         {
             "id": "r1",
-            "name": "FFVideoFormat1080p30",
-            "frameDuration": "100/3000s",
-            "width": "1920",
-            "height": "1080",
+            "name": f"FFVideoFormat{width}x{height}p{round(fps, 2)}",
+            "frameDuration": fcpx_frame_duration(fps),
+            "width": str(width),
+            "height": str(height),
         },
     )
 

@@ -147,3 +147,36 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# react-doctor agent skill folders (created by `react-doctor install`).
+# We keep frontend/.claude/ for Claude Code; everything else is junk for tools we don't use.
+# Do NOT re-run `react-doctor install` — it will recreate these.
+frontend/.adal/
+frontend/.agents/
+frontend/.augment/
+frontend/.bob/
+frontend/.codebuddy/
+frontend/.commandcode/
+frontend/.continue/
+frontend/.cortex/
+frontend/.crush/
+frontend/.factory/
+frontend/.goose/
+frontend/.iflow/
+frontend/.junie/
+frontend/.kilocode/
+frontend/.kiro/
+frontend/.kode/
+frontend/.mcpjam/
+frontend/.mux/
+frontend/.neovate/
+frontend/.openhands/
+frontend/.pochi/
+frontend/.qoder/
+frontend/.qwen/
+frontend/.roo/
+frontend/.trae/
+frontend/.vibe/
+frontend/.windsurf/
+frontend/.zencoder/
+frontend/skills/

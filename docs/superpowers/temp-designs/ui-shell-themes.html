@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Clip Assembler Shell Theme Concepts</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --font-ui: "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+        --text-xs: 11px;
+        --text-sm: 13px;
+        --text-md: 14px;
+        --text-lg: 16px;
+        --text-xl: 20px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #08090b;
+        color: #f4f6f8;
+        font-family: var(--font-ui);
+        font-size: var(--text-sm);
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 28px;
+        display: grid;
+        gap: 28px;
+      }
+
+      .intro {
+        max-width: 1160px;
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: end;
+      }
+
+      .intro h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .intro p {
+        margin: 0;
+        max-width: 760px;
+        color: #9da5af;
+        line-height: 1.5;
+      }
+
+      .tag {
+        border: 1px solid #2b3138;
+        color: #b8c1cc;
+        padding: 6px 9px;
+        border-radius: 6px;
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        white-space: nowrap;
+      }
+
+      .concept {
+        display: grid;
+        grid-template-columns: 190px minmax(920px, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .notes {
+        position: sticky;
+        top: 20px;
+        color: #a6afba;
+      }
+
+      .notes h2 {
+        margin: 0 0 8px;
+        color: #eef3f8;
+        font-size: var(--text-lg);
+        font-weight: 650;
+      }
+
+      .notes p {
+        margin: 0;
+        line-height: 1.45;
+      }
+
+      .shell {
+        min-width: 920px;
+        height: 620px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--app);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+        display: grid;
+        grid-template-rows: 38px 1fr 28px;
+      }
+
+      .titlebar,
+      .statusbar {
+        display: flex;
+        align-items: center;
+        border-color: var(--border);
+        background: var(--bar);
+      }
+
+      .titlebar {
+        border-bottom: 1px solid var(--border);
+        padding: 0 12px;
+        gap: 12px;
+      }
+
+      .traffic {
+        display: flex;
+        gap: 7px;
+      }
+
+      .traffic i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: block;
+      }
+
+      .red { background: #ff6159; }
+      .yellow { background: #ffbd2e; }
+      .green { background: #28c941; }
+
+      .project-name {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .command {
+        margin-left: auto;
+        height: 24px;
+        min-width: 142px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px;
+        color: var(--muted);
+        border: 1px solid var(--border-strong);
+        border-radius: 5px;
+        background: var(--control);
+        font-size: var(--text-xs);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 232px 1fr;
+        min-height: 0;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+        padding: 12px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 14px;
+      }
+
+      .new-button {
+        height: 30px;
+        border: 1px solid var(--border-strong);
+        background: var(--button);
+        color: var(--text);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font-weight: 620;
+      }
+
+      .section-label {
+        color: var(--faint);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: 8px 0;
+      }
+
+      .project {
+        display: grid;
+        grid-template-columns: 12px 1fr auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 8px;
+        border-radius: 5px;
+        color: var(--muted);
+      }
+
+      .project.active {
+        background: var(--active);
+        color: var(--text);
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 16px var(--accent-glow);
+      }
+
+      .count {
+        color: var(--faint);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+      }
+
+      .sidebar-bottom {
+        border-top: 1px solid var(--border);
+        padding-top: 10px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .side-action {
+        height: 28px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        border-radius: 5px;
+        padding: 0 8px;
+      }
+
+      .content {
+        background:
+          linear-gradient(180deg, var(--content-top), transparent 46%),
+          var(--content);
+        padding: 22px 26px;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .route-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 18px;
+      }
+
+      .route-head h3 {
+        margin: 0;
+        font-size: var(--text-xl);
+        font-weight: 650;
+      }
+
+      .route-head p {
+        margin: 5px 0 0;
+        color: var(--muted);
+      }
+
+      .pills {
+        display: flex;
+        gap: 8px;
+      }
+
+      .pill {
+        height: 26px;
+        display: flex;
+        align-items: center;
+        border-radius: 5px;
+        border: 1px solid var(--border-strong);
+        padding: 0 9px;
+        color: var(--muted);
+        background: var(--control);
+        font-size: var(--text-xs);
+      }
+
+      .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .clip {
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--card);
+        overflow: hidden;
+      }
+
+      .thumb {
+        height: 112px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.12), transparent 35%),
+          radial-gradient(circle at 70% 24%, var(--thumb-hot), transparent 24%),
+          linear-gradient(135deg, var(--thumb-a), var(--thumb-b));
+        position: relative;
+      }
+
+      .thumb::after {
+        content: "";
+        position: absolute;
+        inset: auto 10px 10px;
+        height: 24px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, var(--accent), transparent 62%);
+        opacity: 0.7;
+      }
+
+      .clip-meta {
+        padding: 9px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .clip-title {
+        color: var(--text);
+        font-weight: 560;
+      }
+
+      .timeline-strip {
+        height: 46px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--timeline);
+        display: flex;
+        align-items: center;
+        padding: 7px;
+        gap: 5px;
+      }
+
+      .segment {
+        height: 28px;
+        border-radius: 4px;
+        background: var(--segment);
+        border: 1px solid var(--border-strong);
+      }
+
+      .statusbar {
+        border-top: 1px solid var(--border);
+        padding: 0 12px;
+        gap: 16px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+      }
+
+      .statusbar span:last-child {
+        margin-left: auto;
+      }
+
+      .concept-a {
+        --app: #101215;
+        --bar: #15181c;
+        --surface: #171a1f;
+        --content: #111317;
+        --content-top: rgba(70, 82, 98, 0.18);
+        --control: #1b2026;
+        --button: #242a31;
+        --card: #181c21;
+        --active: #242b34;
+        --border: #2a3038;
+        --border-strong: #38414b;
+        --text: #f4f6f8;
+        --muted: #a8b0ba;
+        --faint: #68727f;
+        --accent: #62a8ff;
+        --accent-glow: rgba(98, 168, 255, 0.45);
+        --thumb-a: #263445;
+        --thumb-b: #15191f;
+        --thumb-hot: rgba(98, 168, 255, 0.62);
+        --timeline: #15191e;
+        --segment: #2c6fae;
+      }
+
+      .concept-b {
+        --app: #0d1111;
+        --bar: #121819;
+        --surface: #151c1c;
+        --content: #0f1313;
+        --content-top: rgba(170, 207, 120, 0.1);
+        --control: #1b2424;
+        --button: #21312d;
+        --card: #161d1d;
+        --active: #26342f;
+        --border: #283232;
+        --border-strong: #3d4b48;
+        --text: #f3f5ef;
+        --muted: #aab4ad;
+        --faint: #6d7771;
+        --accent: #aecf78;
+        --accent-glow: rgba(174, 207, 120, 0.32);
+        --thumb-a: #394533;
+        --thumb-b: #131817;
+        --thumb-hot: rgba(224, 172, 86, 0.55);
+        --timeline: #141b1a;
+        --segment: #879d5f;
+      }
+
+      .concept-c {
+        --app: #090b0e;
+        --bar: #0f1218;
+        --surface: #11151c;
+        --content: #0b0e13;
+        --content-top: rgba(255, 77, 109, 0.08);
+        --control: #151a22;
+        --button: #1b2230;
+        --card: #10151d;
+        --active: #1e2633;
+        --border: #262d38;
+        --border-strong: #3a4453;
+        --text: #f7f8fb;
+        --muted: #a4acba;
+        --faint: #626b79;
+        --accent: #ff4d6d;
+        --accent-glow: rgba(255, 77, 109, 0.28);
+        --thumb-a: #2b3141;
+        --thumb-b: #0e1118;
+        --thumb-hot: rgba(79, 195, 247, 0.5);
+        --timeline: #10141b;
+        --segment: #c94660;
+      }
+
+      @media (max-width: 1180px) {
+        .concept {
+          grid-template-columns: 1fr;
+        }
+
+        .notes {
+          position: static;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="intro">
+        <div>
+          <h1>AI Clip Assembler shell theme concepts</h1>
+          <p>Three PR-1 directions for shell, design tokens, and placeholder project sidebar only. Route content is represented as inert placeholder panels so data wiring and page internals stay out of scope.</p>
+        </div>
+        <span class="tag">tokens keep 11px metadata text</span>
+      </section>
+
+      <section class="concept">
+        <aside class="notes">
+          <h2>1. Editorial Steel</h2>
+          <p>Closest to the plan: neutral graphite, calm blue accent, dense chrome. Safest professional video-editor read.</p>
+        </aside>
+        <div class="shell concept-a">
+          <div class="titlebar">
+            <div class="traffic"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+            <div class="project-name">sunset-drone-footage</div>
+            <div class="command"><span>Search commands</span><strong>⌘K</strong></div>
+          </div>
+          <div class="workspace">
+            <aside class="sidebar">
+              <div class="new-button">+ New Project</div>
+              <div>
+                <div class="section-label">Projects</div>
+                <div class="project active"><span class="dot"></span><span>sunset-drone-footage</span><span class="count">72</span></div>
+                <div class="project"><span></span><span>forest-interview</span><span class="count">18</span></div>
+                <div class="project"><span></span><span>coast-broll</span><span class="count">44</span></div>
+              </div>
+              <div class="sidebar-bottom">
+                <div class="side-action">↗ Open folder</div>
+                <div class="side-action">⚙ Settings</div>
+                <div class="side-action">⌁ Diagnostics</div>
+              </div>
+            </aside>
+            <section class="content">
+              <div class="route-head">
+                <div><h3>Review Board</h3><p>72 candidates from 5 source clips</p></div>
+                <div class="pills"><span class="pill">threshold 0.74</span><span class="pill">ffmpeg ready</span></div>
+              </div>
+              <div class="preview-grid">
+                <article class="clip"><div class="thumb"></div><div class="clip-meta"><span class="clip-title">ridge reveal</span><span class="count">00:03:18:12 · score 91</span></div></article>
+                <article class="clip"><div class="thumb"></div><div class="clip-meta"><span class="clip-title">wide valley pan</span><span class="count">00:07:42:03 · score 86</span></div></article>
+                <article class="clip"><div class="thumb"></div><div class="clip-meta"><span class="clip-title">cloud break</span><span class="count">00:10:05:21 · score 83</span></div></article>
+              </div>
+            </section>
+          </div>
+          <div class="statusbar"><span>● Backend online</span><span>ffmpeg ✓</span><span>pi ✓</span><span>24 accepted / 72 candidates</span></div>
+        </div>
+      </section>
+
+      <section class="concept">
+        <aside class="notes">
+          <h2>2. Cutroom Olive</h2>
+          <p>Warmer and more tactile: dark green-black surfaces, muted olive accent, less SaaS. Good if the app should feel like an editing room tool.</p>
+        </aside>
+        <div class="shell concept-b">
+          <div class="titlebar">
+            <div class="traffic"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+            <div class="project-name">sunset-drone-footage</div>
+            <div class="command"><span>Search commands</span><strong>⌘K</strong></div>
+          </div>
+          <div class="workspace">
+            <aside class="sidebar">
+              <div class="new-button">+ New Project</div>
+              <div>
+                <div class="section-label">Projects</div>
+                <div class="project active"><span class="dot"></span><span>sunset-drone-footage</span><span class="count">72</span></div>
+                <div class="project"><span></span><span>forest-interview</span><span class="count">18</span></div>
+                <div class="project"><span></span><span>coast-broll</span><span class="count">44</span></div>
+              </div>
+              <div class="sidebar-bottom">
+                <div class="side-action">↗ Open folder</div>
+                <div class="side-action">⚙ Settings</div>
+                <div class="side-action">⌁ Diagnostics</div>
+              </div>
+            </aside>
+            <section class="content">
+              <div class="route-head">
+                <div><h3>Import</h3><p>Drop MP4 footage into the local project workspace</p></div>
+                <div class="pills"><span class="pill">local only</span><span class="pill">5 files queued</span></div>
+              </div>
+              <div class="timeline-strip">
+                <div class="segment" style="width: 19%"></div>
+                <div class="segment" style="width: 28%"></div>
+                <div class="segment" style="width: 12%"></div>
+                <div class="segment" style="width: 23%"></div>
+              </div>
+            </section>
+          </div>
+          <div class="statusbar"><span>● Backend online</span><span>opencv ✓</span><span>scenedetect ✓</span><span>5 videos imported</span></div>
+        </div>
+      </section>
+
+      <section class="concept">
+        <aside class="notes">
+          <h2>3. Signal Console</h2>
+          <p>Sharper contrast, cooler blacks, punchy red accent. Most distinctive, but higher risk because it can feel more diagnostic than editor-native.</p>
+        </aside>
+        <div class="shell concept-c">
+          <div class="titlebar">
+            <div class="traffic"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+            <div class="project-name">sunset-drone-footage</div>
+            <div class="command"><span>Search commands</span><strong>⌘K</strong></div>
+          </div>
+          <div class="workspace">
+            <aside class="sidebar">
+              <div class="new-button">+ New Project</div>
+              <div>
+                <div class="section-label">Projects</div>
+                <div class="project active"><span class="dot"></span><span>sunset-drone-footage</span><span class="count">72</span></div>
+                <div class="project"><span></span><span>forest-interview</span><span class="count">18</span></div>
+                <div class="project"><span></span><span>coast-broll</span><span class="count">44</span></div>
+              </div>
+              <div class="sidebar-bottom">
+                <div class="side-action">↗ Open folder</div>
+                <div class="side-action">⚙ Settings</div>
+                <div class="side-action">⌁ Diagnostics</div>
+              </div>
+            </aside>
+            <section class="content">
+              <div class="route-head">
+                <div><h3>Export</h3><p>Prepare an edit decision list for downstream editors</p></div>
+                <div class="pills"><span class="pill">FCPXML</span><span class="pill">24 accepted</span></div>
+              </div>
+              <div class="preview-grid">
+                <article class="clip"><div class="thumb"></div><div class="clip-meta"><span class="clip-title">assembly pass</span><span class="count">03:42 total runtime</span></div></article>
+                <article class="clip"><div class="thumb"></div><div class="clip-meta"><span class="clip-title">edl preview</span><span class="count">24 events · 0 errors</span></div></article>
+                <article class="clip"><div class="thumb"></div><div class="clip-meta"><span class="clip-title">resolve xml</span><span class="count">ready</span></div></article>
+              </div>
+            </section>
+          </div>
+          <div class="statusbar"><span>● Backend online</span><span>exporter ready</span><span>diagnostics clean</span><span>24 accepted / 72 candidates</span></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

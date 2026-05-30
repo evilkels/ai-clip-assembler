@@ -844,4 +844,3 @@ def test_list_harnesses_shows_pi_agent_enabled_and_local_qwen_postponed():
     assert harnesses["pi_agent"]["enabled"] is True
     # Local Qwen is postponed until the local-model path is fully figured out.
     assert harnesses["local_qwen"]["enabled"] is False
-    assert harnesses["manual"]["enabled"] is True

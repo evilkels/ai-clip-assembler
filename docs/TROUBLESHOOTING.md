@@ -84,7 +84,7 @@ restarts.
 
 ```bash
 # Backend
-cd backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py
+cd backend && PYTHONPATH=. .venv/bin/python -m pytest
 
 # Frontend
 cd frontend && npm run typecheck && npm run build

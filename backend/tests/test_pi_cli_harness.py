@@ -163,7 +163,7 @@ def test_call_pi_cli_raises_clear_error_on_nonzero_exit(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     try:
-        _call_pi_cli(["/tmp/frame.jpg"], timeout_sec=1)
+        _call_pi_cli(["/tmp/frame.jpg"], pi_bin="pi", timeout_sec=1)
     except PiCliUnavailableError as exc:
         assert "not logged in" in str(exc)
     else:
@@ -181,7 +181,7 @@ def test_call_pi_cli_parses_stdout_json(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = _call_pi_cli(["/tmp/frame.jpg"], timeout_sec=1)
+    result = _call_pi_cli(["/tmp/frame.jpg"], pi_bin="pi", timeout_sec=1)
 
     assert result == {"smoothness": 8, "visual_interest": 6, "reason": "ok"}
 
@@ -193,7 +193,7 @@ def test_call_pi_cli_raises_when_binary_missing(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     try:
-        _call_pi_cli(["/tmp/frame.jpg"], timeout_sec=1)
+        _call_pi_cli(["/tmp/frame.jpg"], pi_bin="pi", timeout_sec=1)
     except PiCliUnavailableError as exc:
         assert "not found" in str(exc)
     else:

@@ -52,11 +52,11 @@ automatically.
 
 ```bash
 cd backend
-PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py
+PYTHONPATH=. .venv/bin/python -m pytest
 ```
 
-> `tests/test_codex_cli_harness.py` is an unfinished stub that imports a module
-> that does not exist yet; ignore it until the codex harness is implemented.
+Run the backend tests from `backend/` so `PYTHONPATH=.` resolves the `src`
+package consistently.
 
 ## Frontend (Electron + React + Vite)
 

@@ -20,11 +20,15 @@ brew install python@3.11 node ffmpeg
 ffmpeg -hide_banner -filters | grep vidstabdetect   # must print a line
 
 # Backend
-cd backend && python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd backend
+python3.11 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn src.api:app --reload --port 8000 &
 
-# Frontend (new shell)
-cd frontend && npm install && npm run dev
+# Frontend
+cd ../frontend
+npm install
+npm run dev
 ```
 
 Full setup, tests, and project layout: [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md).

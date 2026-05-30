@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { ImportPage } from './routes/Import';
 import { ReviewPage } from './routes/Review';
+import { TimelinePage } from './routes/Timeline';
 import { ExportPage } from './routes/Export';
 import { ReviewProvider, useReview } from './state/ReviewContext';
 import { pingBackend } from './api/client';
@@ -60,6 +61,9 @@ function Shell() {
           <NavLink to="/review" className={({ isActive }) => (isActive ? 'active' : '')}>
             Review
           </NavLink>
+          <NavLink to="/timeline" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Timeline
+          </NavLink>
           <NavLink to="/export" className={({ isActive }) => (isActive ? 'active' : '')}>
             Export
           </NavLink>
@@ -70,6 +74,7 @@ function Shell() {
           <Route path="/" element={<Navigate to="/import" replace />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/review" element={<ReviewPage />} />
+          <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/export" element={<ExportPage />} />
         </Routes>
       </main>

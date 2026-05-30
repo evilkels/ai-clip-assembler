@@ -347,7 +347,7 @@ def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
     assert "TITLE:" in Path(body["file_path"]).read_text()
 
 
-def test_analyze_local_qwen_harness_returns_enhanced_clips(monkeypatch, tmp_path):
+def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
     client = TestClient(api.app)
@@ -421,30 +421,30 @@ def test_analyze_local_qwen_harness_returns_enhanced_clips(monkeypatch, tmp_path
                         }
                     )
                 ],
-                "metadata": {"model_used": "qwen3-vl:8b", "local": True, "used_ai": True, "clips_enhanced": 1, "clips_total": 1},
-                "harness_id": "local_qwen",
+                "metadata": {"model_used": "gpt-5.4-mini", "local": False, "used_ai": True, "clips_enhanced": 1, "clips_total": 1},
+                "harness_id": "pi_agent",
             }
         )
         return enhanced, True
 
-    monkeypatch.setattr("src.api.enhance_clips_with_local_qwen", fake_enhance)
+    monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
 
     response = client.post(
         f"/projects/{project_id}/analyze",
-        json={"project_id": project_id, "harness_id": "local_qwen", "preferences": {}},
+        json={"project_id": project_id, "harness_id": "pi_agent", "preferences": {}},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "complete"
-    assert body["harness_id"] == "local_qwen"
+    assert body["harness_id"] == "pi_agent"
     assert body["clips"][0]["clip_id"] == "clip-1"
-    assert body["metadata"]["model_used"] == "qwen3-vl:8b"
-    assert body["metadata"]["local"] is True
+    assert body["metadata"]["model_used"] == "gpt-5.4-mini"
+    assert body["metadata"]["local"] is False
     assert "warning" not in body["metadata"]
 
 
-def test_analyze_local_qwen_fallback_when_ollama_unavailable(monkeypatch, tmp_path):
+def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
     client = TestClient(api.app)
@@ -509,25 +509,40 @@ def test_analyze_local_qwen_fallback_when_ollama_unavailable(monkeypatch, tmp_pa
     def fake_enhance(result, frames, **kwargs):
         fallback = result.model_copy(
             update={
-                "metadata": {"warning": "Local Qwen fallback: Ollama/model unavailable", "used_ai": False},
-                "harness_id": "local_qwen",
+                "metadata": {"warning": "pi harness fallback: CLI unavailable or no usable scores", "used_ai": False},
+                "harness_id": "pi_agent",
             }
         )
         return fallback, False
 
-    monkeypatch.setattr("src.api.enhance_clips_with_local_qwen", fake_enhance)
+    monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "pi_agent", "preferences": {}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "complete"
+    assert body["harness_id"] == "pi_agent"
+    assert body["clips"][0]["overall_score"] == 8
+    assert "file-1" in body["metadata"]["warning"]
+
+
+def test_analyze_rejects_postponed_local_qwen_harness(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
 
     response = client.post(
         f"/projects/{project_id}/analyze",
         json={"project_id": project_id, "harness_id": "local_qwen", "preferences": {}},
     )
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "complete"
-    assert body["harness_id"] == "local_qwen"
-    assert body["clips"][0]["overall_score"] == 8
-    assert "file-1" in body["metadata"]["warning"]
+    assert response.status_code == 400
+    assert "manual and pi_agent" in response.json()["detail"]
 
 
 def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
@@ -820,10 +835,13 @@ def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path)
     assert "00:00:01:00 00:00:02:00 00:00:00:00 00:00:01:00" in Path(response.json()["file_path"]).read_text()
 
 
-def test_list_harnesses_shows_local_qwen_enabled():
+def test_list_harnesses_shows_pi_agent_enabled_and_local_qwen_postponed():
     client = TestClient(api.app)
     response = client.get("/harnesses")
     assert response.status_code == 200
     harnesses = {h["id"]: h for h in response.json()["harnesses"]}
-    assert harnesses["local_qwen"]["enabled"] is True
+    assert harnesses["manual"]["enabled"] is True
+    assert harnesses["pi_agent"]["enabled"] is True
+    # Local Qwen is postponed until the local-model path is fully figured out.
+    assert harnesses["local_qwen"]["enabled"] is False
     assert harnesses["manual"]["enabled"] is True

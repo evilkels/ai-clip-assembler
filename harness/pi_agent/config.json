@@ -1,0 +1,17 @@
+{
+  "id": "pi_agent",
+  "name": "Pi Agent",
+  "type": "agent",
+  "enabled": true,
+  "version": "1.0.0",
+  "interface_version": "1.0",
+  "_comment": "Reference only. The implementation lives in backend/src/pi_cli_harness.py and is configured via environment variables: PI_BIN, PI_PROVIDER, PI_MODEL, PI_TIMEOUT_SEC. Provider credentials are managed by the pi CLI itself (pi /login, ~/.pi/agent/auth.json, or provider env vars such as OPENCODE_API_KEY).",
+  "config": {
+    "bin": "pi",
+    "provider": "openai-codex",
+    "model": "gpt-5.4-mini",
+    "mode": "print",
+    "max_frames_per_clip": 4,
+    "timeout_sec": 180
+  }
+}

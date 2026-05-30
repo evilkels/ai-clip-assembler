@@ -103,7 +103,37 @@
 
 ## Harness Implementations
 
-### 1. Local Model Harness (Default)
+### 0. Pi Coding-Agent Harness (Default)
+
+**ID:** `pi_agent`
+**Status:** Active default AI harness.
+**Input:** Sampled frame image paths per candidate clip.
+**Process:**
+1. For each rule-based candidate clip, sample up to 4 representative frames.
+2. Spawn the `pi` CLI in non-interactive print mode (`pi --provider <p> --model <m> --print --mode text --no-session`).
+3. `pi` reads the frame images with its built-in `read` tool and returns a JSON object scoring smoothness and visual interest.
+4. Blend the score (70 % original technical + 30 % visual interest) and re-rank clips.
+5. Fall back to the rule-based result if the CLI is unavailable or every clip fails to score.
+
+**Config (environment variables only):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PI_BIN` | `pi` | Path/name of the pi executable |
+| `PI_PROVIDER` | `openai-codex` | pi provider to route through (e.g. `openai-codex`, `opencode`) |
+| `PI_MODEL` | `gpt-5.4-mini` | Model pattern/ID for that provider |
+| `PI_TIMEOUT_SEC` | `180` | Per-clip subprocess timeout in seconds |
+
+Provider credentials are managed by `pi` itself (`pi /login`, `~/.pi/agent/auth.json`,
+or provider env vars such as `OPENCODE_API_KEY`); the harness inherits the backend
+process environment when spawning the CLI.
+
+### 1. Local Model Harness (Postponed)
+
+> **Status:** Postponed and disabled in `GET /harnesses`. The local-model path
+> (Ollama/MLX) is not fully figured out yet. The code in
+> `backend/src/local_qwen_harness.py` is retained for future re-enablement but is
+> not a selectable harness in `/analyze`.
 
 **ID:** `local_qwen`
 **Input:** Frame images + OpenCV metrics

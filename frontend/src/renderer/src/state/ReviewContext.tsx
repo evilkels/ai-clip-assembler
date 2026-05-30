@@ -32,6 +32,7 @@ interface ReviewState {
   exclude: (clipId: string) => void;
   resetDecision: (clipId: string) => void;
   moveAccepted: (clipId: string, direction: -1 | 1) => void;
+  reorderAccepted: (clipId: string, toIndex: number) => void;
   setTrim: (clipId: string, trim: Trim) => void;
   setProjectId: (id: string) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
@@ -140,6 +141,18 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const reorderAccepted = useCallback((clipId: string, toIndex: number) => {
+    setAcceptedOrder((prev) => {
+      const from = prev.indexOf(clipId);
+      if (from < 0) return prev;
+      const without = prev.slice();
+      without.splice(from, 1);
+      const target = Math.max(0, Math.min(toIndex, without.length));
+      without.splice(target, 0, clipId);
+      return without;
+    });
+  }, []);
+
   const setTrim = useCallback((clipId: string, trim: Trim) => {
     setTrims((prev) => ({ ...prev, [clipId]: trim }));
   }, []);
@@ -161,6 +174,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       exclude,
       resetDecision,
       moveAccepted,
+      reorderAccepted,
       setTrim,
       setProjectId,
       setUploadedVideos,
@@ -184,6 +198,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       exclude,
       resetDecision,
       moveAccepted,
+      reorderAccepted,
       setTrim,
     ],
   );

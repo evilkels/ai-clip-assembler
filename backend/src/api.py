@@ -16,7 +16,8 @@ from pydantic import BaseModel
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .export_engine import choose_timeline_fps, generate_edl, generate_fcpxml
-from .local_qwen_harness import enhance_clips_with_local_qwen
+from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (postponed; kept for future re-enable)
+from .pi_cli_harness import enhance_clips_with_pi_cli
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -120,8 +121,8 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
 async def analyze_videos(project_id: str, request: AnalysisRequest):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    if request.harness_id not in ("manual", "local_qwen"):
-        raise HTTPException(status_code=400, detail="Only manual and local_qwen harnesses are available in the drone MVP")
+    if request.harness_id not in ("manual", "pi_agent"):
+        raise HTTPException(status_code=400, detail="Only manual and pi_agent harnesses are available in the drone MVP")
 
     all_clips = []
     per_video_results = []
@@ -158,8 +159,8 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
             preferences=preferences,
         )
         video_metadata = {}
-        if request.harness_id == "local_qwen":
-            result, used_ai = enhance_clips_with_local_qwen(result, frame_scores)
+        if request.harness_id == "pi_agent":
+            result, used_ai = enhance_clips_with_pi_cli(result, frame_scores)
             video_metadata["used_ai"] = used_ai
             video_metadata["model_used"] = result.metadata.get("model_used")
             video_metadata["file_id"] = video["file_id"]
@@ -189,7 +190,7 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
     }
-    if request.harness_id == "local_qwen":
+    if request.harness_id == "pi_agent":
         harness_metadata = {"per_video": per_video_results}
         all_ai = all(v.get("used_ai") for v in per_video_results)
         any_ai = any(v.get("used_ai") for v in per_video_results)
@@ -200,8 +201,8 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
                 v["file_id"] for v in per_video_results if v.get("warning")
             ]
             harness_metadata["warning"] = (
-                f"Local Qwen fallback for video(s): {', '.join(fallback_videos)}"
-                if fallback_videos else "Local Qwen fallback"
+                f"pi harness fallback for video(s): {', '.join(fallback_videos)}"
+                if fallback_videos else "pi harness fallback"
             )
         else:
             harness_metadata["used_ai"] = True
@@ -212,7 +213,7 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
             harness_metadata["model_used"] = models_used[0]
         elif models_used:
             harness_metadata["models_used"] = models_used
-        harness_metadata["local"] = True
+        harness_metadata["local"] = False
         response["metadata"] = harness_metadata
     return response
 
@@ -285,10 +286,10 @@ async def list_harnesses():
     return {
         "harnesses": [
             {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True},
-            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": True},
+            {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": True},
+            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": False},
             {"id": "claude_code", "name": "Claude Code", "type": "agent", "enabled": False},
             {"id": "codex", "name": "Codex", "type": "agent", "enabled": False},
-            {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": False},
         ]
     }
 

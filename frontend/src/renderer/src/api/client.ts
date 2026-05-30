@@ -108,7 +108,7 @@ export async function analyzeProject(
   projectId: string,
   options: AnalyzeOptions = {},
 ): Promise<AnalysisResult> {
-  const harness_id = options.harness_id ?? 'manual';
+  const harness_id = options.harness_id ?? 'pi_agent';
   const preferences = options.preferences ?? {};
   const res = await fetch(`${backendUrl()}/projects/${projectId}/analyze`, {
     method: 'POST',
@@ -167,17 +167,38 @@ export async function exportTimeline(
 export interface UpdateTimelineOptions {
   order?: string[];
   trims?: Record<string, { start_sec: number; end_sec: number }>;
+  clips?: Array<{
+    clip_id: string;
+    start_sec: number;
+    end_sec: number;
+    included?: boolean;
+  }>;
 }
 
 export async function updateTimeline(
   projectId: string,
   options: UpdateTimelineOptions,
 ): Promise<{ ok: boolean }> {
+  const clips =
+    options.clips ??
+    (options.order ?? []).map((clipId) => {
+      const trim = options.trims?.[clipId];
+      if (!trim) {
+        throw new Error(`Missing trim for accepted clip: ${clipId}`);
+      }
+      return {
+        clip_id: clipId,
+        start_sec: trim.start_sec,
+        end_sec: trim.end_sec,
+        included: true,
+      };
+    });
+
   try {
     const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, ...options }),
+      body: JSON.stringify({ clips }),
     });
     if (!res.ok) {
       if (res.status === 404) return { ok: false };

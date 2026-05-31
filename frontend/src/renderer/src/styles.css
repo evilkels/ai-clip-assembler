@@ -212,6 +212,7 @@ a {
   align-items: center;
   gap: 8px;
   padding: 0 8px;
+  width: 100%;
 }
 
 .project-row:hover,
@@ -248,6 +249,34 @@ a {
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+}
+
+.project-row-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 6px 28px;
+}
+
+.project-row-actions button,
+.project-empty,
+.sidebar-error,
+.sidebar-current {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.project-row-actions button:hover {
+  color: var(--text);
+}
+
+.project-empty,
+.sidebar-error,
+.sidebar-current {
+  padding: 6px 8px;
+}
+
+.sidebar-error {
+  color: var(--text-error);
 }
 
 .route-link,

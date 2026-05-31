@@ -55,7 +55,16 @@ export function ExportPage() {
       }
 
       try {
-        const result = await exportTimeline(projectId, format);
+        let result;
+        try {
+          result = await exportTimeline(projectId, format);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (!message.includes('already exists')) throw err;
+          const overwrite = window.confirm(`${message}\n\nOverwrite existing export?`);
+          if (!overwrite) throw err;
+          result = await exportTimeline(projectId, format, { overwrite: true });
+        }
         setExportResult((prev) => ({ ...prev, [format]: result.file_path }));
       } catch (err) {
         setExportError(err instanceof Error ? err.message : String(err));

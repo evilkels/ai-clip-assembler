@@ -8,11 +8,19 @@ const bridge = {
   selectProjectFolder: () => ipcRenderer.invoke('project:select-folder') as Promise<string | null>,
   listRecentProjects: () =>
     ipcRenderer.invoke('project:recent-list') as Promise<
-      Array<{ folderPath: string; lastOpenedAt: string }>
+      Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
     >,
-  addRecentProject: (folderPath: string) =>
-    ipcRenderer.invoke('project:recent-add', folderPath) as Promise<
-      Array<{ folderPath: string; lastOpenedAt: string }>
+  addRecentProject: (folderPath: string, name?: string) =>
+    ipcRenderer.invoke('project:recent-add', folderPath, name) as Promise<
+      Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
+    >,
+  removeRecentProject: (folderPath: string) =>
+    ipcRenderer.invoke('project:recent-remove', folderPath) as Promise<
+      Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
+    >,
+  relocateRecentProject: (folderPath: string) =>
+    ipcRenderer.invoke('project:recent-relocate', folderPath) as Promise<
+      Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
     >,
 };
 

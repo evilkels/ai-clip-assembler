@@ -46,6 +46,13 @@ export interface ProjectManifest {
   settings_overrides: Record<string, unknown>;
 }
 
+export interface RecentProject {
+  folderPath: string;
+  lastOpenedAt: string;
+  name?: string;
+  missing?: boolean;
+}
+
 export interface AnalysisResult {
   project_id: string;
   harness_id: string;

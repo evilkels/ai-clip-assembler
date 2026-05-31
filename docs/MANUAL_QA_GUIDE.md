@@ -128,6 +128,7 @@ Nested folders are intentionally ignored in the MVP.
 <footage-folder>/clipassembler/samples/
 <footage-folder>/clipassembler/analysis/
 <footage-folder>/clipassembler/cache/
+<footage-folder>/clipassembler/cache/.nosync
 ```
 
 5. Click **Analyze**.
@@ -147,9 +148,35 @@ Move-folder check:
 1. Quit the app.
 2. Rename or move the footage folder.
 3. Launch the app again.
-4. Use **Create / Open Folder Project** and choose the moved folder.
-5. Confirm the existing `clipassembler/project.json` opens without overwriting
+4. Confirm the sidebar marks the old recent project as missing.
+5. Click **Locate** and choose the moved folder.
+6. Open the relocated recent project.
+7. Confirm the existing `clipassembler/project.json` opens without overwriting
    the source video list.
+
+Rescan check:
+
+1. Add a new top-level `.mp4`, `.mov`, or `.mkv` to the footage folder.
+2. Click **Rescan** in the sidebar or Import tab.
+3. Confirm the new source video appears in the UI.
+4. Confirm `clipassembler/project.json::source_videos` includes the new file
+   once and preserves existing entries.
+
+Recent-list and delete-files checks:
+
+1. Click **Remove** on a recent project.
+2. Confirm the recent entry disappears and the folder contents remain untouched.
+3. Reopen the folder project.
+4. Click **Delete project files**.
+5. Confirm only `clipassembler/` and `exports/` are deleted.
+6. Confirm source videos remain in place.
+
+Overwrite check:
+
+1. Export an EDL or FCPXML.
+2. Export the same format again.
+3. Confirm the app warns before overwriting.
+4. Confirm canceling leaves the existing export untouched.
 
 Empty-folder check:
 

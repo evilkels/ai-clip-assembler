@@ -7,19 +7,31 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import {
+  addRecentProject,
+  createProject,
+  createProjectFromFolder,
+  deleteProjectFiles,
+  getClipsWithFallback,
+  listRecentProjects,
+  relocateRecentProject,
+  removeRecentProject,
+  rescanProject,
+} from '../api/client';
 import type {
   AnalysisStatus,
   ClipCandidate,
   ClipDecision,
+  RecentProject,
   Trim,
   UploadedVideo,
 } from '../types/clip';
-import { createProject, createProjectFromFolder, getClipsWithFallback } from '../api/client';
 
 interface ReviewState {
   projectId: string | null;
   projectName: string | null;
   projectFolder: string | null;
+  recentProjects: RecentProject[];
   uploadedVideos: UploadedVideo[];
   analysisStatus: AnalysisStatus;
   loading: boolean;
@@ -36,11 +48,17 @@ interface ReviewState {
   moveAccepted: (clipId: string, direction: -1 | 1) => void;
   reorderAccepted: (clipId: string, toIndex: number) => void;
   setTrim: (clipId: string, trim: Trim) => void;
-  setProjectId: (id: string) => void;
+  setProjectId: (id: string | null) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
   setAnalysisStatus: (status: AnalysisStatus) => void;
   setClips: (clips: ClipCandidate[]) => void;
+  createUploadProject: () => Promise<void>;
   openProjectFolder: (folderPath: string) => Promise<void>;
+  refreshRecentProjects: () => Promise<void>;
+  removeRecent: (folderPath: string) => Promise<void>;
+  relocateRecent: (folderPath: string) => Promise<void>;
+  rescanOpenProject: () => Promise<void>;
+  deleteOpenProjectFiles: () => Promise<void>;
   acceptedCount: number;
   totalCount: number;
 }
@@ -51,6 +69,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [projectFolder, setProjectFolder] = useState<string | null>(null);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [uploadedVideos, setUploadedVideos] = useState<UploadedVideo[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({ phase: 'idle' });
   const [clips, setClips] = useState<ClipCandidate[]>([]);
@@ -61,32 +80,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
 
-  useEffect(() => {
-    let alive = true;
-    createProject()
-      .then(({ project_id }) => {
-        if (!alive) return;
-        setProjectId(project_id);
-        setClips([]);
-        setError(null);
-      })
-      .catch(() => {
-        if (!alive) return;
-        getClipsWithFallback(null)
-          .then((loaded) => {
-            if (!alive) return;
-            setClips(loaded);
-          })
-          .finally(() => {
-            if (!alive) return;
-            setLoading(false);
-          });
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   const resetProjectSession = useCallback(() => {
     setClips([]);
     setDecisions({});
@@ -95,6 +88,28 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
   }, []);
+
+  const refreshRecentProjects = useCallback(async () => {
+    setRecentProjects(await listRecentProjects());
+  }, []);
+
+  useEffect(() => {
+    refreshRecentProjects().catch(() => {});
+  }, [refreshRecentProjects]);
+
+  const createUploadProject = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { project_id } = await createProject();
+      setProjectId(project_id);
+      setProjectName('Upload Project');
+      setProjectFolder(null);
+      setUploadedVideos([]);
+      resetProjectSession();
+    } finally {
+      setLoading(false);
+    }
+  }, [resetProjectSession]);
 
   const openProjectFolder = useCallback(
     async (folderPath: string) => {
@@ -106,12 +121,52 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setProjectFolder(result.project_folder);
         setUploadedVideos(result.videos);
         resetProjectSession();
+        setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
       } finally {
         setLoading(false);
       }
     },
     [resetProjectSession],
   );
+
+  const removeRecent = useCallback(async (folderPath: string) => {
+    setRecentProjects(await removeRecentProject(folderPath));
+  }, []);
+
+  const relocateRecent = useCallback(async (folderPath: string) => {
+    setRecentProjects(await relocateRecentProject(folderPath));
+  }, []);
+
+  const rescanOpenProject = useCallback(async () => {
+    if (!projectId || !projectFolder) return;
+    setLoading(true);
+    try {
+      const result = await rescanProject(projectId);
+      setProjectName(result.project.name);
+      setProjectFolder(result.project_folder);
+      setUploadedVideos(result.videos);
+      resetProjectSession();
+      setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, projectFolder, resetProjectSession]);
+
+  const deleteOpenProjectFiles = useCallback(async () => {
+    if (!projectId || !projectFolder) return;
+    setLoading(true);
+    try {
+      await deleteProjectFiles(projectId);
+      setRecentProjects(await removeRecentProject(projectFolder));
+      setProjectId(null);
+      setProjectName(null);
+      setProjectFolder(null);
+      setUploadedVideos([]);
+      resetProjectSession();
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, projectFolder, resetProjectSession]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -193,6 +248,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       projectId,
       projectName,
       projectFolder,
+      recentProjects,
       uploadedVideos,
       analysisStatus,
       loading,
@@ -213,7 +269,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setUploadedVideos,
       setAnalysisStatus,
       setClips,
+      createUploadProject,
       openProjectFolder,
+      refreshRecentProjects,
+      removeRecent,
+      relocateRecent,
+      rescanOpenProject,
+      deleteOpenProjectFiles,
       acceptedCount: acceptedOrder.length,
       totalCount: clips.length,
     }),
@@ -221,6 +283,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       projectId,
       projectName,
       projectFolder,
+      recentProjects,
       uploadedVideos,
       analysisStatus,
       loading,
@@ -236,7 +299,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       moveAccepted,
       reorderAccepted,
       setTrim,
+      createUploadProject,
       openProjectFolder,
+      refreshRecentProjects,
+      removeRecent,
+      relocateRecent,
+      rescanOpenProject,
+      deleteOpenProjectFiles,
     ],
   );
 

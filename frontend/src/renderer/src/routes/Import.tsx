@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
 import {
-  addRecentProject,
   analyzeProject,
-  listRecentProjects,
   selectProjectFolder,
   uploadVideo,
 } from '../api/client';
@@ -21,39 +19,20 @@ export function ImportPage() {
     projectFolder,
     uploadedVideos,
     analysisStatus,
+    createUploadProject,
     setUploadedVideos,
     setAnalysisStatus,
     setClips,
     openProjectFolder,
+    rescanOpenProject,
   } = useReview();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [openingFolder, setOpeningFolder] = useState(false);
-  const [recentProjects, setRecentProjects] = useState<Array<{ folderPath: string; lastOpenedAt: string }>>([]);
-
-  useEffect(() => {
-    let alive = true;
-    listRecentProjects().then((projects) => {
-      if (alive) setRecentProjects(projects);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const openFolderPath = useCallback(
-    async (folderPath: string) => {
-      await openProjectFolder(folderPath);
-      const recents = await addRecentProject(folderPath);
-      setRecentProjects(recents);
-    },
-    [openProjectFolder],
-  );
 
   const handleFiles = useCallback(
     async (files: FileList) => {
-      if (!projectId) return;
       setUploadErrors([]);
       setUploading(true);
       const accepted = Array.from(files).filter((f) =>
@@ -64,10 +43,17 @@ export function ImportPage() {
         setUploading(false);
         return;
       }
+      let activeProjectId = projectId;
+      if (!activeProjectId) {
+        await createUploadProject();
+        setUploadErrors(['Legacy upload project created. Select the files again to upload.']);
+        setUploading(false);
+        return;
+      }
       const newVideos = [...uploadedVideos];
       for (const file of accepted) {
         try {
-          const video = await uploadVideo(projectId, file);
+          const video = await uploadVideo(activeProjectId, file);
           newVideos.push(video);
         } catch (err) {
           setUploadErrors((prev) => [
@@ -79,7 +65,7 @@ export function ImportPage() {
       setUploadedVideos(newVideos);
       setUploading(false);
     },
-    [projectId, uploadedVideos, setUploadedVideos],
+    [projectId, uploadedVideos, setUploadedVideos, createUploadProject],
   );
 
   const handleAnalyze = useCallback(async () => {
@@ -103,7 +89,7 @@ export function ImportPage() {
     try {
       const folderPath = await selectProjectFolder();
       if (!folderPath) return;
-      await openFolderPath(folderPath);
+      await openProjectFolder(folderPath);
     } catch (err) {
       setUploadErrors([
         err instanceof Error ? err.message : String(err),
@@ -111,7 +97,7 @@ export function ImportPage() {
     } finally {
       setOpeningFolder(false);
     }
-  }, [openFolderPath]);
+  }, [openProjectFolder]);
 
   const isAnalyzing = analysisStatus.phase === 'analyzing';
   const isComplete = analysisStatus.phase === 'complete';
@@ -135,48 +121,24 @@ export function ImportPage() {
           <button className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
             {openingFolder ? 'Opening…' : 'Create / Open Folder Project'}
           </button>
+          {projectFolder && (
+            <button className="btn subtle" onClick={rescanOpenProject}>
+              Rescan Folder
+            </button>
+          )}
         </div>
-
-        {recentProjects.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <h2 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
-              RECENT PROJECTS
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {recentProjects.map((project) => (
-                <button
-                  key={project.folderPath}
-                  className="btn subtle"
-                  style={{ justifyContent: 'flex-start' }}
-                  disabled={openingFolder}
-                  onClick={() => {
-                    setOpeningFolder(true);
-                    setUploadErrors([]);
-                    openFolderPath(project.folderPath)
-                      .catch((err) => {
-                        setUploadErrors([
-                          err instanceof Error ? err.message : String(err),
-                        ]);
-                      })
-                      .finally(() => setOpeningFolder(false));
-                  }}
-                >
-                  {project.folderPath}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div
           className="drop-zone"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            if (!projectFolder) fileInputRef.current?.click();
+          }}
           style={{
             border: '1px dashed var(--border)',
             borderRadius: 8,
             padding: 24,
             textAlign: 'center',
-            cursor: 'pointer',
+            cursor: projectFolder ? 'default' : 'pointer',
             marginBottom: 16,
           }}
         >
@@ -196,7 +158,9 @@ export function ImportPage() {
               ? 'Uploading…'
               : hasVideos
                 ? `${uploadedVideos.length} source video${uploadedVideos.length === 1 ? '' : 's'} ready — click to add more`
-                : 'Click to select MP4/MOV files'}
+                : projectFolder
+                  ? 'Add videos to the folder, then rescan'
+                  : 'Click to select MP4/MOV files'}
           </p>
         </div>
 

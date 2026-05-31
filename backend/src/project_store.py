@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List
@@ -12,6 +13,10 @@ PROJECT_MANIFEST_FILENAME = "project.json"
 PROJECT_SCHEMA_VERSION = 1
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
 DEFAULT_HARNESS_ID = "pi_agent"
+UNSAFE_PROJECT_ROOTS = [
+    Path("/System"),
+    Path("/Applications"),
+]
 
 
 class ProjectStoreError(Exception):
@@ -31,6 +36,10 @@ class NoSourceVideosFoundError(ProjectStoreError):
 
 
 class InvalidProjectManifestError(ProjectStoreError):
+    pass
+
+
+class UnsafeProjectFolderError(ProjectStoreError):
     pass
 
 
@@ -85,6 +94,7 @@ def create_project(
         return open_project(project_folder)
 
     validate_project_folder(project_folder)
+    validate_safe_project_folder(project_folder)
     if not has_write_permission(project_folder):
         raise ProjectFolderNotWritableError(
             f"Project folder is not writable: {project_folder}"
@@ -110,8 +120,47 @@ def create_project(
     (state_dir / "samples").mkdir(parents=True, exist_ok=True)
     (state_dir / "analysis").mkdir(parents=True, exist_ok=True)
     (state_dir / "cache").mkdir(parents=True, exist_ok=True)
+    (state_dir / "cache" / ".nosync").touch()
     write_project_manifest(project_folder, manifest)
     return manifest
+
+
+def rescan_project(
+    project_folder: Path,
+    now: Callable[[], datetime] = datetime_now_utc,
+) -> ProjectManifest:
+    manifest = open_project(project_folder)
+    known_filenames = {video.filename for video in manifest.source_videos}
+    imported_at = format_timestamp(now())
+    new_videos = [
+        ProjectSourceVideo(filename=filename, imported_at=imported_at)
+        for filename in scan_source_video_filenames(project_folder)
+        if filename not in known_filenames
+    ]
+    if not new_videos:
+        return manifest
+
+    updated = manifest.model_copy(
+        update={
+            "source_videos": sorted(
+                [*manifest.source_videos, *new_videos],
+                key=lambda video: video.filename.casefold(),
+            )
+        }
+    )
+    write_project_manifest(project_folder, updated)
+    return updated
+
+
+def delete_project_files(project_folder: Path) -> List[str]:
+    validate_project_folder(project_folder)
+    deleted = []
+    for dirname in [PROJECT_STATE_DIRNAME, "exports"]:
+        path = project_folder / dirname
+        if path.exists():
+            shutil.rmtree(path)
+            deleted.append(dirname)
+    return deleted
 
 
 def open_project(project_folder: Path) -> ProjectManifest:
@@ -153,6 +202,16 @@ def validate_project_folder(project_folder: Path) -> None:
         raise FileNotFoundError(f"Project folder does not exist: {project_folder}")
     if not project_folder.is_dir():
         raise NotADirectoryError(f"Project path is not a folder: {project_folder}")
+
+
+def validate_safe_project_folder(project_folder: Path) -> None:
+    resolved = project_folder.resolve()
+    for unsafe_root in UNSAFE_PROJECT_ROOTS:
+        unsafe = unsafe_root.resolve()
+        if resolved == unsafe or unsafe in resolved.parents:
+            raise UnsafeProjectFolderError(
+                f"Project folder is not allowed in protected location: {project_folder}"
+            )
 
 
 def project_state_dir(project_folder: Path) -> Path:

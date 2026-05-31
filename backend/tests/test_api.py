@@ -72,6 +72,54 @@ def test_create_project_from_folder_rejects_empty_folder_without_mutation(tmp_pa
     assert not (project_folder / "clipassembler").exists()
 
 
+def test_rescan_folder_project_adds_new_source_videos(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    (project_folder / "DJI_0043.MP4").write_bytes(b"video")
+
+    response = client.post(f"/projects/{project_id}/rescan")
+
+    assert response.status_code == 200
+    assert [video["file_name"] for video in response.json()["videos"]] == [
+        "DJI_0042.MP4",
+        "DJI_0043.MP4",
+    ]
+    assert [
+        video["filename"]
+        for video in response.json()["project"]["source_videos"]
+    ] == ["DJI_0042.MP4", "DJI_0043.MP4"]
+
+
+def test_delete_folder_project_files_keeps_source_video(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    (project_folder / "exports").mkdir()
+    (project_folder / "exports" / "timeline.edl").write_text("export", encoding="utf-8")
+
+    response = client.delete(f"/projects/{project_id}/files")
+
+    assert response.status_code == 200
+    assert source_video.read_bytes() == b"video"
+    assert not (project_folder / "clipassembler").exists()
+    assert not (project_folder / "exports").exists()
+    assert project_id not in api.projects
+
+
 def test_analyze_folder_project_writes_work_files_under_clipassembler(monkeypatch, tmp_path):
     api.projects.clear()
     project_folder = tmp_path / "footage"
@@ -495,6 +543,44 @@ def test_export_folder_project_writes_inside_project_exports(tmp_path):
     export_path = Path(body["file_path"])
     assert export_path == project_folder / "exports" / "fcp" / "timeline.fcpxml"
     assert 'src="../../DJI_0042.MP4"' in export_path.read_text(encoding="utf-8")
+
+
+def test_export_folder_project_requires_overwrite_flag_for_existing_export(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    api.projects[project_id]["videos"][0]["metadata"] = {
+        "duration_sec": 10.0,
+        "fps": 30,
+        "resolution": [1920, 1080],
+    }
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "DJI_0042.MP4",
+            "file_name": "DJI_0042.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+    first = client.post(f"/projects/{project_id}/export?format=edl")
+
+    blocked = client.post(f"/projects/{project_id}/export?format=edl")
+    overwritten = client.post(f"/projects/{project_id}/export?format=edl&overwrite=true")
+
+    assert first.status_code == 200
+    assert blocked.status_code == 409
+    assert "already exists" in blocked.json()["detail"]
+    assert overwritten.status_code == 200
 
 
 def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):

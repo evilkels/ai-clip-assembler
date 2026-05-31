@@ -9,6 +9,7 @@ import type {
   AnalysisResult,
   ClipCandidate,
   ProjectManifest,
+  RecentProject,
   UploadedVideo,
   VideoMetadata,
 } from '../types/clip';
@@ -20,10 +21,10 @@ declare global {
       backendUrl: string;
       platform: string;
       selectProjectFolder?: () => Promise<string | null>;
-      listRecentProjects?: () => Promise<Array<{ folderPath: string; lastOpenedAt: string }>>;
-      addRecentProject?: (
-        folderPath: string,
-      ) => Promise<Array<{ folderPath: string; lastOpenedAt: string }>>;
+      listRecentProjects?: () => Promise<RecentProject[]>;
+      addRecentProject?: (folderPath: string, name?: string) => Promise<RecentProject[]>;
+      removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
+      relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
     };
   }
 }
@@ -111,14 +112,47 @@ export async function selectProjectFolder(): Promise<string | null> {
   return window.clipAssembler?.selectProjectFolder?.() ?? null;
 }
 
-export async function listRecentProjects(): Promise<Array<{ folderPath: string; lastOpenedAt: string }>> {
+export async function listRecentProjects(): Promise<RecentProject[]> {
   return window.clipAssembler?.listRecentProjects?.() ?? [];
 }
 
 export async function addRecentProject(
   folderPath: string,
-): Promise<Array<{ folderPath: string; lastOpenedAt: string }>> {
-  return window.clipAssembler?.addRecentProject?.(folderPath) ?? [];
+  name?: string,
+): Promise<RecentProject[]> {
+  return window.clipAssembler?.addRecentProject?.(folderPath, name) ?? [];
+}
+
+export async function removeRecentProject(folderPath: string): Promise<RecentProject[]> {
+  return window.clipAssembler?.removeRecentProject?.(folderPath) ?? [];
+}
+
+export async function relocateRecentProject(folderPath: string): Promise<RecentProject[]> {
+  return window.clipAssembler?.relocateRecentProject?.(folderPath) ?? [];
+}
+
+export async function rescanProject(projectId: string): Promise<FolderProjectResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/rescan`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Rescan failed: ${res.status}`);
+  }
+  return res.json() as Promise<FolderProjectResult>;
+}
+
+export async function deleteProjectFiles(
+  projectId: string,
+): Promise<{ project_id: string; deleted: string[] }> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/files`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Delete project files failed: ${res.status}`);
+  }
+  return res.json() as Promise<{ project_id: string; deleted: string[] }>;
 }
 
 export async function uploadVideo(
@@ -192,9 +226,11 @@ export interface ExportResult {
 export async function exportTimeline(
   projectId: string,
   format: 'edl' | 'fcpxml',
+  options: { overwrite?: boolean } = {},
 ): Promise<ExportResult> {
+  const overwrite = options.overwrite ? '&overwrite=true' : '';
   const res = await fetch(
-    `${backendUrl()}/projects/${projectId}/export?format=${format}`,
+    `${backendUrl()}/projects/${projectId}/export?format=${format}${overwrite}`,
     { method: 'POST' },
   );
   if (!res.ok) {

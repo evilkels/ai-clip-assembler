@@ -1,6 +1,6 @@
 # Plan: Project = Folder On Disk
 
-Status: partially implemented in `feature/project-folder-model`, pending review
+Status: implemented in `feature/project-folder-model`, pending manual QA
 Owner: Elvijs / Codex
 Related: `UBIQUITOUS_LANGUAGE.md` (defines **Project**), `docs/PRD.md`
 
@@ -137,8 +137,8 @@ Each phase should be a separate PR / ready-for-agent issue:
 1. **Backend: project loader/writer** — `project.json` read/write, folder-scan, schema validation, idempotent create. Pure Python, unit-tested. **Done in branch.**
 2. **Backend: relocate analysis output** — move whatever the current pipeline writes into `clipassembler/samples/` and `clipassembler/analysis/`. **Done in branch for folder-backed projects.**
 3. **Backend: exports write inside project folder** — change export endpoints to take a project, not arbitrary paths. **Done in branch for EDL/FCPXML folder-backed exports.**
-4. **Frontend: Create / Open Project flow** — Electron folder picker, `recent.json` in app-data, sidebar entry. **Partial in branch.** Folder picker and recent list exist on the Import page; the dedicated Project Sidebar is not implemented.
-5. **Frontend: project-scoped views** — current drone-video workflow becomes "the open project's view". **Partial in branch.** The open folder project drives import/analyze/review/export, but the app still creates an implicit upload project on startup and does not yet have a complete project shell.
+4. **Frontend: Create / Open Project flow** — Electron folder picker, `recent.json` in app-data, sidebar entry. **Done in branch.**
+5. **Frontend: project-scoped views** — current drone-video workflow becomes "the open project's view". **Done in branch.** The app starts with no open project; legacy upload is available as an explicit fallback.
 6. **Docs: extend `MANUAL_QA_GUIDE.md`** with the three flows above. **Done in branch.**
 
 Phases 1-3 can land before any frontend change; the existing UI keeps working against a single implicit project during the migration.
@@ -163,56 +163,31 @@ Implemented:
 - FCPXML source media references relative to the export directory, e.g. `../../DJI_0042.MP4`.
 - Electron folder picker.
 - App-data `recent.json`.
-- Basic recent project list on the Import page.
+- Project Sidebar with recent projects, missing-folder state, locate, remove-from-list, rescan, and delete-project-files actions.
+- No-project startup state with explicit legacy upload fallback.
+- Rescan flow for newly added top-level source videos.
+- Delete-project-files flow that removes only `clipassembler/` and `exports/`.
+- Unsafe folder deny-list for `/System` and `/Applications`.
+- `clipassembler/cache/.nosync` creation.
+- Export overwrite guard and frontend confirmation.
 - Manual QA guide coverage for create/open folder, export paths, empty-folder behavior, and move-folder reopen.
 
 Verified:
 
-- Backend: `PYTHONPATH=. .venv/bin/pytest` passes with 95 tests.
+- Backend: `PYTHONPATH=. .venv/bin/pytest` passes with 101 tests.
 - Frontend: `npm run build` passes.
 
-## Remaining Gaps Before 100%
+## Remaining Manual QA Before Complete
 
-The plan is not 100% implemented until these are complete:
+The implementation work is complete, but the plan should not be marked
+`complete` until real-footage QA has been run:
 
-1. **Project Sidebar UI**
-   - Move recent projects out of the Import page into a real sidebar or project switcher.
-   - Show project name, path, last opened time, and missing-folder state.
-   - Support "Remove from list".
-
-2. **Missing / moved folder relocation**
-   - Detect recent project paths that no longer exist.
-   - Mark them as missing instead of failing as a generic open error.
-   - Provide a "Locate folder" action that updates `recent.json`.
-
-3. **Rescan action**
-   - Add a user-triggered rescan for newly added top-level source videos.
-   - Update `clipassembler/project.json::source_videos` without duplicating existing entries.
-   - Keep scan non-recursive for MVP.
-
-4. **Delete project files action**
-   - Add a guarded action that deletes only `clipassembler/` and `exports/`.
-   - Never delete source videos.
-   - Keep "Remove from list" separate from deletion.
-
-5. **Project-scoped app startup**
-   - Stop always creating an implicit upload project on app startup.
-   - Start in a no-project/open-project state.
-   - Preserve legacy upload flow only if still intentionally supported.
-
-6. **Read-only and unsafe folder UX**
-   - Surface read-only folder errors clearly in the frontend.
-   - Define and enforce a deny-list for unsafe roots such as `/System` and `/Applications`.
-
-7. **Sync-provider cache exclusion**
-   - Create `clipassembler/cache/.nosync` for macOS/iCloud-style exclusion.
-   - Decide whether Windows/Linux sync-provider markers belong in this plan or a follow-up.
-
-8. **Export overwrite warning**
-   - Warn before overwriting an existing export of the same name.
-   - Keep actual writes inside the project folder.
-
-9. **Manual QA execution**
-   - Run the documented folder-project QA flow with real footage.
-   - Verify EDL/FCPXML import behavior in DaVinci Resolve or Final Cut Pro.
-   - Record any relink, timing, orientation, or missing-media issues.
+1. Run the documented folder-project QA flow with real footage.
+2. Verify source videos are not copied.
+3. Verify `clipassembler/`, `clipassembler/cache/.nosync`, and `exports/` are created in the chosen folder.
+4. Verify adding a new top-level video and clicking **Rescan** updates `project.json`.
+5. Verify moving/renaming a recent project folder shows missing state and can be recovered with **Locate**.
+6. Verify **Remove** only removes a recent-project entry.
+7. Verify **Delete project files** deletes only `clipassembler/` and `exports/`.
+8. Verify exporting twice shows an overwrite warning.
+9. Import generated EDL/FCPXML into DaVinci Resolve or Final Cut Pro and confirm media resolves without relink prompts.

@@ -31,8 +31,11 @@ from .project_store import (
     ProjectFolderNotWritableError,
     ProjectNotFoundError,
     ProjectStoreError,
+    UnsafeProjectFolderError,
     create_or_open_project as create_or_open_folder_project,
+    delete_project_files,
     project_state_dir,
+    rescan_project,
 )
 from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
@@ -104,6 +107,8 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ProjectFolderNotWritableError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except UnsafeProjectFolderError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (ProjectNotFoundError, FileNotFoundError, NotADirectoryError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except InvalidProjectManifestError as exc:
@@ -112,16 +117,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     project_id = str(uuid.uuid4())
-    videos = [
-        {
-            "file_id": source_video.filename,
-            "file_name": source_video.filename,
-            "file_path": str(folder_path / source_video.filename),
-            "status": "ready",
-            "metadata": {},
-        }
-        for source_video in manifest.source_videos
-    ]
+    videos = videos_from_manifest(folder_path, manifest)
     projects[project_id] = {
         "project_id": project_id,
         "project_folder": str(folder_path),
@@ -136,6 +132,46 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "project": manifest.model_dump(),
         "videos": videos,
     }
+
+
+@app.post("/projects/{project_id}/rescan")
+async def rescan_project_sources(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    if not project.get("project_folder"):
+        raise HTTPException(status_code=400, detail="Rescan is only available for folder projects")
+
+    folder_path = Path(project["project_folder"])
+    try:
+        manifest = rescan_project(folder_path)
+    except ProjectStoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    videos = videos_from_manifest(folder_path, manifest)
+    project["project"] = manifest.model_dump()
+    project["videos"] = videos
+    project["clips"] = []
+    project["timeline"] = None
+    return {
+        "project_id": project_id,
+        "project_folder": str(folder_path),
+        "project": manifest.model_dump(),
+        "videos": videos,
+    }
+
+
+@app.delete("/projects/{project_id}/files")
+async def delete_project_owned_files(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    if not project.get("project_folder"):
+        raise HTTPException(status_code=400, detail="Delete project files is only available for folder projects")
+
+    deleted = delete_project_files(Path(project["project_folder"]))
+    del projects[project_id]
+    return {"project_id": project_id, "deleted": deleted}
 
 
 @app.post("/projects/{project_id}/videos")
@@ -304,7 +340,11 @@ async def get_clips(project_id: str):
 
 
 @app.post("/projects/{project_id}/export")
-async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "resolve_xml"]):
+async def export_timeline(
+    project_id: str,
+    format: Literal["fcpxml", "edl", "resolve_xml"],
+    overwrite: bool = False,
+):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     if not projects[project_id].get("clips"):
@@ -317,12 +357,14 @@ async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "res
 
     if format == "edl":
         file_path = export_dir / "timeline.edl"
+        ensure_export_can_write(file_path, overwrite)
         file_path.write_text(
             generate_edl("AI Clip Assembler", clips, fps=round_edl_fps(choose_timeline_fps(videos_by_id))),
             encoding="utf-8",
         )
     elif format == "fcpxml":
         file_path = export_dir / "timeline.fcpxml"
+        ensure_export_can_write(file_path, overwrite)
         media_base_path = export_dir if projects[project_id].get("project_folder") else None
         file_path.write_text(
             generate_fcpxml(
@@ -361,6 +403,27 @@ async def list_harnesses():
 
 def project_dir(project_id: str) -> Path:
     return PROJECTS_DIR / project_id
+
+
+def videos_from_manifest(folder_path: Path, manifest) -> list[dict]:
+    return [
+        {
+            "file_id": source_video.filename,
+            "file_name": source_video.filename,
+            "file_path": str(folder_path / source_video.filename),
+            "status": "ready",
+            "metadata": {},
+        }
+        for source_video in manifest.source_videos
+    ]
+
+
+def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:
+    if file_path.exists() and not overwrite:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Export already exists: {file_path}",
+        )
 
 
 def project_work_dir(project_id: str) -> Path:

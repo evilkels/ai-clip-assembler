@@ -6,9 +6,12 @@ from src.project_store import (
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
     ProjectFolderNotWritableError,
+    UnsafeProjectFolderError,
     create_or_open_project,
     create_project,
+    delete_project_files,
     open_project,
+    rescan_project,
 )
 
 
@@ -36,6 +39,7 @@ def test_create_project_writes_manifest_with_relative_source_video_filenames(tmp
     assert (project_folder / "clipassembler" / "samples").is_dir()
     assert (project_folder / "clipassembler" / "analysis").is_dir()
     assert (project_folder / "clipassembler" / "cache").is_dir()
+    assert (project_folder / "clipassembler" / "cache" / ".nosync").is_file()
 
 
 def test_create_project_scans_only_top_level_supported_videos(tmp_path):
@@ -97,6 +101,51 @@ def test_create_project_rejects_folder_without_write_permission(monkeypatch, tmp
         create_project(project_folder, now=fixed_now)
 
     assert not (project_folder / "clipassembler").exists()
+
+
+def test_create_project_rejects_unsafe_system_folder(monkeypatch, tmp_path):
+    project_folder = tmp_path / "System"
+    project_folder.mkdir()
+    monkeypatch.setattr("src.project_store.UNSAFE_PROJECT_ROOTS", [project_folder])
+
+    with pytest.raises(UnsafeProjectFolderError):
+        create_project(project_folder, now=fixed_now)
+
+
+def test_rescan_project_adds_new_top_level_videos_without_duplicates(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    create_project(project_folder, now=fixed_now)
+    (project_folder / "DJI_0043.MP4").write_bytes(b"video")
+    (project_folder / "notes.txt").write_text("ignore")
+
+    project = rescan_project(project_folder, now=lambda: datetime(2026, 5, 31, 8, 0, 0, tzinfo=timezone.utc))
+
+    assert [video.filename for video in project.source_videos] == [
+        "DJI_0042.MP4",
+        "DJI_0043.MP4",
+    ]
+    assert project.source_videos[0].imported_at == "2026-05-30T19:00:00Z"
+    assert project.source_videos[1].imported_at == "2026-05-31T08:00:00Z"
+
+
+def test_delete_project_files_removes_only_app_owned_folders(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(b"video")
+    create_project(project_folder, now=fixed_now)
+    exports_dir = project_folder / "exports"
+    exports_dir.mkdir()
+    (exports_dir / "timeline.edl").write_text("export", encoding="utf-8")
+
+    deleted = delete_project_files(project_folder)
+
+    assert set(deleted) == {"clipassembler", "exports"}
+    assert source_video.read_bytes() == b"video"
+    assert not (project_folder / "clipassembler").exists()
+    assert not exports_dir.exists()
 
 
 def test_open_project_rejects_unsupported_schema_version(tmp_path):

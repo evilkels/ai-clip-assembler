@@ -1,5 +1,6 @@
+import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import quote
 import xml.etree.ElementTree as ET
 
@@ -60,6 +61,12 @@ def path_to_file_url(path: str) -> str:
     return "file://" + quote(str(Path(path).absolute()))
 
 
+def path_to_asset_src(path: str, media_base_path: Optional[Path] = None) -> str:
+    if media_base_path is None:
+        return path_to_file_url(path)
+    return Path(os.path.relpath(Path(path).resolve(), media_base_path.resolve())).as_posix()
+
+
 def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
     lines = [f"TITLE: {title}", "FCM: NON-DROP FRAME", ""]
     timeline_cursor = 0.0
@@ -81,7 +88,12 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
     return "\n".join(lines)
 
 
-def generate_fcpxml(title: str, clips: List[dict], videos_by_id: Dict[str, dict]) -> str:
+def generate_fcpxml(
+    title: str,
+    clips: List[dict],
+    videos_by_id: Dict[str, dict],
+    media_base_path: Optional[Path] = None,
+) -> str:
     fcpxml = ET.Element("fcpxml", {"version": "1.10"})
     resources = ET.SubElement(fcpxml, "resources")
     fps = choose_timeline_fps(videos_by_id)
@@ -107,7 +119,7 @@ def generate_fcpxml(title: str, clips: List[dict], videos_by_id: Dict[str, dict]
             {
                 "id": f"asset-{file_id}",
                 "name": video["file_name"],
-                "src": path_to_file_url(video["file_path"]),
+                "src": path_to_asset_src(video["file_path"], media_base_path),
                 "duration": seconds_to_fcpx_duration(duration),
                 "hasVideo": "1",
             },

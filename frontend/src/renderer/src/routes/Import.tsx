@@ -1,6 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
-import { analyzeProject, uploadVideo } from '../api/client';
+import {
+  addRecentProject,
+  analyzeProject,
+  listRecentProjects,
+  selectProjectFolder,
+  uploadVideo,
+} from '../api/client';
 
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -11,15 +17,39 @@ function formatDuration(sec: number): string {
 export function ImportPage() {
   const {
     projectId,
+    projectName,
+    projectFolder,
     uploadedVideos,
     analysisStatus,
     setUploadedVideos,
     setAnalysisStatus,
     setClips,
+    openProjectFolder,
   } = useReview();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [openingFolder, setOpeningFolder] = useState(false);
+  const [recentProjects, setRecentProjects] = useState<Array<{ folderPath: string; lastOpenedAt: string }>>([]);
+
+  useEffect(() => {
+    let alive = true;
+    listRecentProjects().then((projects) => {
+      if (alive) setRecentProjects(projects);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const openFolderPath = useCallback(
+    async (folderPath: string) => {
+      await openProjectFolder(folderPath);
+      const recents = await addRecentProject(folderPath);
+      setRecentProjects(recents);
+    },
+    [openProjectFolder],
+  );
 
   const handleFiles = useCallback(
     async (files: FileList) => {
@@ -67,6 +97,22 @@ export function ImportPage() {
     }
   }, [projectId, setAnalysisStatus, setClips]);
 
+  const handleOpenFolder = useCallback(async () => {
+    setUploadErrors([]);
+    setOpeningFolder(true);
+    try {
+      const folderPath = await selectProjectFolder();
+      if (!folderPath) return;
+      await openFolderPath(folderPath);
+    } catch (err) {
+      setUploadErrors([
+        err instanceof Error ? err.message : String(err),
+      ]);
+    } finally {
+      setOpeningFolder(false);
+    }
+  }, [openFolderPath]);
+
   const isAnalyzing = analysisStatus.phase === 'analyzing';
   const isComplete = analysisStatus.phase === 'complete';
   const hasError = analysisStatus.phase === 'error';
@@ -77,10 +123,51 @@ export function ImportPage() {
       <div className="page-header">
         <div>
           <h1>Import</h1>
-          <p>Upload drone footage. Analyze to detect stable clip candidates.</p>
+          <p>
+            {projectFolder
+              ? `${projectName ?? 'Project'} · ${projectFolder}`
+              : 'Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates.'}
+          </p>
         </div>
       </div>
       <div className="page-body">
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
+            {openingFolder ? 'Opening…' : 'Create / Open Folder Project'}
+          </button>
+        </div>
+
+        {recentProjects.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
+              RECENT PROJECTS
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {recentProjects.map((project) => (
+                <button
+                  key={project.folderPath}
+                  className="btn subtle"
+                  style={{ justifyContent: 'flex-start' }}
+                  disabled={openingFolder}
+                  onClick={() => {
+                    setOpeningFolder(true);
+                    setUploadErrors([]);
+                    openFolderPath(project.folderPath)
+                      .catch((err) => {
+                        setUploadErrors([
+                          err instanceof Error ? err.message : String(err),
+                        ]);
+                      })
+                      .finally(() => setOpeningFolder(false));
+                  }}
+                >
+                  {project.folderPath}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div
           className="drop-zone"
           onClick={() => fileInputRef.current?.click()}
@@ -108,7 +195,7 @@ export function ImportPage() {
             {uploading
               ? 'Uploading…'
               : hasVideos
-                ? `${uploadedVideos.length} video${uploadedVideos.length === 1 ? '' : 's'} ready — click to add more`
+                ? `${uploadedVideos.length} source video${uploadedVideos.length === 1 ? '' : 's'} ready — click to add more`
                 : 'Click to select MP4/MOV files'}
           </p>
         </div>
@@ -126,7 +213,7 @@ export function ImportPage() {
         {uploadedVideos.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
-              UPLOADED VIDEOS
+              SOURCE VIDEOS
             </h2>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
@@ -142,12 +229,16 @@ export function ImportPage() {
                 {uploadedVideos.map((v) => (
                   <tr key={v.file_id} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '4px 8px' }}>{v.file_name}</td>
-                    <td style={{ padding: '4px 8px' }}>{formatDuration(v.metadata.duration_sec)}</td>
-                    <td style={{ padding: '4px 8px' }}>{v.metadata.fps.toFixed(2)}</td>
                     <td style={{ padding: '4px 8px' }}>
-                      {v.metadata.resolution[0]}×{v.metadata.resolution[1]}
+                      {v.metadata ? formatDuration(v.metadata.duration_sec) : 'Pending analysis'}
                     </td>
-                    <td style={{ padding: '4px 8px' }}>{v.metadata.codec}</td>
+                    <td style={{ padding: '4px 8px' }}>
+                      {v.metadata ? v.metadata.fps.toFixed(2) : '—'}
+                    </td>
+                    <td style={{ padding: '4px 8px' }}>
+                      {v.metadata ? `${v.metadata.resolution[0]}×${v.metadata.resolution[1]}` : '—'}
+                    </td>
+                    <td style={{ padding: '4px 8px' }}>{v.metadata?.codec ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

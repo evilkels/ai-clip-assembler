@@ -8,6 +8,7 @@
 import type {
   AnalysisResult,
   ClipCandidate,
+  ProjectManifest,
   UploadedVideo,
   VideoMetadata,
 } from '../types/clip';
@@ -18,6 +19,11 @@ declare global {
     clipAssembler?: {
       backendUrl: string;
       platform: string;
+      selectProjectFolder?: () => Promise<string | null>;
+      listRecentProjects?: () => Promise<Array<{ folderPath: string; lastOpenedAt: string }>>;
+      addRecentProject?: (
+        folderPath: string,
+      ) => Promise<Array<{ folderPath: string; lastOpenedAt: string }>>;
     };
   }
 }
@@ -79,6 +85,40 @@ export async function createProject(): Promise<{ project_id: string }> {
   const res = await fetch(`${backendUrl()}/projects`, { method: 'POST' });
   if (!res.ok) throw new Error(`Failed to create project: ${res.status}`);
   return res.json() as Promise<{ project_id: string }>;
+}
+
+export interface FolderProjectResult {
+  project_id: string;
+  project_folder: string;
+  project: ProjectManifest;
+  videos: UploadedVideo[];
+}
+
+export async function createProjectFromFolder(folderPath: string): Promise<FolderProjectResult> {
+  const res = await fetch(`${backendUrl()}/projects/from-folder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder_path: folderPath }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Failed to open project folder: ${res.status}`);
+  }
+  return res.json() as Promise<FolderProjectResult>;
+}
+
+export async function selectProjectFolder(): Promise<string | null> {
+  return window.clipAssembler?.selectProjectFolder?.() ?? null;
+}
+
+export async function listRecentProjects(): Promise<Array<{ folderPath: string; lastOpenedAt: string }>> {
+  return window.clipAssembler?.listRecentProjects?.() ?? [];
+}
+
+export async function addRecentProject(
+  folderPath: string,
+): Promise<Array<{ folderPath: string; lastOpenedAt: string }>> {
+  return window.clipAssembler?.addRecentProject?.(folderPath) ?? [];
 }
 
 export async function uploadVideo(

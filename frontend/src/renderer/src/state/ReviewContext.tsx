@@ -14,10 +14,12 @@ import type {
   Trim,
   UploadedVideo,
 } from '../types/clip';
-import { createProject, getClipsWithFallback } from '../api/client';
+import { createProject, createProjectFromFolder, getClipsWithFallback } from '../api/client';
 
 interface ReviewState {
   projectId: string | null;
+  projectName: string | null;
+  projectFolder: string | null;
   uploadedVideos: UploadedVideo[];
   analysisStatus: AnalysisStatus;
   loading: boolean;
@@ -38,6 +40,7 @@ interface ReviewState {
   setUploadedVideos: (videos: UploadedVideo[]) => void;
   setAnalysisStatus: (status: AnalysisStatus) => void;
   setClips: (clips: ClipCandidate[]) => void;
+  openProjectFolder: (folderPath: string) => Promise<void>;
   acceptedCount: number;
   totalCount: number;
 }
@@ -46,6 +49,8 @@ const Ctx = createContext<ReviewState | null>(null);
 
 export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
+  const [projectFolder, setProjectFolder] = useState<string | null>(null);
   const [uploadedVideos, setUploadedVideos] = useState<UploadedVideo[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({ phase: 'idle' });
   const [clips, setClips] = useState<ClipCandidate[]>([]);
@@ -81,6 +86,32 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       alive = false;
     };
   }, []);
+
+  const resetProjectSession = useCallback(() => {
+    setClips([]);
+    setDecisions({});
+    setAcceptedOrder([]);
+    setTrims({});
+    setAnalysisStatus({ phase: 'idle' });
+    setError(null);
+  }, []);
+
+  const openProjectFolder = useCallback(
+    async (folderPath: string) => {
+      setLoading(true);
+      try {
+        const result = await createProjectFromFolder(folderPath);
+        setProjectId(result.project_id);
+        setProjectName(result.project.name);
+        setProjectFolder(result.project_folder);
+        setUploadedVideos(result.videos);
+        resetProjectSession();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [resetProjectSession],
+  );
 
   useEffect(() => {
     if (!projectId) return;
@@ -160,6 +191,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ReviewState>(
     () => ({
       projectId,
+      projectName,
+      projectFolder,
       uploadedVideos,
       analysisStatus,
       loading,
@@ -180,11 +213,14 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setUploadedVideos,
       setAnalysisStatus,
       setClips,
+      openProjectFolder,
       acceptedCount: acceptedOrder.length,
       totalCount: clips.length,
     }),
     [
       projectId,
+      projectName,
+      projectFolder,
       uploadedVideos,
       analysisStatus,
       loading,
@@ -200,6 +236,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       moveAccepted,
       reorderAccepted,
       setTrim,
+      openProjectFolder,
     ],
   );
 

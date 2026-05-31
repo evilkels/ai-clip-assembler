@@ -34,7 +34,16 @@ export interface UploadedVideo {
   file_id: string;
   file_name: string;
   status: string;
-  metadata: VideoMetadata;
+  metadata?: VideoMetadata;
+}
+
+export interface ProjectManifest {
+  schema_version: number;
+  name: string;
+  created_at: string;
+  harness: string;
+  source_videos: Array<{ filename: string; imported_at: string }>;
+  settings_overrides: Record<string, unknown>;
 }
 
 export interface AnalysisResult {

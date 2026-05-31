@@ -6,6 +6,118 @@ from src import api
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 
 
+def test_create_project_from_folder_registers_source_videos_without_copying(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "sunset-drone-footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(b"original")
+    client = TestClient(api.app)
+
+    response = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["project"]["name"] == "sunset-drone-footage"
+    assert body["project"]["harness"] == "pi_agent"
+    assert body["project"]["source_videos"][0]["filename"] == "DJI_0042.MP4"
+    project = api.projects[body["project_id"]]
+    assert project["project_folder"] == str(project_folder)
+    assert project["videos"] == [
+        {
+            "file_id": "DJI_0042.MP4",
+            "file_name": "DJI_0042.MP4",
+            "file_path": str(source_video),
+            "status": "ready",
+            "metadata": {},
+        }
+    ]
+    assert not (project_folder / "videos").exists()
+
+
+def test_create_project_from_folder_opens_existing_manifest_without_rescan(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"original")
+    client = TestClient(api.app)
+    first = client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
+    (project_folder / "DJI_0043.MP4").write_bytes(b"new")
+
+    second = client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
+
+    assert second.status_code == 200
+    assert first.json()["project"]["source_videos"] == second.json()["project"]["source_videos"]
+    assert [video["file_name"] for video in api.projects[second.json()["project_id"]]["videos"]] == [
+        "DJI_0042.MP4"
+    ]
+
+
+def test_create_project_from_folder_rejects_empty_folder_without_mutation(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "empty"
+    project_folder.mkdir()
+    client = TestClient(api.app)
+
+    response = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    )
+
+    assert response.status_code == 422
+    assert "No supported source videos" in response.json()["detail"]
+    assert not (project_folder / "clipassembler").exists()
+
+
+def test_analyze_folder_project_writes_work_files_under_clipassembler(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    paths = {}
+
+    def fake_vidstab(**kwargs):
+        paths["transforms_path"] = kwargs["transforms_path"]
+
+    def fake_extract(**kwargs):
+        paths["frames_dir"] = kwargs["frames_dir"]
+        return [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")]
+
+    monkeypatch.setattr(api, "run_vidstabdetect", fake_vidstab)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
+    monkeypatch.setattr(api, "extract_frames", fake_extract)
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: [])
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences: AssemblyResult(
+            clips=[],
+            sequence=TimelineSequence(total_duration_sec=0, clips=[]),
+        ),
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+
+    assert response.status_code == 200
+    assert paths["transforms_path"] == (
+        project_folder / "clipassembler" / "analysis" / "motion" / "DJI_0042.MP4.trf"
+    )
+    assert paths["frames_dir"] == (
+        project_folder / "clipassembler" / "samples" / "DJI_0042.MP4"
+    )
+
+
 def test_upload_video_stores_file_and_returns_metadata(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
@@ -345,6 +457,44 @@ def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
     assert body["status"] == "generated"
     assert body["file_path"].endswith("timeline.edl")
     assert "TITLE:" in Path(body["file_path"]).read_text()
+
+
+def test_export_folder_project_writes_inside_project_exports(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    api.projects[project_id]["videos"][0]["metadata"] = {
+        "duration_sec": 10.0,
+        "fps": 30,
+        "resolution": [1920, 1080],
+    }
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "DJI_0042.MP4",
+            "file_name": "DJI_0042.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+
+    response = client.post(f"/projects/{project_id}/export?format=fcpxml")
+
+    assert response.status_code == 200
+    body = response.json()
+    export_path = Path(body["file_path"])
+    assert export_path == project_folder / "exports" / "fcp" / "timeline.fcpxml"
+    assert 'src="../../DJI_0042.MP4"' in export_path.read_text(encoding="utf-8")
 
 
 def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):

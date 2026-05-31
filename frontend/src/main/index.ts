@@ -1,7 +1,54 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const isDev = !app.isPackaged;
+const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
+
+interface RecentProject {
+  folderPath: string;
+  lastOpenedAt: string;
+}
+
+async function readRecentProjects(): Promise<RecentProject[]> {
+  try {
+    const raw = await readFile(recentProjectsPath(), 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is RecentProject =>
+        typeof item?.folderPath === 'string' && typeof item?.lastOpenedAt === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function writeRecentProjects(projects: RecentProject[]): Promise<void> {
+  await mkdir(app.getPath('userData'), { recursive: true });
+  await writeFile(recentProjectsPath(), JSON.stringify(projects, null, 2) + '\n', 'utf-8');
+}
+
+function registerIpcHandlers(): void {
+  ipcMain.handle('project:select-folder', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Choose Project Folder',
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('project:recent-list', async () => readRecentProjects());
+
+  ipcMain.handle('project:recent-add', async (_event, folderPath: string) => {
+    if (typeof folderPath !== 'string' || folderPath.length === 0) return [];
+    const now = new Date().toISOString();
+    const rest = (await readRecentProjects()).filter((item) => item.folderPath !== folderPath);
+    const next = [{ folderPath, lastOpenedAt: now }, ...rest].slice(0, 20);
+    await writeRecentProjects(next);
+    return next;
+  });
+}
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -43,6 +90,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  registerIpcHandlers();
   createWindow();
 
   app.on('activate', () => {

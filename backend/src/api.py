@@ -25,6 +25,15 @@ from .motion_analysis import (
     FFmpegVidstabUnavailableError,
     run_vidstabdetect,
 )
+from .project_store import (
+    InvalidProjectManifestError,
+    NoSourceVideosFoundError,
+    ProjectFolderNotWritableError,
+    ProjectNotFoundError,
+    ProjectStoreError,
+    create_or_open_project as create_or_open_folder_project,
+    project_state_dir,
+)
 from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
@@ -64,6 +73,10 @@ class TimelineUpdateRequest(BaseModel):
     clips: list[TimelineClipUpdate]
 
 
+class ProjectFolderRequest(BaseModel):
+    folder_path: str
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "version": "0.1.0"}
@@ -80,6 +93,49 @@ async def create_project():
         "timeline": None,
     }
     return {"project_id": project_id}
+
+
+@app.post("/projects/from-folder")
+async def create_project_from_folder(request: ProjectFolderRequest):
+    folder_path = Path(request.folder_path).expanduser()
+    try:
+        manifest = create_or_open_folder_project(folder_path)
+    except NoSourceVideosFoundError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ProjectFolderNotWritableError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (ProjectNotFoundError, FileNotFoundError, NotADirectoryError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvalidProjectManifestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ProjectStoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    project_id = str(uuid.uuid4())
+    videos = [
+        {
+            "file_id": source_video.filename,
+            "file_name": source_video.filename,
+            "file_path": str(folder_path / source_video.filename),
+            "status": "ready",
+            "metadata": {},
+        }
+        for source_video in manifest.source_videos
+    ]
+    projects[project_id] = {
+        "project_id": project_id,
+        "project_folder": str(folder_path),
+        "project": manifest.model_dump(),
+        "videos": videos,
+        "clips": [],
+        "timeline": None,
+    }
+    return {
+        "project_id": project_id,
+        "project_folder": str(folder_path),
+        "project": manifest.model_dump(),
+        "videos": videos,
+    }
 
 
 @app.post("/projects/{project_id}/videos")
@@ -132,11 +188,11 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
         try:
             run_vidstabdetect(
                 input_path=Path(video["file_path"]),
-                transforms_path=project_dir(project_id) / "motion" / f"{video['file_id']}.trf",
+                transforms_path=analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf",
             )
             samples = extract_frames(
                 input_path=Path(video["file_path"]),
-                frames_dir=project_dir(project_id) / "frames" / video["file_id"],
+                frames_dir=samples_dir(project_id) / video["file_id"],
                 file_id=video["file_id"],
                 sample_fps=sample_fps,
                 max_width=int(request.preferences.get("max_width", 960)),
@@ -254,7 +310,7 @@ async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "res
     if not projects[project_id].get("clips"):
         raise HTTPException(status_code=400, detail="No clips available to export")
 
-    export_dir = project_dir(project_id) / "exports"
+    export_dir = export_dir_for(project_id, format)
     export_dir.mkdir(parents=True, exist_ok=True)
     videos_by_id = {video["file_id"]: video for video in projects[project_id]["videos"]}
     clips = clips_in_timeline_order(projects[project_id])
@@ -267,7 +323,16 @@ async def export_timeline(project_id: str, format: Literal["fcpxml", "edl", "res
         )
     elif format == "fcpxml":
         file_path = export_dir / "timeline.fcpxml"
-        file_path.write_text(generate_fcpxml("AI Clip Assembler", clips, videos_by_id), encoding="utf-8")
+        media_base_path = export_dir if projects[project_id].get("project_folder") else None
+        file_path.write_text(
+            generate_fcpxml(
+                "AI Clip Assembler",
+                clips,
+                videos_by_id,
+                media_base_path=media_base_path,
+            ),
+            encoding="utf-8",
+        )
     else:
         raise HTTPException(status_code=400, detail="Resolve XML export is not implemented yet")
 
@@ -296,6 +361,39 @@ async def list_harnesses():
 
 def project_dir(project_id: str) -> Path:
     return PROJECTS_DIR / project_id
+
+
+def project_work_dir(project_id: str) -> Path:
+    project = projects.get(project_id)
+    if project and project.get("project_folder"):
+        return project_state_dir(Path(project["project_folder"]))
+    return project_dir(project_id)
+
+
+def samples_dir(project_id: str) -> Path:
+    project = projects.get(project_id)
+    if project and project.get("project_folder"):
+        return project_work_dir(project_id) / "samples"
+    return project_work_dir(project_id) / "frames"
+
+
+def analysis_dir(project_id: str) -> Path:
+    project = projects.get(project_id)
+    if project and project.get("project_folder"):
+        return project_work_dir(project_id) / "analysis"
+    return project_work_dir(project_id)
+
+
+def export_dir_for(project_id: str, format: str) -> Path:
+    project = projects.get(project_id)
+    if project and project.get("project_folder"):
+        folder_name = {
+            "fcpxml": "fcp",
+            "edl": "edl",
+            "resolve_xml": "davinci",
+        }[format]
+        return Path(project["project_folder"]) / "exports" / folder_name
+    return project_dir(project_id) / "exports"
 
 
 def clips_in_timeline_order(project: dict) -> list:

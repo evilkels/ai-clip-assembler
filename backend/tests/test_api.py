@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
@@ -6,11 +7,11 @@ from src import api
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 
 
-def create_folder_project_with_video(tmp_path, content=b"folder video bytes"):
+def create_folder_project_with_video(tmp_path, content=b"folder video bytes", filename="DJI_0042.MP4"):
     api.projects.clear()
     project_folder = tmp_path / "footage"
     project_folder.mkdir()
-    source_video = project_folder / "DJI_0042.MP4"
+    source_video = project_folder / filename
     source_video.write_bytes(content)
     client = TestClient(api.app)
     project_id = client.post(
@@ -319,6 +320,25 @@ def test_project_video_media_supports_byte_range_requests(tmp_path):
     assert response.headers["content-range"] == "bytes 0-3/18"
     assert response.content == b"fold"
     assert response.headers["accept-ranges"] == "bytes"
+
+
+def test_project_video_media_supports_unicode_filename_byte_range(tmp_path):
+    filename = "č😀.MP4"
+    client, project_id, _source_video = create_folder_project_with_video(
+        tmp_path,
+        content=b"unicode video bytes",
+        filename=filename,
+    )
+
+    response = client.get(
+        f"/projects/{project_id}/videos/{quote(filename)}/media",
+        headers={"Range": "bytes=0-3"},
+    )
+
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-3/19"
+    assert response.content == b"unic"
+    assert "content-disposition" not in response.headers
 
 
 def test_project_video_media_supports_open_ended_byte_range_without_full_read(monkeypatch, tmp_path):

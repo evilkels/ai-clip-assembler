@@ -236,7 +236,6 @@ async def get_project_video_media(
             video_path,
             range_header,
             media_type=media_type,
-            file_name=video["file_name"],
         )
     return FileResponse(
         video_path,
@@ -608,7 +607,6 @@ def ranged_video_response(
     range_header: str,
     *,
     media_type: str,
-    file_name: str,
 ) -> Response:
     file_size = video_path.stat().st_size
     byte_range = parse_byte_range(range_header, file_size)
@@ -632,7 +630,6 @@ def ranged_video_response(
             "Accept-Ranges": "bytes",
             "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Content-Length": str(length),
-            "Content-Disposition": f'inline; filename="{file_name}"',
         },
     )
 

@@ -3,6 +3,7 @@ import { ImportPage } from './routes/Import';
 import { ReviewPage } from './routes/Review';
 import { TimelinePage } from './routes/Timeline';
 import { ExportPage } from './routes/Export';
+import { PlaywriterQaPage } from './routes/PlaywriterQa';
 import { AppShell } from './layouts/AppShell';
 import { ReviewProvider } from './state/ReviewContext';
 
@@ -15,6 +16,7 @@ function Shell() {
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/timeline" element={<TimelinePage />} />
         <Route path="/export" element={<ExportPage />} />
+        <Route path="/playwriter" element={<PlaywriterQaPage />} />
       </Routes>
     </AppShell>
   );

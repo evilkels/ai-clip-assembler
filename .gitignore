@@ -148,6 +148,11 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
+# Playwright-generated artifacts and synthesized media fixtures
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.fixtures/
+
 # react-doctor agent skill folders (created by `react-doctor install`).
 # We keep frontend/.claude/ for Claude Code; everything else is junk for tools we don't use.
 # Do NOT re-run `react-doctor install` — it will recreate these.

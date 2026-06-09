@@ -33,6 +33,10 @@ declare global {
 const backendUrl = (): string =>
   window.clipAssembler?.backendUrl ?? 'http://127.0.0.1:8000';
 
+export function buildVideoMediaUrl(projectId: string, fileId: string): string {
+  return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/media`;
+}
+
 export interface BackendStatus {
   online: boolean;
   version?: string;

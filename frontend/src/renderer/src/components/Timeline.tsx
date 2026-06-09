@@ -7,8 +7,10 @@ import {
   type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
+import { buildVideoMediaUrl } from '../api/client';
 import { useReview } from '../state/ReviewContext';
 import type { ClipCandidate } from '../types/clip';
+import { ClipPreview } from './ClipPreview';
 
 const MIN_PX_PER_SEC = 6;
 const MAX_PX_PER_SEC = 160;
@@ -45,7 +47,7 @@ function niceStep(pxPerSec: number): number {
 }
 
 export function Timeline() {
-  const { clips, acceptedOrder, trims, reorderAccepted, moveAccepted, setTrim, resetDecision } =
+  const { projectId, clips, acceptedOrder, trims, reorderAccepted, moveAccepted, setTrim, resetDecision } =
     useReview();
 
   const [pxPerSec, setPxPerSec] = useState(40);
@@ -92,6 +94,21 @@ export function Timeline() {
   const currentSegment = segments.find(
     (seg) => playhead >= seg.offset && playhead < seg.offset + seg.duration,
   );
+  const selectedSegment = selectedId
+    ? segments.find((seg) => seg.clip.clip_id === selectedId)
+    : undefined;
+  const previewSegment = currentSegment ?? selectedSegment ?? segments[0];
+  const previewRelativeTime =
+    previewSegment && currentSegment?.clip.clip_id === previewSegment.clip.clip_id
+      ? clamp(playhead - previewSegment.offset, 0, previewSegment.duration)
+      : 0;
+  const previewSourceTime = previewSegment
+    ? previewSegment.trimStart + previewRelativeTime
+    : 0;
+  const previewMediaUrl =
+    projectId && previewSegment
+      ? buildVideoMediaUrl(projectId, previewSegment.clip.file_id)
+      : undefined;
 
   // Keep the playhead inside the timeline when durations change.
   useEffect(() => {
@@ -307,6 +324,31 @@ export function Timeline() {
 
   return (
     <div className="timeline">
+      {previewSegment && (
+        <section className="timeline-preview" aria-label="Timeline video preview">
+          <ClipPreview
+            mediaUrl={previewMediaUrl}
+            startSec={previewSegment.trimStart}
+            endSec={previewSegment.trimEnd}
+            currentTimeSec={previewSourceTime}
+            playing={direction === 1 && currentSegment?.clip.clip_id === previewSegment.clip.clip_id}
+            loop={false}
+            label={previewSegment.clip.file_name}
+            testId="timeline-preview-video"
+          />
+          <div className="timeline-preview-meta">
+            <strong data-testid="timeline-preview-current-clip">
+              {previewSegment.clip.file_name}
+            </strong>
+            <span>
+              Source {formatTime(previewSegment.trimStart)} → {formatTime(previewSegment.trimEnd)}
+            </span>
+            <span>
+              Timeline {formatTime(previewSegment.offset)} · {previewSegment.duration.toFixed(1)}s
+            </span>
+          </div>
+        </section>
+      )}
       <div className="timeline-toolbar">
         <div className="transport">
           <button className="btn subtle" onClick={() => setDirection(-1)} title="Reverse (J)">
@@ -396,6 +438,7 @@ export function Timeline() {
                   onPointerDown={(e) => {
                     e.stopPropagation();
                     setSelectedId(seg.clip.clip_id);
+                    setPlayhead(seg.offset);
                   }}
                   title={`${seg.clip.file_name} — ${seg.duration.toFixed(1)}s`}
                 >

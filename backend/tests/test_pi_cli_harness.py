@@ -3,6 +3,7 @@ from pathlib import Path
 
 from src.models import AssemblyResult, ClipSuggestion, FrameScore, TimelineSequence
 from src.pi_cli_harness import (
+    REPO_ROOT,
     PiCliUnavailableError,
     _call_pi_cli,
     _parse_pi_json_response,
@@ -263,7 +264,7 @@ def test_call_pi_cli_parses_stdout_json(monkeypatch):
     assert "read" in captured["command"]
     assert "@/tmp/frame.jpg" in captured["command"]
     assert captured["kwargs"]["stdin"] == subprocess.DEVNULL
-    assert captured["kwargs"]["cwd"].endswith("ai-clip-assembler")
+    assert captured["kwargs"]["cwd"] == str(REPO_ROOT)
 
 
 def test_call_pi_cli_timeout_reports_diagnostics(monkeypatch):

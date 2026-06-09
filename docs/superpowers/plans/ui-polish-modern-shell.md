@@ -1,6 +1,6 @@
 # Plan: Modern Professional UI Shell
 
-Status: partially implemented, awaiting review
+Status: partially implemented; component migration and command palette remain active
 Owner: Elvijs / CODEX
 Pairs with: `project-sidebar.md`, `settings-page.md`
 Informs: `react-doctor-triage.md` (some a11y/correctness rules become trivial once we adopt the recommended library)
@@ -203,11 +203,26 @@ After PR 1-4, expected react-doctor score: ~95+/100 without any specific cleanup
 
 ## Acceptance
 
-- [ ] All routes wrapped in `AppShell`, sidebar visible.
+- [x] All routes wrapped in `AppShell`, sidebar visible.
 - [ ] Tokens centralized; no hardcoded hex colors in components.
 - [ ] Cmd-K opens command palette.
 - [ ] Re-running `npm run doctor` after PRs 1-4 shows ≥ 95/100 score with no new findings.
 - [ ] Subjective: side-by-side with DaVinci Resolve / Final Cut, the app's chrome reads as "same category of tool," not "web dashboard."
+
+## Implementation Status
+
+Implemented:
+
+- `AppShell`, `Sidebar`, `TitleBar`, and `StatusBar`.
+- Central token file and dark editor shell.
+- Existing Import, Review, Timeline, Export, and QA routes render inside the shell.
+
+Remaining:
+
+- Planned shadcn/Radix/lucide component migration.
+- Command palette and `Cmd-K`.
+- Remove remaining hardcoded/component-local styling.
+- Reach and verify the React Doctor acceptance score.
 
 ## Open Questions
 

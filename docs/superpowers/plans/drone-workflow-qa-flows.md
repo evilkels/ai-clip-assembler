@@ -1,7 +1,7 @@
 # Plan: QA Flows For The Drone Clip Extraction Workflow
 
-Status: draft, awaiting review
-Owner: TBD
+Status: partially automated; real-footage, performance, DaVinci, and signal QA remain
+Owner: Elvijs / Codex
 Related: `docs/QA.md` (technical acceptance tests), `docs/MANUAL_QA_GUIDE.md` (launch + smoke test), `project-folder-model.md` (folder layout these flows assume)
 
 ## Why This Doc Exists
@@ -169,6 +169,21 @@ After each flow run, capture:
 5. New `docs/QA.md`-style bug entries for each failure.
 
 Store under `~/Footage/QA/runs/<YYYY-MM-DD>/`. Do not commit to repo.
+
+## Automation Status
+
+Implemented:
+
+- `scripts/synthetic_e2e_qa.py` generates smooth, shaky, and mixed footage and runs the real backend pipeline.
+- The synthetic workflow verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, EDL/FCPXML/DaVinci XML exports, relative media paths, and close/reopen state restore.
+- Playwright browser coverage verifies upload, analysis completion, Review video preview, inclusion, and Timeline video preview.
+
+Still manual:
+
+- Real-footage timing targets and renderer responsiveness.
+- DaVinci/FCP import with zero relink prompts and clean playback.
+- Project move/Locate behavior through the packaged app.
+- AI-vs-Manual recall, precision, and surprise-win judgment.
 
 ## Open Questions
 

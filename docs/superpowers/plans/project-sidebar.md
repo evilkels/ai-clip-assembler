@@ -1,7 +1,7 @@
 # Plan: Project Sidebar
 
-Status: draft, awaiting review
-Owner: TBD
+Status: partially implemented; remaining UX and persistence acceptance items are active
+Owner: Elvijs / Codex
 Depends on: `project-folder-model.md` (project = folder, `recent.json` in app-data)
 Pairs with: `settings-page.md`, `ui-polish-modern-shell.md`
 
@@ -137,6 +137,22 @@ window.api.projects = {
 - [ ] Right-click → Remove → entry disappears, folder on disk untouched.
 - [ ] `Cmd-B` toggles collapsed/expanded; preference persists.
 - [ ] Sidebar passes react-doctor a11y rules (keyboard nav, ARIA roles).
+
+## Implementation Status
+
+Implemented:
+
+- Persistent `recent.json` storage in the Electron main process.
+- Sidebar recent-project list, active project state, create/open folder action, missing-folder state, Locate, Remove, Rescan, and Delete Project Files.
+- Preload IPC methods and renderer API/client wiring for recent projects.
+
+Remaining:
+
+- Automatically re-open the last-open project after relaunch.
+- Navigate directly to the Review Board after create/open.
+- Resizable/collapsible rail mode with persisted width and `Cmd-B`.
+- Replace the current inline action buttons with the planned context-menu interaction.
+- Complete keyboard-navigation/a11y verification.
 
 ## Open Questions
 

@@ -1,8 +1,16 @@
 # React Doctor Triage
 
+Status: partially implemented; state refactors and current warnings remain active
+
 Source: `npx react-doctor@latest --verbose` on `frontend/` (v0.2.14).
 Score: **88 / 100**, 40 issues across 19 rules.
 Snapshot at `/tmp/claude-501/react-doctor-209912ac-9bb7-427d-8b5b-844077d758cc`.
+
+Current note (2026-06-10): the original snapshot is historical. A post-merge
+`react-doctor --staged` run scored 90/100 with four warnings in the incoming
+React files, while `--verbose --diff` still reports broader pre-existing and
+active findings. Re-run before selecting the next batch; do not use the
+original counts as the current backlog.
 
 ## How To Use This Doc
 

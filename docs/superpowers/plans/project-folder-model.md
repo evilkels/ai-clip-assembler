@@ -1,6 +1,6 @@
 # Plan: Project = Folder On Disk
 
-Status: implemented in `feature/project-folder-model`, pending manual QA
+Status: implementation and automated QA complete; pending real-footage/manual app QA
 Owner: Elvijs / Codex
 Related: `UBIQUITOUS_LANGUAGE.md` (defines **Project**), `docs/PRD.md`
 
@@ -136,7 +136,7 @@ Each phase should be a separate PR / ready-for-agent issue:
 
 1. **Backend: project loader/writer** — `project.json` read/write, folder-scan, schema validation, idempotent create. Pure Python, unit-tested. **Done in branch.**
 2. **Backend: relocate analysis output** — move whatever the current pipeline writes into `clipassembler/samples/` and `clipassembler/analysis/`. **Done in branch for folder-backed projects.**
-3. **Backend: exports write inside project folder** — change export endpoints to take a project, not arbitrary paths. **Done in branch for EDL/FCPXML folder-backed exports.**
+3. **Backend: exports write inside project folder** — change export endpoints to take a project, not arbitrary paths. **Done in branch for EDL/FCPXML/DaVinci XML folder-backed exports.**
 4. **Frontend: Create / Open Project flow** — Electron folder picker, `recent.json` in app-data, sidebar entry. **Done in branch.**
 5. **Frontend: project-scoped views** — current drone-video workflow becomes "the open project's view". **Done in branch.** The app starts with no open project; legacy upload is available as an explicit fallback.
 6. **Docs: extend `MANUAL_QA_GUIDE.md`** with the three flows above. **Done in branch.**
@@ -182,13 +182,15 @@ Added later on `t3code/190b754e`:
 
 Verified:
 
-- Backend: `PYTHONPATH=. .venv/bin/pytest` passes with 101 tests.
-- Frontend: `npm run build` passes.
+- Backend: `PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py` passes with 131 tests.
+- Frontend: `npm run typecheck` and `npm run build` pass.
+- Browser workflow: `npm run test:e2e -- --project=chromium` passes.
+- Synthetic real-pipeline workflow: `backend/.venv/bin/python scripts/synthetic_e2e_qa.py` passes folder creation, analysis, timeline edit, all three exports, relative media paths, and close/reopen state restore.
 
 ## Remaining Manual QA Before Complete
 
-The implementation work is complete, but the plan should not be marked
-`complete` until real-footage QA has been run:
+The implementation and automated QA work are complete, but the plan should not
+move to `plans/done/` until real-footage/manual app QA has been run:
 
 1. Run the documented folder-project QA flow with real footage.
 2. Verify source videos are not copied.

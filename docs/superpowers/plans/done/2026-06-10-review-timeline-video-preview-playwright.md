@@ -1,5 +1,8 @@
 # Review Timeline Video Preview Playwright Implementation Plan
 
+Status: implemented and verified on `feature/project-folder-model`
+Completed: 2026-06-10
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add backend-backed video preview playback to Review and Timeline, plus a browser QA route that can be driven by Playwright.
@@ -7,6 +10,14 @@
 **Architecture:** The backend exposes registered source videos through a safe project media endpoint. The React renderer builds media URLs from project and file IDs, then uses one shared clip preview component in Review and Timeline. Playwright drives Chromium against the Vite renderer URL `http://localhost:5173/#/playwriter`; the route name stays `/playwriter`, but the automation tool is Playwright, not the Playwriter extension.
 
 **Tech Stack:** FastAPI, Starlette `FileResponse`, React 19, React Router `HashRouter`, Vite, Electron renderer, TypeScript, Playwright test runner.
+
+## Completion Record
+
+- Backend registered-video media endpoint supports full and ranged responses.
+- Review and Timeline render shared clip-range video previews.
+- Browser QA route remains `/#/playwriter`; automation uses Playwright.
+- `npm run test:e2e -- --project=chromium` covers upload, analysis, Review preview, inclusion, and Timeline preview.
+- Final merged verification: 131 backend tests passed, frontend typecheck/build passed, and Playwright E2E passed.
 
 ---
 
@@ -35,7 +46,7 @@
 - Modify: `backend/src/api.py`
 - Test: `backend/tests/test_api.py`
 
-- [ ] **Step 1: Write failing backend media tests**
+- [x] **Step 1: Write failing backend media tests**
 
 Append these tests near the existing upload and folder project tests in `backend/tests/test_api.py`:
 
@@ -126,7 +137,7 @@ def test_project_video_media_rejects_missing_registered_file(monkeypatch, tmp_pa
     assert response.json()["detail"] == "Video file not found"
 ```
 
-- [ ] **Step 2: Run backend media tests and verify red**
+- [x] **Step 2: Run backend media tests and verify red**
 
 Run:
 
@@ -136,7 +147,7 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_api.py -k "proj
 
 Expected result: all five new tests fail with `404 Not Found` because the endpoint does not exist.
 
-- [ ] **Step 3: Implement the media endpoint**
+- [x] **Step 3: Implement the media endpoint**
 
 Edit `backend/src/api.py`.
 
@@ -183,7 +194,7 @@ def media_type_for_video(video_path: Path) -> str:
     return "video/mp4"
 ```
 
-- [ ] **Step 4: Run backend media tests and verify green**
+- [x] **Step 4: Run backend media tests and verify green**
 
 Run:
 
@@ -193,7 +204,7 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_api.py -k "proj
 
 Expected result: `5 passed`.
 
-- [ ] **Step 5: Run focused API tests**
+- [x] **Step 5: Run focused API tests**
 
 Run:
 
@@ -203,7 +214,7 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_api.py -q
 
 Expected result: all `test_api.py` tests pass.
 
-- [ ] **Step 6: Commit backend media endpoint**
+- [x] **Step 6: Commit backend media endpoint**
 
 Run:
 
@@ -221,7 +232,7 @@ git commit -m "feat: serve registered project videos"
 - Create: `frontend/src/renderer/src/components/ClipPreview.tsx`
 - Modify: `frontend/src/renderer/src/styles.css`
 
-- [ ] **Step 1: Add media URL helper**
+- [x] **Step 1: Add media URL helper**
 
 Append this helper after `backendUrl()` in `frontend/src/renderer/src/api/client.ts`:
 
@@ -231,7 +242,7 @@ export function buildVideoMediaUrl(projectId: string, fileId: string): string {
 }
 ```
 
-- [ ] **Step 2: Create shared clip preview component**
+- [x] **Step 2: Create shared clip preview component**
 
 Create `frontend/src/renderer/src/components/ClipPreview.tsx`:
 
@@ -339,7 +350,7 @@ export function ClipPreview({
 }
 ```
 
-- [ ] **Step 3: Add preview styles**
+- [x] **Step 3: Add preview styles**
 
 Append these styles near the existing clip and timeline styles in `frontend/src/renderer/src/styles.css`:
 
@@ -416,7 +427,7 @@ Append these styles near the existing clip and timeline styles in `frontend/src/
 }
 ```
 
-- [ ] **Step 4: Run frontend typecheck and verify green**
+- [x] **Step 4: Run frontend typecheck and verify green**
 
 Run:
 
@@ -426,7 +437,7 @@ cd frontend && npm run typecheck
 
 Expected result: `tsc --noEmit -p tsconfig.json` exits with code `0`.
 
-- [ ] **Step 5: Commit media helper and preview component**
+- [x] **Step 5: Commit media helper and preview component**
 
 Run:
 
@@ -443,7 +454,7 @@ git commit -m "feat: add reusable clip preview player"
 - Modify: `frontend/src/renderer/src/components/ClipCard.tsx`
 - Modify: `frontend/src/renderer/src/routes/Review.tsx`
 
-- [ ] **Step 1: Update ClipCard props and render preview**
+- [x] **Step 1: Update ClipCard props and render preview**
 
 Edit `frontend/src/renderer/src/components/ClipCard.tsx`.
 
@@ -488,7 +499,7 @@ Replace the current `.clip-thumb` block with:
 </div>
 ```
 
-- [ ] **Step 2: Pass Review media URLs**
+- [x] **Step 2: Pass Review media URLs**
 
 Edit `frontend/src/renderer/src/routes/Review.tsx`.
 
@@ -522,7 +533,7 @@ Pass `mediaUrl` to each `ClipCard`:
 />
 ```
 
-- [ ] **Step 3: Run typecheck**
+- [x] **Step 3: Run typecheck**
 
 Run:
 
@@ -532,7 +543,7 @@ cd frontend && npm run typecheck
 
 Expected result: exits with code `0`.
 
-- [ ] **Step 4: Commit Review preview integration**
+- [x] **Step 4: Commit Review preview integration**
 
 Run:
 
@@ -548,7 +559,7 @@ git commit -m "feat: preview clips in review"
 **Files:**
 - Modify: `frontend/src/renderer/src/components/Timeline.tsx`
 
-- [ ] **Step 1: Add imports and project ID**
+- [x] **Step 1: Add imports and project ID**
 
 Edit `frontend/src/renderer/src/components/Timeline.tsx`.
 
@@ -566,7 +577,7 @@ Change the `useReview()` destructure:
     useReview();
 ```
 
-- [ ] **Step 2: Add selected segment and preview timing**
+- [x] **Step 2: Add selected segment and preview timing**
 
 Place this after `currentSegment`:
 
@@ -589,7 +600,7 @@ Place this after `currentSegment`:
       : undefined;
 ```
 
-- [ ] **Step 3: Render Timeline preview before toolbar**
+- [x] **Step 3: Render Timeline preview before toolbar**
 
 Inside the non-empty return, immediately after `<div className="timeline">`, add:
 
@@ -621,7 +632,7 @@ Inside the non-empty return, immediately after `<div className="timeline">`, add
       )}
 ```
 
-- [ ] **Step 4: Make selected clip drive preview even before scrub**
+- [x] **Step 4: Make selected clip drive preview even before scrub**
 
 In the existing `onPointerDown` handler for each `.tl-clip`, keep the existing selection and also move the playhead to the start of that segment:
 
@@ -633,7 +644,7 @@ onPointerDown={(e) => {
 }}
 ```
 
-- [ ] **Step 5: Run typecheck**
+- [x] **Step 5: Run typecheck**
 
 Run:
 
@@ -643,7 +654,7 @@ cd frontend && npm run typecheck
 
 Expected result: exits with code `0`.
 
-- [ ] **Step 6: Commit Timeline preview integration**
+- [x] **Step 6: Commit Timeline preview integration**
 
 Run:
 
@@ -660,7 +671,7 @@ git commit -m "feat: preview timeline playback"
 - Create: `frontend/src/renderer/src/routes/PlaywriterQa.tsx`
 - Modify: `frontend/src/renderer/src/App.tsx`
 
-- [ ] **Step 1: Create QA route component**
+- [x] **Step 1: Create QA route component**
 
 Create `frontend/src/renderer/src/routes/PlaywriterQa.tsx`:
 
@@ -755,7 +766,7 @@ export function PlaywriterQaPage() {
 }
 ```
 
-- [ ] **Step 2: Register route**
+- [x] **Step 2: Register route**
 
 Edit `frontend/src/renderer/src/App.tsx`.
 
@@ -771,7 +782,7 @@ Add route:
 <Route path="/playwriter" element={<PlaywriterQaPage />} />
 ```
 
-- [ ] **Step 3: Run typecheck**
+- [x] **Step 3: Run typecheck**
 
 Run:
 
@@ -781,7 +792,7 @@ cd frontend && npm run typecheck
 
 Expected result: exits with code `0`.
 
-- [ ] **Step 4: Commit QA route**
+- [x] **Step 4: Commit QA route**
 
 Run:
 
@@ -799,7 +810,7 @@ git commit -m "feat: add playwright qa route"
 - Create: `frontend/playwright.config.ts`
 - Create: `frontend/e2e/playwriter-preview.spec.ts`
 
-- [ ] **Step 1: Install Playwright test dependency**
+- [x] **Step 1: Install Playwright test dependency**
 
 Run:
 
@@ -809,7 +820,7 @@ cd frontend && npm install -D @playwright/test
 
 Expected result: `package.json` and `package-lock.json` update.
 
-- [ ] **Step 2: Add Playwright scripts**
+- [x] **Step 2: Add Playwright scripts**
 
 Edit `frontend/package.json` scripts:
 
@@ -820,7 +831,7 @@ Edit `frontend/package.json` scripts:
 
 The scripts block keeps the existing scripts and adds these two entries.
 
-- [ ] **Step 3: Add Playwright config**
+- [x] **Step 3: Add Playwright config**
 
 Create `frontend/playwright.config.ts`:
 
@@ -861,7 +872,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Add Playwright workflow test**
+- [x] **Step 4: Add Playwright workflow test**
 
 Create `frontend/e2e/playwriter-preview.spec.ts`:
 
@@ -933,7 +944,7 @@ test('analysis completes and review/timeline previews render playable videos', a
 });
 ```
 
-- [ ] **Step 5: Run Playwright install**
+- [x] **Step 5: Run Playwright install**
 
 Run:
 
@@ -943,7 +954,7 @@ cd frontend && npx playwright install chromium
 
 Expected result: Chromium browser is installed or reported as already installed.
 
-- [ ] **Step 6: Run Playwright E2E test**
+- [x] **Step 6: Run Playwright E2E test**
 
 Run:
 
@@ -953,7 +964,7 @@ cd frontend && npm run test:e2e -- --project=chromium
 
 Expected result: the single E2E test passes. If `ffmpeg` lacks `vidstabdetect`, the test fails during analysis and the correct fix is the FFmpeg setup documented in `docs/MANUAL_QA_GUIDE.md`.
 
-- [ ] **Step 7: Commit Playwright coverage**
+- [x] **Step 7: Commit Playwright coverage**
 
 Run:
 
@@ -969,7 +980,7 @@ git commit -m "test: cover preview workflow with playwright"
 **Files:**
 - No new file edits.
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run:
 
@@ -979,7 +990,7 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_
 
 Expected result: all backend tests pass.
 
-- [ ] **Step 2: Run frontend typecheck**
+- [x] **Step 2: Run frontend typecheck**
 
 Run:
 
@@ -989,7 +1000,7 @@ cd frontend && npm run typecheck
 
 Expected result: exits with code `0`.
 
-- [ ] **Step 3: Run frontend build**
+- [x] **Step 3: Run frontend build**
 
 Run:
 
@@ -999,7 +1010,7 @@ cd frontend && npm run build
 
 Expected result: Electron Vite build completes without TypeScript or bundling errors.
 
-- [ ] **Step 4: Run Playwright workflow**
+- [x] **Step 4: Run Playwright workflow**
 
 Run:
 
@@ -1009,7 +1020,7 @@ cd frontend && npm run test:e2e -- --project=chromium
 
 Expected result: the Playwright workflow passes in Chromium.
 
-- [ ] **Step 5: Inspect git status**
+- [x] **Step 5: Inspect git status**
 
 Run:
 

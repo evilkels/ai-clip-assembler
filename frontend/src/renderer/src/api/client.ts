@@ -234,6 +234,32 @@ export async function analyzeProject(
   };
 }
 
+export interface SavedTimelineEntry {
+  clip_id: string;
+  start_sec: number;
+  end_sec: number;
+}
+
+/**
+ * Returns the saved (user-edited) timeline for a project, or null when the
+ * timeline is still the fresh post-analysis ranking (clip-id strings) and
+ * carries no review decisions to restore.
+ */
+export async function getSavedTimeline(
+  projectId: string,
+): Promise<SavedTimelineEntry[] | null> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    timeline: { clips?: Array<string | SavedTimelineEntry> } | null;
+  };
+  const entries = data.timeline?.clips;
+  if (!entries || entries.length === 0 || typeof entries[0] === 'string') return null;
+  return entries as SavedTimelineEntry[];
+}
+
 export async function getClips(projectId: string): Promise<ClipCandidate[]> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/clips`);
   if (!res.ok) throw new Error(`Failed to load clips: ${res.status}`);
@@ -248,9 +274,11 @@ export interface ExportResult {
   file_path: string;
 }
 
+export type ExportFormat = 'edl' | 'fcpxml' | 'resolve_xml';
+
 export async function exportTimeline(
   projectId: string,
-  format: 'edl' | 'fcpxml',
+  format: ExportFormat,
   options: { overwrite?: boolean } = {},
 ): Promise<ExportResult> {
   const overwrite = options.overwrite ? '&overwrite=true' : '';

@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 PROJECT_STATE_DIRNAME = "clipassembler"
 PROJECT_MANIFEST_FILENAME = "project.json"
 PROJECT_SCHEMA_VERSION = 1
+ANALYSIS_RESULTS_FILENAME = "results.json"
+ANALYSIS_RESULTS_SCHEMA_VERSION = 1
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
 DEFAULT_HARNESS_ID = "pi_agent"
 UNSAFE_PROJECT_ROOTS = [
@@ -212,6 +214,47 @@ def validate_safe_project_folder(project_folder: Path) -> None:
             raise UnsafeProjectFolderError(
                 f"Project folder is not allowed in protected location: {project_folder}"
             )
+
+
+def analysis_results_path(project_folder: Path) -> Path:
+    return project_state_dir(project_folder) / "analysis" / ANALYSIS_RESULTS_FILENAME
+
+
+def write_analysis_results(
+    project_folder: Path,
+    *,
+    harness_id: str,
+    clips: List[dict],
+    timeline: dict | None,
+    now: Callable[[], datetime] = datetime_now_utc,
+) -> None:
+    payload = {
+        "schema_version": ANALYSIS_RESULTS_SCHEMA_VERSION,
+        "harness_id": harness_id,
+        "analyzed_at": format_timestamp(now()),
+        "clips": clips,
+        "timeline": timeline,
+    }
+    path = analysis_results_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def read_analysis_results(project_folder: Path) -> dict | None:
+    path = analysis_results_path(project_folder)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("schema_version") != ANALYSIS_RESULTS_SCHEMA_VERSION:
+        return None
+    if not isinstance(payload.get("clips"), list):
+        return None
+    return payload
 
 
 def project_state_dir(project_folder: Path) -> Path:

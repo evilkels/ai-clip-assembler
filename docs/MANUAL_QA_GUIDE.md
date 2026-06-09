@@ -17,8 +17,7 @@ Install system tools:
 brew install python@3.11 node
 ```
 
-FFmpeg is required. On macOS, the default Homebrew `ffmpeg` formula includes the
-`vidstabdetect` filter needed for motion analysis:
+FFmpeg with the `vidstabdetect` filter is required for motion analysis:
 
 ```bash
 brew install ffmpeg
@@ -30,20 +29,20 @@ Verify `vidstabdetect` is available:
 ffmpeg -hide_banner -filters | grep vidstabdetect
 ```
 
-If `vidstabdetect` is missing (older Homebrew installs or custom builds), install
-libvidstab and rebuild:
+**Caveat:** the standard Homebrew `ffmpeg` bottle may be compiled **without**
+`libvidstab` (the `configuration:` line in `ffmpeg -version` lacks
+`--enable-libvidstab`). If the grep prints nothing, `brew reinstall ffmpeg`
+will not fix it — Homebrew reinstalls the same prebuilt bottle. Replace it
+with a source build from the homebrew-ffmpeg tap, with the libvidstab option
+enabled explicitly:
 
 ```bash
-brew install libvidstab
-brew reinstall ffmpeg
-```
-
-Alternatively, use Homebrew's `ffmpeg-full` tap which bundles more filters:
-
-```bash
+brew uninstall ffmpeg
 brew tap homebrew-ffmpeg/ffmpeg
-brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
 ```
+
+The tap builds from source; expect 10–30 minutes.
 
 Verify:
 
@@ -57,9 +56,9 @@ node --version
 npm --version
 ```
 
-The backend MVP requires `vidstabdetect`. The regular Homebrew `ffmpeg`
-formula may not include it, so start the backend from a shell where
-`/opt/homebrew/opt/ffmpeg-full/bin` appears before `/opt/homebrew/bin`.
+The backend MVP requires `vidstabdetect`. Both grep checks above must list the
+filter in the shell you start the backend from — the backend resolves `ffmpeg`
+from that shell's `PATH`.
 
 ## Install Dependencies
 
@@ -89,20 +88,16 @@ npm run build
 
 ## Launch The App
 
-Terminal 1, backend:
-
-```bash
-cd /Users/elvijs/DEV/personal/ai-clip-assembler/backend
-source .venv/bin/activate
-PYTHONPATH=. uvicorn src.api:app --reload --port 8000
-```
-
-Terminal 2, frontend:
+One terminal, both halves (backend + Electron app, killed together on Ctrl+C):
 
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler/frontend
-npm run dev
+npm run dev:with-backend
 ```
+
+The backend auto-loads the repo-root `.env` on startup. To run the halves in
+separate terminals instead, use `npm run dev:backend` and `npm run dev` from
+the same directory.
 
 Expected frontend behavior:
 

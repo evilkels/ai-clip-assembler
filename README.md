@@ -18,24 +18,46 @@ cd ai-clip-assembler
 # System tools (FFmpeg must include the vidstabdetect filter)
 brew install python@3.11 node ffmpeg
 ffmpeg -hide_banner -filters | grep vidstabdetect   # must print a line
+```
 
-# Backend
+> **Caveat:** the standard Homebrew `ffmpeg` bottle may be compiled **without**
+> `libvidstab` (check `ffmpeg -version` for `--enable-libvidstab`). If the grep
+> above prints nothing, `brew reinstall ffmpeg` will NOT fix it — it reinstalls
+> the same prebuilt bottle. Replace it with a source build from the
+> homebrew-ffmpeg tap:
+>
+> ```bash
+> brew uninstall ffmpeg
+> brew tap homebrew-ffmpeg/ffmpeg
+> brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
+> ffmpeg -hide_banner -filters | grep vidstab   # vidstabdetect + vidstabtransform
+> ```
+>
+> This builds from source and can take 10–30 minutes.
+
+```bash
+
+# Backend deps (one-time)
 cd backend
 python3.11 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn src.api:app --reload --port 8000 &
 
-# Frontend
+# Frontend deps (one-time)
 cd ../frontend
 npm install
-npm run dev
+
+# Run backend + Electron app together (backend auto-loads repo-root .env)
+npm run dev:with-backend
 ```
+
+Other scripts (from `frontend/`): `npm run dev:backend` (backend only),
+`npm run dev` (app only), `npm run test:backend` (backend test suite).
 
 Full setup, tests, and project layout: [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md).
 
 ## AI Harness
 
-The active default AI harness is **`pi_agent`** — it drives the [`pi`](https://github.com/earendil-works/pi-mono) coding-agent CLI (default provider `openai-codex`, model `gpt-5.4-mini`) to score candidate clips. Authenticate once with `pi /login` (or set a provider key such as `OPENCODE_API_KEY`); the backend inherits that environment. Tune via `PI_PROVIDER` / `PI_MODEL` / `PI_BIN` / `PI_TIMEOUT_SEC` (see `.env.example`).
+The active default AI harness is **`pi_agent`** — it drives the [`pi`](https://github.com/earendil-works/pi-mono) coding-agent CLI (default provider `openai-codex`, model `gpt-5.4-mini`) to score candidate clips. Authenticate once with `pi /login` (or set a provider key such as `OPENCODE_API_KEY`); the backend inherits that environment. Tune via `PI_PROVIDER` / `PI_MODEL` / `PI_BIN` / `PI_TIMEOUT_SEC` — set in the shell or in a repo-root `.env`, which the backend loads automatically (see `.env.example`).
 
 The `manual` rule-based harness needs no AI. The **local-model harness (`local_qwen`) is postponed** — disabled in `GET /harnesses` and not selectable in `/analyze` — until the Ollama/MLX path is fully figured out (code retained for later). See [docs/HARNESS_SPEC.md](docs/HARNESS_SPEC.md).
 

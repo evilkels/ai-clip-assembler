@@ -4,10 +4,13 @@ Drives the ``pi`` coding agent (https://github.com/earendil-works/pi-mono) in
 non-interactive print mode to score the visual interest of candidate drone
 clips. By default it uses the ``openai-codex`` provider with the
 ``gpt-5.4-mini`` model; ``pi`` reads sampled frame images with its built-in
-``read`` tool and returns structured JSON scores.
+frame attachments and returns structured JSON scores.
 
 Falls back gracefully to the original rule-based result when the ``pi`` CLI is
-unavailable, times out, or returns unusable output.
+unavailable, times out, or returns unusable output. Scoring is all-or-nothing:
+blended (0.7 technical + 0.3 visual interest) scores and unblended technical
+scores are not on the same scale, so the first failed clip aborts AI scoring
+for the whole run and the manual ranking is kept intact.
 
 Configuration is via environment variables only (no config file):
 
@@ -23,12 +26,20 @@ provider env vars such as ``OPENCODE_API_KEY``); the harness inherits the
 backend process environment when spawning the CLI.
 """
 
+import hashlib
 import json
+import logging
 import os
+import shutil
 import subprocess
-from typing import List, Optional, Tuple
+import time
+from pathlib import Path
+from typing import Callable, List, Optional, Tuple
 
 from .models import AssemblyResult, ClipSuggestion, FrameScore
+
+# uvicorn's logger so progress messages reach the dev console without extra config
+logger = logging.getLogger("uvicorn.error")
 
 PI_BIN = os.environ.get("PI_BIN", "pi")
 PI_PROVIDER = os.environ.get("PI_PROVIDER", "openai-codex")
@@ -36,6 +47,7 @@ PI_MODEL = os.environ.get("PI_MODEL", "gpt-5.4-mini")
 DEFAULT_TIMEOUT = float(os.environ.get("PI_TIMEOUT_SEC", "180"))
 DEFAULT_MAX_FRAMES_PER_CLIP = 4
 REQUIRED_SCORE_KEYS = {"smoothness", "visual_interest"}
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_PROMPT_TEMPLATE = (
     "You are a drone-video quality analyst. Use your read tool to view each of "
@@ -51,6 +63,41 @@ DEFAULT_PROMPT_TEMPLATE = (
 
 class PiCliUnavailableError(Exception):
     """Raised when the pi CLI is unreachable, fails, or returns junk."""
+
+
+def _output_snippet(value: Optional[str], limit: int = 500) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    text = str(value).strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}..."
+
+
+def _timeout_diagnostics(
+    frame_paths: List[str],
+    pi_bin: str,
+    timeout_sec: float,
+    stdout: Optional[str],
+    stderr: Optional[str],
+) -> str:
+    frame_names = ", ".join(Path(path).name for path in frame_paths)
+    resolved_bin = shutil.which(pi_bin) or pi_bin
+    parts = [
+        f"pi CLI timed out after {timeout_sec:g}s",
+        f"bin={resolved_bin}",
+        f"cwd={REPO_ROOT}",
+        f"frames={len(frame_paths)} [{frame_names}]",
+    ]
+    stdout_snippet = _output_snippet(stdout)
+    stderr_snippet = _output_snippet(stderr)
+    if stdout_snippet:
+        parts.append(f"stdout={stdout_snippet}")
+    if stderr_snippet:
+        parts.append(f"stderr={stderr_snippet}")
+    return "; ".join(parts)
 
 
 def _parse_pi_json_response(raw: str) -> dict:
@@ -117,22 +164,44 @@ def _call_pi_cli(
         "--mode",
         "text",
         "--no-session",
+        "--no-context-files",
+        "--no-skills",
+        "--no-extensions",
+        "--tools",
+        "read",
+        *[f"@{path}" for path in frame_paths],
         prompt,
     ]
+    logger.info(
+        "pi harness: invoking %s provider=%s model=%s cwd=%s frames=%s",
+        shutil.which(pi_bin) or pi_bin,
+        provider,
+        model,
+        REPO_ROOT,
+        [Path(path).name for path in frame_paths],
+    )
 
     try:
         completed = subprocess.run(
             command,
             capture_output=True,
+            stdin=subprocess.DEVNULL,
             text=True,
             timeout=timeout_sec,
+            cwd=str(REPO_ROOT),
             env=os.environ.copy(),
         )
     except FileNotFoundError as exc:
         raise PiCliUnavailableError(f"pi CLI not found on PATH ({pi_bin})") from exc
     except subprocess.TimeoutExpired as exc:
         raise PiCliUnavailableError(
-            f"pi CLI timed out after {timeout_sec}s"
+            _timeout_diagnostics(
+                frame_paths,
+                pi_bin,
+                timeout_sec,
+                exc.stdout or exc.output,
+                exc.stderr,
+            )
         ) from exc
 
     if completed.returncode != 0:
@@ -173,6 +242,45 @@ def _clamp_score(value) -> float:
         return 0.0
 
 
+def _score_cache_key(
+    frame_paths: List[str], provider: str, model: str, prompt_template: str
+) -> str:
+    """Deterministic cache key: same frames + same model + same prompt = same score."""
+    digest = hashlib.sha256()
+    digest.update(provider.encode())
+    digest.update(model.encode())
+    digest.update(prompt_template.encode())
+    for path in frame_paths:
+        try:
+            digest.update(Path(path).read_bytes())
+        except OSError:
+            digest.update(path.encode())
+    return digest.hexdigest()
+
+
+def _load_cached_score(cache_dir: Optional[Path], key: str) -> Optional[dict]:
+    if cache_dir is None:
+        return None
+    cache_file = cache_dir / f"{key}.json"
+    if not cache_file.exists():
+        return None
+    try:
+        cached = json.loads(cache_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return cached if isinstance(cached, dict) else None
+
+
+def _store_cached_score(cache_dir: Optional[Path], key: str, score: dict) -> None:
+    if cache_dir is None:
+        return
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        (cache_dir / f"{key}.json").write_text(json.dumps(score), encoding="utf-8")
+    except OSError:
+        logger.warning("pi harness: could not write score cache in %s", cache_dir)
+
+
 def _fallback_result(manual_result: AssemblyResult, warning: str) -> Tuple[AssemblyResult, bool]:
     metadata = dict(manual_result.metadata)
     metadata["used_ai"] = False
@@ -199,6 +307,8 @@ def enhance_clips_with_pi_cli(
     model: str = PI_MODEL,
     pi_bin: str = PI_BIN,
     timeout_sec: float = DEFAULT_TIMEOUT,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    cache_dir: Optional[Path] = None,
 ) -> Tuple[AssemblyResult, bool]:
     """Enhance manual rule-based clips with pi coding-agent vision analysis.
 
@@ -207,8 +317,17 @@ def enhance_clips_with_pi_cli(
     ``ai_reason``, and a blended ``overall_score`` (70 % original technical +
     30 % visual interest). Clips are then re-ranked by ``overall_score``.
 
-    If the CLI is unavailable or every clip fails to score, the original manual
-    result is returned unchanged and the second return value is ``False``.
+    Scoring is all-or-nothing: blended and unblended overall scores are not
+    comparable, so the first clip that fails aborts AI scoring entirely and the
+    untouched manual result is returned (second return value ``False``). The
+    first call thereby doubles as the pi health check — a dead CLI costs one
+    timeout, not one per clip.
+
+    When *cache_dir* is set, scores are cached per (frames, provider, model,
+    prompt) so re-analyzing unchanged footage is free and reproducible.
+
+    ``progress_callback(scored_count, clip_total)`` is invoked after each clip
+    is attempted, so callers can surface per-clip progress.
 
     Returns
     -------
@@ -226,8 +345,26 @@ def enhance_clips_with_pi_cli(
             manual_result, "pi harness fallback: no frames available for analysis"
         )
 
-    clip_scores: List[Optional[dict]] = []
-    for _clip, paths in clip_samples:
+    clip_scores: List[dict] = []
+    call_durations: List[float] = []
+    for clip_index, (clip, paths) in enumerate(clip_samples, start=1):
+        cache_key = _score_cache_key(paths, provider, model, prompt_template)
+        score = _load_cached_score(cache_dir, cache_key)
+        if score is not None and REQUIRED_SCORE_KEYS.issubset(score):
+            logger.info(
+                "pi harness: clip %d/%d (%s) score cache hit",
+                clip_index, len(clip_samples), clip.clip_id,
+            )
+            clip_scores.append(score)
+            if progress_callback:
+                progress_callback(clip_index, len(clip_samples))
+            continue
+
+        logger.info(
+            "pi harness: scoring clip %d/%d (%s, timeout %.0fs)",
+            clip_index, len(clip_samples), clip.clip_id, timeout_sec,
+        )
+        started = time.monotonic()
         try:
             score = _call_pi_cli(
                 paths,
@@ -237,28 +374,43 @@ def enhance_clips_with_pi_cli(
                 pi_bin=pi_bin,
                 timeout_sec=timeout_sec,
             )
-        except PiCliUnavailableError:
-            clip_scores.append(None)
-            continue
-        if isinstance(score, dict) and REQUIRED_SCORE_KEYS.issubset(score):
-            clip_scores.append(score)
-        else:
-            clip_scores.append(None)
-
-    usable_clips = sum(1 for score in clip_scores if score is not None)
-    if usable_clips == 0:
-        return _fallback_result(
-            manual_result, "pi harness fallback: CLI unavailable or no usable scores"
+        except PiCliUnavailableError as exc:
+            elapsed = time.monotonic() - started
+            logger.warning(
+                "pi harness: clip %d/%d failed after %.1fs, aborting AI scoring "
+                "(all-or-nothing): %s",
+                clip_index, len(clip_samples), elapsed, exc,
+            )
+            return _fallback_result(
+                manual_result,
+                f"pi harness fallback: clip {clip_index}/{len(clip_samples)} "
+                f"failed after {elapsed:.1f}s ({exc}); manual ranking kept",
+            )
+        elapsed = time.monotonic() - started
+        if not REQUIRED_SCORE_KEYS.issubset(score):
+            logger.warning(
+                "pi harness: clip %d/%d returned an unusable score after %.1fs, "
+                "aborting AI scoring (all-or-nothing)",
+                clip_index, len(clip_samples), elapsed,
+            )
+            return _fallback_result(
+                manual_result,
+                f"pi harness fallback: clip {clip_index}/{len(clip_samples)} "
+                f"returned an unusable score; manual ranking kept",
+            )
+        logger.info(
+            "pi harness: clip %d/%d scored in %.1fs",
+            clip_index, len(clip_samples), elapsed,
         )
-
-    partial = usable_clips < len(clip_samples)
+        call_durations.append(round(elapsed, 1))
+        _store_cached_score(cache_dir, cache_key, score)
+        clip_scores.append(score)
+        if progress_callback:
+            progress_callback(clip_index, len(clip_samples))
 
     enhanced_clips: List[ClipSuggestion] = []
     sampled_clip_ids = {clip.clip_id for clip, _ in clip_samples}
     for (original_clip, _paths), score in zip(clip_samples, clip_scores):
-        if score is None:
-            enhanced_clips.append(original_clip)
-            continue
         new_visual_interest = round(_clamp_score(score.get("visual_interest", 0)), 2)
         new_overall = round(
             0.7 * original_clip.overall_score + 0.3 * new_visual_interest, 2
@@ -286,13 +438,10 @@ def enhance_clips_with_pi_cli(
     metadata["provider"] = provider
     metadata["local"] = False
     metadata["used_ai"] = True
-    metadata["clips_enhanced"] = usable_clips
+    metadata["clips_enhanced"] = len(clip_scores)
     metadata["clips_total"] = len(clip_samples)
-    if partial:
-        metadata["partial_enhancement"] = True
-        metadata["warning"] = (
-            f"pi harness partial enhancement: {usable_clips}/{len(clip_samples)} clips enhanced"
-        )
+    if call_durations:
+        metadata["scoring_seconds_per_clip"] = call_durations
 
     return (
         AssemblyResult(

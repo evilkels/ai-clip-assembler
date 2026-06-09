@@ -14,15 +14,21 @@ brew install ffmpeg
 ffmpeg -hide_banner -filters | grep vidstabdetect   # must print a line
 ```
 
-If `vidstabdetect` is missing (some bottled/`ffmpeg` builds omit `libvidstab`),
-install a full build:
+If the grep prints nothing, your `ffmpeg` bottle was compiled without
+`libvidstab` (confirm: `ffmpeg -version` shows no `--enable-libvidstab` in the
+`configuration:` line). **`brew reinstall ffmpeg` will not fix this** — it
+reinstalls the same prebuilt bottle. Replace it with a source build from the
+homebrew-ffmpeg tap:
 
 ```bash
-brew install libvidstab
-brew reinstall ffmpeg
-# or use the full-feature tap:
-#   brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+brew uninstall ffmpeg
+brew tap homebrew-ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
+ffmpeg -hide_banner -filters | grep vidstab   # must list vidstabdetect + vidstabtransform
 ```
+
+The tap builds from source; expect 10–30 minutes. `brew options
+homebrew-ffmpeg/ffmpeg/ffmpeg` lists further optional codecs.
 
 The AI harness uses the [`pi`](https://github.com/earendil-works/pi-mono) CLI.
 Install it and authenticate a provider once:
@@ -44,9 +50,10 @@ python3.11 -m venv .venv
 ```
 
 Key environment variables (see `.env.example`): `PI_BIN`, `PI_PROVIDER`,
-`PI_MODEL`, `PI_TIMEOUT_SEC`. The backend inherits its environment when spawning
-`pi`, so provider credentials configured for the `pi` CLI are picked up
-automatically.
+`PI_MODEL`, `PI_TIMEOUT_SEC`. The backend loads a repo-root `.env` automatically
+on startup (python-dotenv), and shell variables take precedence over `.env`
+values. It also inherits its environment when spawning `pi`, so provider
+credentials configured for the `pi` CLI are picked up automatically.
 
 ### Backend tests
 
@@ -56,7 +63,8 @@ PYTHONPATH=. .venv/bin/python -m pytest
 ```
 
 Run the backend tests from `backend/` so `PYTHONPATH=.` resolves the `src`
-package consistently.
+package consistently. Equivalent npm script: `npm run test:backend` from
+`frontend/`.
 
 ## Frontend (Electron + React + Vite)
 

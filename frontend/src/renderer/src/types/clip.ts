@@ -77,5 +77,16 @@ export interface Trim {
 
 export interface AnalysisStatus {
   phase: 'idle' | 'analyzing' | 'complete' | 'error';
-  error?: string;
+  harness_id?: string;
+  step?: string;
+  video_index?: number;
+  video_total?: number;
+  file_name?: string | null;
+  clip_index?: number;
+  clip_total?: number;
+  message?: string;
+  elapsed_sec?: number;
+  started_at?: number;
+  updated_at?: number;
+  error?: string | null;
 }

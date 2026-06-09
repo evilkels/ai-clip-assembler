@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 
 from src.models import AssemblyResult, ClipSuggestion, FrameScore, TimelineSequence
 from src.pi_cli_harness import (
@@ -97,7 +98,9 @@ def test_enhance_clips_with_pi_cli_blends_scores_and_reranks(monkeypatch, tmp_pa
 
     monkeypatch.setattr("src.pi_cli_harness._call_pi_cli", fake_call)
 
-    result, used_ai = enhance_clips_with_pi_cli(manual_result, frames)
+    # Pin the model: the module-level PI_MODEL default depends on the
+    # developer's .env once src.api has loaded it, so tests must not rely on it.
+    result, used_ai = enhance_clips_with_pi_cli(manual_result, frames, model="gpt-5.4-mini")
 
     assert used_ai is True
     # clip-high blends to 0.7*7.5 + 0.3*9.5 = 8.1, clip-low to 0.7*7 + 0.3*4 = 6.1
@@ -128,31 +131,99 @@ def test_enhance_clips_with_pi_cli_falls_back_when_cli_fails(monkeypatch, tmp_pa
     assert result.harness_id == "pi_agent"
 
 
-def test_enhance_clips_with_pi_cli_partial_when_one_clip_fails(monkeypatch, tmp_path):
+def test_enhance_clips_aborts_on_first_failure_without_scoring_the_rest(monkeypatch, tmp_path):
+    # All-or-nothing: blended and unblended scores are not comparable, so one
+    # failed clip must keep the entire manual ranking and stop calling pi.
+    manual_result = make_manual_result()
+    frames = make_frames(tmp_path)
+    calls = []
+
+    def failing_call(frame_paths, **kwargs):
+        calls.append(frame_paths)
+        raise PiCliUnavailableError("first clip failed")
+
+    monkeypatch.setattr("src.pi_cli_harness._call_pi_cli", failing_call)
+
+    result, used_ai = enhance_clips_with_pi_cli(manual_result, frames)
+
+    assert used_ai is False
+    assert len(calls) == 1
+    assert [clip.clip_id for clip in result.clips] == ["clip-low", "clip-high"]
+    assert [clip.overall_score for clip in result.clips] == [7.0, 7.5]
+    assert "manual ranking kept" in result.metadata["warning"]
+
+
+def test_enhance_clips_aborts_when_score_is_unusable(monkeypatch, tmp_path):
     manual_result = make_manual_result()
     frames = make_frames(tmp_path)
 
-    calls = iter(
+    monkeypatch.setattr(
+        "src.pi_cli_harness._call_pi_cli",
+        lambda frame_paths, **kwargs: {"unexpected": "shape"},
+    )
+
+    result, used_ai = enhance_clips_with_pi_cli(manual_result, frames)
+
+    assert used_ai is False
+    assert "unusable score" in result.metadata["warning"]
+
+
+def test_enhance_clips_caches_scores_and_reuses_them(monkeypatch, tmp_path):
+    manual_result = make_manual_result()
+    frames = make_frames(tmp_path)
+    # Distinct content per frame: the cache is content-addressed, and the
+    # fixture's identical bytes would (correctly) collapse both clips to one key.
+    for i, frame in enumerate(frames):
+        Path(frame.frame_path).write_bytes(f"frame-{i}".encode())
+    cache_dir = tmp_path / "ai-scores"
+    calls = []
+
+    scores = {
+        "clip-low": {"smoothness": 6, "visual_interest": 4, "reason": "muted"},
+        "clip-high": {"smoothness": 9, "visual_interest": 9.5, "reason": "great reveal"},
+    }
+    answers = iter([scores["clip-low"], scores["clip-high"]])
+
+    def counting_call(frame_paths, **kwargs):
+        calls.append(frame_paths)
+        return next(answers)
+
+    monkeypatch.setattr("src.pi_cli_harness._call_pi_cli", counting_call)
+
+    first, used_ai_first = enhance_clips_with_pi_cli(
+        manual_result, frames, model="gpt-5.4-mini", cache_dir=cache_dir
+    )
+    # Second run: same frames/model/prompt must be served from cache, no calls.
+    second, used_ai_second = enhance_clips_with_pi_cli(
+        manual_result, frames, model="gpt-5.4-mini", cache_dir=cache_dir
+    )
+
+    assert used_ai_first is True and used_ai_second is True
+    assert len(calls) == 2
+    assert [c.clip_id for c in first.clips] == [c.clip_id for c in second.clips]
+    assert [c.overall_score for c in first.clips] == [c.overall_score for c in second.clips]
+    assert len(list(cache_dir.glob("*.json"))) == 2
+
+
+def test_enhance_clips_records_per_clip_scoring_durations(monkeypatch, tmp_path):
+    manual_result = make_manual_result()
+    frames = make_frames(tmp_path)
+    answers = iter(
         [
-            PiCliUnavailableError("first clip failed"),
+            {"smoothness": 6, "visual_interest": 4, "reason": "muted"},
             {"smoothness": 9, "visual_interest": 9.5, "reason": "great reveal"},
         ]
     )
-
-    def flaky_call(frame_paths, **kwargs):
-        outcome = next(calls)
-        if isinstance(outcome, Exception):
-            raise outcome
-        return outcome
-
-    monkeypatch.setattr("src.pi_cli_harness._call_pi_cli", flaky_call)
+    monkeypatch.setattr(
+        "src.pi_cli_harness._call_pi_cli", lambda frame_paths, **kwargs: next(answers)
+    )
 
     result, used_ai = enhance_clips_with_pi_cli(manual_result, frames)
 
     assert used_ai is True
-    assert result.metadata["partial_enhancement"] is True
-    assert result.metadata["clips_enhanced"] == 1
-    assert result.metadata["clips_total"] == 2
+    durations = result.metadata["scoring_seconds_per_clip"]
+    assert len(durations) == 2
+    assert all(isinstance(d, float) and d >= 0 for d in durations)
 
 
 def test_call_pi_cli_raises_clear_error_on_nonzero_exit(monkeypatch):
@@ -171,7 +242,11 @@ def test_call_pi_cli_raises_clear_error_on_nonzero_exit(monkeypatch):
 
 
 def test_call_pi_cli_parses_stdout_json(monkeypatch):
+    captured = {}
+
     def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
         return subprocess.CompletedProcess(
             command,
             0,
@@ -184,6 +259,35 @@ def test_call_pi_cli_parses_stdout_json(monkeypatch):
     result = _call_pi_cli(["/tmp/frame.jpg"], pi_bin="pi", timeout_sec=1)
 
     assert result == {"smoothness": 8, "visual_interest": 6, "reason": "ok"}
+    assert "--tools" in captured["command"]
+    assert "read" in captured["command"]
+    assert "@/tmp/frame.jpg" in captured["command"]
+    assert captured["kwargs"]["stdin"] == subprocess.DEVNULL
+    assert captured["kwargs"]["cwd"].endswith("ai-clip-assembler")
+
+
+def test_call_pi_cli_timeout_reports_diagnostics(monkeypatch):
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd=command,
+            timeout=12,
+            output="partial stdout",
+            stderr="partial stderr",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    try:
+        _call_pi_cli(["/tmp/frame-a.jpg", "/tmp/frame-b.jpg"], pi_bin="pi", timeout_sec=12)
+    except PiCliUnavailableError as exc:
+        message = str(exc)
+        assert "timed out after 12s" in message
+        assert "frames=2" in message
+        assert "frame-a.jpg" in message
+        assert "partial stdout" in message
+        assert "partial stderr" in message
+    else:
+        raise AssertionError("Expected PiCliUnavailableError")
 
 
 def test_call_pi_cli_raises_when_binary_missing(monkeypatch):

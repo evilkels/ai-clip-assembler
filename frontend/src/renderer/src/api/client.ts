@@ -7,6 +7,7 @@
 
 import type {
   AnalysisResult,
+  AnalysisStatus,
   ClipCandidate,
   ProjectManifest,
   RecentProject,
@@ -171,6 +172,30 @@ export async function uploadVideo(
   }
   const data = (await res.json()) as { file_id: string; status: string; metadata: VideoMetadata };
   return { ...data, file_name: file.name };
+}
+
+export interface HarnessInfo {
+  id: string;
+  name: string;
+  type: string;
+  enabled: boolean;
+}
+
+export async function listHarnesses(): Promise<HarnessInfo[]> {
+  const res = await fetch(`${backendUrl()}/harnesses`);
+  if (!res.ok) throw new Error(`Failed to load harnesses: ${res.status}`);
+  const data = (await res.json()) as { harnesses: HarnessInfo[] };
+  return data.harnesses;
+}
+
+export type AnalysisProgress = AnalysisStatus;
+
+export async function getAnalysisStatus(projectId: string): Promise<AnalysisProgress> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/analyze/status`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Failed to load analysis status: ${res.status}`);
+  return res.json() as Promise<AnalysisProgress>;
 }
 
 export interface AnalyzeOptions {

@@ -5,14 +5,20 @@ Provides REST endpoints for local video ingestion, smooth drone clip analysis,
 timeline assembly, and editor export files.
 """
 
+import logging
 import shutil
+import time
 import uuid
 from pathlib import Path
 from typing import Literal, Optional
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
+load_dotenv()
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .export_engine import choose_timeline_fps, generate_edl, generate_fcpxml
@@ -40,6 +46,9 @@ from .project_store import (
 from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
+
+# uvicorn's logger so progress messages reach the dev console without extra config
+logger = logging.getLogger("uvicorn.error")
 
 app = FastAPI(
     title="AI Clip Assembler API",
@@ -209,22 +218,111 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
     return {"file_id": file_id, "status": "ready", "metadata": metadata.model_dump()}
 
 
+def set_analysis_progress(project_id: str, **fields) -> None:
+    progress = projects[project_id].setdefault("analysis_progress", {})
+    now = time.time()
+    progress.setdefault("started_at", now)
+    fields.setdefault("updated_at", now)
+    progress.update(fields)
+
+
+@app.get("/projects/{project_id}/analyze/status")
+async def get_analysis_status(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    progress = projects[project_id].get("analysis_progress")
+    if not progress:
+        return {"phase": "idle"}
+    status = dict(progress)
+    started_at = status.get("started_at")
+    if isinstance(started_at, (int, float)):
+        status["elapsed_sec"] = round(max(0.0, time.time() - started_at), 2)
+    return status
+
+
 @app.post("/projects/{project_id}/analyze")
-async def analyze_videos(project_id: str, request: AnalysisRequest):
+def analyze_videos(project_id: str, request: AnalysisRequest):
+    # Sync on purpose: the pipeline is blocking subprocess work, and a sync
+    # endpoint runs in a worker thread so the server stays responsive.
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     if request.harness_id not in ("manual", "pi_agent"):
         raise HTTPException(status_code=400, detail="Only manual and pi_agent harnesses are available in the drone MVP")
+    current = projects[project_id].get("analysis_progress") or {}
+    if current.get("phase") == "analyzing":
+        raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
 
+    projects[project_id]["analysis_progress"] = {}
+    set_analysis_progress(
+        project_id,
+        phase="analyzing",
+        harness_id=request.harness_id,
+        step="starting",
+        video_index=0,
+        video_total=len(projects[project_id]["videos"]),
+        file_name=None,
+        clip_index=0,
+        clip_total=0,
+        message="Preparing analysis",
+        error=None,
+    )
+    try:
+        response = run_analysis_pipeline(project_id, request)
+    except HTTPException as exc:
+        set_analysis_progress(project_id, phase="error", error=str(exc.detail))
+        raise
+    except Exception as exc:
+        set_analysis_progress(project_id, phase="error", error=str(exc))
+        raise
+    set_analysis_progress(
+        project_id,
+        phase="complete",
+        step="complete",
+        message="Analysis complete",
+    )
+    return response
+
+
+def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     all_clips = []
     per_video_results = []
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
-    for video in projects[project_id]["videos"]:
+    total_videos = len(projects[project_id]["videos"])
+    for index, video in enumerate(projects[project_id]["videos"], start=1):
+        set_analysis_progress(
+            project_id,
+            video_index=index,
+            file_name=video["file_name"],
+            clip_index=0,
+            clip_total=0,
+            message=f"Preparing video {index}/{total_videos}: {video['file_name']}",
+        )
         try:
+            logger.info(
+                "Analyze %d/%d %s: motion analysis (vidstabdetect)",
+                index, total_videos, video["file_name"],
+            )
+            set_analysis_progress(
+                project_id,
+                step="motion_analysis",
+                message=(
+                    f"Video {index}/{total_videos}: running FFmpeg motion analysis "
+                    "(this can take a while on long clips)"
+                ),
+            )
             run_vidstabdetect(
                 input_path=Path(video["file_path"]),
                 transforms_path=analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf",
+            )
+            logger.info(
+                "Analyze %d/%d %s: extracting frame samples",
+                index, total_videos, video["file_name"],
+            )
+            set_analysis_progress(
+                project_id,
+                step="frame_extraction",
+                message=f"Video {index}/{total_videos}: extracting frame samples",
             )
             samples = extract_frames(
                 input_path=Path(video["file_path"]),
@@ -232,6 +330,15 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
                 file_id=video["file_id"],
                 sample_fps=sample_fps,
                 max_width=int(request.preferences.get("max_width", 960)),
+            )
+            logger.info(
+                "Analyze %d/%d %s: detecting scenes",
+                index, total_videos, video["file_name"],
+            )
+            set_analysis_progress(
+                project_id,
+                step="scene_detection",
+                message=f"Video {index}/{total_videos}: detecting scene boundaries",
             )
             scenes = detect_scenes(Path(video["file_path"]))
             samples = assign_scene_ids(samples, scenes)
@@ -250,23 +357,52 @@ async def analyze_videos(project_id: str, request: AnalysisRequest):
             frames=frame_scores,
             preferences=preferences,
         )
+        logger.info(
+            "Analyze %d/%d %s: %d candidate clip(s) assembled",
+            index, total_videos, video["file_name"], len(result.clips),
+        )
         video_metadata = {}
         if request.harness_id == "pi_agent":
-            result, used_ai = enhance_clips_with_pi_cli(result, frame_scores)
+            logger.info(
+                "Analyze %d/%d %s: scoring %d clip(s) with pi — one CLI call per clip, can take minutes",
+                index, total_videos, video["file_name"], len(result.clips),
+            )
+            set_analysis_progress(
+                project_id,
+                step="scoring_clips",
+                clip_index=0,
+                clip_total=len(result.clips),
+                message=(
+                    f"Video {index}/{total_videos}: scoring {len(result.clips)} clip(s) "
+                    "with Pi"
+                ),
+            )
+            result, used_ai = enhance_clips_with_pi_cli(
+                result,
+                frame_scores,
+                progress_callback=lambda done, total: set_analysis_progress(
+                    project_id,
+                    clip_index=done,
+                    clip_total=total,
+                    message=f"Video {index}/{total_videos}: Pi scored {done}/{total} clip(s)",
+                ),
+                cache_dir=analysis_dir(project_id) / "ai-scores",
+            )
             video_metadata["used_ai"] = used_ai
             video_metadata["model_used"] = result.metadata.get("model_used")
             video_metadata["file_id"] = video["file_id"]
             if result.metadata.get("warning"):
                 video_metadata["warning"] = result.metadata["warning"]
-            if result.metadata.get("partial_enhancement"):
-                video_metadata["partial_enhancement"] = True
-                video_metadata["clips_enhanced"] = result.metadata.get("clips_enhanced")
-                video_metadata["clips_total"] = result.metadata.get("clips_total")
+            if result.metadata.get("scoring_seconds_per_clip"):
+                video_metadata["scoring_seconds_per_clip"] = result.metadata[
+                    "scoring_seconds_per_clip"
+                ]
         per_video_results.append(video_metadata)
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
 
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
+    logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
     sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
     total_duration = sum(clip["duration_sec"] for clip in ranked_clips)
 
@@ -412,7 +548,9 @@ def videos_from_manifest(folder_path: Path, manifest) -> list[dict]:
             "file_name": source_video.filename,
             "file_path": str(folder_path / source_video.filename),
             "status": "ready",
-            "metadata": {},
+            # None, not {}: an empty dict is truthy in the frontend's
+            # `metadata?: VideoMetadata` check and crashes the source table.
+            "metadata": None,
         }
         for source_video in manifest.source_videos
     ]

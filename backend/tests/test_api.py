@@ -32,7 +32,7 @@ def test_create_project_from_folder_registers_source_videos_without_copying(tmp_
             "file_name": "DJI_0042.MP4",
             "file_path": str(source_video),
             "status": "ready",
-            "metadata": {},
+            "metadata": None,
         }
     ]
     assert not (project_folder / "videos").exists()
@@ -1080,3 +1080,118 @@ def test_list_harnesses_shows_pi_agent_enabled_and_local_qwen_postponed():
     assert harnesses["pi_agent"]["enabled"] is True
     # Local Qwen is postponed until the local-model path is fully figured out.
     assert harnesses["local_qwen"]["enabled"] is False
+
+
+def _project_with_one_video(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": 10.0},
+            "status": "ready",
+        }
+    )
+    return client, project_id
+
+
+def test_analysis_status_is_idle_before_analyze(monkeypatch, tmp_path):
+    client, project_id = _project_with_one_video(monkeypatch, tmp_path)
+
+    response = client.get(f"/projects/{project_id}/analyze/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"phase": "idle"}
+
+
+def test_analysis_status_includes_message_and_elapsed_time(monkeypatch, tmp_path):
+    client, project_id = _project_with_one_video(monkeypatch, tmp_path)
+    api.projects[project_id]["analysis_progress"] = {
+        "phase": "analyzing",
+        "step": "motion_analysis",
+        "message": "Running motion analysis",
+        "started_at": 100.0,
+        "updated_at": 100.0,
+    }
+    monkeypatch.setattr(api.time, "time", lambda: 104.25)
+
+    response = client.get(f"/projects/{project_id}/analyze/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"] == "Running motion analysis"
+    assert body["elapsed_sec"] == 4.25
+    assert body["updated_at"] == 100.0
+
+
+def test_analysis_status_complete_after_successful_analyze(monkeypatch, tmp_path):
+    client, project_id = _project_with_one_video(monkeypatch, tmp_path)
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
+    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: [])
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: [])
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences: AssemblyResult(
+            clips=[], sequence=TimelineSequence(total_duration_sec=0, clips=[])
+        ),
+    )
+
+    analyze = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+    status = client.get(f"/projects/{project_id}/analyze/status")
+
+    assert analyze.status_code == 200
+    body = status.json()
+    assert body["phase"] == "complete"
+    assert body["video_index"] == 1
+    assert body["video_total"] == 1
+    assert body["file_name"] == "DJI_0001.MP4"
+    assert body["error"] is None
+
+
+def test_analysis_status_error_after_failed_analyze(monkeypatch, tmp_path):
+    client, project_id = _project_with_one_video(monkeypatch, tmp_path)
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(
+        api,
+        "extract_frames",
+        lambda **kwargs: (_ for _ in ()).throw(api.FFmpegUnavailableError("ffmpeg missing")),
+    )
+
+    analyze = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+    status = client.get(f"/projects/{project_id}/analyze/status")
+
+    assert analyze.status_code == 503
+    body = status.json()
+    assert body["phase"] == "error"
+    assert body["error"] == "ffmpeg missing"
+
+
+def test_analyze_returns_409_when_analysis_already_in_progress(monkeypatch, tmp_path):
+    client, project_id = _project_with_one_video(monkeypatch, tmp_path)
+    api.projects[project_id]["analysis_progress"] = {"phase": "analyzing"}
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+
+    assert response.status_code == 409
+
+
+def test_analysis_status_returns_404_for_unknown_project():
+    api.projects.clear()
+    client = TestClient(api.app)
+    response = client.get("/projects/nope/analyze/status")
+    assert response.status_code == 404

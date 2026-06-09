@@ -6,6 +6,20 @@ from src import api
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 
 
+def create_folder_project_with_video(tmp_path, content=b"folder video bytes"):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(content)
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    return client, project_id, source_video
+
+
 def test_create_project_from_folder_registers_source_videos_without_copying(tmp_path):
     api.projects.clear()
     project_folder = tmp_path / "sunset-drone-footage"
@@ -284,16 +298,7 @@ def test_project_video_media_returns_uploaded_project_file(monkeypatch, tmp_path
 
 
 def test_project_video_media_returns_folder_project_file(tmp_path):
-    api.projects.clear()
-    project_folder = tmp_path / "footage"
-    project_folder.mkdir()
-    source_video = project_folder / "DJI_0042.MP4"
-    source_video.write_bytes(b"folder video bytes")
-    client = TestClient(api.app)
-    project_id = client.post(
-        "/projects/from-folder",
-        json={"folder_path": str(project_folder)},
-    ).json()["project_id"]
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
 
     response = client.get(f"/projects/{project_id}/videos/DJI_0042.MP4/media")
 
@@ -303,16 +308,7 @@ def test_project_video_media_returns_folder_project_file(tmp_path):
 
 
 def test_project_video_media_supports_byte_range_requests(tmp_path):
-    api.projects.clear()
-    project_folder = tmp_path / "footage"
-    project_folder.mkdir()
-    source_video = project_folder / "DJI_0042.MP4"
-    source_video.write_bytes(b"folder video bytes")
-    client = TestClient(api.app)
-    project_id = client.post(
-        "/projects/from-folder",
-        json={"folder_path": str(project_folder)},
-    ).json()["project_id"]
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
 
     response = client.get(
         f"/projects/{project_id}/videos/DJI_0042.MP4/media",
@@ -322,6 +318,85 @@ def test_project_video_media_supports_byte_range_requests(tmp_path):
     assert response.status_code == 206
     assert response.headers["content-range"] == "bytes 0-3/18"
     assert response.content == b"fold"
+    assert response.headers["accept-ranges"] == "bytes"
+
+
+def test_project_video_media_supports_open_ended_byte_range_without_full_read(monkeypatch, tmp_path):
+    content = b"0123456789"
+    client, project_id, source_video = create_folder_project_with_video(tmp_path, content=content)
+    original_open = Path.open
+    read_sizes = []
+
+    class ReadGuard:
+        def __init__(self, file_obj):
+            self.file_obj = file_obj
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            self.file_obj.close()
+
+        def seek(self, *args, **kwargs):
+            return self.file_obj.seek(*args, **kwargs)
+
+        def read(self, size=-1):
+            read_sizes.append(size)
+            if size == len(content):
+                raise AssertionError("range response read the whole requested range")
+            return self.file_obj.read(size)
+
+    def guarded_open(path, *args, **kwargs):
+        opened = original_open(path, *args, **kwargs)
+        if path == source_video and args and args[0] == "rb":
+            return ReadGuard(opened)
+        return opened
+
+    monkeypatch.setattr(api, "VIDEO_STREAM_CHUNK_SIZE", 4)
+    monkeypatch.setattr(Path, "open", guarded_open)
+
+    response = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/media",
+        headers={"Range": "bytes=0-"},
+    )
+
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-9/10"
+    assert response.content == content
+    assert response.headers["accept-ranges"] == "bytes"
+    assert len(read_sizes) > 1
+
+
+def test_project_video_media_supports_suffix_byte_range(tmp_path):
+    client, project_id, _source_video = create_folder_project_with_video(
+        tmp_path,
+        content=b"folder video bytes",
+    )
+
+    response = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/media",
+        headers={"Range": "bytes=-4"},
+    )
+
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 14-17/18"
+    assert response.content == b"ytes"
+    assert response.headers["accept-ranges"] == "bytes"
+
+
+def test_project_video_media_rejects_unsatisfiable_byte_range(tmp_path):
+    client, project_id, _source_video = create_folder_project_with_video(
+        tmp_path,
+        content=b"folder video bytes",
+    )
+
+    response = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/media",
+        headers={"Range": "bytes=18-30"},
+    )
+
+    assert response.status_code == 416
+    assert response.headers["content-range"] == "bytes */18"
     assert response.headers["accept-ranges"] == "bytes"
 
 

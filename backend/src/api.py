@@ -15,7 +15,7 @@ from typing import Literal, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
@@ -67,6 +67,7 @@ app.add_middleware(
 
 projects = {}
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
+VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 
 
 class AnalysisRequest(BaseModel):
@@ -622,12 +623,9 @@ def ranged_video_response(
 
     start, end = byte_range
     length = end - start + 1
-    with video_path.open("rb") as video_file:
-        video_file.seek(start)
-        content = video_file.read(length)
 
-    return Response(
-        content=content,
+    return StreamingResponse(
+        iter_file_range(video_path, start, end),
         status_code=206,
         media_type=media_type,
         headers={
@@ -637,6 +635,19 @@ def ranged_video_response(
             "Content-Disposition": f'inline; filename="{file_name}"',
         },
     )
+
+
+def iter_file_range(video_path: Path, start: int, end: int):
+    with video_path.open("rb") as video_file:
+        video_file.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            chunk_size = min(VIDEO_STREAM_CHUNK_SIZE, remaining)
+            chunk = video_file.read(chunk_size)
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
 
 
 def parse_byte_range(range_header: str, file_size: int) -> Optional[tuple[int, int]]:

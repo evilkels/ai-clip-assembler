@@ -251,6 +251,92 @@ def test_upload_video_removes_saved_file_when_probe_fails(monkeypatch, tmp_path)
     assert list((tmp_path / project_id / "videos").glob("*")) == []
 
 
+def test_project_video_media_returns_uploaded_project_file(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    source_path = tmp_path / "registered.mp4"
+    source_path.write_bytes(b"uploaded video bytes")
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(source_path),
+            "status": "ready",
+            "metadata": None,
+        }
+    )
+
+    response = client.get(f"/projects/{project_id}/videos/file-1/media")
+
+    assert response.status_code == 200
+    assert response.content == b"uploaded video bytes"
+    assert response.headers["content-type"].startswith("video/mp4")
+
+
+def test_project_video_media_returns_folder_project_file(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(b"folder video bytes")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+
+    response = client.get(f"/projects/{project_id}/videos/DJI_0042.MP4/media")
+
+    assert response.status_code == 200
+    assert response.content == b"folder video bytes"
+    assert response.headers["content-type"].startswith("video/mp4")
+
+
+def test_project_video_media_rejects_unknown_project():
+    api.projects.clear()
+    client = TestClient(api.app)
+
+    response = client.get("/projects/missing/videos/file-1/media")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+
+
+def test_project_video_media_rejects_unknown_file(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+
+    response = client.get(f"/projects/{project_id}/videos/missing/media")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video not found"
+
+
+def test_project_video_media_rejects_missing_registered_file(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "missing.mp4"),
+            "status": "ready",
+            "metadata": None,
+        }
+    )
+
+    response = client.get(f"/projects/{project_id}/videos/file-1/media")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video file not found"
+
+
 def test_analyze_manual_harness_extracts_scores_and_stores_clips(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)

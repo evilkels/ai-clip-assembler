@@ -15,6 +15,7 @@ from typing import Literal, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 # Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
@@ -216,6 +217,19 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
     }
     projects[project_id]["videos"].append(video)
     return {"file_id": file_id, "status": "ready", "metadata": metadata.model_dump()}
+
+
+@app.get("/projects/{project_id}/videos/{file_id}/media")
+async def get_project_video_media(project_id: str, file_id: str):
+    video = registered_video(project_id, file_id)
+    video_path = Path(video["file_path"])
+    if not video_path.exists() or not video_path.is_file():
+        raise HTTPException(status_code=404, detail="Video file not found")
+    return FileResponse(
+        video_path,
+        media_type=media_type_for_video(video_path),
+        filename=video["file_name"],
+    )
 
 
 def set_analysis_progress(project_id: str, **fields) -> None:
@@ -554,6 +568,24 @@ def videos_from_manifest(folder_path: Path, manifest) -> list[dict]:
         }
         for source_video in manifest.source_videos
     ]
+
+
+def registered_video(project_id: str, file_id: str) -> dict:
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    for video in projects[project_id].get("videos", []):
+        if video.get("file_id") == file_id:
+            return video
+    raise HTTPException(status_code=404, detail="Video not found")
+
+
+def media_type_for_video(video_path: Path) -> str:
+    suffix = video_path.suffix.lower()
+    if suffix == ".mov":
+        return "video/quicktime"
+    if suffix == ".mkv":
+        return "video/x-matroska"
+    return "video/mp4"
 
 
 def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:

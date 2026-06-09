@@ -1,7 +1,7 @@
 # Plan: Modern Professional UI Shell
 
-Status: draft, awaiting review
-Owner: TBD
+Status: partially implemented, awaiting review
+Owner: Elvijs / CODEX
 Pairs with: `project-sidebar.md`, `settings-page.md`
 Informs: `react-doctor-triage.md` (some a11y/correctness rules become trivial once we adopt the recommended library)
 

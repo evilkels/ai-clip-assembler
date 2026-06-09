@@ -136,7 +136,7 @@ export function ExportPage() {
               <p style={{ color: 'var(--text-error)', fontSize: 13 }}>{exportError}</p>
             )}
 
-            {EXPORT_FORMATS.filter((format) => exportResult[format.id]).map((format) => (
+            {EXPORT_FORMATS.map((format) => exportResult[format.id] && (
               <div
                 key={format.id}
                 style={{

@@ -66,6 +66,18 @@ Run the backend tests from `backend/` so `PYTHONPATH=.` resolves the `src`
 package consistently. Equivalent npm script: `npm run test:backend` from
 `frontend/`.
 
+### End-to-end check (synthetic footage, real pipeline)
+
+```bash
+# from the repo root; needs ffmpeg with vidstabdetect in PATH
+backend/.venv/bin/python scripts/synthetic_e2e_qa.py
+```
+
+Generates synthetic smooth/shaky/mixed footage and runs the whole folder
+workflow in-process: create-from-folder, analysis, smooth-vs-shaky clip
+discrimination, timeline edit, all three exports (relative media paths), and
+close/reopen state restore. Takes about a minute.
+
 ## Frontend (Electron + React + Vite)
 
 ```bash
@@ -103,7 +115,8 @@ backend/src/
   clip_assembly.py       rule-based candidate clip assembly
   pi_cli_harness.py      DEFAULT AI harness — drives the `pi` CLI
   local_qwen_harness.py  POSTPONED local Ollama/Qwen harness (kept, disabled)
-  export_engine.py       FCPXML / EDL generation
+  export_engine.py       FCPXML / EDL / DaVinci (FCP7 XMEML) generation
+  project_store.py       folder projects: manifest + persisted analysis results
 
 frontend/src/renderer/src/
   routes/                Import, Review, Timeline, Export pages

@@ -101,7 +101,13 @@ ai-clip-assembler/
 
 ## Status
 
-🚧 Active MVP. The drone-first workflow runs end to end: import, analyze (rule-based or `pi_agent` AI harness), review, timeline editing, and FCPXML/EDL export. Local model (Qwen/Ollama) harness is postponed.
+🚧 Active MVP. The drone-first workflow runs end to end: import, analyze (rule-based or `pi_agent` AI harness), review, timeline editing, and export to DaVinci Resolve XML, FCPXML, or EDL. Folder projects persist analysis results and the saved timeline in `clipassembler/analysis/results.json`, so re-opening a project restores the Review Board. Local model (Qwen/Ollama) harness is postponed.
+
+A self-contained end-to-end check (synthetic footage, real pipeline) lives at `scripts/synthetic_e2e_qa.py`:
+
+```bash
+backend/.venv/bin/python scripts/synthetic_e2e_qa.py
+```
 
 ## License
 

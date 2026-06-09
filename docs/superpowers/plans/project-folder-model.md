@@ -172,6 +172,14 @@ Implemented:
 - Export overwrite guard and frontend confirmation.
 - Manual QA guide coverage for create/open folder, export paths, empty-folder behavior, and move-folder reopen.
 
+Added later on `t3code/190b754e`:
+
+- Analysis results + saved timeline persisted to `clipassembler/analysis/results.json`; re-opening a folder project restores candidate clips, accepted order, and trims (backend restore + `GET /projects/{id}/timeline` + frontend session restore).
+- DaVinci Resolve export (`format=resolve_xml`) writing FCP7 XMEML v5 to `<project>/exports/davinci/timeline.xml` with relative `pathurl`s.
+- Folder-project videos are ffprobed on open, so exports use real fps/resolution (previously `metadata: None` crashed FCPXML export for folder projects).
+- Rescan no longer discards existing clips/timeline; re-analyze to cover new footage.
+- Self-contained end-to-end check: `scripts/synthetic_e2e_qa.py`.
+
 Verified:
 
 - Backend: `PYTHONPATH=. .venv/bin/pytest` passes with 101 tests.

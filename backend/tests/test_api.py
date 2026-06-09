@@ -254,25 +254,33 @@ def test_upload_video_removes_saved_file_when_probe_fails(monkeypatch, tmp_path)
 def test_project_video_media_returns_uploaded_project_file(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
-    source_path = tmp_path / "registered.mp4"
-    source_path.write_bytes(b"uploaded video bytes")
+
+    def fake_probe(path):
+        return VideoMetadata(
+            file_id="ignored",
+            file_path=str(path),
+            file_name=path.name,
+            duration_sec=10.0,
+            fps=29.97,
+            resolution=[1920, 1080],
+            codec="h264",
+        )
+
+    monkeypatch.setattr(api, "probe_video", fake_probe)
     client = TestClient(api.app)
     project_id = client.post("/projects").json()["project_id"]
-    api.projects[project_id]["videos"].append(
-        {
-            "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
-            "file_path": str(source_path),
-            "status": "ready",
-            "metadata": None,
-        }
+    upload = client.post(
+        f"/projects/{project_id}/videos",
+        files={"file": ("DJI_0001.MP4", b"uploaded video bytes", "video/mp4")},
     )
+    file_id = upload.json()["file_id"]
 
-    response = client.get(f"/projects/{project_id}/videos/file-1/media")
+    response = client.get(f"/projects/{project_id}/videos/{file_id}/media")
 
     assert response.status_code == 200
     assert response.content == b"uploaded video bytes"
     assert response.headers["content-type"].startswith("video/mp4")
+    assert response.headers["content-disposition"].startswith("inline")
 
 
 def test_project_video_media_returns_folder_project_file(tmp_path):
@@ -292,6 +300,29 @@ def test_project_video_media_returns_folder_project_file(tmp_path):
     assert response.status_code == 200
     assert response.content == b"folder video bytes"
     assert response.headers["content-type"].startswith("video/mp4")
+
+
+def test_project_video_media_supports_byte_range_requests(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    source_video = project_folder / "DJI_0042.MP4"
+    source_video.write_bytes(b"folder video bytes")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+
+    response = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/media",
+        headers={"Range": "bytes=0-3"},
+    )
+
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-3/18"
+    assert response.content == b"fold"
+    assert response.headers["accept-ranges"] == "bytes"
 
 
 def test_project_video_media_rejects_unknown_project():
@@ -335,6 +366,12 @@ def test_project_video_media_rejects_missing_registered_file(monkeypatch, tmp_pa
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Video file not found"
+
+
+def test_media_type_for_video_uses_video_suffix():
+    assert api.media_type_for_video(Path("clip.mp4")) == "video/mp4"
+    assert api.media_type_for_video(Path("clip.mov")) == "video/quicktime"
+    assert api.media_type_for_video(Path("clip.mkv")) == "video/x-matroska"
 
 
 def test_analyze_manual_harness_extracts_scores_and_stores_clips(monkeypatch, tmp_path):

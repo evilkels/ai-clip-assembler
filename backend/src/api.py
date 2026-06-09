@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 # Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
@@ -220,15 +220,29 @@ async def upload_video(project_id: str, file: UploadFile = File(...)):
 
 
 @app.get("/projects/{project_id}/videos/{file_id}/media")
-async def get_project_video_media(project_id: str, file_id: str):
+async def get_project_video_media(
+    project_id: str,
+    file_id: str,
+    range_header: Optional[str] = Header(default=None, alias="Range"),
+):
     video = registered_video(project_id, file_id)
     video_path = Path(video["file_path"])
     if not video_path.exists() or not video_path.is_file():
         raise HTTPException(status_code=404, detail="Video file not found")
+    media_type = media_type_for_video(video_path)
+    if range_header:
+        return ranged_video_response(
+            video_path,
+            range_header,
+            media_type=media_type,
+            file_name=video["file_name"],
+        )
     return FileResponse(
         video_path,
-        media_type=media_type_for_video(video_path),
+        media_type=media_type,
         filename=video["file_name"],
+        content_disposition_type="inline",
+        headers={"Accept-Ranges": "bytes"},
     )
 
 
@@ -586,6 +600,70 @@ def media_type_for_video(video_path: Path) -> str:
     if suffix == ".mkv":
         return "video/x-matroska"
     return "video/mp4"
+
+
+def ranged_video_response(
+    video_path: Path,
+    range_header: str,
+    *,
+    media_type: str,
+    file_name: str,
+) -> Response:
+    file_size = video_path.stat().st_size
+    byte_range = parse_byte_range(range_header, file_size)
+    if byte_range is None:
+        return Response(
+            status_code=416,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Range": f"bytes */{file_size}",
+            },
+        )
+
+    start, end = byte_range
+    length = end - start + 1
+    with video_path.open("rb") as video_file:
+        video_file.seek(start)
+        content = video_file.read(length)
+
+    return Response(
+        content=content,
+        status_code=206,
+        media_type=media_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Content-Length": str(length),
+            "Content-Disposition": f'inline; filename="{file_name}"',
+        },
+    )
+
+
+def parse_byte_range(range_header: str, file_size: int) -> Optional[tuple[int, int]]:
+    if file_size <= 0 or not range_header.startswith("bytes="):
+        return None
+
+    range_value = range_header.removeprefix("bytes=").strip()
+    if "," in range_value or "-" not in range_value:
+        return None
+
+    start_text, end_text = range_value.split("-", 1)
+    try:
+        if start_text == "":
+            suffix_length = int(end_text)
+            if suffix_length <= 0:
+                return None
+            start = max(file_size - suffix_length, 0)
+            end = file_size - 1
+        else:
+            start = int(start_text)
+            end = int(end_text) if end_text else file_size - 1
+    except ValueError:
+        return None
+
+    if start < 0 or end < start or start >= file_size:
+        return None
+    return start, min(end, file_size - 1)
 
 
 def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:

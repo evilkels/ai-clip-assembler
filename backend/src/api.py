@@ -22,7 +22,12 @@ from pydantic import BaseModel
 load_dotenv()
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
-from .export_engine import choose_timeline_fps, generate_edl, generate_fcpxml
+from .export_engine import (
+    choose_timeline_fps,
+    generate_edl,
+    generate_fcpxml,
+    generate_resolve_xml,
+)
 from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (postponed; kept for future re-enable)
 from .pi_cli_harness import enhance_clips_with_pi_cli
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
@@ -42,7 +47,9 @@ from .project_store import (
     create_or_open_project as create_or_open_folder_project,
     delete_project_files,
     project_state_dir,
+    read_analysis_results,
     rescan_project,
+    write_analysis_results,
 )
 from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
@@ -129,19 +136,25 @@ async def create_project_from_folder(request: ProjectFolderRequest):
 
     project_id = str(uuid.uuid4())
     videos = videos_from_manifest(folder_path, manifest)
+    restored = read_analysis_results(folder_path)
+    clips = restored["clips"] if restored else []
+    timeline = restored.get("timeline") if restored else None
     projects[project_id] = {
         "project_id": project_id,
         "project_folder": str(folder_path),
         "project": manifest.model_dump(),
         "videos": videos,
-        "clips": [],
-        "timeline": None,
+        "clips": clips,
+        "timeline": timeline,
+        "harness_id": restored.get("harness_id") if restored else None,
     }
     return {
         "project_id": project_id,
         "project_folder": str(folder_path),
         "project": manifest.model_dump(),
         "videos": videos,
+        "clips": clips,
+        "timeline": timeline,
     }
 
 
@@ -162,8 +175,8 @@ async def rescan_project_sources(project_id: str):
     videos = videos_from_manifest(folder_path, manifest)
     project["project"] = manifest.model_dump()
     project["videos"] = videos
-    project["clips"] = []
-    project["timeline"] = None
+    # Existing clips/timeline stay valid for already-analyzed videos; the user
+    # re-analyzes to cover newly discovered footage.
     return {
         "project_id": project_id,
         "project_folder": str(folder_path),
@@ -439,6 +452,8 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         "total_duration_sec": round(total_duration, 3),
         "clips": sequence_clip_ids,
     }
+    projects[project_id]["harness_id"] = request.harness_id
+    persist_project_results(project_id)
     response = {
         "project_id": project_id,
         "harness_id": request.harness_id,
@@ -489,6 +504,7 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
         "clips": resolved_clips,
         "total_duration_sec": total_duration_sec,
     }
+    persist_project_results(project_id)
     return {
         "project_id": project_id,
         "clips": resolved_clips,
@@ -501,6 +517,16 @@ async def get_clips(project_id: str):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"clips": projects[project_id].get("clips", [])}
+
+
+@app.get("/projects/{project_id}/timeline")
+async def get_timeline(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {
+        "project_id": project_id,
+        "timeline": projects[project_id].get("timeline"),
+    }
 
 
 @app.post("/projects/{project_id}/export")
@@ -540,7 +566,18 @@ async def export_timeline(
             encoding="utf-8",
         )
     else:
-        raise HTTPException(status_code=400, detail="Resolve XML export is not implemented yet")
+        file_path = export_dir / "timeline.xml"
+        ensure_export_can_write(file_path, overwrite)
+        media_base_path = export_dir if projects[project_id].get("project_folder") else None
+        file_path.write_text(
+            generate_resolve_xml(
+                "AI Clip Assembler",
+                clips,
+                videos_by_id,
+                media_base_path=media_base_path,
+            ),
+            encoding="utf-8",
+        )
 
     return {
         "project_id": project_id,
@@ -570,18 +607,29 @@ def project_dir(project_id: str) -> Path:
 
 
 def videos_from_manifest(folder_path: Path, manifest) -> list[dict]:
-    return [
-        {
-            "file_id": source_video.filename,
-            "file_name": source_video.filename,
-            "file_path": str(folder_path / source_video.filename),
-            "status": "ready",
+    videos = []
+    for source_video in manifest.source_videos:
+        video_path = folder_path / source_video.filename
+        try:
+            metadata = probe_video(video_path)
+            metadata.file_id = source_video.filename
+            metadata.file_name = source_video.filename
+            metadata.file_path = str(video_path)
+            metadata_dump = metadata.model_dump()
+        except (FFprobeUnavailableError, FFprobeError, OSError):
             # None, not {}: an empty dict is truthy in the frontend's
             # `metadata?: VideoMetadata` check and crashes the source table.
-            "metadata": None,
-        }
-        for source_video in manifest.source_videos
-    ]
+            metadata_dump = None
+        videos.append(
+            {
+                "file_id": source_video.filename,
+                "file_name": source_video.filename,
+                "file_path": str(video_path),
+                "status": "ready",
+                "metadata": metadata_dump,
+            }
+        )
+    return videos
 
 
 def registered_video(project_id: str, file_id: str) -> dict:
@@ -680,6 +728,24 @@ def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:
             status_code=409,
             detail=f"Export already exists: {file_path}",
         )
+
+
+def persist_project_results(project_id: str) -> None:
+    """Write clips + timeline to <project>/clipassembler/analysis/results.json
+    so re-opening a folder project restores the Review Board. No-op for
+    legacy upload projects, which have no folder to persist into."""
+    project = projects.get(project_id)
+    if not project or not project.get("project_folder"):
+        return
+    try:
+        write_analysis_results(
+            Path(project["project_folder"]),
+            harness_id=project.get("harness_id") or "manual",
+            clips=project.get("clips", []),
+            timeline=project.get("timeline"),
+        )
+    except OSError as exc:
+        logger.warning("Could not persist analysis results for %s: %s", project_id, exc)
 
 
 def project_work_dir(project_id: str) -> Path:

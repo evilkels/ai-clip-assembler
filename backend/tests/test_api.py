@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from urllib.parse import quote
 
@@ -179,6 +180,165 @@ def test_analyze_folder_project_writes_work_files_under_clipassembler(monkeypatc
     assert paths["frames_dir"] == (
         project_folder / "clipassembler" / "samples" / "DJI_0042.MP4"
     )
+
+
+def analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id):
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
+    monkeypatch.setattr(
+        api,
+        "extract_frames",
+        lambda **kwargs: [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")],
+    )
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: [])
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences: AssemblyResult(
+            clips=[
+                ClipSuggestion(
+                    clip_id="clip-1",
+                    file_id=file_id,
+                    file_name=file_name,
+                    start_sec=0,
+                    end_sec=4,
+                    duration_sec=4,
+                    smoothness_score=8,
+                    visual_interest_score=0,
+                    overall_score=8,
+                    ai_reason="Stable 8.0/10",
+                )
+            ],
+            sequence=TimelineSequence(total_duration_sec=4, clips=["clip-1"]),
+        ),
+    )
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+    assert response.status_code == 200
+    return response
+
+
+def test_analyze_folder_project_persists_results_json(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+
+    analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id)
+
+    results_path = project_folder / "clipassembler" / "analysis" / "results.json"
+    assert results_path.exists()
+    results = json.loads(results_path.read_text(encoding="utf-8"))
+    assert results["schema_version"] == 1
+    assert results["harness_id"] == "manual"
+    assert results["clips"][0]["clip_id"] == "clip-1"
+    assert results["timeline"]["clips"] == ["clip-1"]
+
+
+def test_reopen_folder_project_restores_clips_and_timeline(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id)
+
+    api.projects.clear()
+    reopened = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()
+
+    assert reopened["clips"][0]["clip_id"] == "clip-1"
+    clips = client.get(f"/projects/{reopened['project_id']}/clips").json()["clips"]
+    assert clips[0]["clip_id"] == "clip-1"
+    assert api.projects[reopened["project_id"]]["timeline"]["clips"] == ["clip-1"]
+
+
+def test_reopen_folder_project_restores_edited_timeline(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id)
+
+    update = client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 1.0, "end_sec": 3.0, "included": True}]},
+    )
+    assert update.status_code == 200
+
+    api.projects.clear()
+    reopened = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()
+
+    timeline = api.projects[reopened["project_id"]]["timeline"]
+    assert timeline["clips"][0]["clip_id"] == "clip-1"
+    assert timeline["clips"][0]["start_sec"] == 1.0
+    assert timeline["clips"][0]["end_sec"] == 3.0
+
+
+def test_get_timeline_returns_saved_timeline(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id)
+    client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 1.0, "end_sec": 3.0, "included": True}]},
+    )
+
+    response = client.get(f"/projects/{project_id}/timeline")
+
+    assert response.status_code == 200
+    timeline = response.json()["timeline"]
+    assert timeline["clips"][0]["clip_id"] == "clip-1"
+    assert timeline["clips"][0]["start_sec"] == 1.0
+
+
+def test_reopen_folder_project_tolerates_corrupt_results_json(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
+    results_path = project_folder / "clipassembler" / "analysis" / "results.json"
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    results_path.write_text("{not json", encoding="utf-8")
+
+    api.projects.clear()
+    reopened = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    )
+
+    assert reopened.status_code == 200
+    assert api.projects[reopened.json()["project_id"]]["clips"] == []
 
 
 def test_upload_video_stores_file_and_returns_metadata(monkeypatch, tmp_path):
@@ -761,6 +921,45 @@ def test_export_folder_project_writes_inside_project_exports(tmp_path):
     export_path = Path(body["file_path"])
     assert export_path == project_folder / "exports" / "fcp" / "timeline.fcpxml"
     assert 'src="../../DJI_0042.MP4"' in export_path.read_text(encoding="utf-8")
+
+
+def test_export_folder_project_resolve_xml_writes_davinci_timeline(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    api.projects[project_id]["videos"][0]["metadata"] = {
+        "duration_sec": 10.0,
+        "fps": 30,
+        "resolution": [1920, 1080],
+    }
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "DJI_0042.MP4",
+            "file_name": "DJI_0042.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+
+    response = client.post(f"/projects/{project_id}/export?format=resolve_xml")
+
+    assert response.status_code == 200
+    body = response.json()
+    export_path = Path(body["file_path"])
+    assert export_path == project_folder / "exports" / "davinci" / "timeline.xml"
+    content = export_path.read_text(encoding="utf-8")
+    assert '<xmeml version="5">' in content
+    assert "<pathurl>../../DJI_0042.MP4</pathurl>" in content
 
 
 def test_export_folder_project_requires_overwrite_flag_for_existing_export(tmp_path):

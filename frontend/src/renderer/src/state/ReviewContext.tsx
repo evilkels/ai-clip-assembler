@@ -13,6 +13,7 @@ import {
   createProjectFromFolder,
   deleteProjectFiles,
   getClipsWithFallback,
+  getSavedTimeline,
   listRecentProjects,
   relocateRecentProject,
   removeRecentProject,
@@ -172,14 +173,30 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     if (!projectId) return;
     let alive = true;
     setLoading(true);
-    getClipsWithFallback(projectId)
-      .then((loaded) => {
+    Promise.all([
+      getClipsWithFallback(projectId),
+      getSavedTimeline(projectId).catch(() => null),
+    ])
+      .then(([loaded, savedTimeline]) => {
         if (!alive) return;
         setClips(loaded);
         setError(null);
         const newTrims: Record<string, Trim> = {};
         for (const clip of loaded) {
           newTrims[clip.clip_id] = { start_sec: clip.start_sec, end_sec: clip.end_sec };
+        }
+        if (savedTimeline) {
+          // Restore the user's saved review session: accepted clips, their
+          // order, and any trims they made before the project was closed.
+          const knownIds = new Set(loaded.map((clip) => clip.clip_id));
+          const restored = savedTimeline.filter((entry) => knownIds.has(entry.clip_id));
+          const newDecisions: Record<string, ClipDecision> = {};
+          for (const entry of restored) {
+            newDecisions[entry.clip_id] = 'included';
+            newTrims[entry.clip_id] = { start_sec: entry.start_sec, end_sec: entry.end_sec };
+          }
+          setDecisions(newDecisions);
+          setAcceptedOrder(restored.map((entry) => entry.clip_id));
         }
         setTrims(newTrims);
       })

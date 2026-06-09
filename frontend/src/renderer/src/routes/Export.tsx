@@ -1,12 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
-import { exportTimeline, updateTimeline } from '../api/client';
+import { exportTimeline, updateTimeline, type ExportFormat } from '../api/client';
 import type { ClipCandidate } from '../types/clip';
+
+const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }> = [
+  { id: 'resolve_xml', button: 'Export for DaVinci Resolve', label: 'DaVinci Resolve XML exported' },
+  { id: 'fcpxml', button: 'Export FCPXML', label: 'FCPXML exported' },
+  { id: 'edl', button: 'Export EDL', label: 'EDL exported' },
+];
 
 export function ExportPage() {
   const { clips, acceptedOrder, trims, projectId } = useReview();
-  const [exporting, setExporting] = useState<'edl' | 'fcpxml' | null>(null);
-  const [exportResult, setExportResult] = useState<{ edl?: string; fcpxml?: string }>({});
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [exportResult, setExportResult] = useState<Partial<Record<ExportFormat, string>>>({});
   const [exportError, setExportError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState(false);
 
@@ -31,7 +37,7 @@ export function ExportPage() {
   );
 
   const handleExport = useCallback(
-    async (format: 'edl' | 'fcpxml') => {
+    async (format: ExportFormat) => {
       if (!projectId) return;
       setExporting(format);
       setExportError(null);
@@ -113,28 +119,26 @@ export function ExportPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn primary"
-                onClick={() => handleExport('edl')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'edl' ? 'Exporting…' : 'Export EDL'}
-              </button>
-              <button
-                className="btn primary"
-                onClick={() => handleExport('fcpxml')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'fcpxml' ? 'Exporting…' : 'Export FCPXML'}
-              </button>
+              {EXPORT_FORMATS.map((format) => (
+                <button
+                  key={format.id}
+                  type="button"
+                  className="btn primary"
+                  onClick={() => handleExport(format.id)}
+                  disabled={exporting !== null}
+                >
+                  {exporting === format.id ? 'Exporting…' : format.button}
+                </button>
+              ))}
             </div>
 
             {exportError && (
               <p style={{ color: 'var(--text-error)', fontSize: 13 }}>{exportError}</p>
             )}
 
-            {exportResult.edl && (
+            {EXPORT_FORMATS.map((format) => exportResult[format.id] && (
               <div
+                key={format.id}
                 style={{
                   background: 'var(--bg-1)',
                   border: '1px solid var(--border)',
@@ -143,39 +147,21 @@ export function ExportPage() {
                   fontSize: 12,
                 }}
               >
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>EDL exported</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{format.label}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <code style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {exportResult.edl}
+                    {exportResult[format.id]}
                   </code>
-                  <button className="btn subtle" onClick={() => copyPath(exportResult.edl!)}>
+                  <button
+                    type="button"
+                    className="btn subtle"
+                    onClick={() => copyPath(exportResult[format.id]!)}
+                  >
                     Copy
                   </button>
                 </div>
               </div>
-            )}
-
-            {exportResult.fcpxml && (
-              <div
-                style={{
-                  background: 'var(--bg-1)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  padding: '8px 12px',
-                  fontSize: 12,
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>FCPXML exported</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <code style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {exportResult.fcpxml}
-                  </code>
-                  <button className="btn subtle" onClick={() => copyPath(exportResult.fcpxml!)}>
-                    Copy
-                  </button>
-                </div>
-              </div>
-            )}
+            ))}
 
             <details style={{ fontSize: 12 }}>
               <summary style={{ cursor: 'pointer', color: 'var(--text-muted)' }}>

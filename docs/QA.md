@@ -87,6 +87,18 @@ Pass criteria:
 - Final Cut Pro imports FCPXML without errors.
 - EDL edit events have plausible source and timeline timecodes.
 
+### 6a. DaVinci Resolve XML Validation (folder projects)
+
+1. Create a folder project, analyze, accept clips, and click **Export for DaVinci Resolve**.
+2. Open `<project>/exports/davinci/timeline.xml` in Resolve via **File > Import > Timeline > Import AAF, EDL, XML...**.
+3. Confirm media resolves with zero relink prompts (paths in the XML are relative to the export directory).
+4. Copy the whole project folder to another location/drive and repeat step 2 from the copy.
+
+Pass criteria:
+- Resolve imports the XMEML timeline without an error dialog.
+- No relink prompt appears, in either the original or the moved copy.
+- Clip count, order, and in/out points match the app's timeline.
+
 ### 6. DaVinci Resolve EDL Validation
 
 1. Run `scripts/backend_smoke_test.py` against a real local drone MP4 or MOV.

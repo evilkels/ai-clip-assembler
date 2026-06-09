@@ -88,6 +88,112 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
     return "\n".join(lines)
 
 
+def is_ntsc_rate(fps: float) -> bool:
+    return abs(fps - 29.97) < 0.02 or abs(fps - 59.94) < 0.02 or abs(fps - 23.976) < 0.02
+
+
+def xmeml_timebase(fps: float) -> int:
+    if abs(fps - 29.97) < 0.02:
+        return 30
+    if abs(fps - 59.94) < 0.02:
+        return 60
+    if abs(fps - 23.976) < 0.02:
+        return 24
+    return int(round(fps or 30))
+
+
+def append_xmeml_rate(parent: ET.Element, fps: float) -> None:
+    rate = ET.SubElement(parent, "rate")
+    ET.SubElement(rate, "timebase").text = str(xmeml_timebase(fps))
+    ET.SubElement(rate, "ntsc").text = "TRUE" if is_ntsc_rate(fps) else "FALSE"
+
+
+def seconds_to_frames(seconds: float, fps: float) -> int:
+    return int(round(seconds * xmeml_timebase(fps)))
+
+
+def generate_resolve_xml(
+    title: str,
+    clips: List[dict],
+    videos_by_id: Dict[str, dict],
+    media_base_path: Optional[Path] = None,
+) -> str:
+    """FCP7 XMEML v5 timeline for DaVinci Resolve's XML importer.
+
+    With media_base_path set, pathurl is written relative to the export
+    directory so the project folder stays portable (QA Flow C).
+    """
+    fps = choose_timeline_fps(videos_by_id)
+    width, height = timeline_dimensions(videos_by_id)
+    total_frames = seconds_to_frames(sum(clip["duration_sec"] for clip in clips), fps)
+
+    xmeml = ET.Element("xmeml", {"version": "5"})
+    sequence = ET.SubElement(xmeml, "sequence", {"id": "sequence-1"})
+    ET.SubElement(sequence, "name").text = title
+    ET.SubElement(sequence, "duration").text = str(total_frames)
+    append_xmeml_rate(sequence, fps)
+    timecode = ET.SubElement(sequence, "timecode")
+    append_xmeml_rate(timecode, fps)
+    ET.SubElement(timecode, "string").text = "00:00:00:00"
+    ET.SubElement(timecode, "frame").text = "0"
+    ET.SubElement(timecode, "displayformat").text = "DF" if is_ntsc_rate(fps) else "NDF"
+
+    media = ET.SubElement(sequence, "media")
+    video = ET.SubElement(media, "video")
+    video_format = ET.SubElement(video, "format")
+    characteristics = ET.SubElement(video_format, "samplecharacteristics")
+    ET.SubElement(characteristics, "width").text = str(width)
+    ET.SubElement(characteristics, "height").text = str(height)
+    append_xmeml_rate(characteristics, fps)
+    track = ET.SubElement(video, "track")
+
+    defined_file_ids = set()
+    timeline_cursor = 0.0
+    for index, clip in enumerate(clips, start=1):
+        source = videos_by_id.get(clip["file_id"], {})
+        source_metadata = source.get("metadata") or {}
+        source_duration = float(source_metadata.get("duration_sec", 0) or 0)
+
+        clipitem = ET.SubElement(track, "clipitem", {"id": f"clipitem-{index}"})
+        ET.SubElement(clipitem, "name").text = clip["file_name"]
+        ET.SubElement(clipitem, "enabled").text = "TRUE"
+        ET.SubElement(clipitem, "duration").text = str(
+            seconds_to_frames(source_duration or clip["duration_sec"], fps)
+        )
+        append_xmeml_rate(clipitem, fps)
+        ET.SubElement(clipitem, "start").text = str(seconds_to_frames(timeline_cursor, fps))
+        ET.SubElement(clipitem, "end").text = str(
+            seconds_to_frames(timeline_cursor + clip["duration_sec"], fps)
+        )
+        ET.SubElement(clipitem, "in").text = str(seconds_to_frames(clip["start_sec"], fps))
+        ET.SubElement(clipitem, "out").text = str(seconds_to_frames(clip["end_sec"], fps))
+
+        file_id = f"file-{clip['file_id']}"
+        file_element = ET.SubElement(clipitem, "file", {"id": file_id})
+        if file_id not in defined_file_ids:
+            defined_file_ids.add(file_id)
+            ET.SubElement(file_element, "name").text = clip["file_name"]
+            pathurl = ET.SubElement(file_element, "pathurl")
+            if source.get("file_path"):
+                pathurl.text = path_to_asset_src(source["file_path"], media_base_path)
+            else:
+                pathurl.text = clip["file_name"]
+            append_xmeml_rate(file_element, fps)
+            ET.SubElement(file_element, "duration").text = str(
+                seconds_to_frames(source_duration, fps)
+            )
+            file_media = ET.SubElement(file_element, "media")
+            file_video = ET.SubElement(file_media, "video")
+            file_characteristics = ET.SubElement(file_video, "samplecharacteristics")
+            ET.SubElement(file_characteristics, "width").text = str(width)
+            ET.SubElement(file_characteristics, "height").text = str(height)
+
+        timeline_cursor += clip["duration_sec"]
+
+    body = ET.tostring(xmeml, encoding="unicode")
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n' + body
+
+
 def generate_fcpxml(
     title: str,
     clips: List[dict],
@@ -111,7 +217,7 @@ def generate_fcpxml(
     )
 
     for file_id, video in videos_by_id.items():
-        metadata = video.get("metadata", {})
+        metadata = video.get("metadata") or {}
         duration = float(metadata.get("duration_sec", 0) or 0)
         ET.SubElement(
             resources,

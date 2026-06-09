@@ -172,6 +172,6 @@ Store under `~/Footage/QA/runs/<YYYY-MM-DD>/`. Do not commit to repo.
 
 ## Open Questions
 
-1. Should we ship a synthetic test fixture (a public-domain short drone clip + expected output) so this doc can be partially automated in CI? Currently every flow assumes private footage.
+1. ~~Should we ship a synthetic test fixture so this doc can be partially automated in CI?~~ **Done**: `scripts/synthetic_e2e_qa.py` generates synthetic footage (smooth hover / shaky jitter / mixed) and runs the full pipeline in-process — folder create, manual-harness analysis, smooth-vs-shaky discrimination, timeline edit, EDL/FCPXML/DaVinci exports with relative paths, and close/reopen state restore. Run with `backend/.venv/bin/python scripts/synthetic_e2e_qa.py`. Flows A–C remain manual for the real-Resolve import step; Flow D still needs real footage and human judgment.
 2. What's the test machine baseline? Hardware-relative timing targets need a named reference machine.
 3. Pi Agent vs Local Qwen: which is "the AI harness" for Flow D, or both?

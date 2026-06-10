@@ -134,7 +134,6 @@ conventions live in [agents/domain.md](agents/domain.md) and `AGENTS.md`.
 
 Workflow conventions: GitHub Issues track work (labels per
 [agents/triage-labels.md](agents/triage-labels.md)); changes land via PRs against
-`main`; all plans live under `plans/` — numbered advisor/executor plans at the
-root (status table in `plans/README.md`), product/feature plans in
-`plans/product/`, completed ones in `plans/product/done/`.
-(`docs/superpowers/plans` is a compatibility symlink to `plans/product/`.)
+`main`; all plans live under `docs/plans/` (index and statuses in
+`docs/plans/README.md`), and completed ones move to `docs/plans/done/`.
+(`docs/superpowers/plans` is a compatibility symlink to `docs/plans/`.)

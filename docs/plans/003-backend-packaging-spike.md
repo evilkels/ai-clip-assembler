@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
 > **Drift check (run first)**: `git diff --stat 6a39ed1..HEAD -- frontend/src/main/index.ts frontend/package.json backend/src/api.py backend/requirements.txt`
@@ -69,7 +69,7 @@ decision doc recommends it for CI.
 - `frontend/src/preload/**` — expose `clipAssembler.backendUrl` if needed for a non-8000 port
 - `frontend/package.json` — `extraResources` entry pointing at the PyInstaller output
 - `docs/superpowers/specs/<YYYY-MM-DD>-backend-packaging-design.md` (create — the decision doc; the durable deliverable)
-- `plans/README.md` (status row update)
+- `docs/plans/README.md` (status row update)
 
 **Out of scope** (do NOT touch):
 - `backend/src/api.py` and any backend source — landmines 1, 2, 4 get *documented with proposed fixes*, not fixed; keep the spike's blast radius in packaging/spawn code. (If CORS hard-blocks the prototype, note the one-line origin addition you *would* make in the doc and STOP rather than editing api.py.)
@@ -143,7 +143,7 @@ ALL must hold:
 - [ ] `cd frontend && npm run typecheck` exits 0 on the branch
 - [ ] `git diff --name-only main...HEAD` shows changes ONLY to in-scope files
 - [ ] Backend test suite still green (no backend source modified)
-- [ ] `plans/README.md` status row updated (DONE if the packaged flow worked; BLOCKED with the failing landmine named if not)
+- [ ] `docs/plans/README.md` status row updated (DONE if the packaged flow worked; BLOCKED with the failing landmine named if not)
 
 ## STOP conditions
 

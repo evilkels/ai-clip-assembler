@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
 > **Drift check (run first)**: `git diff --stat 6a39ed1..HEAD -- frontend/src/renderer/src/components/Timeline.tsx frontend/src/renderer/src/components/ClipPreview.tsx frontend/src/renderer/src/components/ClipCard.tsx frontend/e2e/`
@@ -115,7 +115,7 @@ Check `frontend/playwright.config.ts` before running e2e to confirm how the back
 - `frontend/src/renderer/src/components/ClipPreview.tsx` (additive, backward-compatible props only)
 - `frontend/src/renderer/src/styles.css` (only if the controls removal needs minor styling)
 - `frontend/e2e/playwriter-preview.spec.ts` (extend) or a new sibling spec file
-- `plans/README.md` (status row)
+- `docs/plans/README.md` (status row)
 
 **Out of scope** (do NOT touch, even though they look related):
 - `frontend/src/renderer/src/components/ClipCard.tsx` and the Review page's behavior — Review keeps native controls and per-clip looping. (Known separate issue, deliberately deferred: every ClipCard mounts its own `<video>` against 4K sources — 14 candidates = 14 video elements. That is a future virtualization/thumbnail plan, not this one.)
@@ -202,7 +202,7 @@ ALL must hold:
 - [ ] New e2e assertions exist for: boundary advance, controls-attribute split (Timeline absent / Review present), zero `seeking` events during 3 s of steady play
 - [ ] `grep -n 'controls' frontend/src/renderer/src/components/ClipPreview.tsx` shows the attribute is prop-driven; `grep -n '0.35' frontend/src/renderer/src/components/ClipPreview.tsx` returns nothing (drift-correction removed)
 - [ ] `git diff --name-only` touches only in-scope files
-- [ ] `plans/README.md` status row updated
+- [ ] `docs/plans/README.md` status row updated
 
 ## STOP conditions
 
@@ -219,4 +219,4 @@ Stop and report back (do not improvise) if:
 - This plan makes the video the clock for forward play; if "fully gapless" preview is built later (dual-buffer, deferred by the operator), the seek-epoch mechanism is the right insertion point — preload the next file's element and swap on boundary instead of bumping the epoch.
 - The Review board's N-video-elements problem (every ClipCard streams 4K metadata) is a known, deliberately deferred jank source — likely the next UX plan (poster thumbnails + mount video on hover/select).
 - Reviewer should scrutinize: RAF loop cleanup on unmount/route change (leaked RAF keeps seeking a dead element), the same-file vs cross-file advance branch, and that `ClipCard`'s rendered DOM is unchanged (diff the e2e snapshot or inspect manually).
-- Real-footage validation (plan 001's runbook, Flow A/B) should be re-run on the Timeline page after this lands — playback quality is part of the "feels like a real editor" bar in `plans/product/drone-workflow-qa-flows.md` Flow B.
+- Real-footage validation (plan 001's runbook, Flow A/B) should be re-run on the Timeline page after this lands — playback quality is part of the "feels like a real editor" bar in `docs/plans/drone-workflow-qa-flows.md` Flow B.

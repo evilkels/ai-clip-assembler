@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
 > **Drift check (run first)**: `git diff --stat 6a39ed1..HEAD -- backend/src/pi_cli_harness.py backend/src/api.py backend/tests/test_pi_cli_harness.py`
@@ -23,7 +23,7 @@
 
 ## Why this matters
 
-The default AI harness (`pi_agent`) scores candidate clips **one subprocess call at a time**, with a 180 s per-clip timeout, and is **all-or-nothing**: the first clip that fails or returns unusable JSON aborts AI scoring for the entire run and discards every score already obtained in that run (cache aside). On the project's own "realistic set" target (5–8 files, 30–60 min of footage — see `plans/product/drone-workflow-qa-flows.md`), that design means potentially dozens of sequential model round-trips, an hour-scale wall clock, and a high probability that one provider flake throws away all completed AI work. This spike produces measured numbers for the current design and a written, evidence-backed recommendation among: per-clip retry, batched multi-clip scoring, bounded concurrency, and partial-result acceptance — **without changing production code**.
+The default AI harness (`pi_agent`) scores candidate clips **one subprocess call at a time**, with a 180 s per-clip timeout, and is **all-or-nothing**: the first clip that fails or returns unusable JSON aborts AI scoring for the entire run and discards every score already obtained in that run (cache aside). On the project's own "realistic set" target (5–8 files, 30–60 min of footage — see `docs/plans/drone-workflow-qa-flows.md`), that design means potentially dozens of sequential model round-trips, an hour-scale wall clock, and a high probability that one provider flake throws away all completed AI work. This spike produces measured numbers for the current design and a written, evidence-backed recommendation among: per-clip retry, batched multi-clip scoring, bounded concurrency, and partial-result acceptance — **without changing production code**.
 
 ## Current state
 
@@ -85,7 +85,7 @@ below will fail — that is a STOP condition, not something to work around.
 **In scope** (the only files you should create or modify):
 - `docs/superpowers/specs/<YYYY-MM-DD>-pi-harness-scaling-design.md` (create — the spike deliverable; use the actual date)
 - `scripts/spike_pi_scaling_benchmark.py` (create — throwaway benchmark driver, clearly headed "SPIKE — not production code")
-- `plans/README.md` (status row update)
+- `docs/plans/README.md` (status row update)
 
 **Out of scope** (do NOT touch):
 - `backend/src/pi_cli_harness.py`, `backend/src/api.py` — **no production changes in this spike**; the recommendation becomes a follow-up implementation plan.
@@ -133,7 +133,7 @@ together:
 2. **Batched scoring** (k clips per call): fewer round-trips, lower cost; risks — response truncation, clip/score misalignment, harder parse. Use the measured batched latency. Recommend a k.
 3. **Bounded concurrency** (2–4 parallel subprocesses): wall-clock win without prompt changes; risks — provider rate limits, interleaved logs, progress-callback ordering.
 4. **Partial results**: accept per-clip failures by giving failed clips a *neutral* visual-interest score so every clip stays on the blended scale (e.g. `overall = 0.7*technical + 0.3*neutral_visual` with neutral = the mean visual score of successfully scored clips, or 5.0). This dissolves the comparability objection — state the chosen neutral-score rule and its bias trade-off explicitly. Note the existing per-(frames,model,prompt) cache means retried runs only re-score the failed clips.
-5. **Do nothing**: defensible if measured failure rate is ~0 and latency × realistic clip count fits the 15-minute budget from `plans/product/drone-workflow-qa-flows.md`. Say so if the numbers support it.
+5. **Do nothing**: defensible if measured failure rate is ~0 and latency × realistic clip count fits the 15-minute budget from `docs/plans/drone-workflow-qa-flows.md`. Say so if the numbers support it.
 
 **Verify**: spec contains all five subsections, each citing a measured number from step 2 or a formula from step 1.
 
@@ -163,7 +163,7 @@ ALL must hold:
 - [ ] Measurements section contains a real output table from `scripts/spike_pi_scaling_benchmark.py` (not hypothetical numbers)
 - [ ] `git diff --name-only` shows changes ONLY to the in-scope files
 - [ ] `cd backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py` exits 0
-- [ ] `plans/README.md` status row updated
+- [ ] `docs/plans/README.md` status row updated
 
 ## STOP conditions
 
@@ -176,7 +176,7 @@ Stop and report back (do not improvise) if:
 
 ## Maintenance notes
 
-- The spec's recommendation should be turned into a numbered implementation plan (`plans/00X-...`) before anyone touches the harness.
+- The spec's recommendation should be turned into a numbered implementation plan (`docs/plans/00X-...`) before anyone touches the harness.
 - Plan 001's Flow D session is the natural consumer: if the validation run shows AI scoring aborting or blowing the time budget, this spec says what to do; if validation shows ~0 failures and acceptable latency, the "do nothing" option wins and this spike still paid for itself.
 - Anything that changes `DEFAULT_PROMPT_TEMPLATE`, provider, or model invalidates the score cache by design (the key includes all three) — batching therefore cold-starts the cache; note this in the spec.
 - Delete `scripts/spike_pi_scaling_benchmark.py` when the follow-up implementation lands (it pins a prompt format that will drift).

@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
 > **Drift check (run first)**: `git diff --stat 6a39ed1..HEAD -- backend/src/api.py backend/tests/test_api.py docs/`
@@ -23,7 +23,7 @@
 
 ## Why this matters
 
-The app has a written acceptance bar (`plans/product/drone-workflow-qa-flows.md`) with three pass/fail criteria — speed (folder → Review Board in <15 min for 30 min of 4K/60fps), signal (≥70% recall vs. manual ground truth), and DaVinci handoff (zero relink prompts) — and none of them has ever been measured on real footage. Every other roadmap bet (settings, packaging, harness work) is speculative until these numbers exist. This plan does the two parts a coding agent *can* do: (a) add per-phase timing telemetry to the analysis pipeline so a QA run captures hard numbers without a stopwatch, and (b) write a self-contained validation runbook + report template so the human session is pure execution. The actual footage runs are explicitly out of scope for the executor (see STOP conditions).
+The app has a written acceptance bar (`docs/plans/drone-workflow-qa-flows.md`) with three pass/fail criteria — speed (folder → Review Board in <15 min for 30 min of 4K/60fps), signal (≥70% recall vs. manual ground truth), and DaVinci handoff (zero relink prompts) — and none of them has ever been measured on real footage. Every other roadmap bet (settings, packaging, harness work) is speculative until these numbers exist. This plan does the two parts a coding agent *can* do: (a) add per-phase timing telemetry to the analysis pipeline so a QA run captures hard numbers without a stopwatch, and (b) write a self-contained validation runbook + report template so the human session is pure execution. The actual footage runs are explicitly out of scope for the executor (see STOP conditions).
 
 ## Current state
 
@@ -31,7 +31,7 @@ Relevant files:
 
 - `backend/src/api.py` — FastAPI entry point. `run_analysis_pipeline` (line 327) runs, per video: vidstab motion analysis → frame extraction → scene detection → rule-based scoring/assembly → optional pi AI scoring. Progress is tracked via `set_analysis_progress` (line 262) and exposed at `GET /projects/{project_id}/analyze/status` (line 270), which already computes `elapsed_sec` from `started_at`. **No per-phase durations are recorded anywhere** — only log lines mark phase transitions.
 - `backend/tests/test_api.py` — API tests using FastAPI's TestClient with monkeypatched ffmpeg-heavy functions. Exemplar: `test_analyze_folder_project_writes_work_files_under_clipassembler` (line 139) — copy its monkeypatch pattern for stubbing `run_vidstabdetect`, `extract_frames`, `detect_scenes`.
-- `plans/product/drone-workflow-qa-flows.md` — defines Flows A–E with pass criteria and the Flow D recall/precision formulas. The runbook in step 3 operationalizes this doc; it does not replace it.
+- `docs/plans/drone-workflow-qa-flows.md` — defines Flows A–E with pass criteria and the Flow D recall/precision formulas. The runbook in step 3 operationalizes this doc; it does not replace it.
 - `docs/MANUAL_QA_GUIDE.md` — how to launch the app for manual QA. Reference it from the runbook, don't duplicate it.
 
 Excerpt — progress tracking as it exists today (`backend/src/api.py:262-281`):
@@ -97,13 +97,13 @@ Repo conventions: Python with type hints where practical, pydantic models in
 - `backend/src/api.py` — timing capture in `run_analysis_pipeline` / status exposure
 - `backend/tests/test_api.py` — new test(s) for the timing report
 - `docs/VALIDATION_RUNBOOK.md` (create)
-- `plans/README.md` (status row update)
+- `docs/plans/README.md` (status row update)
 
 **Out of scope** (do NOT touch, even though they look related):
 - `backend/src/pi_cli_harness.py` — per-clip AI timing already exists there; harness changes belong to plan 002.
 - `frontend/**` — no UI for timings in this plan; the status endpoint and analyze response are the consumers.
 - `backend/src/project_store.py` / `results.json` schema — do not persist timings to disk; they are per-run diagnostics, not project state.
-- `plans/product/drone-workflow-qa-flows.md` — the acceptance bar itself stays as-is; the runbook references it.
+- `docs/plans/drone-workflow-qa-flows.md` — the acceptance bar itself stays as-is; the runbook references it.
 
 ## Git workflow
 
@@ -165,7 +165,7 @@ POST `/projects/{id}/analyze` with `harness_id="manual"`, then assert:
 Create a self-contained runbook a human can follow in one sitting. It must
 contain (inline, not by reference, except where noted):
 
-1. **Purpose**: one paragraph — measure the three success criteria from `plans/product/drone-workflow-qa-flows.md` (quote them: speed <15 min for 30 min of 4K/60fps; recall ≥0.70 vs. manual ground truth; zero DaVinci relink prompts).
+1. **Purpose**: one paragraph — measure the three success criteria from `docs/plans/drone-workflow-qa-flows.md` (quote them: speed <15 min for 30 min of 4K/60fps; recall ≥0.70 vs. manual ground truth; zero DaVinci relink prompts).
 2. **Prerequisites**: the `~/Footage/QA/{small-set,realistic-set,stress-set}` dataset layout with `MANIFEST.md` per set (copy the layout block from the qa-flows doc); app launch per `docs/MANUAL_QA_GUIDE.md`; DaVinci Resolve installed; named test machine recorded in the report (hardware baseline is an open question in the qa-flows doc — the runbook makes the machine name a required report field).
 3. **How to capture timings**: after an analysis run, `curl -s http://127.0.0.1:8000/projects/<id>/analyze/status | python3 -m json.tool` — the `timings` object added in step 1. State that this replaces stopwatch timing for the speed criterion.
 4. **Procedure**: condensed numbered steps for Flow A (cold start), Flow C (portability/relink), and Flow D (signal test) — adapted from the qa-flows doc, including Flow D's ground-truth file (`MANUAL_GROUND_TRUTH.md`), the both-harness run (manual, then `pi_agent`), and the overlap rule ("two clips overlap if their time ranges intersect by ≥50% of either's duration").
@@ -194,7 +194,7 @@ Machine-checkable. ALL must hold:
 - [ ] `grep -n '"timings"' backend/src/api.py` returns at least one match in `run_analysis_pipeline`/`analyze_videos`
 - [ ] `docs/VALIDATION_RUNBOOK.md` exists with ≥5 `## ` sections
 - [ ] No files outside the in-scope list are modified (`git status`)
-- [ ] `plans/README.md` status row updated
+- [ ] `docs/plans/README.md` status row updated
 
 ## STOP conditions
 

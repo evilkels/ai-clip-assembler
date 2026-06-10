@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end QA for the drone clip workflow using synthetic footage.
 
-Answers `plans/product/drone-workflow-qa-flows.md` open question 1:
+Answers `docs/plans/drone-workflow-qa-flows.md` open question 1:
 a repeatable fixture that exercises the full pipeline without private footage.
 
 Generates three synthetic videos (smooth hover, shaky jitter, mixed) and

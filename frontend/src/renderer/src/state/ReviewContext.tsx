@@ -4,8 +4,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 import {
   addRecentProject,
@@ -73,6 +76,60 @@ interface ReviewState {
 
 const Ctx = createContext<ReviewState | null>(null);
 
+type Setter<T> = Dispatch<SetStateAction<T>>;
+
+function useProjectHydration(
+  projectId: string | null,
+  setLoading: Setter<boolean>,
+  setClipCandidates: Setter<ClipCandidate[]>,
+  setError: Setter<string | null>,
+  setDecisions: Setter<Record<string, ClipDecision>>,
+  setAcceptedOrder: Setter<string[]>,
+  setTrims: Setter<Record<string, Trim>>,
+) {
+  useEffect(() => {
+    if (!projectId) return;
+    let alive = true;
+    setLoading(true);
+    Promise.all([
+      getClipsWithFallback(projectId),
+      getSavedTimeline(projectId).catch(() => null),
+    ])
+      .then(([loaded, savedTimeline]) => {
+        if (!alive) return;
+        setClipCandidates(loaded);
+        setError(null);
+        const newTrims: Record<string, Trim> = Object.fromEntries(
+          loaded.map((clip) => [
+            clip.clip_id,
+            { start_sec: clip.start_sec, end_sec: clip.end_sec },
+          ]),
+        );
+        if (savedTimeline) {
+          const knownIds = new Set(loaded.map((clip) => clip.clip_id));
+          const restored = savedTimeline.filter((entry) => knownIds.has(entry.clip_id));
+          setDecisions(
+            Object.fromEntries(restored.map((entry) => [entry.clip_id, 'included' as const])),
+          );
+          setAcceptedOrder(restored.map((entry) => entry.clip_id));
+          for (const entry of restored) {
+            newTrims[entry.clip_id] = { start_sec: entry.start_sec, end_sec: entry.end_sec };
+          }
+        }
+        setTrims(newTrims);
+      })
+      .catch((reason: unknown) => {
+        if (alive) setError(reason instanceof Error ? reason.message : 'Unable to load clip candidates');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [projectId, setAcceptedOrder, setClipCandidates, setDecisions, setError, setLoading, setTrims]);
+}
+
 export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -87,8 +144,18 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [acceptedOrder, setAcceptedOrder] = useState<string[]>([]);
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
-  const [reviewRevision, setReviewRevision] = useState(0);
+  const hasReviewEdits = useRef(false);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
+
+  useProjectHydration(
+    projectId,
+    setLoading,
+    setClipCandidates,
+    setError,
+    setDecisions,
+    setAcceptedOrder,
+    setTrims,
+  );
 
   const resetProjectSession = useCallback(() => {
     setClipCandidates([]);
@@ -97,7 +164,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setTrims({});
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
-    setReviewRevision(0);
+    hasReviewEdits.current = false;
     setRecommendation(null);
   }, []);
 
@@ -180,50 +247,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     }
   }, [projectId, projectFolder, resetProjectSession]);
 
-  useEffect(() => {
-    if (!projectId) return;
-    let alive = true;
-    setLoading(true);
-    Promise.all([
-      getClipsWithFallback(projectId),
-      getSavedTimeline(projectId).catch(() => null),
-    ])
-      .then(([loaded, savedTimeline]) => {
-        if (!alive) return;
-        setClipCandidates(loaded);
-        setError(null);
-        const newTrims: Record<string, Trim> = {};
-        for (const clip of loaded) {
-          newTrims[clip.clip_id] = { start_sec: clip.start_sec, end_sec: clip.end_sec };
-        }
-        if (savedTimeline) {
-          // Restore the user's saved review session: accepted clips, their
-          // order, and any trims they made before the project was closed.
-          const knownIds = new Set(loaded.map((clip) => clip.clip_id));
-          const restored = savedTimeline.filter((entry) => knownIds.has(entry.clip_id));
-          const newDecisions: Record<string, ClipDecision> = {};
-          for (const entry of restored) {
-            newDecisions[entry.clip_id] = 'included';
-            newTrims[entry.clip_id] = { start_sec: entry.start_sec, end_sec: entry.end_sec };
-          }
-          setDecisions(newDecisions);
-          setAcceptedOrder(restored.map((entry) => entry.clip_id));
-        }
-        setTrims(newTrims);
-      })
-      .catch((reason: unknown) => {
-        if (!alive) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load clip candidates');
-      })
-      .finally(() => {
-        if (!alive) return;
-        setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [projectId]);
-
   const setClips = useCallback((nextClips: ClipCandidate[]) => {
     setClipCandidates(nextClips);
     setTrims(
@@ -236,7 +259,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     );
     setDecisions({});
     setAcceptedOrder([]);
-    setReviewRevision(0);
+    hasReviewEdits.current = false;
   }, []);
 
   const restoreTimelineEntries = useCallback((entries: Array<{ clip_id: string; start_sec: number; end_sec: number }>) => {
@@ -263,11 +286,11 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     if (!projectId) return;
     const result = await requestDraft(projectId, profile, targetDurationSec);
     restoreTimelineEntries(result.timeline.clips);
-    setReviewRevision(0);
+    hasReviewEdits.current = false;
   }, [projectId, restoreTimelineEntries]);
 
   useEffect(() => {
-    if (!projectId || reviewRevision === 0) return;
+    if (!projectId || !hasReviewEdits.current) return;
     const timeout = window.setTimeout(() => {
       updateTimeline(projectId, { order: acceptedOrder, trims })
         .then((result) => {
@@ -278,31 +301,32 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         });
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [projectId, acceptedOrder, trims, reviewRevision]);
+  }, [projectId, acceptedOrder, trims]);
 
   const include = useCallback((clipId: string) => {
+    hasReviewEdits.current = true;
     setDecisions((prev) => ({ ...prev, [clipId]: 'included' }));
     setAcceptedOrder((prev) => (prev.includes(clipId) ? prev : [...prev, clipId]));
-    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const exclude = useCallback((clipId: string) => {
+    hasReviewEdits.current = true;
     setDecisions((prev) => ({ ...prev, [clipId]: 'excluded' }));
     setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
-    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const resetDecision = useCallback((clipId: string) => {
+    hasReviewEdits.current = true;
     setDecisions((prev) => {
       const next = { ...prev };
       delete next[clipId];
       return next;
     });
     setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
-    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const moveAccepted = useCallback((clipId: string, direction: -1 | 1) => {
+    hasReviewEdits.current = true;
     setAcceptedOrder((prev) => {
       const idx = prev.indexOf(clipId);
       if (idx < 0) return prev;
@@ -310,12 +334,12 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       if (target < 0 || target >= prev.length) return prev;
       const next = prev.slice();
       [next[idx], next[target]] = [next[target], next[idx]];
-      setReviewRevision((revision) => revision + 1);
       return next;
     });
   }, []);
 
   const reorderAccepted = useCallback((clipId: string, toIndex: number) => {
+    hasReviewEdits.current = true;
     setAcceptedOrder((prev) => {
       const from = prev.indexOf(clipId);
       if (from < 0) return prev;
@@ -323,14 +347,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       without.splice(from, 1);
       const target = Math.max(0, Math.min(toIndex, without.length));
       without.splice(target, 0, clipId);
-      setReviewRevision((revision) => revision + 1);
       return without;
     });
   }, []);
 
   const setTrim = useCallback((clipId: string, trim: Trim) => {
+    hasReviewEdits.current = true;
     setTrims((prev) => ({ ...prev, [clipId]: trim }));
-    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const value = useMemo<ReviewState>(

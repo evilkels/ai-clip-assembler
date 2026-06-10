@@ -35,7 +35,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [settings-page](settings-page.md) | Draft, awaiting review. |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented; re-run `npx react-doctor` before selecting the next batch (original snapshot is historical). |
-| [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | In progress; Release Slice A implements confirmed workflow defects from the June 11 QA review. |
+| [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
 
 ## Completed (`done/`)
 

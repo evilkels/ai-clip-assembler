@@ -15,7 +15,6 @@ export function ExportPage() {
   const [exportResult, setExportResult] = useState<Partial<Record<ExportFormat, string>>>({});
   const [exportError, setExportError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState(false);
-  const [handoffStatus, setHandoffStatus] = useState<string | null>(null);
 
   const acceptedClips = useMemo(
     () => {
@@ -168,11 +167,9 @@ export function ExportPage() {
                         setExportError(null);
                         try {
                           const opened = await openInDaVinci(exportResult.resolve_xml!, projectFolder ?? undefined);
-                          setHandoffStatus(
-                            opened
-                              ? 'DaVinci Resolve opened with the exported XML. Source footage references are relative to the project folder.'
-                              : 'Open the exported XML in DaVinci Resolve to import the draft.',
-                          );
+                          if (!opened) {
+                            setExportError('Open the exported XML in DaVinci Resolve to import the draft.');
+                          }
                         } catch (err) {
                           setExportError(err instanceof Error ? err.message : String(err));
                         }
@@ -184,8 +181,6 @@ export function ExportPage() {
                 </div>
               </div>
             ))}
-
-            {handoffStatus && <p className="export-handoff-status">{handoffStatus}</p>}
 
             <details style={{ fontSize: 12 }}>
               <summary style={{ cursor: 'pointer', color: 'var(--text-muted)' }}>

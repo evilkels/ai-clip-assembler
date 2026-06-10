@@ -4,7 +4,7 @@
 > or executing-plans to implement this plan task-by-task. Steps use checkbox
 > (`- [ ]`) syntax for tracking.
 
-**Status:** implementation complete; final verification in progress
+**Status:** complete (2026-06-11)
 
 **Goal:** Turn the June 11 real-footage QA findings into a reliable editing
 workflow with persistent review decisions, truthful scoring, stronger Timeline
@@ -57,15 +57,15 @@ TypeScript, Playwright, CSS.
 - Modify: `frontend/src/renderer/src/api/client.ts`
 - Modify: `frontend/e2e/playwriter-preview.spec.ts`
 
-- [ ] Add an E2E regression that includes a clip, reopens the same folder
+- [x] Add an E2E regression that includes a clip, reopens the same folder
   project, and asserts the accepted clip is restored.
-- [ ] Run `cd frontend && npm run test:e2e -- playwriter-preview.spec.ts` and
+- [x] Run `cd frontend && npm run test:e2e -- playwriter-preview.spec.ts` and
   confirm the regression fails because no `PUT /timeline` occurs.
-- [ ] Add a hydration guard and debounced `updateTimeline(projectId, {
+- [x] Add a hydration guard and debounced `updateTimeline(projectId, {
   order: acceptedOrder, trims })` effect. Empty accepted order must persist as
   an intentionally empty edited timeline.
-- [ ] Surface auto-save failures through the existing Review context error.
-- [ ] Re-run the focused E2E test and confirm it passes.
+- [x] Surface auto-save failures through the existing Review context error.
+- [x] Re-run the focused E2E test and confirm it passes.
 
 ## Task 2: Display Truthful Combined And Technical Scores
 
@@ -77,14 +77,14 @@ TypeScript, Playwright, CSS.
 - Modify: `frontend/src/renderer/src/api/client.ts`
 - Modify: `frontend/src/renderer/src/components/ClipCard.tsx`
 
-- [ ] Add a failing backend test asserting assembled clips expose average
+- [x] Add a failing backend test asserting assembled clips expose average
   sharpness, exposure, and contrast scores.
-- [ ] Extend `ClipSuggestion` and clip assembly with those averages; Pi scoring
+- [x] Extend `ClipSuggestion` and clip assembly with those averages; Pi scoring
   must preserve the fields through its existing model-copy flow.
-- [ ] Map those backend fields instead of hardcoding zero in the frontend.
-- [ ] Label `overall` as Combined and place local technical scores in an
+- [x] Map those backend fields instead of hardcoding zero in the frontend.
+- [x] Label `overall` as Combined and place local technical scores in an
   expandable details section.
-- [ ] Run focused backend tests and the frontend build.
+- [x] Run focused backend tests and the frontend build.
 
 ## Task 3: Upgrade Timeline Interaction And Layout
 
@@ -93,16 +93,16 @@ TypeScript, Playwright, CSS.
 - Modify: `frontend/src/renderer/src/styles.css`
 - Modify: `frontend/e2e/timeline-playback.spec.ts`
 
-- [ ] Add failing E2E coverage for dragging the playhead and wheel zoom.
-- [ ] Implement pointer-captured playhead/ruler scrubbing.
-- [ ] Snap playhead and trim edits to clip boundaries by default.
-- [ ] Implement pointer-centered wheel zoom without changing the visible
+- [x] Add failing E2E coverage for dragging the playhead and wheel zoom.
+- [x] Implement pointer-captured playhead/ruler scrubbing.
+- [x] Snap playhead and trim edits to clip boundaries by default.
+- [x] Implement pointer-centered wheel zoom without changing the visible
   timeline point under the pointer.
-- [ ] Add a vertical resize handle between preview and editor; persist the
+- [x] Add a vertical resize handle between preview and editor; persist the
   preview height in versioned local storage.
-- [ ] Refine the Timeline layout into dense preview, transport, and track
+- [x] Refine the Timeline layout into dense preview, transport, and track
   panels.
-- [ ] Run focused Timeline E2E tests and the frontend build.
+- [x] Run focused Timeline E2E tests and the frontend build.
 
 ## Task 4: Fix Native Window Title Presentation
 
@@ -114,12 +114,12 @@ TypeScript, Playwright, CSS.
 - Delete: `frontend/src/renderer/src/layouts/TitleBar.tsx`
 - Modify: `frontend/src/renderer/src/styles.css`
 
-- [ ] Use the native macOS title bar instead of `hiddenInset`.
-- [ ] Add a narrow IPC method that sets the BrowserWindow title.
-- [ ] Update the native title to `AI Clip Assembler — <project>` when a project
+- [x] Use the native macOS title bar instead of `hiddenInset`.
+- [x] Add a narrow IPC method that sets the BrowserWindow title.
+- [x] Update the native title to `AI Clip Assembler — <project>` when a project
   opens and reset it when no project is open.
-- [ ] Remove the custom title-bar row and traffic-light CSS.
-- [ ] Run frontend typecheck and build.
+- [x] Remove the custom title-bar row and traffic-light CSS.
+- [x] Run frontend typecheck and build.
 
 ## Task 5: Verify And Record The Release Slice
 
@@ -127,8 +127,22 @@ TypeScript, Playwright, CSS.
 - Modify: `docs/plans/README.md`
 - Modify: `docs/plans/2026-06-11-real-footage-qa-improvements.md`
 
-- [ ] Run the full backend suite.
-- [ ] Run the frontend production build and full Playwright suite.
-- [ ] Run `backend/.venv/bin/python scripts/synthetic_e2e_qa.py`.
-- [ ] Run `git diff --check`.
-- [ ] Mark Release Slice A complete and leave B/C as explicit follow-up work.
+- [x] Run the full backend suite.
+- [x] Run the frontend production build and full Playwright suite.
+- [x] Run `backend/.venv/bin/python scripts/synthetic_e2e_qa.py`.
+- [x] Run `git diff --check`.
+- [x] Mark the QA improvement plan complete. Speed adjustments and color
+  grading remain deliberately deferred because the operator classified them as
+  later nice-to-have features.
+
+## Completion Record
+
+- Release Slice A: persistent review decisions, truthful scores, Timeline
+  interaction/layout, and native title behavior shipped.
+- Release Slice B: adaptive profiles, automatic chronological drafts,
+  re-analysis preservation, and abrupt-turn filtering shipped.
+- Release Slice C: DaVinci Resolve launch/import handoff shipped. Speed and
+  color controls remain deferred by product decision.
+- Verification: backend `139 passed`; frontend build passed; Playwright
+  `6 passed`; synthetic end-to-end QA passed; React Doctor branch diff reported
+  no issues.

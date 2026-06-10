@@ -83,7 +83,7 @@ below will fail — that is a STOP condition, not something to work around.
 ## Scope
 
 **In scope** (the only files you should create or modify):
-- `docs/superpowers/specs/<YYYY-MM-DD>-pi-harness-scaling-design.md` (create — the spike deliverable; use the actual date)
+- `docs/specs/<YYYY-MM-DD>-pi-harness-scaling-design.md` (create — the spike deliverable; use the actual date)
 - `scripts/spike_pi_scaling_benchmark.py` (create — throwaway benchmark driver, clearly headed "SPIKE — not production code")
 - `docs/plans/README.md` (status row update)
 
@@ -145,7 +145,7 @@ End the spec with:
 - An implementation sketch: which functions in `backend/src/pi_cli_harness.py` change, which tests in `backend/tests/test_pi_cli_harness.py` to add, expected size (S/M).
 - Open questions for the maintainer (e.g. provider rate limits, whether `scoring_seconds_per_clip` telemetry should feed plan 001's timing report).
 
-**Verify**: `grep -c '^## ' docs/superpowers/specs/*pi-harness-scaling-design.md` → ≥ 4 (Baseline, Measurements, Options, Recommendation).
+**Verify**: `grep -c '^## ' docs/specs/*pi-harness-scaling-design.md` → ≥ 4 (Baseline, Measurements, Options, Recommendation).
 
 ## Test plan
 
@@ -159,7 +159,7 @@ exits 0) and the existing suite must stay green
 
 ALL must hold:
 
-- [ ] `docs/superpowers/specs/<date>-pi-harness-scaling-design.md` exists with Baseline / Measurements / Options (all five) / Recommendation sections
+- [ ] `docs/specs/<date>-pi-harness-scaling-design.md` exists with Baseline / Measurements / Options (all five) / Recommendation sections
 - [ ] Measurements section contains a real output table from `scripts/spike_pi_scaling_benchmark.py` (not hypothetical numbers)
 - [ ] `git diff --name-only` shows changes ONLY to the in-scope files
 - [ ] `cd backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py` exits 0

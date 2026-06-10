@@ -68,7 +68,7 @@ decision doc recommends it for CI.
 - `frontend/src/main/index.ts` — prototype backend spawn/health-check/kill (clearly commented as spike code)
 - `frontend/src/preload/**` — expose `clipAssembler.backendUrl` if needed for a non-8000 port
 - `frontend/package.json` — `extraResources` entry pointing at the PyInstaller output
-- `docs/superpowers/specs/<YYYY-MM-DD>-backend-packaging-design.md` (create — the decision doc; the durable deliverable)
+- `docs/specs/<YYYY-MM-DD>-backend-packaging-design.md` (create — the decision doc; the durable deliverable)
 - `docs/plans/README.md` (status row update)
 
 **Out of scope** (do NOT touch):
@@ -117,14 +117,14 @@ Add to `frontend/package.json` `build` config:
 
 ### Step 4: Write the decision doc
 
-`docs/superpowers/specs/<date>-backend-packaging-design.md` with sections:
+`docs/specs/<date>-backend-packaging-design.md` with sections:
 
 1. **Approach compared**: PyInstaller onedir (prototyped) vs. python-build-standalone + venv vs. "require user-installed Python" — recommend one with the measured numbers (bundle size, launch time, build complexity).
 2. **Landmine dispositions**: each of the four landmines above → observed behavior in the prototype + the precise production fix (file:line) it implies.
 3. **External binaries strategy**: ffmpeg-with-vidstab and `pi` CLI — bundle vs. detect-and-guide; recommendation and rationale (note `README.md:23-36`: stock Homebrew ffmpeg lacks vidstab, so "detect-and-guide" needs a first-run check UI eventually).
 4. **Production checklist**: signing/notarization, crash/orphan handling, port collision policy, auto-update implications, CI build — each one line, sized S/M/L.
 
-**Verify**: `grep -c '^## ' docs/superpowers/specs/*backend-packaging-design.md` → ≥ 4.
+**Verify**: `grep -c '^## ' docs/specs/*backend-packaging-design.md` → ≥ 4.
 
 ## Test plan
 

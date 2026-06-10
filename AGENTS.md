@@ -38,13 +38,14 @@ Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for decisions. See 
 3. Main branch is protected — PRs required
 4. Local testing before PR
 
-### Plans
+### Plans and docs layout
 
 All written plans live in `docs/plans/` (index + statuses in
-`docs/plans/README.md`; completed plans in `docs/plans/done/`). Do not create
-plan folders elsewhere — `docs/superpowers/plans` is a compatibility symlink to
-`docs/plans/`, and if a tool writes a repo-root `plans/`, merge it back into
-`docs/plans/`.
+`docs/plans/README.md`; completed plans in `docs/plans/done/`). Design specs go
+in `docs/specs/`, review records in `docs/reviews/`, design mockups in
+`docs/designs/`. Do not create plan folders elsewhere — if a tool writes to a
+repo-root `plans/` or `docs/superpowers/plans/`, merge the contents back into
+`docs/plans/`. See `docs/README.md` for the full docs map.
 
 ## Key Files
 

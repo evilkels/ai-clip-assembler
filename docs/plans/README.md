@@ -1,9 +1,8 @@
 # Plans
 
 Single home for all written plans. Completed plans move to [`done/`](done/).
-`docs/superpowers/plans` is a compatibility symlink to this directory (the
-writing-plans skill saves there); if any tool recreates a repo-root `plans/`
-folder, merge it back here.
+This is the **only** plans directory — if any tool recreates `plans/` at the
+repo root or `docs/superpowers/plans/`, merge the contents back here.
 
 Two kinds of plans live side by side:
 

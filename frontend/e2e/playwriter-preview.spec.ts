@@ -55,7 +55,11 @@ test('analysis completes and review/timeline previews render playable videos', a
       timeout: 30_000,
     })
     .toBeGreaterThanOrEqual(1);
-  await page.getByRole('button', { name: 'Include' }).first().click();
+  const included = page.getByRole('button', { name: 'Included ✓', exact: true });
+  if (await included.count()) {
+    await included.first().click();
+  }
+  await page.getByRole('button', { name: 'Include', exact: true }).first().click();
   await page.goto('/#/playwriter');
   const projectId = await page.getByTestId('qa-project-id').textContent();
   await expect

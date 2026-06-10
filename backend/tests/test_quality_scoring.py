@@ -35,6 +35,14 @@ def test_normalize_frame_metrics_penalizes_shake_blur_and_bad_exposure():
     assert bad["contrast_score"] <= 2.0
 
 
+def test_normalize_frame_metrics_penalizes_abrupt_turns_but_allows_slow_turns():
+    slow = normalize_frame_metrics(1, 300, 0.5, 0.5, turn_rate_deg_per_sec=4)
+    abrupt = normalize_frame_metrics(1, 300, 0.5, 0.5, turn_rate_deg_per_sec=30)
+
+    assert slow["smoothness_score"] >= 8
+    assert abrupt["smoothness_score"] <= 2
+
+
 def test_score_samples_from_images_uses_image_quality_and_motion(tmp_path):
     first = tmp_path / "first.jpg"
     second = tmp_path / "second.jpg"

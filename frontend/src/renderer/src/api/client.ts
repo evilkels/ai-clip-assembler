@@ -8,7 +8,9 @@
 import type {
   AnalysisResult,
   AnalysisStatus,
+  AssemblyProfile,
   ClipCandidate,
+  DraftResult,
   ProjectManifest,
   RecentProject,
   UploadedVideo,
@@ -236,7 +238,8 @@ export async function analyzeProject(
     harness_id: string;
     status: string;
     clips: BackendClipSuggestion[];
-    sequence: { total_duration_sec: number; clips: string[] };
+    sequence: AnalysisResult['sequence'];
+    recommendation: AnalysisResult['recommendation'];
   };
   return {
     project_id: raw.project_id,
@@ -244,6 +247,7 @@ export async function analyzeProject(
     status: raw.status,
     clips: raw.clips.map(mapBackendClip),
     sequence: raw.sequence,
+    recommendation: raw.recommendation,
   };
 }
 
@@ -354,6 +358,23 @@ export async function updateTimeline(
     }
     return { ok: false };
   }
+}
+
+export async function regenerateDraft(
+  projectId: string,
+  profile: AssemblyProfile,
+  targetDurationSec: number,
+): Promise<DraftResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile, target_duration_sec: targetDurationSec }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Draft generation failed: ${res.status}`);
+  }
+  return res.json() as Promise<DraftResult>;
 }
 
 export async function getClipsWithFallback(

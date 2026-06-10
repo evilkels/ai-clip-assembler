@@ -1,8 +1,16 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import { ClipCard } from '../components/ClipCard';
 import { useReview } from '../state/ReviewContext';
 import type { ClipCandidate } from '../types/clip';
+import type { AssemblyProfile } from '../types/clip';
+
+const PROFILE_LABELS: Record<AssemblyProfile, string> = {
+  short_social: 'Short Social',
+  cinematic_highlight: 'Cinematic Highlight',
+  long_scenic: 'Long Scenic',
+  custom: 'Custom',
+};
 
 function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
   return [...clips].sort((a, b) => b.scores.overall - a.scores.overall);
@@ -82,7 +90,18 @@ export function ReviewPage() {
     resetDecision,
     moveAccepted,
     setTrim,
+    recommendation,
+    regenerateDraft,
   } = useReview();
+  const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
+  const [targetDuration, setTargetDuration] = useState(120);
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+
+  useEffect(() => {
+    if (!recommendation) return;
+    setProfile(recommendation.profile);
+    setTargetDuration(recommendation.target_duration_sec);
+  }, [recommendation]);
 
   const ranked = useMemo(() => rankClips(clips), [clips]);
   const filtered = useMemo(
@@ -137,6 +156,55 @@ export function ReviewPage() {
       </div>
 
       <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {clips.length > 0 && (
+          <section className="draft-setup" aria-label="Draft setup">
+            <div>
+              <span className="draft-kicker">Recommended assembly</span>
+              <strong>{PROFILE_LABELS[recommendation?.profile ?? profile]}</strong>
+              <p>
+                {recommendation?.reason ??
+                  'Choose a pacing profile and generate a chronological best-effort draft.'}
+              </p>
+            </div>
+            <label>
+              Profile
+              <select value={profile} onChange={(event) => setProfile(event.target.value as AssemblyProfile)}>
+                {Object.entries(PROFILE_LABELS).map(([id, label]) => (
+                  <option key={id} value={id}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Target seconds
+              <input
+                type="number"
+                min={5}
+                step={5}
+                value={targetDuration}
+                onChange={(event) => setTargetDuration(Math.max(5, Number(event.target.value)))}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={generatingDraft}
+              onClick={async () => {
+                if (
+                  acceptedOrder.length > 0 &&
+                  !window.confirm('Replace the current Timeline with a newly generated draft?')
+                ) return;
+                setGeneratingDraft(true);
+                try {
+                  await regenerateDraft(profile, targetDuration);
+                } finally {
+                  setGeneratingDraft(false);
+                }
+              }}
+            >
+              {generatingDraft ? 'Generating…' : 'Regenerate Draft'}
+            </button>
+          </section>
+        )}
         {acceptedClips.length > 0 && (
           <div className="accepted-strip">
             <h2>Accepted order — sent to export</h2>

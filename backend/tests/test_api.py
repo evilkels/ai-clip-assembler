@@ -239,7 +239,8 @@ def test_analyze_folder_project_persists_results_json(monkeypatch, tmp_path):
     assert results["schema_version"] == 1
     assert results["harness_id"] == "manual"
     assert results["clips"][0]["clip_id"] == "clip-1"
-    assert results["timeline"]["clips"] == ["clip-1"]
+    assert results["timeline"]["source"] == "draft"
+    assert results["timeline"]["clips"][0]["clip_id"] == "clip-1"
 
 
 def test_reopen_folder_project_restores_clips_and_timeline(monkeypatch, tmp_path):
@@ -263,7 +264,7 @@ def test_reopen_folder_project_restores_clips_and_timeline(monkeypatch, tmp_path
     assert reopened["clips"][0]["clip_id"] == "clip-1"
     clips = client.get(f"/projects/{reopened['project_id']}/clips").json()["clips"]
     assert clips[0]["clip_id"] == "clip-1"
-    assert api.projects[reopened["project_id"]]["timeline"]["clips"] == ["clip-1"]
+    assert api.projects[reopened["project_id"]]["timeline"]["clips"][0]["clip_id"] == "clip-1"
 
 
 def test_reopen_folder_project_restores_edited_timeline(monkeypatch, tmp_path):
@@ -294,6 +295,30 @@ def test_reopen_folder_project_restores_edited_timeline(monkeypatch, tmp_path):
     assert timeline["clips"][0]["clip_id"] == "clip-1"
     assert timeline["clips"][0]["start_sec"] == 1.0
     assert timeline["clips"][0]["end_sec"] == 3.0
+
+
+def test_reanalysis_preserves_manual_timeline(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id)
+    client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 1.0, "end_sec": 3.0}]},
+    )
+
+    analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, project_id)
+
+    timeline = api.projects[project_id]["timeline"]
+    assert timeline["source"] == "manual"
+    assert timeline["clips"][0]["clip_id"] == "clip-1"
+    assert timeline["clips"][0]["start_sec"] == 1.0
 
 
 def test_get_timeline_returns_saved_timeline(monkeypatch, tmp_path):
@@ -846,7 +871,7 @@ def test_analyze_ranks_clips_globally_across_videos(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert [clip["clip_id"] for clip in response.json()["clips"]] == ["high-clip", "low-clip"]
-    assert response.json()["sequence"]["clips"] == ["high-clip", "low-clip"]
+    assert [clip["clip_id"] for clip in response.json()["sequence"]["clips"]] == ["high-clip", "low-clip"]
 
 
 def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
@@ -1241,6 +1266,34 @@ def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
     assert body["clips"][0]["duration_sec"] == 2.5
     assert body["clips"][1]["duration_sec"] == 3.0
     assert body["total_duration_sec"] == 5.5
+
+
+def test_regenerate_draft_uses_requested_profile(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 20.0,
+            "duration_sec": 20.0,
+            "overall_score": 9,
+        }
+    ]
+
+    response = client.post(
+        f"/projects/{project_id}/draft",
+        json={"profile": "short_social", "target_duration_sec": 30},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile"] == "short_social"
+    assert body["timeline"]["clips"][0]["duration_sec"] == 6
 
 
 def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):

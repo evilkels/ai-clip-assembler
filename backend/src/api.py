@@ -22,6 +22,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .assembly_profiles import AssemblyProfile, build_draft_timeline, recommend_assembly_profile
 from .export_engine import (
     choose_timeline_fps,
     generate_edl,
@@ -92,6 +93,11 @@ class TimelineClipUpdate(BaseModel):
 
 class TimelineUpdateRequest(BaseModel):
     clips: list[TimelineClipUpdate]
+
+
+class DraftRequest(BaseModel):
+    profile: AssemblyProfile
+    target_duration_sec: Optional[float] = None
 
 
 class ProjectFolderRequest(BaseModel):
@@ -447,11 +453,30 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
     total_duration = sum(clip["duration_sec"] for clip in ranked_clips)
 
+    existing_timeline = projects[project_id].get("timeline")
+    existing_clips = projects[project_id].get("clips", [])
+    if isinstance(existing_timeline, dict) and existing_timeline.get("source") == "manual":
+        accepted_ids = {
+            entry["clip_id"]
+            for entry in existing_timeline.get("clips", [])
+            if isinstance(entry, dict) and entry.get("clip_id")
+        }
+        new_ids = {clip["clip_id"] for clip in ranked_clips}
+        ranked_clips.extend(
+            clip for clip in existing_clips
+            if clip.get("clip_id") in accepted_ids and clip.get("clip_id") not in new_ids
+        )
+        timeline = existing_timeline
+    else:
+        recommendation = recommend_assembly_profile(ranked_clips)
+        timeline = build_draft_timeline(
+            ranked_clips,
+            profile=recommendation["profile"],
+            target_duration_sec=recommendation["target_duration_sec"],
+        )
+
     projects[project_id]["clips"] = ranked_clips
-    projects[project_id]["timeline"] = {
-        "total_duration_sec": round(total_duration, 3),
-        "clips": sequence_clip_ids,
-    }
+    projects[project_id]["timeline"] = timeline
     projects[project_id]["harness_id"] = request.harness_id
     persist_project_results(project_id)
     response = {
@@ -460,6 +485,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         "status": "complete",
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
+        "recommendation": recommend_assembly_profile(ranked_clips),
     }
     if request.harness_id == "pi_agent":
         harness_metadata = {"per_video": per_video_results}
@@ -501,6 +527,7 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
     resolved_clips = resolve_timeline_clips(project, request.clips)
     total_duration_sec = round(sum(clip["duration_sec"] for clip in resolved_clips), 3)
     project["timeline"] = {
+        "source": "manual",
         "clips": resolved_clips,
         "total_duration_sec": total_duration_sec,
     }
@@ -510,6 +537,23 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
         "clips": resolved_clips,
         "total_duration_sec": total_duration_sec,
     }
+
+
+@app.post("/projects/{project_id}/draft")
+async def regenerate_draft(project_id: str, request: DraftRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    if not project.get("clips"):
+        raise HTTPException(status_code=400, detail="No analyzed clips available")
+    timeline = build_draft_timeline(
+        project["clips"],
+        profile=request.profile,
+        target_duration_sec=request.target_duration_sec,
+    )
+    project["timeline"] = timeline
+    persist_project_results(project_id)
+    return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
 
 
 @app.get("/projects/{project_id}/clips")
@@ -863,6 +907,7 @@ def preferences_from_request(preferences: dict) -> AssemblyPreferences:
         max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 15.0)),
         smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
+        max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 12.0)),
     )
 
 

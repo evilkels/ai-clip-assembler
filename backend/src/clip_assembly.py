@@ -12,6 +12,7 @@ class AssemblyPreferences:
     max_clip_duration_sec: float = 15.0
     smoothness_threshold: float = 7.0
     target_duration_sec: float = 120.0
+    max_turn_rate_deg_per_sec: float = 12.0
 
 
 def average(values: Iterable[float]) -> float:
@@ -48,11 +49,18 @@ def split_by_duration(frames: List[FrameScore], max_duration: float) -> List[Lis
     return chunks
 
 
-def candidate_runs(frames: List[FrameScore], threshold: float) -> List[List[FrameScore]]:
+def candidate_runs(
+    frames: List[FrameScore],
+    threshold: float,
+    max_turn_rate_deg_per_sec: float = 12.0,
+) -> List[List[FrameScore]]:
     runs = []
     current = []
     for frame in sorted(frames, key=lambda item: item.timestamp):
-        if frame.smoothness_score >= threshold:
+        if (
+            frame.smoothness_score >= threshold
+            and frame.turn_rate_deg_per_sec <= max_turn_rate_deg_per_sec
+        ):
             current.append(frame)
         elif current:
             runs.append(current)
@@ -67,14 +75,16 @@ def build_reason(frames: List[FrameScore]) -> str:
         f"Stable {average(frame.smoothness_score for frame in frames):.1f}/10, "
         f"sharp {average(frame.sharpness_score for frame in frames):.1f}/10, "
         f"exposure {average(frame.exposure_score for frame in frames):.1f}/10"
+        f", max turn {max(frame.turn_rate_deg_per_sec for frame in frames):.1f}°/s"
     )
 
 
 def make_clip(file_id: str, file_name: str, frames: List[FrameScore]) -> ClipSuggestion:
     start = frames[0].timestamp
     end = frames[-1].timestamp
+    clip_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{file_id}:{start:.3f}:{end:.3f}"))
     return ClipSuggestion(
-        clip_id=str(uuid.uuid4()),
+        clip_id=clip_id,
         file_id=file_id,
         file_name=file_name,
         start_sec=start,
@@ -84,6 +94,7 @@ def make_clip(file_id: str, file_name: str, frames: List[FrameScore]) -> ClipSug
         sharpness_score=average(frame.sharpness_score for frame in frames),
         exposure_score=average(frame.exposure_score for frame in frames),
         contrast_score=average(frame.contrast_score for frame in frames),
+        max_turn_rate_deg_per_sec=round(max(frame.turn_rate_deg_per_sec for frame in frames), 2),
         visual_interest_score=0.0,
         overall_score=weighted_overall(frames),
         ai_reason=build_reason(frames),
@@ -100,7 +111,11 @@ def assemble_smooth_clips(
     preferences: AssemblyPreferences = AssemblyPreferences(),
 ) -> AssemblyResult:
     clips = []
-    for run in candidate_runs(frames, preferences.smoothness_threshold):
+    for run in candidate_runs(
+        frames,
+        preferences.smoothness_threshold,
+        preferences.max_turn_rate_deg_per_sec,
+    ):
         for chunk in split_by_duration(run, preferences.max_clip_duration_sec):
             duration = chunk[-1].timestamp - chunk[0].timestamp
             if duration >= preferences.min_clip_duration_sec:

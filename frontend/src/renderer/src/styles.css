@@ -449,6 +449,57 @@ a {
 
 /* ---------- Review board ---------- */
 
+.draft-setup {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto auto;
+  align-items: end;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--bg-2), var(--bg-1));
+}
+
+.draft-setup > div {
+  display: grid;
+  gap: 3px;
+}
+
+.draft-setup strong {
+  font-size: 14px;
+}
+
+.draft-setup p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.draft-kicker {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.draft-setup label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.draft-setup select {
+  min-height: 30px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-2);
+}
+
 .review-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

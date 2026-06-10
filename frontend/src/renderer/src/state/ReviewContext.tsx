@@ -17,11 +17,15 @@ import {
   listRecentProjects,
   relocateRecentProject,
   removeRecentProject,
+  regenerateDraft as requestDraft,
   rescanProject,
   updateTimeline,
 } from '../api/client';
 import type {
   AnalysisStatus,
+  AnalysisResult,
+  AssemblyProfile,
+  AssemblyRecommendation,
   ClipCandidate,
   ClipDecision,
   RecentProject,
@@ -53,7 +57,9 @@ interface ReviewState {
   setProjectId: (id: string | null) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
   setAnalysisStatus: (status: AnalysisStatus) => void;
-  setClips: (clips: ClipCandidate[]) => void;
+  applyAnalysisResult: (result: AnalysisResult) => void;
+  recommendation: AssemblyRecommendation | null;
+  regenerateDraft: (profile: AssemblyProfile, targetDurationSec: number) => Promise<void>;
   createUploadProject: () => Promise<void>;
   openProjectFolder: (folderPath: string) => Promise<void>;
   refreshRecentProjects: () => Promise<void>;
@@ -82,6 +88,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
   const [reviewRevision, setReviewRevision] = useState(0);
+  const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
 
   const resetProjectSession = useCallback(() => {
     setClipCandidates([]);
@@ -91,6 +98,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
     setReviewRevision(0);
+    setRecommendation(null);
   }, []);
 
   const refreshRecentProjects = useCallback(async () => {
@@ -231,6 +239,33 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setReviewRevision(0);
   }, []);
 
+  const restoreTimelineEntries = useCallback((entries: Array<{ clip_id: string; start_sec: number; end_sec: number }>) => {
+    setAcceptedOrder(entries.map((entry) => entry.clip_id));
+    setDecisions(Object.fromEntries(entries.map((entry) => [entry.clip_id, 'included' as const])));
+    setTrims((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        entries.map((entry) => [
+          entry.clip_id,
+          { start_sec: entry.start_sec, end_sec: entry.end_sec },
+        ]),
+      ),
+    }));
+  }, []);
+
+  const applyAnalysisResult = useCallback((result: AnalysisResult) => {
+    setClips(result.clips);
+    restoreTimelineEntries(result.sequence.clips);
+    setRecommendation(result.recommendation);
+  }, [restoreTimelineEntries, setClips]);
+
+  const regenerateDraft = useCallback(async (profile: AssemblyProfile, targetDurationSec: number) => {
+    if (!projectId) return;
+    const result = await requestDraft(projectId, profile, targetDurationSec);
+    restoreTimelineEntries(result.timeline.clips);
+    setReviewRevision(0);
+  }, [projectId, restoreTimelineEntries]);
+
   useEffect(() => {
     if (!projectId || reviewRevision === 0) return;
     const timeout = window.setTimeout(() => {
@@ -323,7 +358,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setProjectId,
       setUploadedVideos,
       setAnalysisStatus,
-      setClips,
+      applyAnalysisResult,
+      recommendation,
+      regenerateDraft,
       createUploadProject,
       openProjectFolder,
       refreshRecentProjects,
@@ -354,6 +391,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       moveAccepted,
       reorderAccepted,
       setTrim,
+      applyAnalysisResult,
+      recommendation,
+      regenerateDraft,
       createUploadProject,
       openProjectFolder,
       refreshRecentProjects,

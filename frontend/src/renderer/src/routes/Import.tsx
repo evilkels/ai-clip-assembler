@@ -82,7 +82,7 @@ export function ImportPage() {
     createUploadProject,
     setUploadedVideos,
     setAnalysisStatus,
-    setClips,
+    applyAnalysisResult,
     openProjectFolder,
     rescanOpenProject,
   } = useReview();
@@ -151,7 +151,7 @@ export function ImportPage() {
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
       const result = await analyzeProject(projectId, { harness_id: harnessId });
-      setClips(result.clips);
+      applyAnalysisResult(result);
       setAnalysisStatus({ phase: 'complete' });
     } catch (err) {
       setAnalysisStatus({
@@ -161,7 +161,7 @@ export function ImportPage() {
     } finally {
       setProgress(null);
     }
-  }, [projectId, harnessId, setAnalysisStatus, setClips]);
+  }, [projectId, harnessId, setAnalysisStatus, applyAnalysisResult]);
 
   const isAnalyzingNow = analysisStatus.phase === 'analyzing';
   useEffect(() => {

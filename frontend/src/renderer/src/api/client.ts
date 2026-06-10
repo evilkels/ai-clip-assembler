@@ -26,6 +26,7 @@ declare global {
       addRecentProject?: (folderPath: string, name?: string) => Promise<RecentProject[]>;
       removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
+      setWindowTitle?: (projectName?: string) => Promise<void>;
     };
   }
 }
@@ -61,6 +62,9 @@ interface BackendClipSuggestion {
   end_sec: number;
   duration_sec: number;
   smoothness_score: number;
+  sharpness_score?: number | null;
+  exposure_score?: number | null;
+  contrast_score?: number | null;
   visual_interest_score: number;
   overall_score: number;
   ai_reason: string;
@@ -78,9 +82,10 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
     end_sec: c.end_sec,
     scores: {
       smoothness: c.smoothness_score,
-      sharpness: 0,
-      exposure: 0,
-      contrast: 0,
+      sharpness: c.sharpness_score ?? undefined,
+      exposure: c.exposure_score ?? undefined,
+      contrast: c.contrast_score ?? undefined,
+      visualInterest: c.visual_interest_score,
       overall: c.overall_score,
     },
     reason: c.ai_reason,
@@ -134,6 +139,10 @@ export async function removeRecentProject(folderPath: string): Promise<RecentPro
 
 export async function relocateRecentProject(folderPath: string): Promise<RecentProject[]> {
   return window.clipAssembler?.relocateRecentProject?.(folderPath) ?? [];
+}
+
+export async function setWindowTitle(projectName?: string): Promise<void> {
+  await window.clipAssembler?.setWindowTitle?.(projectName);
 }
 
 export async function rescanProject(projectId: string): Promise<FolderProjectResult> {

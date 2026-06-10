@@ -18,6 +18,7 @@ import {
   relocateRecentProject,
   removeRecentProject,
   rescanProject,
+  updateTimeline,
 } from '../api/client';
 import type {
   AnalysisStatus,
@@ -73,21 +74,23 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [uploadedVideos, setUploadedVideos] = useState<UploadedVideo[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({ phase: 'idle' });
-  const [clips, setClips] = useState<ClipCandidate[]>([]);
+  const [clips, setClipCandidates] = useState<ClipCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Record<string, ClipDecision>>({});
   const [acceptedOrder, setAcceptedOrder] = useState<string[]>([]);
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
+  const [reviewRevision, setReviewRevision] = useState(0);
 
   const resetProjectSession = useCallback(() => {
-    setClips([]);
+    setClipCandidates([]);
     setDecisions({});
     setAcceptedOrder([]);
     setTrims({});
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
+    setReviewRevision(0);
   }, []);
 
   const refreshRecentProjects = useCallback(async () => {
@@ -179,7 +182,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     ])
       .then(([loaded, savedTimeline]) => {
         if (!alive) return;
-        setClips(loaded);
+        setClipCandidates(loaded);
         setError(null);
         const newTrims: Record<string, Trim> = {};
         for (const clip of loaded) {
@@ -213,14 +216,45 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     };
   }, [projectId]);
 
+  const setClips = useCallback((nextClips: ClipCandidate[]) => {
+    setClipCandidates(nextClips);
+    setTrims(
+      Object.fromEntries(
+        nextClips.map((clip) => [
+          clip.clip_id,
+          { start_sec: clip.start_sec, end_sec: clip.end_sec },
+        ]),
+      ),
+    );
+    setDecisions({});
+    setAcceptedOrder([]);
+    setReviewRevision(0);
+  }, []);
+
+  useEffect(() => {
+    if (!projectId || reviewRevision === 0) return;
+    const timeout = window.setTimeout(() => {
+      updateTimeline(projectId, { order: acceptedOrder, trims })
+        .then((result) => {
+          if (!result.ok) setError('Unable to auto-save Timeline changes');
+        })
+        .catch((reason: unknown) => {
+          setError(reason instanceof Error ? reason.message : 'Unable to auto-save Timeline changes');
+        });
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [projectId, acceptedOrder, trims, reviewRevision]);
+
   const include = useCallback((clipId: string) => {
     setDecisions((prev) => ({ ...prev, [clipId]: 'included' }));
     setAcceptedOrder((prev) => (prev.includes(clipId) ? prev : [...prev, clipId]));
+    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const exclude = useCallback((clipId: string) => {
     setDecisions((prev) => ({ ...prev, [clipId]: 'excluded' }));
     setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
+    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const resetDecision = useCallback((clipId: string) => {
@@ -230,6 +264,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       return next;
     });
     setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
+    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const moveAccepted = useCallback((clipId: string, direction: -1 | 1) => {
@@ -240,6 +275,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       if (target < 0 || target >= prev.length) return prev;
       const next = prev.slice();
       [next[idx], next[target]] = [next[target], next[idx]];
+      setReviewRevision((revision) => revision + 1);
       return next;
     });
   }, []);
@@ -252,12 +288,14 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       without.splice(from, 1);
       const target = Math.max(0, Math.min(toIndex, without.length));
       without.splice(target, 0, clipId);
+      setReviewRevision((revision) => revision + 1);
       return without;
     });
   }, []);
 
   const setTrim = useCallback((clipId: string, trim: Trim) => {
     setTrims((prev) => ({ ...prev, [clipId]: trim }));
+    setReviewRevision((revision) => revision + 1);
   }, []);
 
   const value = useMemo<ReviewState>(

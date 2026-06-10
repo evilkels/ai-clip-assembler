@@ -44,11 +44,19 @@ export function ClipCard({ clip, rank, decision, mediaUrl, onToggleInclude, onEx
         </div>
         <div className="score-row">
           <ScoreChip label="smooth" value={clip.scores.smoothness} />
-          <ScoreChip label="sharp" value={clip.scores.sharpness} />
-          <ScoreChip label="expose" value={clip.scores.exposure} />
-          <ScoreChip label="contrast" value={clip.scores.contrast} />
-          <ScoreChip label="overall" value={clip.scores.overall} />
+          {typeof clip.scores.visualInterest === 'number' && clip.scores.visualInterest > 0 && (
+            <ScoreChip label="visual" value={clip.scores.visualInterest} />
+          )}
+          <ScoreChip label="combined" value={clip.scores.overall} />
         </div>
+        <details className="clip-score-details">
+          <summary>Local technical scores</summary>
+          <div className="score-row">
+            <ScoreChip label="sharp" value={clip.scores.sharpness} />
+            <ScoreChip label="expose" value={clip.scores.exposure} />
+            <ScoreChip label="contrast" value={clip.scores.contrast} />
+          </div>
+        </details>
         <div className="clip-reason">{clip.reason}</div>
         <div className="clip-actions">
           <button

@@ -47,6 +47,9 @@ class ClipSuggestion(BaseModel):
     end_sec: float
     duration_sec: float
     smoothness_score: float
+    sharpness_score: Optional[float] = None
+    exposure_score: Optional[float] = None
+    contrast_score: Optional[float] = None
     visual_interest_score: float
     overall_score: float
     ai_reason: str

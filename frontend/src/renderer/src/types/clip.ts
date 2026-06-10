@@ -4,9 +4,10 @@
 
 export interface ClipScores {
   smoothness: number;
-  sharpness: number;
-  exposure: number;
-  contrast: number;
+  sharpness?: number;
+  exposure?: number;
+  contrast?: number;
+  visualInterest?: number;
   overall: number;
 }
 

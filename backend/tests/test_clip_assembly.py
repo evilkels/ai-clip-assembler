@@ -51,6 +51,9 @@ def test_assemble_smooth_clips_finds_ranked_segments_with_reason():
     assert result.clips[0].start_sec == 6
     assert result.clips[0].end_sec == 9
     assert result.clips[0].overall_score > result.clips[1].overall_score
+    assert result.clips[0].sharpness_score == 8.0
+    assert result.clips[0].exposure_score == 8.0
+    assert result.clips[0].contrast_score == 8.0
     assert "Stable" in result.clips[0].ai_reason
     assert result.sequence.clips == [clip.clip_id for clip in result.clips]
 

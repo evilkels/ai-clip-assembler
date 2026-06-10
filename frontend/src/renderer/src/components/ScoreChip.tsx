@@ -1,6 +1,6 @@
 interface Props {
   label: string;
-  value: number;
+  value?: number;
 }
 
 function tierFor(value: number): 'green' | 'yellow' | 'red' {
@@ -10,6 +10,14 @@ function tierFor(value: number): 'green' | 'yellow' | 'red' {
 }
 
 export function ScoreChip({ label, value }: Props) {
+  if (typeof value !== 'number') {
+    return (
+      <span className="score-chip neutral" title={`${label}: unavailable`}>
+        <span className="chip-label">{label}</span>
+        <span className="chip-value">n/a</span>
+      </span>
+    );
+  }
   return (
     <span className={`score-chip ${tierFor(value)}`} title={`${label}: ${value.toFixed(1)} / 10`}>
       <span className="chip-label">{label}</span>

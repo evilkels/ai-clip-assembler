@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 
+interface SeekCommand {
+  time: number;
+  epoch: number;
+}
+
 interface ClipPreviewProps {
   mediaUrl?: string;
   startSec: number;
@@ -9,6 +14,15 @@ interface ClipPreviewProps {
   playing?: boolean;
   loop?: boolean;
   testId: string;
+  controls?: boolean;
+  /**
+   * Explicit seek command: applied once per epoch change (and re-applied after
+   * a src swap). When set, the legacy currentTimeSec drift-correction path is
+   * disabled and the video clock is never corrected while playing.
+   */
+  seek?: SeekCommand;
+  /** Reports video.currentTime every animation frame while playing. */
+  onPlaybackTime?: (sourceTimeSec: number) => void;
 }
 
 function boundedStart(startSec: number, endSec: number): number {
@@ -24,29 +38,43 @@ export function ClipPreview({
   playing = false,
   loop = true,
   testId,
+  controls = true,
+  seek,
+  onPlaybackTime,
 }: ClipPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const appliedSeekRef = useRef<{ epoch: number; mediaUrl: string } | null>(null);
   const safeStart = useMemo(() => boundedStart(startSec, endSec), [startSec, endSec]);
   const targetTime = currentTimeSec ?? safeStart;
 
+  // Legacy path (ClipCard): keep the video at targetTime.
   useEffect(() => {
+    if (seek) return;
     const video = videoRef.current;
     if (!video || !mediaUrl) return;
-    const seek = () => {
+    const apply = () => {
       video.currentTime = targetTime;
     };
-    if (video.readyState >= 1) seek();
-    else video.addEventListener('loadedmetadata', seek, { once: true });
-    return () => video.removeEventListener('loadedmetadata', seek);
-  }, [mediaUrl, targetTime]);
+    if (video.readyState >= 1) apply();
+    else video.addEventListener('loadedmetadata', apply, { once: true });
+    return () => video.removeEventListener('loadedmetadata', apply);
+  }, [seek, mediaUrl, targetTime]);
 
+  // Command path (Timeline): seek only when the epoch changes or the src swaps.
   useEffect(() => {
+    if (!seek) return;
     const video = videoRef.current;
     if (!video || !mediaUrl) return;
-    if (Math.abs(video.currentTime - targetTime) > 0.35) {
-      video.currentTime = targetTime;
-    }
-  }, [mediaUrl, targetTime]);
+    const applied = appliedSeekRef.current;
+    if (applied && applied.epoch === seek.epoch && applied.mediaUrl === mediaUrl) return;
+    appliedSeekRef.current = { epoch: seek.epoch, mediaUrl };
+    const apply = () => {
+      video.currentTime = seek.time;
+    };
+    if (video.readyState >= 1) apply();
+    else video.addEventListener('loadedmetadata', apply, { once: true });
+    return () => video.removeEventListener('loadedmetadata', apply);
+  }, [seek, mediaUrl]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -57,6 +85,20 @@ export function ClipPreview({
       video.pause();
     }
   }, [mediaUrl, playing]);
+
+  // Report the video clock while playing (RAF for smooth playhead motion).
+  useEffect(() => {
+    if (!playing || !onPlaybackTime) return;
+    const video = videoRef.current;
+    if (!video) return;
+    let raf = 0;
+    const tick = () => {
+      onPlaybackTime(video.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, onPlaybackTime]);
 
   if (!mediaUrl) {
     return (
@@ -73,27 +115,33 @@ export function ClipPreview({
         ref={videoRef}
         data-testid={testId}
         src={mediaUrl}
-        controls
+        controls={controls}
         muted
         preload="metadata"
         playsInline
         aria-label={label}
         onLoadedMetadata={(event) => {
-          event.currentTarget.currentTime = targetTime;
+          if (!seek) event.currentTarget.currentTime = targetTime;
         }}
-        onTimeUpdate={(event) => {
-          const video = event.currentTarget;
-          if (video.currentTime < startSec) video.currentTime = safeStart;
-          if (video.currentTime >= endSec) {
-            if (loop && endSec > startSec) {
-              video.currentTime = safeStart;
-              if (playing) video.play().catch(() => {});
-            } else {
-              video.pause();
-              video.currentTime = safeStart;
-            }
-          }
-        }}
+        onTimeUpdate={
+          // The clip-range clamp belongs to native controls (ClipCard usage);
+          // with controls off the owner drives boundaries via seek commands.
+          controls
+            ? (event) => {
+                const video = event.currentTarget;
+                if (video.currentTime < startSec) video.currentTime = safeStart;
+                if (video.currentTime >= endSec) {
+                  if (loop && endSec > startSec) {
+                    video.currentTime = safeStart;
+                    if (playing) video.play().catch(() => {});
+                  } else {
+                    video.pause();
+                    video.currentTime = safeStart;
+                  }
+                }
+              }
+            : undefined
+        }
       />
       <div className="clip-preview-label">{label}</div>
     </div>

@@ -1,16 +1,22 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { setWindowTitle } from '../api/client';
+import { useReview } from '../state/ReviewContext';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
-import { TitleBar } from './TitleBar';
 
 type AppShellProps = {
   children: ReactNode;
 };
 
 export function AppShell({ children }: AppShellProps) {
+  const { projectName } = useReview();
+
+  useEffect(() => {
+    setWindowTitle(projectName ?? undefined).catch(() => {});
+  }, [projectName]);
+
   return (
     <div className="app-shell">
-      <TitleBar />
       <div className="app-workspace">
         <Sidebar />
         <main className="main">{children}</main>

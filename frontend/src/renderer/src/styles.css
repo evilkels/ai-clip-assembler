@@ -52,92 +52,11 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 38px 1fr 28px;
+  grid-template-rows: 1fr 28px;
   height: 100vh;
   min-width: 1024px;
   overflow: hidden;
   background: var(--bg-0);
-}
-
-.titlebar {
-  -webkit-app-region: drag;
-  background: var(--bg-1);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  gap: 12px;
-  font-size: var(--text-xs);
-  color: var(--text-dim);
-  user-select: none;
-}
-
-.titlebar-traffic {
-  display: flex;
-  gap: 7px;
-  padding-right: 4px;
-}
-
-.traffic-light {
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-}
-
-.traffic-light-red { background: var(--window-close); }
-.traffic-light-yellow { background: var(--window-minimize); }
-.traffic-light-green { background: var(--window-zoom); }
-
-.titlebar-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.titlebar-product {
-  color: var(--text-dim);
-  font-weight: 500;
-}
-
-.titlebar-project {
-  color: var(--text);
-  font-weight: 650;
-}
-
-.command-button {
-  -webkit-app-region: no-drag;
-  margin-left: auto;
-  height: 24px;
-  min-width: 146px;
-  padding: 0 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  cursor: default;
-}
-
-.command-button:disabled {
-  opacity: 1;
-  color: var(--text-dim);
-  -webkit-text-fill-color: var(--text-dim);
-}
-
-.command-button kbd {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  padding: 1px 5px;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.2;
 }
 
 .app-workspace {
@@ -701,6 +620,22 @@ a {
   background: rgba(240, 107, 107, 0.08);
 }
 
+.score-chip.neutral {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: var(--bg-2);
+}
+
+.clip-score-details {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.clip-score-details summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
 .score-chip .chip-label {
   color: var(--text-muted);
   font-size: 10px;
@@ -781,15 +716,31 @@ a {
 .timeline {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  min-height: 0;
 }
 
 .timeline-preview {
   display: grid;
-  grid-template-columns: minmax(280px, 520px) minmax(180px, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(320px, 1fr) minmax(180px, 300px);
+  gap: 12px;
   align-items: stretch;
-  margin-bottom: 16px;
+  min-height: 220px;
+  max-height: 720px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-1);
+}
+
+.timeline-preview .clip-preview,
+.timeline-preview .clip-preview video {
+  height: 100%;
+  min-height: 0;
+}
+
+.timeline-preview .clip-preview video {
+  aspect-ratio: auto;
 }
 
 .timeline-preview-meta {
@@ -814,6 +765,30 @@ a {
   .timeline-preview {
     grid-template-columns: 1fr;
   }
+}
+
+.timeline-resize-handle {
+  height: 8px;
+  border-radius: 999px;
+  cursor: ns-resize;
+  background: linear-gradient(
+    to bottom,
+    transparent 3px,
+    var(--border-strong) 3px,
+    var(--border-strong) 5px,
+    transparent 5px
+  );
+}
+
+.timeline-resize-handle:hover,
+.timeline-resize-handle:focus-visible {
+  background: linear-gradient(
+    to bottom,
+    transparent 3px,
+    var(--accent) 3px,
+    var(--accent) 5px,
+    transparent 5px
+  );
 }
 
 .timeline-toolbar {
@@ -861,6 +836,7 @@ a {
   border-radius: 8px;
   background: var(--bg-1);
   padding: 0 0 8px;
+  overscroll-behavior: contain;
 }
 
 .timeline-track {
@@ -872,7 +848,7 @@ a {
   position: relative;
   height: 24px;
   border-bottom: 1px solid var(--border);
-  cursor: text;
+  cursor: ew-resize;
   user-select: none;
 }
 
@@ -977,8 +953,15 @@ a {
   bottom: 0;
   width: 0;
   border-left: 2px solid var(--red);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: ew-resize;
   z-index: 3;
+}
+
+.timeline-playhead::after {
+  content: '';
+  position: absolute;
+  inset: 0 -7px;
 }
 
 .timeline-playhead::before {

@@ -22,6 +22,7 @@ const bridge = {
     ipcRenderer.invoke('project:recent-relocate', folderPath) as Promise<
       Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
     >,
+  setWindowTitle: (projectName?: string) => ipcRenderer.invoke('window:set-title', projectName),
 };
 
 contextBridge.exposeInMainWorld('clipAssembler', bridge);

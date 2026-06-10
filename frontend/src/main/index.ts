@@ -93,6 +93,11 @@ function registerIpcHandlers(): void {
     await writeRecentProjects(next);
     return enrichRecentProjects();
   });
+
+  ipcMain.handle('window:set-title', (event, projectName?: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    win?.setTitle(projectName ? `AI Clip Assembler — ${projectName}` : 'AI Clip Assembler');
+  });
 }
 
 function createWindow(): void {
@@ -102,7 +107,7 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: '#0e0f12',
-    titleBarStyle: 'hiddenInset',
+    title: 'AI Clip Assembler',
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

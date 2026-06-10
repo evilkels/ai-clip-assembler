@@ -165,3 +165,30 @@ test('playback crosses the clip boundary and continues into the next file', asyn
 
   await page.getByTestId('transport-stop').click();
 });
+
+test('playhead drags continuously and wheel zoom changes timeline scale', async ({ page }) => {
+  await setupTimeline(page, [fixtureA(), fixtureB()]);
+
+  const rulerBox = await page.locator('.timeline-ruler').boundingBox();
+  expect(rulerBox).toBeTruthy();
+
+  const playhead = page.locator('.timeline-playhead');
+  const before = await playhead.evaluate((element) =>
+    parseFloat((element as HTMLElement).style.left),
+  );
+  await page.mouse.move(rulerBox!.x + 20, rulerBox!.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(rulerBox!.x + 180, rulerBox!.y + 10, { steps: 5 });
+  await page.mouse.up();
+  const after = await playhead.evaluate((element) =>
+    parseFloat((element as HTMLElement).style.left),
+  );
+  expect(after).toBeGreaterThan(before + 100);
+
+  const zoomBefore = Number(await page.getByLabel('Zoom').inputValue());
+  await page.mouse.move(rulerBox!.x + rulerBox!.width / 2, rulerBox!.y + 10);
+  await page.mouse.wheel(0, -300);
+  await expect
+    .poll(async () => Number(await page.getByLabel('Zoom').inputValue()))
+    .toBeGreaterThan(zoomBefore);
+});

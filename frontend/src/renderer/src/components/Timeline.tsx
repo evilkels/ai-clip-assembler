@@ -6,6 +6,7 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import { useReview } from '../state/ReviewContext';
@@ -20,6 +21,10 @@ const NICE_STEPS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
 const PLAYHEAD_THROTTLE_MS = 150;
 const REVERSE_SEEK_HZ = 4;
 const SEGMENT_END_EPSILON = 0.05;
+const SNAP_DISTANCE_PX = 10;
+const PREVIEW_HEIGHT_KEY = 'ai-clip-assembler:timeline-preview-height:v1';
+const MIN_PREVIEW_HEIGHT = 220;
+const MAX_PREVIEW_HEIGHT = 720;
 
 interface Segment {
   clip: ClipCandidate;
@@ -62,8 +67,13 @@ export function Timeline() {
   const [canDrag, setCanDrag] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [seek, setSeek] = useState<{ time: number; epoch: number }>({ time: 0, epoch: 0 });
+  const [previewHeight, setPreviewHeight] = useState(() => {
+    const stored = Number(window.localStorage.getItem(PREVIEW_HEIGHT_KEY));
+    return Number.isFinite(stored) ? clamp(stored, MIN_PREVIEW_HEIGHT, MAX_PREVIEW_HEIGHT) : 360;
+  });
 
   const trackRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const playheadLineRef = useRef<HTMLDivElement>(null);
   const timecodeRef = useRef<HTMLSpanElement>(null);
   // While playing, the <video> is the only clock: RAF callbacks mutate these
@@ -356,11 +366,69 @@ export function Timeline() {
       const el = trackRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const x = clientX - rect.left + el.scrollLeft;
-      jumpTo(x / pxPerSecRef.current);
+      const requested = clamp((clientX - rect.left) / pxPerSecRef.current, 0, totalDurationRef.current);
+      const snapThreshold = SNAP_DISTANCE_PX / pxPerSecRef.current;
+      const boundaries = segmentsRef.current.flatMap((seg) => [seg.offset, seg.offset + seg.duration]);
+      const nearest = boundaries.reduce(
+        (best, boundary) =>
+          Math.abs(boundary - requested) < Math.abs(best - requested) ? boundary : best,
+        requested,
+      );
+      jumpTo(Math.abs(nearest - requested) <= snapThreshold ? nearest : requested);
     },
     [jumpTo],
   );
+
+  const startScrub = useCallback(
+    (e: ReactPointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      setDirection(0);
+      scrub(e.clientX);
+      const onMove = (event: PointerEvent) => scrub(event.clientX);
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [scrub],
+  );
+
+  const handleWheelZoom = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
+    if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const rect = scroll.getBoundingClientRect();
+    const pointerX = e.clientX - rect.left;
+    const timelineAtPointer = (scroll.scrollLeft + pointerX) / pxPerSecRef.current;
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    const next = clamp(Math.round(pxPerSecRef.current * factor), MIN_PX_PER_SEC, MAX_PX_PER_SEC);
+    setPxPerSec(next);
+    requestAnimationFrame(() => {
+      scroll.scrollLeft = Math.max(0, timelineAtPointer * next - pointerX);
+    });
+  }, []);
+
+  const startPreviewResize = useCallback((e: ReactPointerEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = previewHeight;
+    const onMove = (event: PointerEvent) => {
+      setPreviewHeight(clamp(startHeight + event.clientY - startY, MIN_PREVIEW_HEIGHT, MAX_PREVIEW_HEIGHT));
+    };
+    const onUp = (event: PointerEvent) => {
+      const height = clamp(startHeight + event.clientY - startY, MIN_PREVIEW_HEIGHT, MAX_PREVIEW_HEIGHT);
+      setPreviewHeight(height);
+      window.localStorage.setItem(PREVIEW_HEIGHT_KEY, String(height));
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [previewHeight]);
 
   const handleDragOver = useCallback(
     (e: ReactDragEvent) => {
@@ -439,7 +507,11 @@ export function Timeline() {
   return (
     <div className="timeline">
       {previewSegment && (
-        <section className="timeline-preview" aria-label="Timeline video preview">
+          <section
+            className="timeline-preview"
+            aria-label="Timeline video preview"
+            style={{ height: previewHeight }}
+          >
           <ClipPreview
             mediaUrl={previewMediaUrl}
             startSec={previewSegment.trimStart}
@@ -465,6 +537,12 @@ export function Timeline() {
           </div>
         </section>
       )}
+      <button
+        className="timeline-resize-handle"
+        type="button"
+        aria-label="Resize preview and timeline"
+        onPointerDown={startPreviewResize}
+      />
       <div className="timeline-toolbar">
         <div className="transport">
           <button
@@ -520,7 +598,7 @@ export function Timeline() {
         </div>
       </div>
 
-      <div className="timeline-scroll">
+      <div className="timeline-scroll" ref={scrollRef} onWheel={handleWheelZoom}>
         <div
           className="timeline-track"
           ref={trackRef}
@@ -528,7 +606,7 @@ export function Timeline() {
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          <div className="timeline-ruler" onPointerDown={(e) => scrub(e.clientX)}>
+          <div className="timeline-ruler" onPointerDown={startScrub}>
             {ticks.map((t) => (
               <div key={t} className="tick" style={{ left: t * pxPerSec }}>
                 <span className="tick-label">{formatTime(t)}</span>
@@ -536,7 +614,7 @@ export function Timeline() {
             ))}
           </div>
 
-          <div className="timeline-clips" onPointerDown={(e) => scrub(e.clientX)}>
+          <div className="timeline-clips" onPointerDown={startScrub}>
             {segments.map((seg, idx) => {
               const selected = seg.clip.clip_id === selectedId;
               const dragging = seg.clip.clip_id === dragId;
@@ -601,12 +679,13 @@ export function Timeline() {
             className="timeline-playhead"
             ref={playheadLineRef}
             style={{ left: playhead * pxPerSec }}
+            onPointerDown={startScrub}
           />
         </div>
       </div>
 
       <p className="timeline-hint">
-        Drag clips to reorder · drag edges to trim · click to scrub · <kbd>J</kbd>/<kbd>K</kbd>/
+        Drag clips to reorder · drag edges to trim · drag playhead to scrub · wheel to zoom · <kbd>J</kbd>/<kbd>K</kbd>/
         <kbd>L</kbd> transport · <kbd>↑</kbd>/<kbd>↓</kbd> select · <kbd>Shift</kbd>+<kbd>←</kbd>/
         <kbd>→</kbd> reorder · <kbd>⌫</kbd> remove · <kbd>+</kbd>/<kbd>−</kbd> zoom
       </p>

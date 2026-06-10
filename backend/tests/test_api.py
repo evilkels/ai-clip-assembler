@@ -1625,6 +1625,20 @@ def test_analysis_status_complete_after_successful_analyze(monkeypatch, tmp_path
     assert body["video_total"] == 1
     assert body["file_name"] == "DJI_0001.MP4"
     assert body["error"] is None
+    assert body["timings"] == analyze.json()["timings"]
+    assert body["timings"]["pipeline_total_sec"] >= 0
+    timing = body["timings"]["per_video"][0]
+    assert timing["file_name"] == "DJI_0001.MP4"
+    for key in [
+        "motion_analysis_sec",
+        "frame_extraction_sec",
+        "scene_detection_sec",
+        "assembly_sec",
+        "ai_scoring_sec",
+        "video_total_sec",
+    ]:
+        assert timing[key] >= 0
+    assert timing["ai_scoring_sec"] == 0.0
 
 
 def test_analysis_status_error_after_failed_analyze(monkeypatch, tmp_path):

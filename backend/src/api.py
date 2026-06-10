@@ -326,17 +326,22 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
         phase="complete",
         step="complete",
         message="Analysis complete",
+        timings=response["timings"],
     )
     return response
 
 
 def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
+    pipeline_started = time.monotonic()
     all_clips = []
     per_video_results = []
+    timings = []
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     total_videos = len(projects[project_id]["videos"])
     for index, video in enumerate(projects[project_id]["videos"], start=1):
+        video_started = time.monotonic()
+        video_timing = {"file_name": video["file_name"]}
         set_analysis_progress(
             project_id,
             video_index=index,
@@ -358,10 +363,12 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                     "(this can take a while on long clips)"
                 ),
             )
+            phase_started = time.monotonic()
             run_vidstabdetect(
                 input_path=Path(video["file_path"]),
                 transforms_path=analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf",
             )
+            video_timing["motion_analysis_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
                 "Analyze %d/%d %s: extracting frame samples",
                 index, total_videos, video["file_name"],
@@ -371,6 +378,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 step="frame_extraction",
                 message=f"Video {index}/{total_videos}: extracting frame samples",
             )
+            phase_started = time.monotonic()
             samples = extract_frames(
                 input_path=Path(video["file_path"]),
                 frames_dir=samples_dir(project_id) / video["file_id"],
@@ -378,6 +386,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 sample_fps=sample_fps,
                 max_width=int(request.preferences.get("max_width", 960)),
             )
+            video_timing["frame_extraction_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
                 "Analyze %d/%d %s: detecting scenes",
                 index, total_videos, video["file_name"],
@@ -387,8 +396,10 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 step="scene_detection",
                 message=f"Video {index}/{total_videos}: detecting scene boundaries",
             )
+            phase_started = time.monotonic()
             scenes = detect_scenes(Path(video["file_path"]))
             samples = assign_scene_ids(samples, scenes)
+            video_timing["scene_detection_sec"] = round(time.monotonic() - phase_started, 2)
         except FFmpegVidstabUnavailableError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except FFmpegVidstabError as exc:
@@ -397,6 +408,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except FFmpegError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        phase_started = time.monotonic()
         frame_scores = score_samples_rule_based(samples)
         result = assemble_smooth_clips(
             file_id=video["file_id"],
@@ -404,6 +416,8 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             frames=frame_scores,
             preferences=preferences,
         )
+        video_timing["assembly_sec"] = round(time.monotonic() - phase_started, 2)
+        video_timing["ai_scoring_sec"] = 0.0
         logger.info(
             "Analyze %d/%d %s: %d candidate clip(s) assembled",
             index, total_videos, video["file_name"], len(result.clips),
@@ -424,6 +438,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                     "with Pi"
                 ),
             )
+            phase_started = time.monotonic()
             result, used_ai = enhance_clips_with_pi_cli(
                 result,
                 frame_scores,
@@ -435,6 +450,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 ),
                 cache_dir=analysis_dir(project_id) / "ai-scores",
             )
+            video_timing["ai_scoring_sec"] = round(time.monotonic() - phase_started, 2)
             video_metadata["used_ai"] = used_ai
             video_metadata["model_used"] = result.metadata.get("model_used")
             video_metadata["file_id"] = video["file_id"]
@@ -447,6 +463,8 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         per_video_results.append(video_metadata)
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
+        video_timing["video_total_sec"] = round(time.monotonic() - video_started, 2)
+        timings.append(video_timing)
 
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
@@ -486,7 +504,16 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
         "recommendation": recommend_assembly_profile(ranked_clips),
+        "timings": {
+            "per_video": timings,
+            "pipeline_total_sec": round(time.monotonic() - pipeline_started, 2),
+        },
     }
+    logger.info(
+        "Analyze timings: total %.1fs, per-video %s",
+        response["timings"]["pipeline_total_sec"],
+        timings,
+    )
     if request.harness_id == "pi_agent":
         harness_metadata = {"per_video": per_video_results}
         all_ai = all(v.get("used_ai") for v in per_video_results)

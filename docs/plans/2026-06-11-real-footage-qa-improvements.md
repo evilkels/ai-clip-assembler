@@ -4,7 +4,7 @@
 > or executing-plans to implement this plan task-by-task. Steps use checkbox
 > (`- [ ]`) syntax for tracking.
 
-**Status:** in progress
+**Status:** implementation complete; final verification in progress
 
 **Goal:** Turn the June 11 real-footage QA findings into a reliable editing
 workflow with persistent review decisions, truthful scoring, stronger Timeline
@@ -132,4 +132,3 @@ TypeScript, Playwright, CSS.
 - [ ] Run `backend/.venv/bin/python scripts/synthetic_e2e_qa.py`.
 - [ ] Run `git diff --check`.
 - [ ] Mark Release Slice A complete and leave B/C as explicit follow-up work.
-

@@ -34,7 +34,23 @@ export interface UploadedVideo {
   file_id: string;
   file_name: string;
   status: string;
-  metadata: VideoMetadata;
+  metadata?: VideoMetadata;
+}
+
+export interface ProjectManifest {
+  schema_version: number;
+  name: string;
+  created_at: string;
+  harness: string;
+  source_videos: Array<{ filename: string; imported_at: string }>;
+  settings_overrides: Record<string, unknown>;
+}
+
+export interface RecentProject {
+  folderPath: string;
+  lastOpenedAt: string;
+  name?: string;
+  missing?: boolean;
 }
 
 export interface AnalysisResult {
@@ -61,5 +77,16 @@ export interface Trim {
 
 export interface AnalysisStatus {
   phase: 'idle' | 'analyzing' | 'complete' | 'error';
-  error?: string;
+  harness_id?: string;
+  step?: string;
+  video_index?: number;
+  video_total?: number;
+  file_name?: string | null;
+  clip_index?: number;
+  clip_total?: number;
+  message?: string;
+  elapsed_sec?: number;
+  started_at?: number;
+  updated_at?: number;
+  error?: string | null;
 }

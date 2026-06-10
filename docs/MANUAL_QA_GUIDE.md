@@ -4,11 +4,10 @@ This guide launches the current drone-first MVP on macOS for manual QA.
 
 ## Current Product State
 
-- The Electron frontend launches and shows the drone **Review Board** with mock candidate clips.
+- The Electron frontend launches and can create/open a **Project** from a footage folder.
 - The FastAPI backend can create projects, upload source videos, probe metadata, extract frames, score frame samples, and assemble rule-based smooth **Candidate Clips**.
-- The frontend API client is not fully wired to real backend project/video analysis yet; use the backend API smoke test below for real footage analysis.
-- The backend can export analyzed timelines as FCPXML or EDL files.
-- The frontend Export tab still shows a JSON preview and is not yet wired to call the backend export endpoint.
+- The frontend can run backend analysis and export accepted timelines as FCPXML or EDL.
+- Folder-backed projects keep source videos in place and write app state into `clipassembler/`.
 
 ## Prerequisites
 
@@ -18,8 +17,7 @@ Install system tools:
 brew install python@3.11 node
 ```
 
-FFmpeg is required. On macOS, the default Homebrew `ffmpeg` formula includes the
-`vidstabdetect` filter needed for motion analysis:
+FFmpeg with the `vidstabdetect` filter is required for motion analysis:
 
 ```bash
 brew install ffmpeg
@@ -31,20 +29,20 @@ Verify `vidstabdetect` is available:
 ffmpeg -hide_banner -filters | grep vidstabdetect
 ```
 
-If `vidstabdetect` is missing (older Homebrew installs or custom builds), install
-libvidstab and rebuild:
+**Caveat:** the standard Homebrew `ffmpeg` bottle may be compiled **without**
+`libvidstab` (the `configuration:` line in `ffmpeg -version` lacks
+`--enable-libvidstab`). If the grep prints nothing, `brew reinstall ffmpeg`
+will not fix it — Homebrew reinstalls the same prebuilt bottle. Replace it
+with a source build from the homebrew-ffmpeg tap, with the libvidstab option
+enabled explicitly:
 
 ```bash
-brew install libvidstab
-brew reinstall ffmpeg
-```
-
-Alternatively, use Homebrew's `ffmpeg-full` tap which bundles more filters:
-
-```bash
+brew uninstall ffmpeg
 brew tap homebrew-ffmpeg/ffmpeg
-brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
 ```
+
+The tap builds from source; expect 10–30 minutes.
 
 Verify:
 
@@ -58,9 +56,9 @@ node --version
 npm --version
 ```
 
-The backend MVP requires `vidstabdetect`. The regular Homebrew `ffmpeg`
-formula may not include it, so start the backend from a shell where
-`/opt/homebrew/opt/ffmpeg-full/bin` appears before `/opt/homebrew/bin`.
+The backend MVP requires `vidstabdetect`. Both grep checks above must list the
+filter in the shell you start the backend from — the backend resolves `ffmpeg`
+from that shell's `PATH`.
 
 ## Install Dependencies
 
@@ -90,28 +88,96 @@ npm run build
 
 ## Launch The App
 
-Terminal 1, backend:
-
-```bash
-cd /Users/elvijs/DEV/personal/ai-clip-assembler/backend
-source .venv/bin/activate
-PYTHONPATH=. uvicorn src.api:app --reload --port 8000
-```
-
-Terminal 2, frontend:
+One terminal, both halves (backend + Electron app, killed together on Ctrl+C):
 
 ```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler/frontend
-npm run dev
+npm run dev:with-backend
 ```
+
+The backend auto-loads the repo-root `.env` on startup. To run the halves in
+separate terminals instead, use `npm run dev:backend` and `npm run dev` from
+the same directory.
 
 Expected frontend behavior:
 
 - Electron opens a dark editor-style app.
-- The Review tab shows mock drone candidate clips.
+- The Import tab can create/open a folder-backed project with **Create / Open Folder Project**.
+- Source videos are listed without copying footage.
 - Smoothness threshold defaults to 7+.
 - You can include, exclude, and reorder accepted clips.
-- The Export tab shows a JSON preview of accepted clip order.
+- The Export tab can generate EDL and FCPXML files.
+
+## Folder Project QA Flow
+
+Use a folder containing one or more top-level `.mp4`, `.mov`, or `.mkv` files.
+Nested folders are intentionally ignored in the MVP.
+
+1. Launch the backend and frontend.
+2. In the Import tab, click **Create / Open Folder Project**.
+3. Choose the footage folder.
+4. Confirm the app lists source videos and creates:
+
+```bash
+<footage-folder>/clipassembler/project.json
+<footage-folder>/clipassembler/samples/
+<footage-folder>/clipassembler/analysis/
+<footage-folder>/clipassembler/cache/
+<footage-folder>/clipassembler/cache/.nosync
+```
+
+5. Click **Analyze**.
+6. Confirm frame samples appear under `clipassembler/samples/` and motion files
+   appear under `clipassembler/analysis/motion/`.
+7. Accept one or more clips on the Review tab.
+8. Export EDL and FCPXML from the Export tab.
+9. Confirm exports are written to:
+
+```bash
+<footage-folder>/exports/edl/timeline.edl
+<footage-folder>/exports/fcp/timeline.fcpxml
+```
+
+Move-folder check:
+
+1. Quit the app.
+2. Rename or move the footage folder.
+3. Launch the app again.
+4. Confirm the sidebar marks the old recent project as missing.
+5. Click **Locate** and choose the moved folder.
+6. Open the relocated recent project.
+7. Confirm the existing `clipassembler/project.json` opens without overwriting
+   the source video list.
+
+Rescan check:
+
+1. Add a new top-level `.mp4`, `.mov`, or `.mkv` to the footage folder.
+2. Click **Rescan** in the sidebar or Import tab.
+3. Confirm the new source video appears in the UI.
+4. Confirm `clipassembler/project.json::source_videos` includes the new file
+   once and preserves existing entries.
+
+Recent-list and delete-files checks:
+
+1. Click **Remove** on a recent project.
+2. Confirm the recent entry disappears and the folder contents remain untouched.
+3. Reopen the folder project.
+4. Click **Delete project files**.
+5. Confirm only `clipassembler/` and `exports/` are deleted.
+6. Confirm source videos remain in place.
+
+Overwrite check:
+
+1. Export an EDL or FCPXML.
+2. Export the same format again.
+3. Confirm the app warns before overwriting.
+4. Confirm canceling leaves the existing export untouched.
+
+Empty-folder check:
+
+1. Choose a folder with no top-level supported videos.
+2. Confirm the app shows an error.
+3. Confirm it did not create `clipassembler/`.
 
 ## Backend Real-Footage Smoke Test
 
@@ -137,6 +203,18 @@ Create a project:
 
 ```bash
 PROJECT_ID=$(curl -s -X POST http://127.0.0.1:8000/projects | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])')
+echo "$PROJECT_ID"
+```
+
+Create/open a folder-backed project:
+
+```bash
+PROJECT_FOLDER="/absolute/path/to/your/footage-folder"
+PROJECT_ID=$(curl -s \
+  -H "Content-Type: application/json" \
+  -X POST http://127.0.0.1:8000/projects/from-folder \
+  -d "{\"folder_path\":\"${PROJECT_FOLDER}\"}" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])')
 echo "$PROJECT_ID"
 ```
 
@@ -261,13 +339,20 @@ timelines without requiring Final Cut Pro.
 1. Open Resolve and create a new project.
 2. Import the original source MP4/MOV into the Media Pool.
 3. Use **File > Import > Timeline > Import AAF, EDL, XML...**.
-4. Select the generated export, usually:
+4. For folder-backed projects, select the generated export:
+
+```bash
+<footage-folder>/exports/edl/timeline.edl
+```
+
+For legacy upload smoke tests, select:
 
 ```bash
 backend/.ai-clip-assembler/projects/<project-id>/exports/timeline.edl
 ```
 
-5. If Resolve cannot relink media, import the copied backend media from:
+5. If Resolve cannot relink media for legacy upload projects, import the copied
+   backend media from:
 
 ```bash
 backend/.ai-clip-assembler/projects/<project-id>/videos/
@@ -278,7 +363,8 @@ Check:
 - The timeline imports without an error dialog.
 - The number of clips matches the smoke-test output.
 - Each clip has plausible source timing and duration.
-- Media is online or can be relinked manually.
+- For folder-backed projects, media should resolve from the original footage
+  folder without copying source videos.
 - Vertical footage is upright or the orientation issue is recorded.
 - Playback timing is plausible and does not appear sped up or slowed down.
 

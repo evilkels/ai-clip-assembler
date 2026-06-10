@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 
 from src.export_engine import (
+    generate_resolve_xml,
     choose_timeline_fps,
     fcpx_frame_duration,
     generate_edl,
@@ -74,6 +75,38 @@ def test_generate_fcpxml_references_assets_and_timeline_clips():
     assert asset_clip.attrib["ref"] == "asset-file-1"
     assert asset_clip.attrib["start"] == "10000/1000s"
     assert asset_clip.attrib["duration"] == "4000/1000s"
+
+
+def test_generate_fcpxml_can_reference_assets_relative_to_export_dir(tmp_path):
+    project_folder = tmp_path / "footage"
+    export_dir = project_folder / "exports" / "fcp"
+    source_video = project_folder / "DJI_0001.MP4"
+    export_dir.mkdir(parents=True)
+    source_video.write_bytes(b"video")
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(source_video),
+            "metadata": {"duration_sec": 120, "fps": 30, "resolution": [3840, 2160]},
+        }
+    }
+    clips = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+        }
+    ]
+
+    root = ET.fromstring(generate_fcpxml("Drone MVP", clips, videos, media_base_path=export_dir))
+
+    asset = root.find(".//asset")
+    assert asset is not None
+    assert asset.attrib["src"] == "../../DJI_0001.MP4"
 
 
 def test_generate_fcpxml_uses_source_fps_and_vertical_display_dimensions():
@@ -184,3 +217,122 @@ def test_choose_timeline_fps_all_invalid_defaults_to_30():
         "f4": {"metadata": {}},
     }
     assert choose_timeline_fps(videos) == 30.0
+
+
+def make_resolve_videos_and_clips():
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": "/Users/me/footage/DJI_0001.MP4",
+            "metadata": {"duration_sec": 120, "fps": 30, "resolution": [3840, 2160]},
+        },
+        "file-2": {
+            "file_id": "file-2",
+            "file_name": "DJI_0002.MP4",
+            "file_path": "/Users/me/footage/DJI_0002.MP4",
+            "metadata": {"duration_sec": 90, "fps": 30, "resolution": [3840, 2160]},
+        },
+    }
+    clips = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+        },
+        {
+            "clip_id": "clip-2",
+            "file_id": "file-2",
+            "file_name": "DJI_0002.MP4",
+            "start_sec": 5.0,
+            "end_sec": 8.0,
+            "duration_sec": 3.0,
+        },
+        {
+            "clip_id": "clip-3",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 30.0,
+            "end_sec": 32.0,
+            "duration_sec": 2.0,
+        },
+    ]
+    return videos, clips
+
+
+def test_generate_resolve_xml_builds_xmeml_timeline():
+    videos, clips = make_resolve_videos_and_clips()
+
+    xml = generate_resolve_xml("Drone MVP", clips, videos)
+
+    assert xml.startswith('<?xml version="1.0" encoding="UTF-8"?>')
+    assert "<!DOCTYPE xmeml>" in xml
+    root = ET.fromstring(xml.split("?>", 1)[1])
+    assert root.tag == "xmeml"
+    assert root.attrib["version"] == "5"
+    assert root.find("./sequence/name").text == "Drone MVP"
+    assert root.find("./sequence/rate/timebase").text == "30"
+
+    clipitems = root.findall(".//clipitem")
+    assert len(clipitems) == 3
+    first = clipitems[0]
+    # Source range 10s-14s at timeline position 0s-4s, all in frames.
+    assert first.find("in").text == "300"
+    assert first.find("out").text == "420"
+    assert first.find("start").text == "0"
+    assert first.find("end").text == "120"
+    second = clipitems[1]
+    assert second.find("start").text == "120"
+    assert second.find("end").text == "210"
+
+    width = root.find(".//format/samplecharacteristics/width")
+    assert width is not None and width.text == "3840"
+
+
+def test_generate_resolve_xml_defines_each_source_file_once():
+    videos, clips = make_resolve_videos_and_clips()
+
+    root = ET.fromstring(generate_resolve_xml("Drone MVP", clips, videos).split("?>", 1)[1])
+
+    files = [item.find("file") for item in root.findall(".//clipitem")]
+    assert files[0].attrib["id"] == files[2].attrib["id"]
+    assert files[0].find("pathurl") is not None
+    assert len(files[2]) == 0  # repeat reference carries only the id
+    assert files[0].find("pathurl").text == "file:///Users/me/footage/DJI_0001.MP4"
+
+
+def test_generate_resolve_xml_uses_relative_pathurl_for_folder_projects(tmp_path):
+    project_folder = tmp_path / "footage"
+    export_dir = project_folder / "exports" / "davinci"
+    export_dir.mkdir(parents=True)
+    source_video = project_folder / "DJI_0001.MP4"
+    source_video.write_bytes(b"video")
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(source_video),
+            "metadata": {"duration_sec": 120, "fps": 30, "resolution": [3840, 2160]},
+        }
+    }
+    clips = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+        }
+    ]
+
+    root = ET.fromstring(
+        generate_resolve_xml("Drone MVP", clips, videos, media_base_path=export_dir).split("?>", 1)[1]
+    )
+
+    pathurl = root.find(".//clipitem/file/pathurl")
+    assert pathurl is not None
+    assert pathurl.text == "../../DJI_0001.MP4"

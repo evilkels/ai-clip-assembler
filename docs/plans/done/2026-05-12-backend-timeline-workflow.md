@@ -1,5 +1,7 @@
 # Backend Timeline Workflow Implementation Plan
 
+Status: implemented and verified
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add backend timeline replacement and export behavior that matches the PRD's editable timeline workflow for drone-video testing.
@@ -7,6 +9,13 @@
 **Architecture:** Keep analyzed clips as the immutable suggestion catalog and store a separate ordered export timeline with trimmed timings. Export reads the edited timeline when present, while analysis still seeds the default sequence for projects that have not been manually edited.
 
 **Tech Stack:** FastAPI, Pydantic, pytest, TestClient, EDL/FCPXML export helpers
+
+## Completion Record
+
+- Backend stores an editable ordered/trimmed timeline separately from analyzed clip suggestions.
+- Export reads the edited timeline when present.
+- Later project-folder work persists and restores the saved timeline.
+- Current merged backend verification passes with 131 tests.
 
 ---
 
@@ -23,7 +32,7 @@
 - Modify: `backend/tests/test_api.py`
 - Test: `backend/tests/test_api.py`
 
-- [ ] **Step 1: Write the failing tests for timeline replacement and export behavior**
+- [x] **Step 1: Write the failing tests for timeline replacement and export behavior**
 
 ```python
 def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
@@ -90,7 +99,7 @@ def test_export_uses_updated_timeline_order_and_trimmed_timings(monkeypatch, tmp
     assert response.json()["clip_count"] == 2
 ```
 
-- [ ] **Step 2: Run the targeted tests to verify they fail for the expected missing behavior**
+- [x] **Step 2: Run the targeted tests to verify they fail for the expected missing behavior**
 
 Run: `PYTHONPATH=. .venv/bin/python -m pytest backend/tests/test_api.py -k "timeline or export"`
 Expected: FAIL because `PUT /projects/{project_id}/timeline` does not exist yet and export still uses original clip data only.
@@ -101,7 +110,7 @@ Expected: FAIL because `PUT /projects/{project_id}/timeline` does not exist yet 
 - Modify: `backend/src/api.py`
 - Test: `backend/tests/test_api.py`
 
-- [ ] **Step 1: Add Pydantic models and helpers for full timeline replacement**
+- [x] **Step 1: Add Pydantic models and helpers for full timeline replacement**
 
 ```python
 class TimelineClipUpdate(BaseModel):
@@ -115,7 +124,7 @@ class TimelineUpdateRequest(BaseModel):
     clips: list[TimelineClipUpdate]
 ```
 
-- [ ] **Step 2: Implement `PUT /projects/{project_id}/timeline` with project and clip validation**
+- [x] **Step 2: Implement `PUT /projects/{project_id}/timeline` with project and clip validation**
 
 ```python
 @app.put("/projects/{project_id}/timeline")
@@ -123,7 +132,7 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
     ...
 ```
 
-- [ ] **Step 3: Re-run the targeted tests and make the new endpoint pass**
+- [x] **Step 3: Re-run the targeted tests and make the new endpoint pass**
 
 Run: `PYTHONPATH=. .venv/bin/python -m pytest backend/tests/test_api.py -k "update_timeline"`
 Expected: PASS
@@ -134,14 +143,14 @@ Expected: PASS
 - Modify: `backend/src/api.py`
 - Test: `backend/tests/test_api.py`
 
-- [ ] **Step 1: Update timeline-order helpers so export uses edited trims and order**
+- [x] **Step 1: Update timeline-order helpers so export uses edited trims and order**
 
 ```python
 def clips_in_timeline_order(project: dict) -> list[dict]:
     ...
 ```
 
-- [ ] **Step 2: Extend export response summary fields**
+- [x] **Step 2: Extend export response summary fields**
 
 ```python
 return {
@@ -154,7 +163,7 @@ return {
 }
 ```
 
-- [ ] **Step 3: Re-run the export-focused tests and make them pass**
+- [x] **Step 3: Re-run the export-focused tests and make them pass**
 
 Run: `PYTHONPATH=. .venv/bin/python -m pytest backend/tests/test_api.py -k "export"`
 Expected: PASS
@@ -164,17 +173,17 @@ Expected: PASS
 **Files:**
 - Test: `backend/tests/test_api.py`
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run: `cd backend && PYTHONPATH=. .venv/bin/python -m pytest`
 Expected: PASS
 
-- [ ] **Step 2: Run frontend typecheck**
+- [x] **Step 2: Run frontend typecheck**
 
 Run: `cd frontend && npm run typecheck`
 Expected: PASS
 
-- [ ] **Step 3: Run frontend build**
+- [x] **Step 3: Run frontend build**
 
 Run: `cd frontend && npm run build`
 Expected: PASS
@@ -184,12 +193,12 @@ Expected: PASS
 **Files:**
 - Modify: none required unless review finds issues
 
-- [ ] **Step 1: Review the diff and verify it stays backend-focused**
+- [x] **Step 1: Review the diff and verify it stays backend-focused**
 
 Run: `git diff -- backend/src/api.py backend/tests/test_api.py docs/superpowers`
 Expected: only backend API/tests and workflow docs changed
 
-- [ ] **Step 2: Commit and open a PR against `main`**
+- [x] **Step 2: Commit and open a PR against `main`**
 
 Run:
 

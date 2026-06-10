@@ -88,11 +88,17 @@ Keyboard shortcuts (when the Timeline tab is focused):
 ![Export screen](images/export.png)
 
 1. Open the **Export** tab. It shows the accepted clip count and total duration.
-2. Click **Export EDL** or **Export FCPXML**. The app first syncs your timeline
-   order and trims to the backend, then writes the file.
+2. Click **Export for DaVinci Resolve**, **Export FCPXML**, or **Export EDL**.
+   The app first syncs your timeline order and trims to the backend, then
+   writes the file.
 3. The resulting file path is shown with a **Copy** button. Import that file
-   into Final Cut Pro (FCPXML) or any editor that reads EDL (DaVinci Resolve,
-   Premiere, etc.).
+   into DaVinci Resolve (`exports/davinci/timeline.xml`), Final Cut Pro
+   (FCPXML), or any editor that reads EDL (Premiere, etc.).
+
+For folder projects, exports are written inside the project folder
+(`exports/davinci/`, `exports/fcp/`, `exports/edl/`) with media paths relative
+to the export file, so the whole folder can be moved or copied to another
+drive and the timeline still resolves without relink prompts.
 
 Use the **Review export payload** disclosure to inspect the exact clip list,
 order, and timings being exported.

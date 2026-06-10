@@ -6,14 +6,18 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:renderer": "vite --config vite.renderer.config.ts",
-    "dev:with-backend": "concurrently \"npm run dev:backend\" \"npm run dev\"",
-    "dev:backend": "cd ../backend && uvicorn src.api:app --reload --port 8000",
+    "dev:with-backend": "concurrently -k -n backend,app -c blue,green \"npm run dev:backend\" \"npm run dev\"",
+    "dev:backend": "cd ../backend && PYTHONPATH=. .venv/bin/uvicorn src.api:app --reload --port 8000",
+    "test:backend": "cd ../backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "postinstall": "electron-builder install-app-deps",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -21,6 +25,7 @@
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
@@ -28,6 +33,7 @@
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0",
     "electron-vite": "^3.0.0",
+    "react-doctor": "^0.2.14",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0"

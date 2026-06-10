@@ -7,7 +7,10 @@
 
 import type {
   AnalysisResult,
+  AnalysisStatus,
   ClipCandidate,
+  ProjectManifest,
+  RecentProject,
   UploadedVideo,
   VideoMetadata,
 } from '../types/clip';
@@ -18,12 +21,21 @@ declare global {
     clipAssembler?: {
       backendUrl: string;
       platform: string;
+      selectProjectFolder?: () => Promise<string | null>;
+      listRecentProjects?: () => Promise<RecentProject[]>;
+      addRecentProject?: (folderPath: string, name?: string) => Promise<RecentProject[]>;
+      removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
+      relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
     };
   }
 }
 
 const backendUrl = (): string =>
   window.clipAssembler?.backendUrl ?? 'http://127.0.0.1:8000';
+
+export function buildVideoMediaUrl(projectId: string, fileId: string): string {
+  return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/media`;
+}
 
 export interface BackendStatus {
   online: boolean;
@@ -81,6 +93,73 @@ export async function createProject(): Promise<{ project_id: string }> {
   return res.json() as Promise<{ project_id: string }>;
 }
 
+export interface FolderProjectResult {
+  project_id: string;
+  project_folder: string;
+  project: ProjectManifest;
+  videos: UploadedVideo[];
+}
+
+export async function createProjectFromFolder(folderPath: string): Promise<FolderProjectResult> {
+  const res = await fetch(`${backendUrl()}/projects/from-folder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder_path: folderPath }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Failed to open project folder: ${res.status}`);
+  }
+  return res.json() as Promise<FolderProjectResult>;
+}
+
+export async function selectProjectFolder(): Promise<string | null> {
+  return window.clipAssembler?.selectProjectFolder?.() ?? null;
+}
+
+export async function listRecentProjects(): Promise<RecentProject[]> {
+  return window.clipAssembler?.listRecentProjects?.() ?? [];
+}
+
+export async function addRecentProject(
+  folderPath: string,
+  name?: string,
+): Promise<RecentProject[]> {
+  return window.clipAssembler?.addRecentProject?.(folderPath, name) ?? [];
+}
+
+export async function removeRecentProject(folderPath: string): Promise<RecentProject[]> {
+  return window.clipAssembler?.removeRecentProject?.(folderPath) ?? [];
+}
+
+export async function relocateRecentProject(folderPath: string): Promise<RecentProject[]> {
+  return window.clipAssembler?.relocateRecentProject?.(folderPath) ?? [];
+}
+
+export async function rescanProject(projectId: string): Promise<FolderProjectResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/rescan`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Rescan failed: ${res.status}`);
+  }
+  return res.json() as Promise<FolderProjectResult>;
+}
+
+export async function deleteProjectFiles(
+  projectId: string,
+): Promise<{ project_id: string; deleted: string[] }> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/files`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Delete project files failed: ${res.status}`);
+  }
+  return res.json() as Promise<{ project_id: string; deleted: string[] }>;
+}
+
 export async function uploadVideo(
   projectId: string,
   file: File,
@@ -97,6 +176,30 @@ export async function uploadVideo(
   }
   const data = (await res.json()) as { file_id: string; status: string; metadata: VideoMetadata };
   return { ...data, file_name: file.name };
+}
+
+export interface HarnessInfo {
+  id: string;
+  name: string;
+  type: string;
+  enabled: boolean;
+}
+
+export async function listHarnesses(): Promise<HarnessInfo[]> {
+  const res = await fetch(`${backendUrl()}/harnesses`);
+  if (!res.ok) throw new Error(`Failed to load harnesses: ${res.status}`);
+  const data = (await res.json()) as { harnesses: HarnessInfo[] };
+  return data.harnesses;
+}
+
+export type AnalysisProgress = AnalysisStatus;
+
+export async function getAnalysisStatus(projectId: string): Promise<AnalysisProgress> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/analyze/status`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Failed to load analysis status: ${res.status}`);
+  return res.json() as Promise<AnalysisProgress>;
 }
 
 export interface AnalyzeOptions {
@@ -135,6 +238,32 @@ export async function analyzeProject(
   };
 }
 
+export interface SavedTimelineEntry {
+  clip_id: string;
+  start_sec: number;
+  end_sec: number;
+}
+
+/**
+ * Returns the saved (user-edited) timeline for a project, or null when the
+ * timeline is still the fresh post-analysis ranking (clip-id strings) and
+ * carries no review decisions to restore.
+ */
+export async function getSavedTimeline(
+  projectId: string,
+): Promise<SavedTimelineEntry[] | null> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    timeline: { clips?: Array<string | SavedTimelineEntry> } | null;
+  };
+  const entries = data.timeline?.clips;
+  if (!entries || entries.length === 0 || typeof entries[0] === 'string') return null;
+  return entries as SavedTimelineEntry[];
+}
+
 export async function getClips(projectId: string): Promise<ClipCandidate[]> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/clips`);
   if (!res.ok) throw new Error(`Failed to load clips: ${res.status}`);
@@ -149,12 +278,16 @@ export interface ExportResult {
   file_path: string;
 }
 
+export type ExportFormat = 'edl' | 'fcpxml' | 'resolve_xml';
+
 export async function exportTimeline(
   projectId: string,
-  format: 'edl' | 'fcpxml',
+  format: ExportFormat,
+  options: { overwrite?: boolean } = {},
 ): Promise<ExportResult> {
+  const overwrite = options.overwrite ? '&overwrite=true' : '';
   const res = await fetch(
-    `${backendUrl()}/projects/${projectId}/export?format=${format}`,
+    `${backendUrl()}/projects/${projectId}/export?format=${format}${overwrite}`,
     { method: 'POST' },
   );
   if (!res.ok) {

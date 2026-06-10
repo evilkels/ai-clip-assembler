@@ -19,12 +19,23 @@ Review/Timeline/Export UI — these are not from your footage.
 
 Symptom: `Analyze` errors, or the backend logs `FFmpegVidstabUnavailableError`.
 
-Your `ffmpeg` build lacks the `vidstabdetect` filter. Verify and fix:
+Your `ffmpeg` build lacks the `vidstabdetect` filter. Verify:
 
 ```bash
 ffmpeg -hide_banner -filters | grep vidstabdetect   # no output = missing
-brew install libvidstab && brew reinstall ffmpeg
-# or: brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+ffmpeg -version   # configuration: line without --enable-libvidstab confirms it
+```
+
+Note: `brew install libvidstab && brew reinstall ffmpeg` does **not** fix this —
+Homebrew reinstalls the same prebuilt bottle, which was compiled without
+`libvidstab`. Replace it with a source build from the homebrew-ffmpeg tap
+(takes 10–30 minutes):
+
+```bash
+brew uninstall ffmpeg
+brew tap homebrew-ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
+ffmpeg -hide_banner -filters | grep vidstab   # must list vidstabdetect + vidstabtransform
 ```
 
 Then restart the backend.

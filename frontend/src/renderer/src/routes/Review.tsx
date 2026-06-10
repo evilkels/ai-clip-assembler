@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { buildVideoMediaUrl } from '../api/client';
 import { ClipCard } from '../components/ClipCard';
 import { useReview } from '../state/ReviewContext';
 import type { ClipCandidate } from '../types/clip';
@@ -67,6 +68,7 @@ function TrimEditor({
 
 export function ReviewPage() {
   const {
+    projectId,
     loading,
     error,
     clips,
@@ -207,6 +209,7 @@ export function ReviewPage() {
                   clip={clip}
                   rank={idx + 1}
                   decision={decision}
+                  mediaUrl={projectId ? buildVideoMediaUrl(projectId, clip.file_id) : undefined}
                   onToggleInclude={() =>
                     decision === 'included' ? resetDecision(clip.clip_id) : include(clip.clip_id)
                   }

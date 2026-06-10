@@ -192,3 +192,13 @@ test('playhead drags continuously and wheel zoom changes timeline scale', async 
     .poll(async () => Number(await page.getByLabel('Zoom').inputValue()))
     .toBeGreaterThan(zoomBefore);
 });
+
+test('Resolve export exposes an Open in DaVinci handoff', async ({ page }) => {
+  await setupTimeline(page, [fixtureA()]);
+  await page.goto('/#/export');
+
+  await page.getByRole('button', { name: 'Export for DaVinci Resolve' }).click();
+
+  await expect(page.getByText('DaVinci Resolve XML exported')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open in DaVinci Resolve' })).toBeVisible();
+});

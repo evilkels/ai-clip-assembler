@@ -29,6 +29,7 @@ declare global {
       removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
+      openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
     };
   }
 }
@@ -145,6 +146,11 @@ export async function relocateRecentProject(folderPath: string): Promise<RecentP
 
 export async function setWindowTitle(projectName?: string): Promise<void> {
   await window.clipAssembler?.setWindowTitle?.(projectName);
+}
+
+export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
+  const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
+  return result?.opened ?? false;
 }
 
 export async function rescanProject(projectId: string): Promise<FolderProjectResult> {

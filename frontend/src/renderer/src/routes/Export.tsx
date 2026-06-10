@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
-import { exportTimeline, updateTimeline, type ExportFormat } from '../api/client';
+import { exportTimeline, openInDaVinci, updateTimeline, type ExportFormat } from '../api/client';
 import type { ClipCandidate } from '../types/clip';
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }> = [
@@ -10,11 +10,12 @@ const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }>
 ];
 
 export function ExportPage() {
-  const { clips, acceptedOrder, trims, projectId } = useReview();
+  const { clips, acceptedOrder, trims, projectId, projectFolder } = useReview();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportResult, setExportResult] = useState<Partial<Record<ExportFormat, string>>>({});
   const [exportError, setExportError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState(false);
+  const [handoffStatus, setHandoffStatus] = useState<string | null>(null);
 
   const acceptedClips = useMemo(
     () => {
@@ -159,9 +160,32 @@ export function ExportPage() {
                   >
                     Copy
                   </button>
+                  {format.id === 'resolve_xml' && (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={async () => {
+                        setExportError(null);
+                        try {
+                          const opened = await openInDaVinci(exportResult.resolve_xml!, projectFolder ?? undefined);
+                          setHandoffStatus(
+                            opened
+                              ? 'DaVinci Resolve opened with the exported XML. Source footage references are relative to the project folder.'
+                              : 'Open the exported XML in DaVinci Resolve to import the draft.',
+                          );
+                        } catch (err) {
+                          setExportError(err instanceof Error ? err.message : String(err));
+                        }
+                      }}
+                    >
+                      Open in DaVinci Resolve
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+
+            {handoffStatus && <p className="export-handoff-status">{handoffStatus}</p>}
 
             <details style={{ fontSize: 12 }}>
               <summary style={{ cursor: 'pointer', color: 'var(--text-muted)' }}>

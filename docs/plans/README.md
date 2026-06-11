@@ -18,7 +18,7 @@ Two kinds of plans live side by side:
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-real-footage-validation.md) | Instrument analysis timing + real-footage validation runbook | P1 | S | — | TODO |
+| [001](001-real-footage-validation.md) | Instrument analysis timing + real-footage validation runbook | P1 | S | — | DONE (2026-06-11, telemetry + runbook) |
 | [002](002-pi-harness-scaling-spike.md) | Pi harness scaling design spike (batching, retries, partial results) | P2 | M | — | TODO |
 | [003](003-backend-packaging-spike.md) | Backend packaging spike (bundle FastAPI into the Electron DMG) | P3 | M (spike) | 001 (sequencing) | TODO |
 | [004](done/004-timeline-sequence-playback.md) | Timeline sequence playback, video-driven and stutter-free | P1 | M | — | DONE (2026-06-11, branch `feature/timeline-sequence-playback`) |
@@ -35,6 +35,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [settings-page](settings-page.md) | Draft, awaiting review. |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented; re-run `npx react-doctor` before selecting the next batch (original snapshot is historical). |
+| [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
 
 ## Completed (`done/`)
 

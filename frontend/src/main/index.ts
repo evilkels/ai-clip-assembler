@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { execFile } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -93,6 +94,30 @@ function registerIpcHandlers(): void {
     await writeRecentProjects(next);
     return enrichRecentProjects();
   });
+
+  ipcMain.handle('window:set-title', (event, projectName?: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    win?.setTitle(projectName ? `AI Clip Assembler — ${projectName}` : 'AI Clip Assembler');
+  });
+
+  ipcMain.handle('davinci:open-handoff', async (_event, exportPath: string, sourceFolder?: string) => {
+    if (typeof exportPath !== 'string' || !exportPath.toLowerCase().endsWith('.xml')) {
+      throw new Error('A DaVinci Resolve XML export is required');
+    }
+    if (process.platform === 'darwin') {
+      await new Promise<void>((resolve, reject) => {
+        execFile('/usr/bin/open', ['-a', 'DaVinci Resolve', exportPath], (error) => {
+          if (error) reject(new Error('DaVinci Resolve could not be opened. Install it or import the XML manually.'));
+          else resolve();
+        });
+      });
+    } else {
+      const error = await shell.openPath(exportPath);
+      if (error) throw new Error(error);
+    }
+    if (sourceFolder) shell.showItemInFolder(sourceFolder);
+    return { opened: true };
+  });
 }
 
 function createWindow(): void {
@@ -102,7 +127,7 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: '#0e0f12',
-    titleBarStyle: 'hiddenInset',
+    title: 'AI Clip Assembler',
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

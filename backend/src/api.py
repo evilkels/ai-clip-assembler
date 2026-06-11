@@ -22,6 +22,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .assembly_profiles import AssemblyProfile, build_draft_timeline, recommend_assembly_profile
 from .export_engine import (
     choose_timeline_fps,
     generate_edl,
@@ -92,6 +93,11 @@ class TimelineClipUpdate(BaseModel):
 
 class TimelineUpdateRequest(BaseModel):
     clips: list[TimelineClipUpdate]
+
+
+class DraftRequest(BaseModel):
+    profile: AssemblyProfile
+    target_duration_sec: Optional[float] = None
 
 
 class ProjectFolderRequest(BaseModel):
@@ -320,17 +326,22 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
         phase="complete",
         step="complete",
         message="Analysis complete",
+        timings=response["timings"],
     )
     return response
 
 
 def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
+    pipeline_started = time.monotonic()
     all_clips = []
     per_video_results = []
+    timings = []
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     total_videos = len(projects[project_id]["videos"])
     for index, video in enumerate(projects[project_id]["videos"], start=1):
+        video_started = time.monotonic()
+        video_timing = {"file_name": video["file_name"]}
         set_analysis_progress(
             project_id,
             video_index=index,
@@ -352,10 +363,12 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                     "(this can take a while on long clips)"
                 ),
             )
+            phase_started = time.monotonic()
             run_vidstabdetect(
                 input_path=Path(video["file_path"]),
                 transforms_path=analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf",
             )
+            video_timing["motion_analysis_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
                 "Analyze %d/%d %s: extracting frame samples",
                 index, total_videos, video["file_name"],
@@ -365,6 +378,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 step="frame_extraction",
                 message=f"Video {index}/{total_videos}: extracting frame samples",
             )
+            phase_started = time.monotonic()
             samples = extract_frames(
                 input_path=Path(video["file_path"]),
                 frames_dir=samples_dir(project_id) / video["file_id"],
@@ -372,6 +386,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 sample_fps=sample_fps,
                 max_width=int(request.preferences.get("max_width", 960)),
             )
+            video_timing["frame_extraction_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
                 "Analyze %d/%d %s: detecting scenes",
                 index, total_videos, video["file_name"],
@@ -381,8 +396,10 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 step="scene_detection",
                 message=f"Video {index}/{total_videos}: detecting scene boundaries",
             )
+            phase_started = time.monotonic()
             scenes = detect_scenes(Path(video["file_path"]))
             samples = assign_scene_ids(samples, scenes)
+            video_timing["scene_detection_sec"] = round(time.monotonic() - phase_started, 2)
         except FFmpegVidstabUnavailableError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except FFmpegVidstabError as exc:
@@ -391,6 +408,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except FFmpegError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        phase_started = time.monotonic()
         frame_scores = score_samples_rule_based(samples)
         result = assemble_smooth_clips(
             file_id=video["file_id"],
@@ -398,6 +416,8 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             frames=frame_scores,
             preferences=preferences,
         )
+        video_timing["assembly_sec"] = round(time.monotonic() - phase_started, 2)
+        video_timing["ai_scoring_sec"] = 0.0
         logger.info(
             "Analyze %d/%d %s: %d candidate clip(s) assembled",
             index, total_videos, video["file_name"], len(result.clips),
@@ -418,6 +438,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                     "with Pi"
                 ),
             )
+            phase_started = time.monotonic()
             result, used_ai = enhance_clips_with_pi_cli(
                 result,
                 frame_scores,
@@ -429,6 +450,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 ),
                 cache_dir=analysis_dir(project_id) / "ai-scores",
             )
+            video_timing["ai_scoring_sec"] = round(time.monotonic() - phase_started, 2)
             video_metadata["used_ai"] = used_ai
             video_metadata["model_used"] = result.metadata.get("model_used")
             video_metadata["file_id"] = video["file_id"]
@@ -441,17 +463,38 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         per_video_results.append(video_metadata)
         clips = [clip.model_dump() for clip in result.clips]
         all_clips.extend(clips)
+        video_timing["video_total_sec"] = round(time.monotonic() - video_started, 2)
+        timings.append(video_timing)
 
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
     sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
     total_duration = sum(clip["duration_sec"] for clip in ranked_clips)
 
+    existing_timeline = projects[project_id].get("timeline")
+    existing_clips = projects[project_id].get("clips", [])
+    if isinstance(existing_timeline, dict) and existing_timeline.get("source") == "manual":
+        accepted_ids = {
+            entry["clip_id"]
+            for entry in existing_timeline.get("clips", [])
+            if isinstance(entry, dict) and entry.get("clip_id")
+        }
+        new_ids = {clip["clip_id"] for clip in ranked_clips}
+        ranked_clips.extend(
+            clip for clip in existing_clips
+            if clip.get("clip_id") in accepted_ids and clip.get("clip_id") not in new_ids
+        )
+        timeline = existing_timeline
+    else:
+        recommendation = recommend_assembly_profile(ranked_clips)
+        timeline = build_draft_timeline(
+            ranked_clips,
+            profile=recommendation["profile"],
+            target_duration_sec=recommendation["target_duration_sec"],
+        )
+
     projects[project_id]["clips"] = ranked_clips
-    projects[project_id]["timeline"] = {
-        "total_duration_sec": round(total_duration, 3),
-        "clips": sequence_clip_ids,
-    }
+    projects[project_id]["timeline"] = timeline
     projects[project_id]["harness_id"] = request.harness_id
     persist_project_results(project_id)
     response = {
@@ -460,7 +503,17 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         "status": "complete",
         "clips": ranked_clips,
         "sequence": projects[project_id]["timeline"],
+        "recommendation": recommend_assembly_profile(ranked_clips),
+        "timings": {
+            "per_video": timings,
+            "pipeline_total_sec": round(time.monotonic() - pipeline_started, 2),
+        },
     }
+    logger.info(
+        "Analyze timings: total %.1fs, per-video %s",
+        response["timings"]["pipeline_total_sec"],
+        timings,
+    )
     if request.harness_id == "pi_agent":
         harness_metadata = {"per_video": per_video_results}
         all_ai = all(v.get("used_ai") for v in per_video_results)
@@ -501,6 +554,7 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
     resolved_clips = resolve_timeline_clips(project, request.clips)
     total_duration_sec = round(sum(clip["duration_sec"] for clip in resolved_clips), 3)
     project["timeline"] = {
+        "source": "manual",
         "clips": resolved_clips,
         "total_duration_sec": total_duration_sec,
     }
@@ -510,6 +564,23 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
         "clips": resolved_clips,
         "total_duration_sec": total_duration_sec,
     }
+
+
+@app.post("/projects/{project_id}/draft")
+async def regenerate_draft(project_id: str, request: DraftRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    if not project.get("clips"):
+        raise HTTPException(status_code=400, detail="No analyzed clips available")
+    timeline = build_draft_timeline(
+        project["clips"],
+        profile=request.profile,
+        target_duration_sec=request.target_duration_sec,
+    )
+    project["timeline"] = timeline
+    persist_project_results(project_id)
+    return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
 
 
 @app.get("/projects/{project_id}/clips")
@@ -860,9 +931,12 @@ def round_edl_fps(fps: float) -> int:
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:
     return AssemblyPreferences(
         min_clip_duration_sec=float(preferences.get("min_clip_duration_sec", 3.0)),
-        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 15.0)),
+        # Retain sustained stable ranges once; assembly profiles trim them
+        # later without repeating expensive footage analysis.
+        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 30.0)),
         smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
+        max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 12.0)),
     )
 
 

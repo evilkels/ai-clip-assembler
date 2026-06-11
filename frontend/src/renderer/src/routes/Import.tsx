@@ -72,6 +72,12 @@ function progressPercent(progress: AnalysisProgress): number | null {
   return Math.max(2, Math.min(100, overall));
 }
 
+function estimatedRemaining(progress: AnalysisProgress, percent: number | null): string | null {
+  if (!percent || percent < 5 || typeof progress.elapsed_sec !== 'number') return null;
+  const remaining = progress.elapsed_sec * ((100 - percent) / percent);
+  return `about ${formatElapsed(remaining)} remaining`;
+}
+
 export function ImportPage() {
   const {
     projectId,
@@ -82,7 +88,7 @@ export function ImportPage() {
     createUploadProject,
     setUploadedVideos,
     setAnalysisStatus,
-    setClips,
+    applyAnalysisResult,
     openProjectFolder,
     rescanOpenProject,
   } = useReview();
@@ -151,7 +157,7 @@ export function ImportPage() {
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
       const result = await analyzeProject(projectId, { harness_id: harnessId });
-      setClips(result.clips);
+      applyAnalysisResult(result);
       setAnalysisStatus({ phase: 'complete' });
     } catch (err) {
       setAnalysisStatus({
@@ -161,7 +167,7 @@ export function ImportPage() {
     } finally {
       setProgress(null);
     }
-  }, [projectId, harnessId, setAnalysisStatus, setClips]);
+  }, [projectId, harnessId, setAnalysisStatus, applyAnalysisResult]);
 
   const isAnalyzingNow = analysisStatus.phase === 'analyzing';
   useEffect(() => {
@@ -207,6 +213,7 @@ export function ImportPage() {
   const hasVideos = uploadedVideos.length > 0;
   const activeProgress = progress ?? analysisStatus;
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
+  const eta = estimatedRemaining(activeProgress, activePercent);
 
   return (
     <div className="page">
@@ -361,7 +368,8 @@ export function ImportPage() {
                 </div>
               </div>
               <div className="analysis-progress-time">
-                {formatElapsed(activeProgress.elapsed_sec)}
+                <span>{formatElapsed(activeProgress.elapsed_sec)} elapsed</span>
+                {eta && <span>{eta}</span>}
               </div>
             </div>
             <div

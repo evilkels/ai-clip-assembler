@@ -4,9 +4,10 @@
 
 export interface ClipScores {
   smoothness: number;
-  sharpness: number;
-  exposure: number;
-  contrast: number;
+  sharpness?: number;
+  exposure?: number;
+  contrast?: number;
+  visualInterest?: number;
   overall: number;
 }
 
@@ -58,10 +59,42 @@ export interface AnalysisResult {
   harness_id: string;
   status: string;
   clips: ClipCandidate[];
-  sequence: {
+  sequence: DraftTimeline;
+  recommendation: AssemblyRecommendation;
+}
+
+export type AssemblyProfile =
+  | 'short_social'
+  | 'cinematic_highlight'
+  | 'long_scenic'
+  | 'custom';
+
+export interface AssemblyRecommendation {
+  profile: AssemblyProfile;
+  target_duration_sec: number;
+  reason: string;
+}
+
+export interface DraftTimeline {
+  source?: 'draft' | 'manual';
+  profile?: AssemblyProfile;
+  total_duration_sec: number;
+  clips: Array<{
+    clip_id: string;
+    start_sec: number;
+    end_sec: number;
+  }>;
+}
+
+export interface DraftResult {
+  project_id: string;
+  profile: AssemblyProfile;
+  timeline: DraftTimeline;
+}
+
+export interface LegacySequence {
     total_duration_sec: number;
     clips: string[];
-  };
 }
 
 export interface ProjectClipsResponse {

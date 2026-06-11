@@ -37,6 +37,7 @@ class FrameScore(BaseModel):
     contrast: float
     scene_id: int = 0
     is_keyframe: bool = True
+    turn_rate_deg_per_sec: float = 0.0
 
 
 class ClipSuggestion(BaseModel):
@@ -47,6 +48,10 @@ class ClipSuggestion(BaseModel):
     end_sec: float
     duration_sec: float
     smoothness_score: float
+    sharpness_score: Optional[float] = None
+    exposure_score: Optional[float] = None
+    contrast_score: Optional[float] = None
+    max_turn_rate_deg_per_sec: Optional[float] = None
     visual_interest_score: float
     overall_score: float
     ai_reason: str

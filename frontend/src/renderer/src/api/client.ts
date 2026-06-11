@@ -8,7 +8,9 @@
 import type {
   AnalysisResult,
   AnalysisStatus,
+  AssemblyProfile,
   ClipCandidate,
+  DraftResult,
   ProjectManifest,
   RecentProject,
   UploadedVideo,
@@ -26,6 +28,8 @@ declare global {
       addRecentProject?: (folderPath: string, name?: string) => Promise<RecentProject[]>;
       removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
+      setWindowTitle?: (projectName?: string) => Promise<void>;
+      openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
     };
   }
 }
@@ -61,6 +65,9 @@ interface BackendClipSuggestion {
   end_sec: number;
   duration_sec: number;
   smoothness_score: number;
+  sharpness_score?: number | null;
+  exposure_score?: number | null;
+  contrast_score?: number | null;
   visual_interest_score: number;
   overall_score: number;
   ai_reason: string;
@@ -78,9 +85,10 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
     end_sec: c.end_sec,
     scores: {
       smoothness: c.smoothness_score,
-      sharpness: 0,
-      exposure: 0,
-      contrast: 0,
+      sharpness: c.sharpness_score ?? undefined,
+      exposure: c.exposure_score ?? undefined,
+      contrast: c.contrast_score ?? undefined,
+      visualInterest: c.visual_interest_score,
       overall: c.overall_score,
     },
     reason: c.ai_reason,
@@ -134,6 +142,15 @@ export async function removeRecentProject(folderPath: string): Promise<RecentPro
 
 export async function relocateRecentProject(folderPath: string): Promise<RecentProject[]> {
   return window.clipAssembler?.relocateRecentProject?.(folderPath) ?? [];
+}
+
+export async function setWindowTitle(projectName?: string): Promise<void> {
+  await window.clipAssembler?.setWindowTitle?.(projectName);
+}
+
+export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
+  const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
+  return result?.opened ?? false;
 }
 
 export async function rescanProject(projectId: string): Promise<FolderProjectResult> {
@@ -227,7 +244,8 @@ export async function analyzeProject(
     harness_id: string;
     status: string;
     clips: BackendClipSuggestion[];
-    sequence: { total_duration_sec: number; clips: string[] };
+    sequence: AnalysisResult['sequence'];
+    recommendation: AnalysisResult['recommendation'];
   };
   return {
     project_id: raw.project_id,
@@ -235,6 +253,7 @@ export async function analyzeProject(
     status: raw.status,
     clips: raw.clips.map(mapBackendClip),
     sequence: raw.sequence,
+    recommendation: raw.recommendation,
   };
 }
 
@@ -345,6 +364,23 @@ export async function updateTimeline(
     }
     return { ok: false };
   }
+}
+
+export async function regenerateDraft(
+  projectId: string,
+  profile: AssemblyProfile,
+  targetDurationSec: number,
+): Promise<DraftResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile, target_duration_sec: targetDurationSec }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Draft generation failed: ${res.status}`);
+  }
+  return res.json() as Promise<DraftResult>;
 }
 
 export async function getClipsWithFallback(

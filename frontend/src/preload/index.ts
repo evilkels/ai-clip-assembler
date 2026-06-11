@@ -22,6 +22,9 @@ const bridge = {
     ipcRenderer.invoke('project:recent-relocate', folderPath) as Promise<
       Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
     >,
+  setWindowTitle: (projectName?: string) => ipcRenderer.invoke('window:set-title', projectName),
+  openInDaVinci: (exportPath: string, sourceFolder?: string) =>
+    ipcRenderer.invoke('davinci:open-handoff', exportPath, sourceFolder) as Promise<{ opened: boolean }>,
 };
 
 contextBridge.exposeInMainWorld('clipAssembler', bridge);

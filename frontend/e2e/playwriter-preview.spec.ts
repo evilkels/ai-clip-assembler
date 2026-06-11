@@ -55,7 +55,22 @@ test('analysis completes and review/timeline previews render playable videos', a
       timeout: 30_000,
     })
     .toBeGreaterThanOrEqual(1);
-  await page.getByRole('button', { name: 'Include' }).first().click();
+  const included = page.getByRole('button', { name: 'Included ✓', exact: true });
+  if (await included.count()) {
+    await included.first().click();
+  }
+  await page.getByRole('button', { name: 'Include', exact: true }).first().click();
+  await page.goto('/#/playwriter');
+  const projectId = await page.getByTestId('qa-project-id').textContent();
+  await expect
+    .poll(async () => {
+      const response = await page.request.get(
+        `http://127.0.0.1:8000/projects/${projectId}/timeline`,
+      );
+      const data = await response.json();
+      return typeof data.timeline?.clips?.[0] === 'object';
+    })
+    .toBe(true);
 
   await page.goto('/#/timeline');
   const timelinePreview = page.getByTestId('timeline-preview-video');

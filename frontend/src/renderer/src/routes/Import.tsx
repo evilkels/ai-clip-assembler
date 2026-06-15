@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
 import {
   analyzeProject,
+  cancelAnalysis,
   getAnalysisStatus,
   listHarnesses,
   selectProjectFolder,
@@ -14,6 +15,40 @@ function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = (sec % 60).toFixed(1);
   return `${m}:${s.padStart(4, '0')}`;
+}
+
+function formatResolution(metadata: {
+  resolution: [number, number];
+  display_resolution?: [number, number];
+}): string {
+  // Display resolution accounts for rotation metadata, so vertical footage
+  // (e.g. drone clips with 90° rotation) reads as 1080×1920, matching export.
+  const [w, h] =
+    metadata.display_resolution && metadata.display_resolution.length === 2
+      ? metadata.display_resolution
+      : metadata.resolution;
+  const orientation = h > w ? ' ↕' : '';
+  return `${w}×${h}${orientation}`;
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 100 || unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
 const HARNESS_HINTS: Record<string, string> = {
@@ -84,6 +119,7 @@ export function ImportPage() {
     projectName,
     projectFolder,
     uploadedVideos,
+    clips,
     analysisStatus,
     createUploadProject,
     setUploadedVideos,
@@ -102,6 +138,68 @@ export function ImportPage() {
   ]);
   const [harnessId, setHarnessId] = useState('pi_agent');
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
+  const analyzedIds = useMemo(() => new Set(clips.map((clip) => clip.file_id)), [clips]);
+  // Analyzed files default to unchecked so a rescan targets the new batch.
+  const [deselected, setDeselected] = useState<Set<string>>(new Set());
+  const [cancelling, setCancelling] = useState(false);
+  const [sort, setSort] = useState<{ key: 'size' | 'date' | 'analyzed' | null; dir: 'asc' | 'desc' }>({
+    key: null,
+    dir: 'asc',
+  });
+
+  const toggleSort = useCallback((key: 'size' | 'date' | 'analyzed') => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' },
+    );
+  }, []);
+
+  const sortedVideos = useMemo(() => {
+    if (!sort.key) return uploadedVideos;
+    const factor = sort.dir === 'asc' ? 1 : -1;
+    const value = (v: (typeof uploadedVideos)[number]): number =>
+      sort.key === 'size'
+        ? v.metadata?.size_bytes ?? 0
+        : sort.key === 'analyzed'
+          ? Number(analyzedIds.has(v.file_id))
+        : v.metadata?.created_at
+          ? new Date(v.metadata.created_at).getTime() || 0
+          : 0;
+    return [...uploadedVideos].sort((a, b) => (value(a) - value(b)) * factor);
+  }, [uploadedVideos, sort, analyzedIds]);
+
+  const sortArrow = (key: 'size' | 'date' | 'analyzed') =>
+    sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+
+  useEffect(() => {
+    setDeselected(
+      new Set(uploadedVideos.filter((video) => analyzedIds.has(video.file_id)).map((video) => video.file_id)),
+    );
+  }, [projectId, uploadedVideos, analyzedIds]);
+
+  const selectedIds = uploadedVideos
+    .map((v) => v.file_id)
+    .filter((id) => !deselected.has(id));
+  const selectedCount = selectedIds.length;
+  const allSelected = uploadedVideos.length > 0 && selectedCount === uploadedVideos.length;
+
+  const toggleOne = useCallback((fileId: string) => {
+    setDeselected((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setDeselected((prev) => {
+      // If everything is currently selected, deselect all; otherwise select all.
+      const everythingSelected = uploadedVideos.every((v) => !prev.has(v.file_id));
+      return everythingSelected ? new Set(uploadedVideos.map((v) => v.file_id)) : new Set();
+    });
+  }, [uploadedVideos]);
 
   useEffect(() => {
     listHarnesses()
@@ -152,22 +250,39 @@ export function ImportPage() {
   );
 
   const handleAnalyze = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId || selectedCount === 0) return;
+    setCancelling(false);
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
-      const result = await analyzeProject(projectId, { harness_id: harnessId });
+      const result = await analyzeProject(projectId, {
+        harness_id: harnessId,
+        file_ids: selectedIds,
+      });
       applyAnalysisResult(result);
       setAnalysisStatus({ phase: 'complete' });
     } catch (err) {
-      setAnalysisStatus({
-        phase: 'error',
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const message = err instanceof Error ? err.message : String(err);
+      if (/cancel/i.test(message)) {
+        setAnalysisStatus({ phase: 'cancelled', message: 'Analysis cancelled' });
+      } else {
+        setAnalysisStatus({ phase: 'error', error: message });
+      }
     } finally {
       setProgress(null);
+      setCancelling(false);
     }
-  }, [projectId, harnessId, setAnalysisStatus, applyAnalysisResult]);
+  }, [projectId, harnessId, selectedIds, selectedCount, setAnalysisStatus, applyAnalysisResult]);
+
+  const handleAbort = useCallback(async () => {
+    if (!projectId) return;
+    setCancelling(true);
+    try {
+      await cancelAnalysis(projectId);
+    } catch {
+      // The analyze request itself surfaces the final state; ignore cancel errors.
+    }
+  }, [projectId]);
 
   const isAnalyzingNow = analysisStatus.phase === 'analyzing';
   useEffect(() => {
@@ -178,7 +293,11 @@ export function ImportPage() {
           if (status.phase === 'analyzing') {
             setProgress(status);
             setAnalysisStatus(status);
-          } else if (status.phase === 'error' || status.phase === 'complete') {
+          } else if (
+            status.phase === 'error' ||
+            status.phase === 'complete' ||
+            status.phase === 'cancelled'
+          ) {
             setAnalysisStatus(status);
           }
         })
@@ -210,6 +329,7 @@ export function ImportPage() {
   const isAnalyzing = analysisStatus.phase === 'analyzing';
   const isComplete = analysisStatus.phase === 'complete';
   const hasError = analysisStatus.phase === 'error';
+  const isCancelled = analysisStatus.phase === 'cancelled';
   const hasVideos = uploadedVideos.length > 0;
   const activeProgress = progress ?? analysisStatus;
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
@@ -287,35 +407,125 @@ export function ImportPage() {
 
         {uploadedVideos.length > 0 && (
           <div style={{ marginBottom: 24 }}>
-            <h2 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
-              SOURCE VIDEOS
-            </h2>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+              }}
+            >
+              <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--text-muted)' }}>
+                SOURCE VIDEOS
+              </h2>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {selectedCount} of {uploadedVideos.length} selected
+              </span>
+            </div>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: 12,
+                tableLayout: 'auto',
+              }}
+            >
               <thead>
                 <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-                  <th style={{ padding: '4px 8px' }}>File</th>
-                  <th style={{ padding: '4px 8px' }}>Duration</th>
-                  <th style={{ padding: '4px 8px' }}>FPS</th>
-                  <th style={{ padding: '4px 8px' }}>Resolution</th>
-                  <th style={{ padding: '4px 8px' }}>Codec</th>
+                  <th style={{ padding: '6px 8px', width: 28 }}>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selectedCount > 0 && !allSelected;
+                      }}
+                      onChange={toggleAll}
+                      disabled={isAnalyzing}
+                      aria-label="Select all videos"
+                      style={{ cursor: isAnalyzing ? 'default' : 'pointer' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px' }}>File</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right' }}>Duration</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right' }}>FPS</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right' }}>Resolution</th>
+                  <th
+                    onClick={() => toggleSort('size')}
+                    style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by size"
+                  >
+                    Size{sortArrow('size')}
+                  </th>
+                  <th
+                    onClick={() => toggleSort('date')}
+                    style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by date"
+                  >
+                    Date{sortArrow('date')}
+                  </th>
+                  <th style={{ padding: '6px 8px' }}>Codec</th>
+                  <th
+                    onClick={() => toggleSort('analyzed')}
+                    style={{ padding: '6px 8px', cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by analysis status"
+                  >
+                    Analysis{sortArrow('analyzed')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {uploadedVideos.map((v) => (
-                  <tr key={v.file_id} style={{ borderTop: '1px solid var(--border)' }}>
-                    <td style={{ padding: '4px 8px' }}>{v.file_name}</td>
-                    <td style={{ padding: '4px 8px' }}>
-                      {v.metadata ? formatDuration(v.metadata.duration_sec) : 'Pending analysis'}
-                    </td>
-                    <td style={{ padding: '4px 8px' }}>
-                      {v.metadata ? v.metadata.fps.toFixed(2) : '—'}
-                    </td>
-                    <td style={{ padding: '4px 8px' }}>
-                      {v.metadata ? `${v.metadata.resolution[0]}×${v.metadata.resolution[1]}` : '—'}
-                    </td>
-                    <td style={{ padding: '4px 8px' }}>{v.metadata?.codec ?? '—'}</td>
-                  </tr>
-                ))}
+                {sortedVideos.map((v) => {
+                  const checked = !deselected.has(v.file_id);
+                  return (
+                    <tr
+                      key={v.file_id}
+                      onClick={() => !isAnalyzing && toggleOne(v.file_id)}
+                      style={{
+                        borderTop: '1px solid var(--border)',
+                        cursor: isAnalyzing ? 'default' : 'pointer',
+                        opacity: checked ? 1 : 0.45,
+                        background: checked ? 'transparent' : 'var(--bg-subtle, transparent)',
+                      }}
+                    >
+                      <td style={{ padding: '6px 8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleOne(v.file_id)}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={isAnalyzing}
+                          aria-label={`Select ${v.file_name}`}
+                          style={{ cursor: isAnalyzing ? 'default' : 'pointer' }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px 8px' }}>{v.file_name}</td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {v.metadata ? formatDuration(v.metadata.duration_sec) : 'Pending'}
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {v.metadata ? v.metadata.fps.toFixed(2) : '—'}
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {v.metadata ? formatResolution(v.metadata) : '—'}
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatBytes(v.metadata?.size_bytes)}
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatDate(v.metadata?.created_at)}
+                      </td>
+                      <td style={{ padding: '6px 8px' }}>{v.metadata?.codec ?? '—'}</td>
+                      <td
+                        style={{
+                          padding: '6px 8px',
+                          color: analyzedIds.has(v.file_id) ? 'var(--green)' : 'var(--text-muted)',
+                        }}
+                      >
+                        {analyzedIds.has(v.file_id) ? '✓ Analyzed' : '— Not analyzed'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -326,10 +536,21 @@ export function ImportPage() {
             <button
               className="btn primary"
               onClick={handleAnalyze}
-              disabled={isAnalyzing || isComplete}
+              disabled={isAnalyzing || selectedCount === 0}
             >
-              {isAnalyzing ? 'Analyzing…' : isComplete ? 'Analysis complete' : 'Analyze'}
+              {isAnalyzing
+                ? 'Analyzing…'
+                : selectedCount === 0
+                  ? 'Select videos to analyze'
+                  : selectedCount === uploadedVideos.length
+                    ? `Analyze all ${selectedCount}`
+                    : `Analyze ${selectedCount} of ${uploadedVideos.length}`}
             </button>
+            {isAnalyzing && (
+              <button className="btn subtle" onClick={handleAbort} disabled={cancelling}>
+                {cancelling ? 'Stopping…' : 'Abort'}
+              </button>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
               Harness
               <select
@@ -406,6 +627,12 @@ export function ImportPage() {
         {isComplete && (
           <p style={{ color: 'var(--text-success)', marginTop: 12, fontSize: 13 }}>
             Analysis complete. Head to Review to see clip candidates.
+          </p>
+        )}
+
+        {isCancelled && (
+          <p style={{ color: 'var(--text-muted)', marginTop: 12, fontSize: 13 }}>
+            Analysis cancelled. Adjust your selection and analyze again when ready.
           </p>
         )}
       </div>

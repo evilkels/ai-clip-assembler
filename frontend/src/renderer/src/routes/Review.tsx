@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import { ClipCard } from '../components/ClipCard';
 import { useReview } from '../state/ReviewContext';
@@ -85,6 +85,10 @@ export function ReviewPage() {
     trims,
     smoothnessThreshold,
     setSmoothnessThreshold,
+    profile,
+    setProfile,
+    targetDuration,
+    setTargetDuration,
     include,
     exclude,
     resetDecision,
@@ -93,15 +97,7 @@ export function ReviewPage() {
     recommendation,
     regenerateDraft,
   } = useReview();
-  const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
-  const [targetDuration, setTargetDuration] = useState(120);
   const [generatingDraft, setGeneratingDraft] = useState(false);
-
-  useEffect(() => {
-    if (!recommendation) return;
-    setProfile(recommendation.profile);
-    setTargetDuration(recommendation.target_duration_sec);
-  }, [recommendation]);
 
   const ranked = useMemo(() => rankClips(clips), [clips]);
   const filtered = useMemo(

@@ -132,23 +132,17 @@ def rescan_project(
     now: Callable[[], datetime] = datetime_now_utc,
 ) -> ProjectManifest:
     manifest = open_project(project_folder)
-    known_filenames = {video.filename for video in manifest.source_videos}
+    scanned_filenames = scan_source_video_filenames(project_folder)
+    existing_by_filename = {video.filename: video for video in manifest.source_videos}
     imported_at = format_timestamp(now())
-    new_videos = [
-        ProjectSourceVideo(filename=filename, imported_at=imported_at)
-        for filename in scan_source_video_filenames(project_folder)
-        if filename not in known_filenames
+    reconciled_videos = [
+        existing_by_filename.get(filename)
+        or ProjectSourceVideo(filename=filename, imported_at=imported_at)
+        for filename in scanned_filenames
     ]
-    if not new_videos:
-        return manifest
 
     updated = manifest.model_copy(
-        update={
-            "source_videos": sorted(
-                [*manifest.source_videos, *new_videos],
-                key=lambda video: video.filename.casefold(),
-            )
-        }
+        update={"source_videos": reconciled_videos}
     )
     write_project_manifest(project_folder, updated)
     return updated

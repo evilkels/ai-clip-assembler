@@ -39,6 +39,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Completed (`done/`)
 
+- [2026-06-15-clip-quality-and-review-ux](done/2026-06-15-clip-quality-and-review-ux.md) — 2026-06-15; scene-aware ranked windows, fitted-rotation turn-rate scoring, per-profile pacing/density/speed/ordering, export retiming, poster cards, batch visibility + cancel. Follow-up: calibrate turn-rate thresholds on real footage.
 - [004-timeline-sequence-playback](done/004-timeline-sequence-playback.md) — 2026-06-11
 - [2026-06-10-review-timeline-video-preview-playwright](done/2026-06-10-review-timeline-video-preview-playwright.md)
 - [2026-05-12-backend-timeline-workflow](done/2026-05-12-backend-timeline-workflow.md)

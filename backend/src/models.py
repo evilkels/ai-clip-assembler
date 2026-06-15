@@ -13,6 +13,9 @@ class VideoMetadata(BaseModel):
     display_resolution: List[int] = Field(default_factory=list)
     rotation_degrees: int = 0
     codec: str
+    size_bytes: int = 0
+    # ISO 8601 recording time from container metadata, or file mtime fallback.
+    created_at: Optional[str] = None
 
 
 class FrameSample(BaseModel):
@@ -44,6 +47,7 @@ class ClipSuggestion(BaseModel):
     clip_id: str
     file_id: str
     file_name: str
+    scene_id: int = 0
     start_sec: float
     end_sec: float
     duration_sec: float

@@ -1,7 +1,7 @@
 from src.assembly_profiles import build_draft_timeline, recommend_assembly_profile
 
 
-def clip(clip_id, start, end, score=8.0, file_name="DJI_0001.MP4"):
+def clip(clip_id, start, end, score=8.0, file_name="DJI_0001.MP4", scene_id=0, smoothness=0.0, max_turn=999.0):
     return {
         "clip_id": clip_id,
         "file_id": "file-1",
@@ -10,6 +10,9 @@ def clip(clip_id, start, end, score=8.0, file_name="DJI_0001.MP4"):
         "end_sec": end,
         "duration_sec": end - start,
         "overall_score": score,
+        "scene_id": scene_id,
+        "smoothness_score": smoothness,
+        "max_turn_rate_deg_per_sec": max_turn,
     }
 
 
@@ -42,3 +45,57 @@ def test_short_social_trims_long_candidates_without_padding_target():
 
     assert draft["clips"][0]["end_sec"] - draft["clips"][0]["start_sec"] == 6
     assert draft["total_duration_sec"] == 6
+
+
+def test_profiles_alternate_clip_lengths_for_rhythm():
+    clips = [clip(str(i), i * 20, i * 20 + 20, score=10 - i / 10) for i in range(4)]
+
+    draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
+
+    assert [entry["duration_sec"] for entry in draft["clips"][:3]] == [6.0, 3.0, 6.0]
+
+
+def test_short_social_orders_strongest_first_not_chronologically():
+    clips = [
+        clip("late-best", 40, 50, score=9.5),
+        clip("early-weak", 0, 10, score=6.0),
+        clip("mid", 20, 30, score=8.0),
+    ]
+
+    draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
+
+    assert [entry["clip_id"] for entry in draft["clips"]] == ["late-best", "mid", "early-weak"]
+
+
+def test_long_scenic_caps_one_clip_per_scene():
+    clips = [
+        clip("s0-a", 0, 30, score=9.5, scene_id=0),
+        clip("s0-b", 40, 70, score=9.0, scene_id=0),
+        clip("s1-a", 80, 110, score=8.5, scene_id=1),
+    ]
+
+    draft = build_draft_timeline(clips, profile="long_scenic", target_duration_sec=300)
+    scene_ids = [entry["scene_id"] for entry in draft["clips"]]
+
+    assert sorted(scene_ids) == [0, 1]  # one per scene, s0-b dropped
+
+
+def test_cinematic_applies_slowmo_to_very_smooth_clips_only():
+    clips = [
+        clip("smooth", 0, 30, score=9.0, scene_id=0, smoothness=9.5, max_turn=1.0),
+        clip("shaky", 40, 70, score=8.0, scene_id=1, smoothness=7.0, max_turn=8.0),
+    ]
+
+    draft = build_draft_timeline(clips, profile="cinematic_highlight", target_duration_sec=300)
+    by_id = {entry["clip_id"]: entry for entry in draft["clips"]}
+
+    assert by_id["smooth"]["suggested_speed"] == 0.5
+    assert by_id["shaky"]["suggested_speed"] == 1.0
+
+
+def test_short_social_never_applies_slowmo():
+    clips = [clip("smooth", 0, 30, score=9.0, smoothness=9.8, max_turn=0.5)]
+
+    draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
+
+    assert draft["clips"][0]["suggested_speed"] == 1.0

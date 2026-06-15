@@ -61,6 +61,7 @@ interface BackendClipSuggestion {
   clip_id: string;
   file_id: string;
   file_name: string;
+  scene_id?: number;
   start_sec: number;
   end_sec: number;
   duration_sec: number;
@@ -81,6 +82,7 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
     clip_id: c.clip_id,
     file_id: c.file_id,
     file_name: c.file_name,
+    scene_id: c.scene_id,
     start_sec: c.start_sec,
     end_sec: c.end_sec,
     scores: {
@@ -92,6 +94,7 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
       overall: c.overall_score,
     },
     reason: c.ai_reason,
+    suggested_speed: c.suggested_speed,
   };
 }
 
@@ -219,9 +222,22 @@ export async function getAnalysisStatus(projectId: string): Promise<AnalysisProg
   return res.json() as Promise<AnalysisProgress>;
 }
 
+export async function cancelAnalysis(projectId: string): Promise<{ status: string }> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/analyze/cancel`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Cancel failed: ${res.status}`);
+  }
+  return res.json() as Promise<{ status: string }>;
+}
+
 export interface AnalyzeOptions {
   harness_id?: string;
   preferences?: Record<string, unknown>;
+  /** When provided, only these source file_ids are analyzed. */
+  file_ids?: string[];
 }
 
 export async function analyzeProject(
@@ -230,10 +246,11 @@ export async function analyzeProject(
 ): Promise<AnalysisResult> {
   const harness_id = options.harness_id ?? 'pi_agent';
   const preferences = options.preferences ?? {};
+  const file_ids = options.file_ids ?? null;
   const res = await fetch(`${backendUrl()}/projects/${projectId}/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project_id: projectId, harness_id, preferences }),
+    body: JSON.stringify({ project_id: projectId, harness_id, preferences, file_ids }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -263,6 +280,13 @@ export interface SavedTimelineEntry {
   end_sec: number;
 }
 
+export interface SavedReviewState {
+  clips: Array<string | SavedTimelineEntry>;
+  decisions: Record<string, 'included' | 'excluded'>;
+  profile?: AssemblyProfile;
+  targetDurationSec?: number;
+}
+
 /**
  * Returns the saved (user-edited) timeline for a project, or null when the
  * timeline is still the fresh post-analysis ranking (clip-id strings) and
@@ -270,17 +294,28 @@ export interface SavedTimelineEntry {
  */
 export async function getSavedTimeline(
   projectId: string,
-): Promise<SavedTimelineEntry[] | null> {
+): Promise<SavedReviewState | null> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline`, {
     cache: 'no-store',
   });
   if (!res.ok) return null;
   const data = (await res.json()) as {
-    timeline: { clips?: Array<string | SavedTimelineEntry> } | null;
+    timeline: {
+      clips?: Array<string | SavedTimelineEntry>;
+      decisions?: Record<string, 'included' | 'excluded'>;
+      profile?: AssemblyProfile;
+      target_duration_sec?: number;
+      total_duration_sec?: number;
+    } | null;
   };
   const entries = data.timeline?.clips;
-  if (!entries || entries.length === 0 || typeof entries[0] === 'string') return null;
-  return entries as SavedTimelineEntry[];
+  if (!entries) return null;
+  return {
+    clips: entries,
+    decisions: data.timeline?.decisions ?? {},
+    profile: data.timeline?.profile,
+    targetDurationSec: data.timeline?.target_duration_sec,
+  };
 }
 
 export async function getClips(projectId: string): Promise<ClipCandidate[]> {
@@ -325,6 +360,9 @@ export interface UpdateTimelineOptions {
     end_sec: number;
     included?: boolean;
   }>;
+  decisions?: Record<string, 'included' | 'excluded'>;
+  profile?: AssemblyProfile;
+  targetDurationSec?: number;
 }
 
 export async function updateTimeline(
@@ -350,7 +388,12 @@ export async function updateTimeline(
     const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clips }),
+      body: JSON.stringify({
+        clips,
+        decisions: options.decisions ?? {},
+        profile: options.profile,
+        target_duration_sec: options.targetDurationSec,
+      }),
     });
     if (!res.ok) {
       if (res.status === 404) return { ok: false };

@@ -112,3 +112,64 @@ def test_abrupt_turn_splits_candidates_but_slow_turn_is_allowed():
     )
 
     assert [(clip.start_sec, clip.end_sec) for clip in result.clips] == [(0, 1), (3, 4)]
+
+
+def test_candidates_never_straddle_scene_boundaries():
+    frames = [
+        frame(0, 9, scene_id=1),
+        frame(1, 9, scene_id=1),
+        frame(2, 9, scene_id=1),
+        frame(3, 9, scene_id=2),
+        frame(4, 9, scene_id=2),
+        frame(5, 9, scene_id=2),
+    ]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "DJI_0001.MP4",
+        frames,
+        AssemblyPreferences(min_clip_duration_sec=2, max_clip_duration_sec=10),
+    )
+
+    assert [(clip.start_sec, clip.end_sec, clip.scene_id) for clip in result.clips] == [
+        (0, 2, 1),
+        (3, 5, 2),
+    ]
+
+
+def test_assembly_picks_highest_scoring_window_in_scene():
+    frames = [
+        frame(0, 7.1),
+        frame(1, 7.2),
+        frame(2, 9.7),
+        frame(3, 9.8),
+        frame(4, 9.9),
+        frame(5, 7.1),
+    ]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "DJI_0001.MP4",
+        frames,
+        AssemblyPreferences(min_clip_duration_sec=2, max_clip_duration_sec=2),
+    )
+
+    assert (result.clips[0].start_sec, result.clips[0].end_sec) == (2, 4)
+
+
+def test_assembly_caps_clips_per_scene():
+    frames = [frame(second, 8 + (second % 3) / 10, scene_id=1) for second in range(20)]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "DJI_0001.MP4",
+        frames,
+        AssemblyPreferences(
+            min_clip_duration_sec=2,
+            max_clip_duration_sec=3,
+            max_clips_per_scene=2,
+            target_duration_sec=60,
+        ),
+    )
+
+    assert len(result.clips) == 2

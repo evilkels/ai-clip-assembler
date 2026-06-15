@@ -7,10 +7,12 @@ timeline assembly, and editor export files.
 
 import logging
 import shutil
+import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
@@ -36,6 +38,7 @@ from .models import FrameSample
 from .motion_analysis import (
     FFmpegVidstabError,
     FFmpegVidstabUnavailableError,
+    parse_trf,
     run_vidstabdetect,
 )
 from .project_store import (
@@ -67,7 +70,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server (npm run dev)
+        "http://127.0.0.1:5173",
+        "null",  # packaged/preview Electron renderer loads via file:// (Origin: null)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,11 +84,51 @@ projects = {}
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 
+# --- Analysis cancellation -------------------------------------------------
+# A SIGTERM'd ffmpeg exits 0 (looks like success), so cancelling needs an
+# explicit cooperative flag plus a handle on the running subprocess to kill.
+_analysis_cancel: dict[str, threading.Event] = {}
+_analysis_active_proc: dict[str, subprocess.Popen] = {}
+
+
+class AnalysisCancelled(Exception):
+    """Raised inside the pipeline when the user aborts an in-flight analysis."""
+
+
+def _check_cancelled(project_id: str) -> None:
+    event = _analysis_cancel.get(project_id)
+    if event is not None and event.is_set():
+        raise AnalysisCancelled()
+
+
+def _make_cancellable_runner(project_id: str):
+    """A subprocess.run-compatible runner that registers the live process so a
+    cancel request can kill it immediately, then surfaces AnalysisCancelled."""
+
+    def runner(cmd, check=False, capture_output=False, text=False, **_kwargs):
+        _check_cancelled(project_id)
+        pipe = subprocess.PIPE if capture_output else None
+        proc = subprocess.Popen(cmd, stdout=pipe, stderr=pipe, text=text)
+        _analysis_active_proc[project_id] = proc
+        try:
+            out, err = proc.communicate()
+        finally:
+            _analysis_active_proc.pop(project_id, None)
+        _check_cancelled(project_id)
+        if check and proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd, output=out, stderr=err)
+        return subprocess.CompletedProcess(cmd, proc.returncode, stdout=out, stderr=err)
+
+    return runner
+
 
 class AnalysisRequest(BaseModel):
     project_id: str
     harness_id: Literal["local_qwen", "claude_code", "codex", "pi_agent", "manual"]
     preferences: dict
+    # When provided, only these source videos are analyzed (file_id values).
+    # Empty/omitted means analyze every source video in the project.
+    file_ids: Optional[List[str]] = None
 
 
 class TimelineClipUpdate(BaseModel):
@@ -93,6 +140,9 @@ class TimelineClipUpdate(BaseModel):
 
 class TimelineUpdateRequest(BaseModel):
     clips: list[TimelineClipUpdate]
+    decisions: dict[str, Literal["included", "excluded"]] = {}
+    profile: Optional[Literal["short_social", "cinematic_highlight", "long_scenic", "custom"]] = None
+    target_duration_sec: Optional[float] = None
 
 
 class DraftRequest(BaseModel):
@@ -299,6 +349,13 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     if current.get("phase") == "analyzing":
         raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
 
+    # Validate request preferences up front so bad input wins over selection state.
+    sample_fps_from_request(request.preferences)
+    selected = selected_videos(project_id, request)
+    if request.file_ids is not None and not selected:
+        raise HTTPException(status_code=400, detail="No source videos selected for analysis")
+
+    _analysis_cancel[project_id] = threading.Event()
     projects[project_id]["analysis_progress"] = {}
     set_analysis_progress(
         project_id,
@@ -306,7 +363,7 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
         harness_id=request.harness_id,
         step="starting",
         video_index=0,
-        video_total=len(projects[project_id]["videos"]),
+        video_total=len(selected),
         file_name=None,
         clip_index=0,
         clip_total=0,
@@ -315,12 +372,20 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     )
     try:
         response = run_analysis_pipeline(project_id, request)
+    except AnalysisCancelled:
+        set_analysis_progress(
+            project_id, phase="cancelled", message="Analysis cancelled", error=None
+        )
+        raise HTTPException(status_code=409, detail="Analysis cancelled")
     except HTTPException as exc:
         set_analysis_progress(project_id, phase="error", error=str(exc.detail))
         raise
     except Exception as exc:
         set_analysis_progress(project_id, phase="error", error=str(exc))
         raise
+    finally:
+        _analysis_cancel.pop(project_id, None)
+        _analysis_active_proc.pop(project_id, None)
     set_analysis_progress(
         project_id,
         phase="complete",
@@ -331,6 +396,34 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     return response
 
 
+def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
+    """Source videos to analyze: the requested subset, or all when unfiltered.
+
+    Order follows the project's video order so progress indices stay stable.
+    """
+    videos = projects[project_id]["videos"]
+    if request.file_ids is None:
+        return list(videos)
+    wanted = set(request.file_ids)
+    return [v for v in videos if v["file_id"] in wanted]
+
+
+@app.post("/projects/{project_id}/analyze/cancel")
+async def cancel_analysis(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    progress = projects[project_id].get("analysis_progress") or {}
+    if progress.get("phase") != "analyzing":
+        return {"status": "idle"}
+    event = _analysis_cancel.setdefault(project_id, threading.Event())
+    event.set()
+    proc = _analysis_active_proc.get(project_id)
+    if proc is not None and proc.poll() is None:
+        proc.kill()
+    set_analysis_progress(project_id, message="Cancelling analysis…")
+    return {"status": "cancelling"}
+
+
 def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     pipeline_started = time.monotonic()
     all_clips = []
@@ -338,8 +431,11 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     timings = []
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
-    total_videos = len(projects[project_id]["videos"])
-    for index, video in enumerate(projects[project_id]["videos"], start=1):
+    cancellable_runner = _make_cancellable_runner(project_id)
+    videos_to_analyze = selected_videos(project_id, request)
+    total_videos = len(videos_to_analyze)
+    for index, video in enumerate(videos_to_analyze, start=1):
+        _check_cancelled(project_id)
         video_started = time.monotonic()
         video_timing = {"file_name": video["file_name"]}
         set_analysis_progress(
@@ -364,9 +460,11 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 ),
             )
             phase_started = time.monotonic()
+            transforms_path = analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf"
             run_vidstabdetect(
                 input_path=Path(video["file_path"]),
-                transforms_path=analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf",
+                transforms_path=transforms_path,
+                runner=cancellable_runner,
             )
             video_timing["motion_analysis_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
@@ -385,6 +483,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 file_id=video["file_id"],
                 sample_fps=sample_fps,
                 max_width=int(request.preferences.get("max_width", 960)),
+                runner=cancellable_runner,
             )
             video_timing["frame_extraction_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
@@ -409,7 +508,11 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         except FFmpegError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         phase_started = time.monotonic()
-        frame_scores = score_samples_rule_based(samples)
+        if transforms_path.exists():
+            fps = float((video.get("metadata") or {}).get("fps") or 30.0)
+            frame_scores = score_samples_rule_based(samples, parse_trf(transforms_path, fps=fps))
+        else:
+            frame_scores = score_samples_rule_based(samples)
         result = assemble_smooth_clips(
             file_id=video["file_id"],
             file_name=video["file_name"],
@@ -439,15 +542,21 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                 ),
             )
             phase_started = time.monotonic()
-            result, used_ai = enhance_clips_with_pi_cli(
-                result,
-                frame_scores,
-                progress_callback=lambda done, total: set_analysis_progress(
+            def pi_progress(done, total, _index=index):
+                # Abort between clips when the user cancels (pi runs its own
+                # subprocess per clip, so we can't kill it mid-call).
+                _check_cancelled(project_id)
+                set_analysis_progress(
                     project_id,
                     clip_index=done,
                     clip_total=total,
-                    message=f"Video {index}/{total_videos}: Pi scored {done}/{total} clip(s)",
-                ),
+                    message=f"Video {_index}/{total_videos}: Pi scored {done}/{total} clip(s)",
+                )
+
+            result, used_ai = enhance_clips_with_pi_cli(
+                result,
+                frame_scores,
+                progress_callback=pi_progress,
                 cache_dir=analysis_dir(project_id) / "ai-scores",
             )
             video_timing["ai_scoring_sec"] = round(time.monotonic() - phase_started, 2)
@@ -466,6 +575,12 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         video_timing["video_total_sec"] = round(time.monotonic() - video_started, 2)
         timings.append(video_timing)
 
+    analyzed_file_ids = {video["file_id"] for video in videos_to_analyze}
+    all_clips.extend(
+        clip
+        for clip in projects[project_id].get("clips", [])
+        if clip.get("file_id") not in analyzed_file_ids
+    )
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
     sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
@@ -556,6 +671,9 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
     project["timeline"] = {
         "source": "manual",
         "clips": resolved_clips,
+        "decisions": request.decisions,
+        "profile": request.profile,
+        "target_duration_sec": request.target_duration_sec,
         "total_duration_sec": total_duration_sec,
     }
     persist_project_results(project_id)
@@ -937,6 +1055,7 @@ def preferences_from_request(preferences: dict) -> AssemblyPreferences:
         smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
         max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 12.0)),
+        max_clips_per_scene=int(preferences.get("max_clips_per_scene", 2)),
     )
 
 
@@ -947,12 +1066,12 @@ def sample_fps_from_request(preferences: dict) -> float:
     return sample_fps
 
 
-def score_samples_rule_based(samples: list) -> list:
+def score_samples_rule_based(samples: list, transforms=None) -> list:
     frame_samples = [
         sample if isinstance(sample, FrameSample) else FrameSample.model_validate(sample)
         for sample in samples
     ]
-    return score_samples_from_images(frame_samples)
+    return score_samples_from_images(frame_samples, transforms=transforms)
 
 
 if __name__ == "__main__":

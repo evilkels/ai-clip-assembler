@@ -15,10 +15,12 @@ export interface ClipCandidate {
   clip_id: string;
   file_id: string;
   file_name: string;
+  scene_id?: number;
   start_sec: number;
   end_sec: number;
   scores: ClipScores;
   reason: string;
+  suggested_speed?: number;
   thumbnail_url?: string;
 }
 
@@ -28,7 +30,11 @@ export interface VideoMetadata {
   duration_sec: number;
   fps: number;
   resolution: [number, number];
+  display_resolution?: [number, number];
+  rotation_degrees?: number;
   codec: string;
+  size_bytes?: number;
+  created_at?: string;
 }
 
 export interface UploadedVideo {
@@ -109,7 +115,7 @@ export interface Trim {
 }
 
 export interface AnalysisStatus {
-  phase: 'idle' | 'analyzing' | 'complete' | 'error';
+  phase: 'idle' | 'analyzing' | 'complete' | 'error' | 'cancelled';
   harness_id?: string;
   step?: string;
   video_index?: number;

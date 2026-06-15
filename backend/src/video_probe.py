@@ -1,8 +1,9 @@
 import json
 import subprocess
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence
 
 from .models import VideoMetadata
 
@@ -58,6 +59,15 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
     width = int(video_stream["width"])
     height = int(video_stream["height"])
     rotation = parse_rotation_degrees(video_stream)
+    size_value = payload.get("format", {}).get("size")
+    try:
+        size_bytes = int(size_value)
+    except (TypeError, ValueError):
+        try:
+            size_bytes = video_path.stat().st_size
+        except OSError:
+            size_bytes = 0
+    created_at = extract_created_at(video_path, payload)
     return VideoMetadata(
         file_id=str(uuid.uuid4()),
         file_path=str(video_path),
@@ -68,7 +78,22 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
         display_resolution=display_resolution(width, height, rotation),
         rotation_degrees=rotation,
         codec=str(video_stream.get("codec_name", "unknown")),
+        size_bytes=size_bytes,
+        created_at=created_at,
     )
+
+
+def extract_created_at(video_path: Path, payload: Dict[str, Any]) -> Optional[str]:
+    """Recording time from container tags, falling back to the file mtime."""
+    tags = payload.get("format", {}).get("tags", {}) or {}
+    creation_time = tags.get("creation_time")
+    if creation_time:
+        return str(creation_time)
+    try:
+        mtime = video_path.stat().st_mtime
+        return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+    except OSError:
+        return None
 
 
 def ffprobe_command(video_path: Path) -> Sequence[str]:

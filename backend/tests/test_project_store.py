@@ -130,6 +130,22 @@ def test_rescan_project_adds_new_top_level_videos_without_duplicates(tmp_path):
     assert project.source_videos[1].imported_at == "2026-05-31T08:00:00Z"
 
 
+def test_rescan_project_prunes_source_videos_deleted_from_disk(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    remaining = project_folder / "DJI_0042.MP4"
+    deleted = project_folder / "DJI_0043.MP4"
+    remaining.write_bytes(b"video")
+    deleted.write_bytes(b"video")
+    create_project(project_folder, now=fixed_now)
+
+    deleted.unlink()
+    project = rescan_project(project_folder)
+
+    assert [video.filename for video in project.source_videos] == ["DJI_0042.MP4"]
+    assert open_project(project_folder) == project
+
+
 def test_delete_project_files_removes_only_app_owned_folders(tmp_path):
     project_folder = tmp_path / "footage"
     project_folder.mkdir()

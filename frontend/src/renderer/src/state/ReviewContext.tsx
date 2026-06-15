@@ -51,6 +51,10 @@ interface ReviewState {
   trims: Record<string, Trim>;
   smoothnessThreshold: number;
   setSmoothnessThreshold: (v: number) => void;
+  profile: AssemblyProfile;
+  setProfile: (profile: AssemblyProfile) => void;
+  targetDuration: number;
+  setTargetDuration: (seconds: number) => void;
   include: (clipId: string) => void;
   exclude: (clipId: string) => void;
   resetDecision: (clipId: string) => void;
@@ -86,6 +90,8 @@ function useProjectHydration(
   setDecisions: Setter<Record<string, ClipDecision>>,
   setAcceptedOrder: Setter<string[]>,
   setTrims: Setter<Record<string, Trim>>,
+  setProfile: Setter<AssemblyProfile>,
+  setTargetDuration: Setter<number>,
 ) {
   useEffect(() => {
     if (!projectId) return;
@@ -107,14 +113,25 @@ function useProjectHydration(
         );
         if (savedTimeline) {
           const knownIds = new Set(loaded.map((clip) => clip.clip_id));
-          const restored = savedTimeline.filter((entry) => knownIds.has(entry.clip_id));
-          setDecisions(
-            Object.fromEntries(restored.map((entry) => [entry.clip_id, 'included' as const])),
-          );
+          const restored = savedTimeline.clips
+            .map((entry) =>
+              typeof entry === 'string'
+                ? loaded.find((clip) => clip.clip_id === entry)
+                : entry,
+            )
+            .filter((entry): entry is { clip_id: string; start_sec: number; end_sec: number } =>
+              Boolean(entry && knownIds.has(entry.clip_id)),
+            );
+          setDecisions({
+            ...Object.fromEntries(restored.map((entry) => [entry.clip_id, 'included' as const])),
+            ...savedTimeline.decisions,
+          });
           setAcceptedOrder(restored.map((entry) => entry.clip_id));
           for (const entry of restored) {
             newTrims[entry.clip_id] = { start_sec: entry.start_sec, end_sec: entry.end_sec };
           }
+          if (savedTimeline.profile) setProfile(savedTimeline.profile);
+          if (savedTimeline.targetDurationSec) setTargetDuration(savedTimeline.targetDurationSec);
         }
         setTrims(newTrims);
       })
@@ -127,7 +144,7 @@ function useProjectHydration(
     return () => {
       alive = false;
     };
-  }, [projectId, setAcceptedOrder, setClipCandidates, setDecisions, setError, setLoading, setTrims]);
+  }, [projectId, setAcceptedOrder, setClipCandidates, setDecisions, setError, setLoading, setProfile, setTargetDuration, setTrims]);
 }
 
 export function ReviewProvider({ children }: { children: ReactNode }) {
@@ -144,6 +161,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [acceptedOrder, setAcceptedOrder] = useState<string[]>([]);
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
+  const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
+  const [targetDuration, setTargetDuration] = useState(120);
   const hasReviewEdits = useRef(false);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
 
@@ -155,6 +174,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setDecisions,
     setAcceptedOrder,
     setTrims,
+    setProfile,
+    setTargetDuration,
   );
 
   const resetProjectSession = useCallback(() => {
@@ -166,6 +187,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setError(null);
     hasReviewEdits.current = false;
     setRecommendation(null);
+    setProfile('cinematic_highlight');
+    setTargetDuration(120);
   }, []);
 
   const refreshRecentProjects = useCallback(async () => {
@@ -280,19 +303,33 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setClips(result.clips);
     restoreTimelineEntries(result.sequence.clips);
     setRecommendation(result.recommendation);
+    setProfile(result.recommendation.profile);
+    setTargetDuration(result.recommendation.target_duration_sec);
   }, [restoreTimelineEntries, setClips]);
 
   const regenerateDraft = useCallback(async (profile: AssemblyProfile, targetDurationSec: number) => {
     if (!projectId) return;
     const result = await requestDraft(projectId, profile, targetDurationSec);
     restoreTimelineEntries(result.timeline.clips);
+    setProfile(profile);
+    setTargetDuration(targetDurationSec);
     hasReviewEdits.current = false;
   }, [projectId, restoreTimelineEntries]);
 
   useEffect(() => {
     if (!projectId || !hasReviewEdits.current) return;
     const timeout = window.setTimeout(() => {
-      updateTimeline(projectId, { order: acceptedOrder, trims })
+      updateTimeline(projectId, {
+        order: acceptedOrder,
+        trims,
+        decisions: Object.fromEntries(
+          Object.entries(decisions).filter((entry): entry is [string, 'included' | 'excluded'] =>
+            entry[1] !== 'pending',
+          ),
+        ),
+        profile,
+        targetDurationSec: targetDuration,
+      })
         .then((result) => {
           if (!result.ok) setError('Unable to auto-save Timeline changes');
         })
@@ -301,7 +338,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         });
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [projectId, acceptedOrder, trims]);
+  }, [projectId, acceptedOrder, trims, decisions, profile, targetDuration]);
 
   const include = useCallback((clipId: string) => {
     hasReviewEdits.current = true;
@@ -356,6 +393,16 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setTrims((prev) => ({ ...prev, [clipId]: trim }));
   }, []);
 
+  const selectProfile = useCallback((nextProfile: AssemblyProfile) => {
+    hasReviewEdits.current = true;
+    setProfile(nextProfile);
+  }, []);
+
+  const selectTargetDuration = useCallback((seconds: number) => {
+    hasReviewEdits.current = true;
+    setTargetDuration(seconds);
+  }, []);
+
   const value = useMemo<ReviewState>(
     () => ({
       projectId,
@@ -372,6 +419,10 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       trims,
       smoothnessThreshold,
       setSmoothnessThreshold,
+      profile,
+      setProfile: selectProfile,
+      targetDuration,
+      setTargetDuration: selectTargetDuration,
       include,
       exclude,
       resetDecision,
@@ -408,6 +459,10 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       acceptedOrder,
       trims,
       smoothnessThreshold,
+      profile,
+      targetDuration,
+      selectProfile,
+      selectTargetDuration,
       include,
       exclude,
       resetDecision,

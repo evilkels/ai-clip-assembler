@@ -67,6 +67,10 @@ def path_to_asset_src(path: str, media_base_path: Optional[Path] = None) -> str:
     return Path(os.path.relpath(Path(path).resolve(), media_base_path.resolve())).as_posix()
 
 
+def effective_duration(clip: dict) -> float:
+    return float(clip["duration_sec"]) / max(0.01, float(clip.get("suggested_speed", 1.0) or 1.0))
+
+
 def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
     lines = [f"TITLE: {title}", "FCM: NON-DROP FRAME", ""]
     timeline_cursor = 0.0
@@ -74,7 +78,7 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
         source_in = clip["start_sec"]
         source_out = clip["end_sec"]
         record_in = timeline_cursor
-        record_out = timeline_cursor + clip["duration_sec"]
+        record_out = timeline_cursor + effective_duration(clip)
         lines.append(
             f"{index:03d}  AX       V     C        "
             f"{seconds_to_timecode(source_in, fps)} "
@@ -83,6 +87,11 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
             f"{seconds_to_timecode(record_out, fps)}"
         )
         lines.append(f"* FROM CLIP NAME: {clip['file_name']}")
+        speed = float(clip.get("suggested_speed", 1.0) or 1.0)
+        if speed != 1.0:
+            lines.append(
+                f"M2   AX      {speed * fps:.3f} {seconds_to_timecode(source_in, fps)}"
+            )
         lines.append("")
         timeline_cursor = record_out
     return "\n".join(lines)
@@ -125,7 +134,7 @@ def generate_resolve_xml(
     """
     fps = choose_timeline_fps(videos_by_id)
     width, height = timeline_dimensions(videos_by_id)
-    total_frames = seconds_to_frames(sum(clip["duration_sec"] for clip in clips), fps)
+    total_frames = seconds_to_frames(sum(effective_duration(clip) for clip in clips), fps)
 
     xmeml = ET.Element("xmeml", {"version": "5"})
     sequence = ET.SubElement(xmeml, "sequence", {"id": "sequence-1"})
@@ -162,8 +171,9 @@ def generate_resolve_xml(
         )
         append_xmeml_rate(clipitem, fps)
         ET.SubElement(clipitem, "start").text = str(seconds_to_frames(timeline_cursor, fps))
+        timeline_duration = effective_duration(clip)
         ET.SubElement(clipitem, "end").text = str(
-            seconds_to_frames(timeline_cursor + clip["duration_sec"], fps)
+            seconds_to_frames(timeline_cursor + timeline_duration, fps)
         )
         ET.SubElement(clipitem, "in").text = str(seconds_to_frames(clip["start_sec"], fps))
         ET.SubElement(clipitem, "out").text = str(seconds_to_frames(clip["end_sec"], fps))
@@ -188,7 +198,17 @@ def generate_resolve_xml(
             ET.SubElement(file_characteristics, "width").text = str(width)
             ET.SubElement(file_characteristics, "height").text = str(height)
 
-        timeline_cursor += clip["duration_sec"]
+        speed = float(clip.get("suggested_speed", 1.0) or 1.0)
+        if speed != 1.0:
+            filter_element = ET.SubElement(clipitem, "filter")
+            effect = ET.SubElement(filter_element, "effect")
+            ET.SubElement(effect, "name").text = "Time Remap"
+            ET.SubElement(effect, "effectid").text = "timeremap"
+            parameter = ET.SubElement(effect, "parameter")
+            ET.SubElement(parameter, "parameterid").text = "speed"
+            ET.SubElement(parameter, "value").text = str(round(speed * 100, 3))
+
+        timeline_cursor += timeline_duration
 
     body = ET.tostring(xmeml, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n' + body
@@ -239,7 +259,9 @@ def generate_fcpxml(
 
     timeline_cursor = 0.0
     for clip in clips:
-        ET.SubElement(
+        speed = max(0.01, float(clip.get("suggested_speed", 1.0) or 1.0))
+        timeline_duration = clip["duration_sec"] / speed
+        asset_clip = ET.SubElement(
             spine,
             "asset-clip",
             {
@@ -247,9 +269,24 @@ def generate_fcpxml(
                 "ref": f"asset-{clip['file_id']}",
                 "offset": seconds_to_fcpx_duration(timeline_cursor),
                 "start": seconds_to_fcpx_duration(clip["start_sec"]),
-                "duration": seconds_to_fcpx_duration(clip["duration_sec"]),
+                "duration": seconds_to_fcpx_duration(timeline_duration),
             },
         )
-        timeline_cursor += clip["duration_sec"]
+        if speed != 1.0:
+            time_map = ET.SubElement(asset_clip, "timeMap")
+            ET.SubElement(
+                time_map,
+                "timept",
+                {"time": "0s", "value": seconds_to_fcpx_duration(clip["start_sec"])},
+            )
+            ET.SubElement(
+                time_map,
+                "timept",
+                {
+                    "time": seconds_to_fcpx_duration(timeline_duration),
+                    "value": seconds_to_fcpx_duration(clip["end_sec"]),
+                },
+            )
+        timeline_cursor += timeline_duration
 
     return ET.tostring(fcpxml, encoding="unicode")

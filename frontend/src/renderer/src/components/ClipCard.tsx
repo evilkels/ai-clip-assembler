@@ -1,5 +1,4 @@
 import type { ClipCandidate, ClipDecision } from '../types/clip';
-import { ClipPreview } from './ClipPreview';
 import { ScoreChip } from './ScoreChip';
 
 interface Props {
@@ -28,19 +27,29 @@ export function ClipCard({ clip, rank, decision, mediaUrl, onToggleInclude, onEx
     <div className={cls}>
       <div className="clip-thumb">
         <span className="clip-thumb-rank">#{rank}</span>
-        <ClipPreview
-          mediaUrl={mediaUrl}
-          startSec={clip.start_sec}
-          endSec={clip.end_sec}
-          label={clip.file_name}
-          testId="clip-preview-video"
-        />
+        {mediaUrl ? (
+          <video
+            src={`${mediaUrl}#t=${clip.start_sec.toFixed(3)}`}
+            preload="metadata"
+            muted
+            playsInline
+            aria-label={`Poster for ${clip.file_name}`}
+          />
+        ) : (
+          <span>Poster unavailable</span>
+        )}
         <span className="clip-thumb-time">{(clip.end_sec - clip.start_sec).toFixed(1)}s</span>
       </div>
       <div className="clip-body">
+        <strong className="clip-source">{clip.file_name}</strong>
         <div className="clip-meta">
           <span>{formatRange(clip.start_sec, clip.end_sec)}</span>
-          <span>overall {clip.scores.overall.toFixed(1)}</span>
+          <span>
+            Scene {clip.scene_id ?? '—'} ·{' '}
+            {clip.suggested_speed && clip.suggested_speed !== 1
+              ? `${clip.suggested_speed}×`
+              : 'normal speed'}
+          </span>
         </div>
         <div className="score-row">
           <ScoreChip label="smooth" value={clip.scores.smoothness} />

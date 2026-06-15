@@ -50,13 +50,13 @@ async function setupTimeline(page: Page, files: string[]) {
   await expect(page.getByText(new RegExp(`${files.length} source videos? ready`))).toBeVisible();
 
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: 'Analyze' }).click();
-  await expect(page.getByRole('button', { name: 'Analysis complete' })).toBeVisible({
+  await page.getByRole('button', { name: /Analyze/ }).click();
+  await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({
     timeout: 180_000,
   });
 
   await page.goto('/#/review');
-  await expect(page.getByTestId('clip-preview-video').first()).toBeVisible();
+  await expect(page.getByLabel(/Poster for/).first()).toBeVisible();
   // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
   const includeButton = page.getByRole('button', { name: 'Include', exact: true });
   for (let i = 0; i < 6 && (await includeButton.count()) > 0; i++) {
@@ -78,16 +78,40 @@ async function setupTimeline(page: Page, files: string[]) {
 const fixtureA = () => ensureFixtureVideo('seq-fixture-a.mp4', 'gray');
 const fixtureB = () => ensureFixtureVideo('seq-fixture-b.mp4', 'navy');
 
-test('timeline preview has no native controls; review cards keep them', async ({ page }) => {
+test('timeline preview has no native controls; review cards use poster videos', async ({ page }) => {
   await setupTimeline(page, [fixtureA()]);
 
   const timelineVideo = page.getByTestId('timeline-preview-video');
   await expect(timelineVideo).not.toHaveAttribute('controls');
 
   await page.goto('/#/review');
-  const reviewVideo = page.getByTestId('clip-preview-video').first();
+  const reviewVideo = page.getByLabel(/Poster for/).first();
   await expect(reviewVideo).toBeVisible();
-  await expect(reviewVideo).toHaveAttribute('controls', '');
+  await expect(reviewVideo).not.toHaveAttribute('controls');
+});
+
+test('left and right trims move their own visual edges', async ({ page }) => {
+  await setupTimeline(page, [fixtureA(), fixtureB()]);
+  const ruler = await page.locator('.timeline-ruler').boundingBox();
+  expect(ruler).toBeTruthy();
+  await page.mouse.click(ruler!.x + 100, ruler!.y + ruler!.height / 2);
+
+  const clip = page.locator('.tl-clip').first();
+  const before = await clip.boundingBox();
+  expect(before).toBeTruthy();
+
+  const left = clip.locator('.tl-trim-handle.left');
+  const leftBox = await left.boundingBox();
+  expect(leftBox).toBeTruthy();
+  await page.mouse.move(leftBox!.x + leftBox!.width / 2, leftBox!.y + leftBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(leftBox!.x + 40, leftBox!.y + leftBox!.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  const afterLeft = await clip.boundingBox();
+  expect(afterLeft).toBeTruthy();
+  expect(afterLeft!.x).toBeGreaterThan(before!.x + 5);
+  expect(afterLeft!.width).toBeLessThan(before!.width);
 });
 
 test('forward play is video-driven: monotonic advance, stable src, zero seeking events', async ({

@@ -77,6 +77,34 @@ def test_generate_fcpxml_references_assets_and_timeline_clips():
     assert asset_clip.attrib["duration"] == "4000/1000s"
 
 
+def test_generate_fcpxml_emits_retime_for_suggested_speed():
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": "/Users/me/DJI_0001.MP4",
+            "metadata": {"duration_sec": 120, "fps": 30, "resolution": [3840, 2160]},
+        }
+    }
+    clips = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+            "suggested_speed": 0.5,
+        }
+    ]
+
+    root = ET.fromstring(generate_fcpxml("Drone MVP", clips, videos))
+    asset_clip = root.find(".//asset-clip")
+    assert asset_clip is not None
+    assert asset_clip.attrib["duration"] == "8000/1000s"
+    assert asset_clip.find("timeMap/timept") is not None
+
+
 def test_generate_fcpxml_can_reference_assets_relative_to_export_dir(tmp_path):
     project_folder = tmp_path / "footage"
     export_dir = project_folder / "exports" / "fcp"

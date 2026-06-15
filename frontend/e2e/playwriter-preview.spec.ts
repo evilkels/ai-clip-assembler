@@ -42,13 +42,13 @@ test('analysis completes and review/timeline previews render playable videos', a
   await expect(page.getByText(/1 source video ready/)).toBeVisible();
 
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: 'Analyze' }).click();
-  await expect(page.getByRole('button', { name: 'Analysis complete' })).toBeVisible({
+  await page.getByRole('button', { name: /Analyze/ }).click();
+  await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({
     timeout: 180_000,
   });
 
   await page.goto('/#/review');
-  const reviewPreview = page.getByTestId('clip-preview-video').first();
+  const reviewPreview = page.getByLabel(/Poster for/).first();
   await expect(reviewPreview).toBeVisible();
   await expect
     .poll(async () => reviewPreview.evaluate((video) => (video as HTMLVideoElement).readyState), {

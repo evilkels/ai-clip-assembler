@@ -2,7 +2,14 @@ import cv2
 import numpy as np
 
 from src.models import FrameSample
-from src.quality_scoring import normalize_frame_metrics, score_frame_metrics, score_samples_from_images
+from src.motion_analysis import FrameTransform
+from src.quality_scoring import (
+    normalize_frame_metrics,
+    score_frame_metrics,
+    score_samples_from_images,
+    stability_scores_for_samples,
+    turn_rates_for_samples,
+)
 
 
 def test_score_frame_metrics_weights_smoothness_first_for_drone_footage():
@@ -75,3 +82,49 @@ def test_score_samples_from_images_preserves_scene_ids(tmp_path):
     )
 
     assert scores[0].scene_id == 4
+
+
+def test_stability_scores_penalize_jitter_but_allow_smooth_pan():
+    samples = [FrameSample(timestamp=float(i), frame_path="unused") for i in range(4)]
+    smooth_pan = [FrameTransform(float(i), float(i * 2), 0, 0, 1) for i in range(4)]
+    jitter = [
+        FrameTransform(0, 0, 0, 0, 1),
+        FrameTransform(1, 8, -8, 0, 1),
+        FrameTransform(2, -8, 8, 0, 1),
+        FrameTransform(3, 8, -8, 0, 1),
+    ]
+
+    assert min(stability_scores_for_samples(samples, smooth_pan)) >= 8
+    assert max(stability_scores_for_samples(samples, jitter)[1:]) < 5
+
+
+def test_turn_rates_scale_per_frame_rotation_by_video_fps():
+    # Transforms spaced 1/30s -> 30fps; 0.5°/frame rotation -> 15°/s.
+    samples = [FrameSample(timestamp=i / 30.0, frame_path="unused") for i in range(3)]
+    transforms = [FrameTransform(i / 30.0, 0, 0, 0.5, 1) for i in range(3)]
+
+    rates = turn_rates_for_samples(samples, transforms)
+
+    assert all(abs(rate - 15.0) < 0.001 for rate in rates)
+
+
+def test_score_samples_feeds_turn_rate_from_transforms(tmp_path):
+    path = tmp_path / "frame.jpg"
+    cv2.imwrite(str(path), np.full((20, 20), 127, dtype="uint8"))
+    samples = [FrameSample(timestamp=i / 30.0, frame_path=str(path)) for i in range(2)]
+    # ~1.5°/frame -> 45°/s, well past the 6°/s smoothness penalty knee.
+    transforms = [FrameTransform(i / 30.0, 0, 0, 1.5, 1) for i in range(2)]
+
+    scores = score_samples_from_images(samples, transforms=transforms)
+
+    assert scores[0].turn_rate_deg_per_sec > 6.0
+
+
+def test_visual_interest_is_non_zero_for_detailed_frames(tmp_path):
+    path = tmp_path / "detailed.jpg"
+    checker = (np.indices((80, 80)).sum(axis=0) % 2 * 255).astype("uint8")
+    cv2.imwrite(str(path), checker)
+
+    score = score_samples_from_images([FrameSample(timestamp=0, frame_path=str(path))])[0]
+
+    assert score.visual_interest_score > 0

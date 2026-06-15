@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
@@ -457,7 +458,7 @@ export function Timeline() {
   }, [dragId, dropIndex, reorderAccepted]);
 
   const startTrim = useCallback(
-    (e: ReactPointerEvent, seg: Segment, edge: 'left' | 'right') => {
+    (e: ReactMouseEvent, seg: Segment, edge: 'left' | 'right') => {
       e.stopPropagation();
       e.preventDefault();
       setCanDrag(false);
@@ -465,7 +466,7 @@ export function Timeline() {
       const startX = e.clientX;
       const { clip, trimStart: origStart, trimEnd: origEnd } = seg;
 
-      const onMove = (ev: PointerEvent) => {
+      const onMove = (ev: MouseEvent) => {
         const deltaSec = (ev.clientX - startX) / pxPerSec;
         if (edge === 'left') {
           const next = clamp(origStart + deltaSec, clip.start_sec, origEnd - MIN_CLIP_DURATION);
@@ -477,11 +478,11 @@ export function Timeline() {
       };
       const onUp = () => {
         setCanDrag(true);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
       };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
     },
     [pxPerSec, setTrim],
   );
@@ -619,6 +620,7 @@ export function Timeline() {
               const selected = seg.clip.clip_id === selectedId;
               const dragging = seg.clip.clip_id === dragId;
               const width = seg.duration * pxPerSec;
+              const leftTrimPx = Math.max(0, seg.trimStart - seg.clip.start_sec) * pxPerSec;
               return (
                 <div
                   key={seg.clip.clip_id}
@@ -629,20 +631,10 @@ export function Timeline() {
                   ]
                     .join(' ')
                     .trim()}
-                  style={{ width }}
-                  draggable={canDrag}
-                  onDragStart={(e) => {
-                    if (!canDrag) {
-                      e.preventDefault();
-                      return;
-                    }
-                    setDragId(seg.clip.clip_id);
-                    setSelectedId(seg.clip.clip_id);
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onDragEnd={() => {
-                    setDragId(null);
-                    setDropIndex(null);
+                  style={{
+                    width,
+                    transform: `translateX(${leftTrimPx}px)`,
+                    marginRight: leftTrimPx,
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -653,17 +645,35 @@ export function Timeline() {
                 >
                   <div
                     className="tl-trim-handle left"
-                    onPointerDown={(e) => startTrim(e, seg, 'left')}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => startTrim(e, seg, 'left')}
                     title="Trim start"
                   />
-                  <div className="tl-clip-body">
+                  <div
+                    className="tl-clip-body"
+                    draggable={canDrag}
+                    onDragStart={(e) => {
+                      if (!canDrag) {
+                        e.preventDefault();
+                        return;
+                      }
+                      setDragId(seg.clip.clip_id);
+                      setSelectedId(seg.clip.clip_id);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setDropIndex(null);
+                    }}
+                  >
                     <span className="tl-clip-rank">#{idx + 1}</span>
                     <span className="tl-clip-name">{seg.clip.file_name}</span>
                     <span className="tl-clip-dur">{seg.duration.toFixed(1)}s</span>
                   </div>
                   <div
                     className="tl-trim-handle right"
-                    onPointerDown={(e) => startTrim(e, seg, 'right')}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => startTrim(e, seg, 'right')}
                     title="Trim end"
                   />
                 </div>

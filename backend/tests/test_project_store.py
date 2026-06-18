@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from src.models import Transform, TimelineDocument, TimelineItem
 from src.project_store import (
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
@@ -10,9 +11,14 @@ from src.project_store import (
     create_or_open_project,
     create_project,
     delete_project_files,
+    load_timeline_document,
+    migrate_legacy_timeline,
     open_project,
+    read_timeline_document,
     rescan_project,
+    write_timeline_document,
 )
+from src.timeline_ops import SourceClip
 
 
 def fixed_now():
@@ -210,3 +216,113 @@ def test_open_project_rejects_absolute_source_video_filename(tmp_path):
 
     with pytest.raises(InvalidProjectManifestError):
         open_project(project_folder)
+
+
+# --- A1.4 Timeline Document persistence + migration -------------------------
+
+
+def _project_with_state(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    create_project(project_folder, now=fixed_now)
+    return project_folder
+
+
+def test_write_then_read_timeline_document_round_trips(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    document = TimelineDocument(
+        items=[
+            TimelineItem(
+                item_id="item-1",
+                source_clip_id="clip-a",
+                start_sec=2.0,
+                end_sec=5.0,
+                speed=2.0,
+                transform=Transform(scale=1.5, x=0.1, y=-0.2),
+            )
+        ],
+        profile="cinematic",
+        target_duration_sec=42.0,
+    )
+
+    write_timeline_document(project_folder, document)
+    loaded = read_timeline_document(project_folder)
+
+    assert loaded == document
+
+
+def test_read_timeline_document_absent_returns_none(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    assert read_timeline_document(project_folder) is None
+
+
+def test_migrate_legacy_timeline_upgrades_old_clip_entries():
+    legacy = {
+        "source": "manual",
+        "profile": "balanced",
+        "target_duration_sec": 30.0,
+        "clips": [
+            {"clip_id": "clip-a", "start_sec": 1.0, "end_sec": 4.0},
+            {"clip_id": "clip-b", "start_sec": 0.0, "end_sec": 2.5},
+        ],
+    }
+
+    document = migrate_legacy_timeline(legacy)
+
+    assert isinstance(document, TimelineDocument)
+    assert document.profile == "balanced"
+    assert document.target_duration_sec == 30.0
+    assert [(i.source_clip_id, i.start_sec, i.end_sec) for i in document.items] == [
+        ("clip-a", 1.0, 4.0),
+        ("clip-b", 0.0, 2.5),
+    ]
+    # Each migrated item gets a generated id, default speed, identity transform.
+    assert all(i.item_id for i in document.items)
+    assert all(i.speed == 1.0 for i in document.items)
+    assert all(i.transform == Transform() for i in document.items)
+    # Distinct ids even though they come from one legacy list.
+    assert len({i.item_id for i in document.items}) == 2
+
+
+def test_migrate_legacy_timeline_resolves_bare_clip_ids_from_sources():
+    legacy = {"profile": "balanced", "clips": ["clip-a"]}
+    sources = {
+        "clip-a": SourceClip(
+            clip_id="clip-a", start_sec=3.0, end_sec=7.0, source_duration_sec=20.0
+        )
+    }
+
+    document = migrate_legacy_timeline(legacy, sources=sources)
+
+    assert [(i.source_clip_id, i.start_sec, i.end_sec) for i in document.items] == [
+        ("clip-a", 3.0, 7.0)
+    ]
+
+
+def test_load_timeline_document_prefers_saved_over_legacy(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    saved = TimelineDocument(
+        items=[TimelineItem(item_id="i1", source_clip_id="c", start_sec=0.0, end_sec=1.0)]
+    )
+    write_timeline_document(project_folder, saved)
+
+    legacy = {"clips": [{"clip_id": "other", "start_sec": 0.0, "end_sec": 9.0}]}
+    loaded = load_timeline_document(project_folder, legacy=legacy)
+
+    assert loaded == saved
+
+
+def test_load_timeline_document_migrates_legacy_when_no_saved_document(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    legacy = {"clips": [{"clip_id": "clip-a", "start_sec": 1.0, "end_sec": 4.0}]}
+
+    loaded = load_timeline_document(project_folder, legacy=legacy)
+
+    assert loaded is not None
+    assert [i.source_clip_id for i in loaded.items] == ["clip-a"]
+
+
+def test_load_timeline_document_none_when_nothing_present(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    assert load_timeline_document(project_folder) is None

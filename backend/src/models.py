@@ -1,6 +1,11 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# Bump when the on-disk Timeline Document shape changes. The legacy
+# `{clip_id, start_sec, end_sec}` timeline is treated as version 1.
+TIMELINE_DOCUMENT_VERSION = 2
 
 
 class VideoMetadata(BaseModel):
@@ -76,3 +81,66 @@ class AssemblyResult(BaseModel):
     clips: List[ClipSuggestion]
     sequence: TimelineSequence
     metadata: dict = Field(default_factory=dict)
+
+
+class Transform(BaseModel):
+    """A Timeline Item's digital zoom/pan/crop. Identity by default.
+
+    ``scale`` is the zoom factor (1.0 = no zoom). ``x`` / ``y`` are pan offsets
+    in normalized frame units. Validated so a transform can never be degenerate.
+    """
+
+    scale: float = 1.0
+    x: float = 0.0
+    y: float = 0.0
+
+    @field_validator("scale")
+    @classmethod
+    def scale_must_be_positive(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("transform scale must be > 0")
+        return value
+
+
+class TimelineItem(BaseModel):
+    """One placement of a Candidate Clip on the Timeline.
+
+    The same candidate may appear as more than one item (multi-instance); each
+    placement has its own in/out bounds within the source video, Speed, and
+    Transform.
+    """
+
+    item_id: str
+    source_clip_id: str
+    start_sec: float
+    end_sec: float
+    speed: float = 1.0
+    transform: Transform = Field(default_factory=Transform)
+
+    @property
+    def effective_duration_sec(self) -> float:
+        """Duration this item occupies on the timeline, after Speed retime."""
+        return (self.end_sec - self.start_sec) / self.speed
+
+    @model_validator(mode="after")
+    def validate_bounds_and_speed(self) -> "TimelineItem":
+        if self.start_sec < 0:
+            raise ValueError("start_sec must be >= 0")
+        if self.end_sec <= self.start_sec:
+            raise ValueError("end_sec must be greater than start_sec")
+        if self.speed <= 0:
+            raise ValueError("speed must be > 0")
+        return self
+
+
+class TimelineDocument(BaseModel):
+    """The single backend-authoritative record of the Timeline.
+
+    Ordered Timeline Items plus the assembly knobs (profile, target duration)
+    and a schema version. The GUI and agents are clients of this document.
+    """
+
+    version: int = TIMELINE_DOCUMENT_VERSION
+    items: List[TimelineItem] = Field(default_factory=list)
+    profile: Optional[str] = None
+    target_duration_sec: Optional[float] = None

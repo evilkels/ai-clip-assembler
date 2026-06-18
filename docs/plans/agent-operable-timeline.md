@@ -23,7 +23,7 @@
 - **Depends on**: none to start; B and C build on A
 - **Category**: architecture + product
 - **Planned at**: commit `ed891fd`, 2026-06-19
-- **Progress**: not started
+- **Progress**: Phase A1 complete (operations core, undo/redo, persistence/migration; 56 tests). At the A1 review gate — A2/B/C not started.
 
 ## Why this matters
 
@@ -67,26 +67,26 @@ phase. Keep the existing `PUT /projects/{id}/timeline` working until A2 replaces
 
 ### Task A1.1 — Document & item models
 **Files:** `backend/src/models.py`, `backend/tests/test_timeline_ops.py`
-- [ ] Add `TimelineItem` (`item_id`, `source_clip_id`, `start_sec`, `end_sec`, `speed=1.0`, `transform`) and `TimelineDocument` (`items[]`, `profile`, `target_duration_sec`, `version`).
-- [ ] Add a `Transform` model (`scale`, `x`, `y`) with identity default and validation.
+- [x] Add `TimelineItem` (`item_id`, `source_clip_id`, `start_sec`, `end_sec`, `speed=1.0`, `transform`) and `TimelineDocument` (`items[]`, `profile`, `target_duration_sec`, `version`).
+- [x] Add a `Transform` model (`scale`, `x`, `y`) with identity default and validation.
 
 ### Task A1.2 — Operations core
 **Files:** `backend/src/timeline_ops.py` (new), `backend/tests/test_timeline_ops.py`
-- [ ] Implement operations from the spec's Section 2 table: `add_item`, `remove_item`, `split_item`, `set_bounds`, `reorder`, `set_speed`, `set_transform`, `include`, `exclude`, `set_profile`, `set_target_duration`.
-- [ ] Validation/clamping: bounds clamped to `[0, source_duration]`; `split_item` splits within bounds; `speed > 0`; transform validated.
-- [ ] Failing-then-passing tests: split math, `speed → effective duration` (`(end-start)/speed`), transform validation, extend/clamp, multi-instance identity (same candidate → distinct `item_id`s).
+- [x] Implement operations from the spec's Section 2 table: `add_item`, `remove_item`, `split_item`, `set_bounds`, `reorder`, `set_speed`, `set_transform`, `include`, `exclude`, `set_profile`, `set_target_duration`.
+- [x] Validation/clamping: bounds clamped to `[0, source_duration]`; `split_item` splits within bounds; `speed > 0`; transform validated.
+- [x] Failing-then-passing tests: split math, `speed → effective duration` (`(end-start)/speed`), transform validation, extend/clamp, multi-instance identity (same candidate → distinct `item_id`s).
 
 ### Task A1.3 — Undo/redo history
 **Files:** `backend/src/timeline_ops.py`, tests
-- [ ] Snapshot-based bounded per-project history; `undo`/`redo` as snapshot pop/push.
-- [ ] Per-project async write lock so GUI + agent operations cannot interleave mid-op.
-- [ ] Tests: undo/redo correctness across each operation; lock serialization.
+- [x] Snapshot-based bounded per-project history; `undo`/`redo` as snapshot pop/push.
+- [x] Per-project async write lock so GUI + agent operations cannot interleave mid-op.
+- [x] Tests: undo/redo correctness across each operation; lock serialization.
 
 ### Task A1.4 — Persistence + migration
 **Files:** `backend/src/project_store.py`, `backend/tests/test_project_store.py`
-- [ ] Persist/load `TimelineDocument`; debounced save after each op (reuse existing save path).
-- [ ] Migration loader: upgrade old `{clip_id, start_sec, end_sec}` timelines into `TimelineItem`s (`item_id` generated, `speed=1.0`, identity transform).
-- [ ] Test: old-format round-trip opens cleanly as a `TimelineDocument`.
+- [x] Persist/load `TimelineDocument`; debounced save after each op (reuse existing save path).
+- [x] Migration loader: upgrade old `{clip_id, start_sec, end_sec}` timelines into `TimelineItem`s (`item_id` generated, `speed=1.0`, identity transform).
+- [x] Test: old-format round-trip opens cleanly as a `TimelineDocument`.
 
 **Phase A1 verification:** `cd frontend && npm run test:backend` green (or
 `backend/.venv/bin/pytest backend/tests/test_timeline_ops.py backend/tests/test_project_store.py -q`).

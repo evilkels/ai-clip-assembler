@@ -1,11 +1,14 @@
 import json
 import os
 import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
+
+from .models import TimelineDocument, TimelineItem
 
 
 PROJECT_STATE_DIRNAME = "clipassembler"
@@ -13,6 +16,7 @@ PROJECT_MANIFEST_FILENAME = "project.json"
 PROJECT_SCHEMA_VERSION = 1
 ANALYSIS_RESULTS_FILENAME = "results.json"
 ANALYSIS_RESULTS_SCHEMA_VERSION = 1
+TIMELINE_DOCUMENT_FILENAME = "timeline.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
 DEFAULT_HARNESS_ID = "pi_agent"
 UNSAFE_PROJECT_ROOTS = [
@@ -249,6 +253,93 @@ def read_analysis_results(project_folder: Path) -> Optional[dict]:
     if not isinstance(payload.get("clips"), list):
         return None
     return payload
+
+
+def timeline_document_path(project_folder: Path) -> Path:
+    return project_state_dir(project_folder) / "analysis" / TIMELINE_DOCUMENT_FILENAME
+
+
+def write_timeline_document(project_folder: Path, document: TimelineDocument) -> None:
+    """Persist the backend-authoritative Timeline Document for a project."""
+    path = timeline_document_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(document.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+
+def read_timeline_document(project_folder: Path) -> Optional[TimelineDocument]:
+    """Load a saved Timeline Document, or ``None`` if absent/unreadable."""
+    path = timeline_document_path(project_folder)
+    if not path.exists():
+        return None
+    try:
+        return TimelineDocument.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValidationError, json.JSONDecodeError):
+        return None
+
+
+def migrate_legacy_timeline(
+    legacy: dict,
+    sources: Optional[Dict[str, object]] = None,
+) -> TimelineDocument:
+    """Upgrade an old ``{clip_id, start_sec, end_sec}`` timeline into a document.
+
+    The legacy timeline stored clips either as bare clip-id strings or as dicts
+    with bounds. Each becomes a :class:`TimelineItem` with a fresh ``item_id``,
+    ``speed = 1.0`` and an identity transform. Bare ids resolve their bounds from
+    the supplied ``sources`` registry (entries that cannot be resolved are
+    dropped rather than failing the whole migration).
+    """
+    items: List[TimelineItem] = []
+    for entry in legacy.get("clips") or []:
+        if isinstance(entry, str):
+            clip_id, start_sec, end_sec = entry, None, None
+        elif isinstance(entry, dict):
+            clip_id = entry.get("clip_id")
+            start_sec = entry.get("start_sec")
+            end_sec = entry.get("end_sec")
+        else:
+            continue
+        if not clip_id:
+            continue
+        if start_sec is None or end_sec is None:
+            source = (sources or {}).get(clip_id)
+            if source is None:
+                continue
+            start_sec = getattr(source, "start_sec", None)
+            end_sec = getattr(source, "end_sec", None)
+            if start_sec is None or end_sec is None:
+                continue
+        items.append(
+            TimelineItem(
+                item_id=uuid.uuid4().hex,
+                source_clip_id=clip_id,
+                start_sec=float(start_sec),
+                end_sec=float(end_sec),
+            )
+        )
+    return TimelineDocument(
+        items=items,
+        profile=legacy.get("profile"),
+        target_duration_sec=legacy.get("target_duration_sec"),
+    )
+
+
+def load_timeline_document(
+    project_folder: Path,
+    legacy: Optional[dict] = None,
+    sources: Optional[Dict[str, object]] = None,
+) -> Optional[TimelineDocument]:
+    """Resolve a project's Timeline Document, preferring the saved one.
+
+    Returns the saved document if present; otherwise migrates the supplied
+    ``legacy`` timeline (the old in-memory/results shape); otherwise ``None``.
+    """
+    saved = read_timeline_document(project_folder)
+    if saved is not None:
+        return saved
+    if legacy is not None:
+        return migrate_legacy_timeline(legacy, sources=sources)
+    return None
 
 
 def project_state_dir(project_folder: Path) -> Path:

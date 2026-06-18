@@ -33,6 +33,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [project-folder-model](project-folder-model.md) | Implementation and automated QA complete; pending real-footage/manual app QA (plan 001's validation session). |
 | [project-sidebar](project-sidebar.md) | Partially implemented (a simpler sidebar exists); remaining UX and persistence acceptance items active. |
 | [settings-page](settings-page.md) | Draft, awaiting review. |
+| [agent-operable-timeline](agent-operable-timeline.md) | Draft, awaiting review. Backend-authoritative timeline + operations core + embedded MCP server + in-app review agent (A→B→C). Spec: `docs/specs/2026-06-19-agent-operable-timeline-design.md`. |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented; re-run `npx react-doctor` before selecting the next batch (original snapshot is historical). |
 | [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |

@@ -34,8 +34,12 @@
 | **Rejected Clip** | A candidate clip the editor has chosen not to use. | Excluded clip, hidden clip |
 | **Clip Reason** | A short explanation of why a candidate clip was suggested or ranked; currently serialized as `ai_reason` in the harness/API contract. | AI reason, rationale |
 | **Review Board** | The first MVP interface for filtering, comparing, accepting, rejecting, and ordering candidate clips. | Clip cards, timeline, dashboard |
-| **Timeline** | The ordered sequence of accepted clips intended for export. | Sequence, assembly |
-| **Trim** | A manual adjustment to a candidate clip's start or end time. | Cut, crop |
+| **Timeline** | The ordered sequence of **Timeline Items** intended for export, held as the backend-authoritative **Timeline Document**. | Sequence, assembly |
+| **Timeline Document** | The single backend-authoritative record of the timeline: ordered **Timeline Items**, assembly profile, target duration, and version. The GUI and agents are clients of it. | Timeline state, project timeline |
+| **Timeline Item** | One placement of a **Candidate Clip** on the **Timeline**, with its own in/out bounds, **Speed**, and **Transform**. The same candidate may appear as more than one item (multi-instance). | Clip instance, timeline clip, segment |
+| **Trim** | A manual adjustment to a **Timeline Item**'s in/out bounds; may **extend** past the original candidate bounds, clamped to the source video duration. | Cut, crop |
+| **Speed** | A **Timeline Item**'s playback-rate multiplier (default 1.0); effective timeline duration is source span divided by speed. | Retime, slow-mo factor |
+| **Transform** | A **Timeline Item**'s digital zoom/pan/crop, expressed as scale and offset; identity by default. | Zoom, pan, crop, reframe |
 
 ## Harnesses And Export
 
@@ -49,6 +53,17 @@
 | **EDL** | A simple edit decision list export format for broad editor compatibility. | CMX3600 |
 | **Resolve XML** | A DaVinci Resolve-compatible XML export format. | DaVinci XML |
 
+## Agent Control And Editing
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Operation** | A single, validated, reversible mutation of the **Timeline Document** (e.g. split, set speed, set transform, reorder). The one and only way the timeline changes, shared by the GUI and agents. | Command, action, edit |
+| **Undo History** | The bounded per-project sequence of **Timeline Document** snapshots that makes every **Operation** reversible via undo/redo. | Edit history, command stack |
+| **Proposal** | A staged set of **Operations** plus the resulting diff, suggested by the **In-App Review Agent** and applied only after the **Editor** accepts it. | Suggestion, draft edit, pending change |
+| **MCP Server** | The local Model Context Protocol endpoint the backend exposes while running, letting agents call **Operations** and read tools with full project context. | Agent server, tool server |
+| **In-App Review Agent** | The hosted conversational agent inside the app; an MCP client of our own **MCP Server** that runs in propose mode (it suggests **Proposals**, it does not apply directly). | Chat bot, assistant, copilot |
+| **External Agent** | An agent outside the app (e.g. Claude Code, Cursor, Codex) connected over the **MCP Server**; it applies **Operations** directly because the **Editor** is driving it. | Remote agent, CLI agent |
+
 ## Relationships
 
 - A **Project** contains one or more **Source Videos**.
@@ -56,9 +71,12 @@
 - A **Frame Sample** receives technical scores such as **Smoothness Score**, **Sharpness Score**, **Exposure Score**, and **Contrast Score**.
 - A run of high-scoring **Frame Samples** can become a **Candidate Clip**.
 - An **Editor** accepts or rejects **Candidate Clips** on the **Review Board**.
-- The **Timeline** is made from ordered **Accepted Clips**.
+- Accepting a **Candidate Clip** adds a **Timeline Item** to the **Timeline Document**; one candidate may back several items (multi-instance).
+- A **Timeline Item** carries its own bounds, **Speed**, and **Transform**.
+- Every change to the **Timeline Document** is an **Operation**, recorded in the **Undo History** so it can be reversed.
+- The **In-App Review Agent** offers **Proposals** the **Editor** accepts or rejects; an **External Agent** applies **Operations** directly over the **MCP Server**.
 - A **Harness** produces or enriches **Candidate Clips**, but the **Manual Harness** is the MVP default.
-- An **Export** serializes the **Timeline** as **FCPXML**, **EDL**, or **Resolve XML**.
+- An **Export** serializes the **Timeline Document** as **FCPXML**, **EDL**, or **Resolve XML** (EDL flattens **Speed** and **Transform**).
 
 ## Example Dialogue
 
@@ -76,8 +94,8 @@
 
 ## Flagged Ambiguities
 
-- "Clip" has been used to mean both **Source Video** and **Candidate Clip**. Use **Source Video** for imported files and **Candidate Clip** for suggested time ranges.
+- "Clip" has been used to mean **Source Video**, **Candidate Clip**, and a placement on the timeline. Use **Source Video** for imported files, **Candidate Clip** for suggested time ranges, and **Timeline Item** for a placement on the **Timeline**.
 - "AI score" is too narrow for the MVP because the first scoring path is rule-based. Use **Overall Score**, **Smoothness Score**, or **Visual Interest Score** depending on the meaning.
-- "Timeline" has been used for both the full precision editing UI and the ordered export sequence. Use **Review Board** for the first MVP UI and **Timeline** for the ordered accepted sequence.
+- "Timeline" has been used for both the editing UI and the data it edits. Use **Review Board** for the candidate-curation UI, **Timeline** for the ordered sequence of **Timeline Items**, and **Timeline Document** when stressing that the backend owns the authoritative record.
 - "Manual" can mean hand-editing or rule-based scoring. Use **Manual Harness** for deterministic no-AI scoring and **Trim** or **Accepted Clip** for editor actions.
 - "Scene" and "shot" are close. Use **Scene** until the app explicitly models cinematographic shots separately.

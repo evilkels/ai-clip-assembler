@@ -151,18 +151,18 @@ adapter — no parallel mutation path.
 
 ### Task B.1 — Mount MCP + mutating tools
 **Files:** `backend/src/api.py` (or a new `backend/src/mcp_server.py`), tests
-- [ ] Mount MCP at `/mcp` on the backend port. Mutating tools 1:1 with the operations core.
-- [ ] Tests: call tool handlers directly; assert they mutate via the core + emit `timeline-changed`.
+- [x] Mount MCP at `/mcp` on the backend port. Mutating tools 1:1 with the operations core.
+- [x] Tests: call tool handlers directly; assert they mutate via the core + emit `timeline-changed`.
 
 ### Task B.2 — Read tools
 **Files:** same, tests
-- [ ] `list_candidates` (scores + reasons), `get_timeline`, `get_project_summary`, `get_frame_paths(clip_id)` (returns local frame JPEG paths, as `pi_cli_harness` uses `@path`).
-- [ ] Tests for each read tool.
+- [x] `list_candidates` (scores + reasons), `get_timeline`, `get_project_summary`, `get_frame_paths(clip_id)` (returns local frame JPEG paths, as `pi_cli_harness` uses `@path`).
+- [x] Tests for each read tool.
 
 ### Task B.3 — Docs + real-agent check
 **Files:** `docs/MCP_SERVER.md` (new)
-- [ ] Document endpoint, port, tool list, and how to connect Claude Code / Cursor.
-- [ ] Record one verified real Claude Code connection that lists candidates and applies one operation.
+- [x] Document endpoint, port, tool list, and how to connect Claude Code / Cursor.
+- [x] Record one verified real Claude Code connection that lists candidates and applies one operation.
 
 **Phase B verification:** MCP tool-handler tests green; documented Claude Code
 round-trip succeeds.

@@ -1799,3 +1799,26 @@ def test_export_reflects_timeline_document_speed_and_transform(monkeypatch, tmp_
     edl = client.post(f"/projects/{project_id}/export?format=edl")
     assert edl.status_code == 200
     assert edl.json()["warnings"], "EDL export should warn that speed/transform were flattened"
+
+
+def test_mcp_endpoint_lists_tools_and_applies_operation(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._mcp_server = None  # rebuild against this test's project registry
+
+    listed = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert listed.status_code == 200
+    names = {t["name"] for t in listed.json()["result"]["tools"]}
+    assert {"include", "split_item", "list_candidates", "get_frame_paths"} <= names
+
+    called = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "include", "arguments": {"project_id": project_id, "clip_id": "clip-1"}},
+        },
+    )
+    assert called.status_code == 200
+    assert called.json()["result"].get("isError") is not True
+    # The MCP edit went through the same core, so the HTTP document reflects it.
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert [i["source_clip_id"] for i in document["items"]] == ["clip-1"]

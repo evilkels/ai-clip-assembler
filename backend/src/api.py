@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
@@ -61,6 +61,7 @@ from .project_store import (
     write_analysis_results,
     write_timeline_document,
 )
+from .mcp_server import TimelineMCPServer
 from .timeline_ops import SourceClip, TimelineController, TimelineOpError
 from .timeline_service import TimelineEventBroker
 from .quality_scoring import score_samples_from_images
@@ -891,6 +892,67 @@ async def timeline_events(project_id: str):
             _timeline_broker.unsubscribe(project_id, queue)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# --- Embedded MCP server (external agents drive the same operations core) ---
+
+
+def _mcp_get_controller(project_id: str) -> TimelineController:
+    if project_id not in projects:
+        raise KeyError(project_id)
+    return get_timeline_controller(project_id)
+
+
+def mcp_frame_paths(project_id: str, clip_id: str) -> list:
+    """Local frame JPEG paths for a candidate clip, for an agent to read
+    directly (the same `@path` images `pi_cli_harness` attaches)."""
+    project = projects.get(project_id) or {}
+    clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
+    if clip is None:
+        return []
+    file_id = clip.get("file_id")
+    base = samples_dir(project_id) / str(file_id)
+    if not base.exists():
+        return []
+    start_ms = float(clip.get("start_sec", 0.0)) * 1000
+    end_ms = float(clip.get("end_sec", 0.0)) * 1000
+    paths = []
+    for path in sorted(base.glob(f"{file_id}_*.jpg")):
+        stem = path.stem
+        if "raw" in stem:
+            continue
+        try:
+            milliseconds = int(stem.rsplit("_", 1)[1])
+        except (ValueError, IndexError):
+            continue
+        if start_ms <= milliseconds <= end_ms:
+            paths.append(str(path))
+    return paths
+
+
+_mcp_server: Optional[TimelineMCPServer] = None
+
+
+def get_mcp_server() -> TimelineMCPServer:
+    global _mcp_server
+    if _mcp_server is None:
+        _mcp_server = TimelineMCPServer(
+            get_controller=_mcp_get_controller,
+            get_project=lambda project_id: projects[project_id],
+            list_frame_paths=mcp_frame_paths,
+        )
+    return _mcp_server
+
+
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    """JSON-RPC entry point for the embedded MCP server. External agents
+    (Claude Code, Cursor) connect here; see docs/MCP_SERVER.md."""
+    message = await request.json()
+    response = await get_mcp_server().handle_jsonrpc(message)
+    if response is None:
+        return Response(status_code=202)
+    return response
 
 
 @app.post("/projects/{project_id}/export")

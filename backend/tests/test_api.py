@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from urllib.parse import quote
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src import api
@@ -1679,3 +1680,122 @@ def test_analysis_status_returns_404_for_unknown_project():
     client = TestClient(api.app)
     response = client.get("/projects/nope/analyze/status")
     assert response.status_code == 404
+
+
+# --- A2: Timeline operations core over HTTP + SSE ---------------------------
+
+
+def _seed_analyzed_project(monkeypatch, tmp_path, *, duration=10.0):
+    """A folderless project with one source video and two candidate clips."""
+    api.projects.clear()
+    api._timeline_controllers.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["videos"].append(
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": str(tmp_path / "DJI_0001.MP4"),
+            "metadata": {"duration_sec": duration, "fps": 30, "resolution": [1920, 1080]},
+            "status": "ready",
+        }
+    )
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1", "file_id": "file-1", "file_name": "DJI_0001.MP4",
+            "start_sec": 1.0, "end_sec": 4.0, "duration_sec": 3.0, "overall_score": 8,
+        },
+        {
+            "clip_id": "clip-2", "file_id": "file-1", "file_name": "DJI_0001.MP4",
+            "start_sec": 5.0, "end_sec": 7.0, "duration_sec": 2.0, "overall_score": 7,
+        },
+    ]
+    return client, project_id
+
+
+def _op(client, project_id, operation, **args):
+    return client.post(
+        f"/projects/{project_id}/timeline/op",
+        json={"operation": operation, "args": args},
+    )
+
+
+def test_timeline_op_include_seeds_item_from_candidate(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    response = _op(client, project_id, "include", clip_id="clip-1")
+    assert response.status_code == 200
+    document = response.json()["document"]
+    assert len(document["items"]) == 1
+    item = document["items"][0]
+    assert item["source_clip_id"] == "clip-1"
+    assert (item["start_sec"], item["end_sec"]) == (1.0, 4.0)
+
+
+def test_timeline_op_set_bounds_clamps_to_source_duration(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path, duration=10.0)
+    item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]
+    response = _op(client, project_id, "set_bounds", item_id=item_id, start_sec=-5.0, end_sec=100.0)
+    item = response.json()["document"]["items"][0]
+    assert (item["start_sec"], item["end_sec"]) == (0.0, 10.0)
+
+
+def test_timeline_op_undo_and_redo(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    _op(client, project_id, "include", clip_id="clip-2")
+    assert len(client.get(f"/projects/{project_id}/timeline/document").json()["document"]["items"]) == 2
+
+    undo = client.post(f"/projects/{project_id}/timeline/undo")
+    assert undo.status_code == 200
+    assert len(undo.json()["document"]["items"]) == 1
+
+    redo = client.post(f"/projects/{project_id}/timeline/redo")
+    assert redo.status_code == 200
+    assert len(redo.json()["document"]["items"]) == 2
+
+
+def test_timeline_op_split_and_set_speed(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]
+    _op(client, project_id, "set_speed", item_id=item_id, speed=2.0)
+    document = _op(client, project_id, "split_item", item_id=item_id, at_sec=2.5).json()["document"]
+    assert len(document["items"]) == 2
+    assert all(i["speed"] == 2.0 for i in document["items"])
+
+
+def test_timeline_op_invalid_returns_422(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    assert _op(client, project_id, "remove_item", item_id="nope").status_code == 422
+    assert _op(client, project_id, "frobnicate").status_code == 422
+
+
+def test_timeline_op_unknown_project_returns_404(monkeypatch, tmp_path):
+    client, _ = _seed_analyzed_project(monkeypatch, tmp_path)
+    assert _op(client, "missing-project", "include", clip_id="clip-1").status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_timeline_events_endpoint_returns_sse_stream(monkeypatch, tmp_path):
+    # Call the handler directly: a live HTTP stream would block on the
+    # never-ending event generator. Event *emission* is covered in
+    # test_timeline_service.py; here we assert the endpoint is wired as SSE.
+    _seed_analyzed_project(monkeypatch, tmp_path)
+    project_id = next(iter(api.projects))
+    response = await api.timeline_events(project_id)
+    assert response.media_type == "text/event-stream"
+
+
+def test_export_reflects_timeline_document_speed_and_transform(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]
+    _op(client, project_id, "set_speed", item_id=item_id, speed=0.5)
+    _op(client, project_id, "set_transform", item_id=item_id, transform={"scale": 1.5, "x": 0.1, "y": 0.0})
+
+    resolve = client.post(f"/projects/{project_id}/export?format=resolve_xml")
+    assert resolve.status_code == 200
+    assert "Basic Motion" in Path(resolve.json()["file_path"]).read_text()
+
+    edl = client.post(f"/projects/{project_id}/export?format=edl")
+    assert edl.status_code == 200
+    assert edl.json()["warnings"], "EDL export should warn that speed/transform were flattened"

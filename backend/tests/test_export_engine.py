@@ -6,6 +6,7 @@ from src.export_engine import (
     fcpx_frame_duration,
     generate_edl,
     generate_fcpxml,
+    edl_flatten_warnings,
     seconds_to_timecode,
 )
 
@@ -364,3 +365,73 @@ def test_generate_resolve_xml_uses_relative_pathurl_for_folder_projects(tmp_path
     pathurl = root.find(".//clipitem/file/pathurl")
     assert pathurl is not None
     assert pathurl.text == "../../DJI_0001.MP4"
+
+
+# --- A2.5: Speed + Transform in exports ------------------------------------
+
+
+def _transform_clip(**transform):
+    return {
+        "clip_id": "clip-t",
+        "file_id": "file-1",
+        "file_name": "DJI_0001.MP4",
+        "start_sec": 0.0,
+        "end_sec": 4.0,
+        "duration_sec": 4.0,
+        "transform": transform,
+    }
+
+
+def _transform_videos():
+    return {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": "/Users/me/footage/DJI_0001.MP4",
+            "metadata": {"duration_sec": 20, "fps": 30, "resolution": [1920, 1080]},
+        }
+    }
+
+
+def test_generate_fcpxml_emits_adjust_transform_for_non_identity_transform():
+    clips = [_transform_clip(scale=1.5, x=0.1, y=-0.2)]
+    root = ET.fromstring(generate_fcpxml("T", clips, _transform_videos()))
+    adjust = root.find(".//asset-clip/adjust-transform")
+    assert adjust is not None
+    assert adjust.get("scale", "").startswith("1.5")
+
+
+def test_generate_fcpxml_omits_adjust_transform_for_identity():
+    clips = [_transform_clip(scale=1.0, x=0.0, y=0.0)]
+    root = ET.fromstring(generate_fcpxml("T", clips, _transform_videos()))
+    assert root.find(".//asset-clip/adjust-transform") is None
+
+
+def test_generate_resolve_xml_emits_basic_motion_for_transform():
+    clips = [_transform_clip(scale=1.5, x=0.1, y=-0.2)]
+    xml = generate_resolve_xml("T", clips, _transform_videos())
+    root = ET.fromstring(xml.split("?>", 1)[1])
+    effect_names = [e.text for e in root.findall(".//clipitem/filter/effect/name")]
+    assert "Basic Motion" in effect_names
+    scale_values = [
+        p.find("value").text
+        for p in root.findall(".//clipitem/filter/effect/parameter")
+        if p.find("parameterid") is not None and p.find("parameterid").text == "scale"
+    ]
+    assert scale_values  # a scale parameter was written
+
+
+def test_edl_flatten_warnings_flags_speed_and_transform():
+    plain = [{"clip_id": "c", "file_id": "f", "file_name": "x.MP4", "start_sec": 0, "end_sec": 2, "duration_sec": 2}]
+    assert edl_flatten_warnings(plain) == []
+
+    speedy = [{**plain[0], "suggested_speed": 0.5}]
+    assert edl_flatten_warnings(speedy)
+
+    zoomed = [_transform_clip(scale=1.4)]
+    assert edl_flatten_warnings(zoomed)
+
+
+def test_generate_edl_notes_flattening_when_transform_present():
+    edl = generate_edl("T", [_transform_clip(scale=1.4)], fps=30)
+    assert "flatten" in edl.lower()

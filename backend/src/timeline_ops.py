@@ -269,6 +269,10 @@ class TimelineController:
     def sources(self) -> Sources:
         return self._sources
 
+    def update_sources(self, sources: Sources) -> None:
+        """Refresh the candidate registry (e.g. after re-analysis adds clips)."""
+        self._sources = sources
+
     @property
     def lock(self) -> asyncio.Lock:
         return self._lock

@@ -5,6 +5,7 @@ Provides REST endpoints for local video ingestion, smooth drone clip analysis,
 timeline assembly, and editor export files.
 """
 
+import json
 import logging
 import shutil
 import subprocess
@@ -27,6 +28,7 @@ from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .assembly_profiles import AssemblyProfile, build_draft_timeline, recommend_assembly_profile
 from .export_engine import (
     choose_timeline_fps,
+    edl_flatten_warnings,
     generate_edl,
     generate_fcpxml,
     generate_resolve_xml,
@@ -41,6 +43,7 @@ from .motion_analysis import (
     parse_trf,
     run_vidstabdetect,
 )
+from .models import TimelineDocument
 from .project_store import (
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
@@ -50,11 +53,16 @@ from .project_store import (
     UnsafeProjectFolderError,
     create_or_open_project as create_or_open_folder_project,
     delete_project_files,
+    load_timeline_document,
+    migrate_legacy_timeline,
     project_state_dir,
     read_analysis_results,
     rescan_project,
     write_analysis_results,
+    write_timeline_document,
 )
+from .timeline_ops import SourceClip, TimelineController, TimelineOpError
+from .timeline_service import TimelineEventBroker
 from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
@@ -83,6 +91,13 @@ app.add_middleware(
 projects = {}
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
+
+# Backend-authoritative Timeline Document layer. One TimelineController per
+# project owns the document + undo history + write lock; the broker fans out
+# `timeline-changed` events to connected clients (GUI over SSE) so the GUI is a
+# thin live-syncing client of the document rather than the source of truth.
+_timeline_controllers: dict[str, TimelineController] = {}
+_timeline_broker = TimelineEventBroker()
 
 # --- Analysis cancellation -------------------------------------------------
 # A SIGTERM'd ffmpeg exits 0 (looks like success), so cancelling needs an
@@ -750,6 +765,134 @@ async def get_timeline(project_id: str):
     }
 
 
+# --- Timeline Document: operations core over HTTP + SSE --------------------
+
+
+class TimelineOpRequest(BaseModel):
+    operation: str
+    args: dict = {}
+
+
+def build_timeline_sources(project: dict) -> dict[str, SourceClip]:
+    """A candidate registry for the operations core: original bounds + the full
+    source-video duration (used to clamp `set_bounds`/`set_speed` extensions)."""
+    videos_by_id = {video["file_id"]: video for video in project.get("videos", [])}
+    sources: dict[str, SourceClip] = {}
+    for clip in project.get("clips", []):
+        clip_id = clip.get("clip_id")
+        if not clip_id:
+            continue
+        video = videos_by_id.get(clip.get("file_id"))
+        duration = (video or {}).get("metadata", {}).get("duration_sec") if video else None
+        if duration is None:
+            duration = clip.get("end_sec", 0.0)
+        sources[clip_id] = SourceClip(
+            clip_id=clip_id,
+            start_sec=float(clip.get("start_sec", 0.0)),
+            end_sec=float(clip.get("end_sec", 0.0)),
+            source_duration_sec=float(duration),
+        )
+    return sources
+
+
+def _initial_timeline_document(project: dict, sources: dict[str, SourceClip]) -> TimelineDocument:
+    folder = project.get("project_folder")
+    legacy = project.get("timeline")
+    if folder:
+        document = load_timeline_document(Path(folder), legacy=legacy, sources=sources)
+        if document is not None:
+            return document
+    if legacy is not None:
+        return migrate_legacy_timeline(legacy, sources=sources)
+    return TimelineDocument()
+
+
+def _make_timeline_on_change(project_id: str):
+    publish = _timeline_broker.publisher(project_id)
+
+    async def on_change(document: TimelineDocument) -> None:
+        project = projects.get(project_id)
+        if project is not None:
+            project["timeline_document"] = document.model_dump()
+            folder = project.get("project_folder")
+            if folder:
+                try:
+                    write_timeline_document(Path(folder), document)
+                except OSError as exc:
+                    logger.warning("Could not persist timeline document for %s: %s", project_id, exc)
+        await publish(document)
+
+    return on_change
+
+
+def get_timeline_controller(project_id: str) -> TimelineController:
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    sources = build_timeline_sources(project)
+    controller = _timeline_controllers.get(project_id)
+    if controller is None:
+        controller = TimelineController(
+            _initial_timeline_document(project, sources),
+            sources,
+            on_change=_make_timeline_on_change(project_id),
+        )
+        _timeline_controllers[project_id] = controller
+    else:
+        controller.update_sources(sources)
+    return controller
+
+
+@app.get("/projects/{project_id}/timeline/document")
+async def get_timeline_document(project_id: str):
+    controller = get_timeline_controller(project_id)
+    return {"project_id": project_id, "document": controller.document.model_dump()}
+
+
+@app.post("/projects/{project_id}/timeline/op")
+async def apply_timeline_op(project_id: str, request: TimelineOpRequest):
+    controller = get_timeline_controller(project_id)
+    try:
+        document = await controller.apply(request.operation, **request.args)
+    except TimelineOpError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TypeError as exc:  # bad/missing args for the operation
+        raise HTTPException(status_code=422, detail=f"invalid arguments: {exc}") from exc
+    return {"project_id": project_id, "document": document.model_dump()}
+
+
+@app.post("/projects/{project_id}/timeline/undo")
+async def undo_timeline_op(project_id: str):
+    controller = get_timeline_controller(project_id)
+    document = await controller.undo()
+    return {"project_id": project_id, "document": document.model_dump()}
+
+
+@app.post("/projects/{project_id}/timeline/redo")
+async def redo_timeline_op(project_id: str):
+    controller = get_timeline_controller(project_id)
+    document = await controller.redo()
+    return {"project_id": project_id, "document": document.model_dump()}
+
+
+@app.get("/projects/{project_id}/events")
+async def timeline_events(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    queue = _timeline_broker.subscribe(project_id)
+
+    async def event_stream():
+        try:
+            yield ": connected\n\n"
+            while True:
+                payload = await queue.get()
+                yield f"event: {payload.get('type', 'message')}\ndata: {json.dumps(payload)}\n\n"
+        finally:
+            _timeline_broker.unsubscribe(project_id, queue)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @app.post("/projects/{project_id}/export")
 async def export_timeline(
     project_id: str,
@@ -764,7 +907,13 @@ async def export_timeline(
     export_dir = export_dir_for(project_id, format)
     export_dir.mkdir(parents=True, exist_ok=True)
     videos_by_id = {video["file_id"]: video for video in projects[project_id]["videos"]}
-    clips = clips_in_timeline_order(projects[project_id])
+    # Prefer the backend-authoritative Timeline Document so Speed/Transform flow
+    # into the export; fall back to the legacy timeline for un-edited projects.
+    document = get_timeline_controller(project_id).document
+    if document.items:
+        clips = clips_from_timeline_document(projects[project_id], document)
+    else:
+        clips = clips_in_timeline_order(projects[project_id])
 
     if format == "edl":
         file_path = export_dir / "timeline.edl"
@@ -807,6 +956,7 @@ async def export_timeline(
         "file_path": str(file_path),
         "clip_count": len(clips),
         "total_duration_sec": round(sum(clip["duration_sec"] for clip in clips), 3),
+        "warnings": edl_flatten_warnings(clips) if format == "edl" else [],
     }
 
 
@@ -1000,6 +1150,32 @@ def export_dir_for(project_id: str, format: str) -> Path:
         }[format]
         return Path(project["project_folder"]) / "exports" / folder_name
     return project_dir(project_id) / "exports"
+
+
+def clips_from_timeline_document(project: dict, document: TimelineDocument) -> list:
+    """Resolve Timeline Document items into export-ready clip dicts.
+
+    Each item joins its source Candidate Clip's metadata (file, name, scores)
+    with the item's own bounds, Speed (`suggested_speed`), and Transform — the
+    fields `export_engine` reads.
+    """
+    clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
+    resolved = []
+    for item in document.items:
+        base = clips_by_id.get(item.source_clip_id)
+        if base is None:
+            continue
+        resolved.append(
+            {
+                **base,
+                "start_sec": item.start_sec,
+                "end_sec": item.end_sec,
+                "duration_sec": round(item.end_sec - item.start_sec, 3),
+                "suggested_speed": item.speed,
+                "transform": item.transform.model_dump(),
+            }
+        )
+    return resolved
 
 
 def clips_in_timeline_order(project: dict) -> list:

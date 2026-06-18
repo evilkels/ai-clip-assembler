@@ -71,8 +71,46 @@ def effective_duration(clip: dict) -> float:
     return float(clip["duration_sec"]) / max(0.01, float(clip.get("suggested_speed", 1.0) or 1.0))
 
 
+def clip_transform(clip: dict) -> Optional[dict]:
+    """A clip's non-identity Transform, or ``None`` for identity/absent."""
+    transform = clip.get("transform")
+    if not transform:
+        return None
+    scale = float(transform.get("scale", 1.0) or 1.0)
+    x = float(transform.get("x", 0.0) or 0.0)
+    y = float(transform.get("y", 0.0) or 0.0)
+    if scale == 1.0 and x == 0.0 and y == 0.0:
+        return None
+    return {"scale": scale, "x": x, "y": y}
+
+
+def edl_flatten_warnings(clips: List[dict]) -> List[str]:
+    """EDL cannot faithfully represent Speed/Transform; warn when present.
+
+    Returned to the caller so the GUI can surface that an EDL export dropped
+    retime/reframe information (use FCPXML or Resolve XML to preserve it).
+    """
+    has_speed = any(float(clip.get("suggested_speed", 1.0) or 1.0) != 1.0 for clip in clips)
+    has_transform = any(clip_transform(clip) is not None for clip in clips)
+    if not (has_speed or has_transform):
+        return []
+    flattened = []
+    if has_speed:
+        flattened.append("Speed")
+    if has_transform:
+        flattened.append("Transform")
+    return [
+        f"EDL cannot represent {' and '.join(flattened)}; it was flattened. "
+        "Export FCPXML or Resolve XML to preserve it."
+    ]
+
+
 def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
     lines = [f"TITLE: {title}", "FCM: NON-DROP FRAME", ""]
+    for warning in edl_flatten_warnings(clips):
+        lines.append(f"* NOTE: {warning} (flattened)")
+    if len(lines) > 3:
+        lines.append("")
     timeline_cursor = 0.0
     for index, clip in enumerate(clips, start=1):
         source_in = clip["start_sec"]
@@ -208,6 +246,26 @@ def generate_resolve_xml(
             ET.SubElement(parameter, "parameterid").text = "speed"
             ET.SubElement(parameter, "value").text = str(round(speed * 100, 3))
 
+        transform = clip_transform(clip)
+        if transform is not None:
+            motion_filter = ET.SubElement(clipitem, "filter")
+            motion = ET.SubElement(motion_filter, "effect")
+            ET.SubElement(motion, "name").text = "Basic Motion"
+            ET.SubElement(motion, "effectid").text = "basic"
+            ET.SubElement(motion, "effectcategory").text = "motion"
+            ET.SubElement(motion, "effecttype").text = "motion"
+            ET.SubElement(motion, "mediatype").text = "video"
+            scale_param = ET.SubElement(motion, "parameter")
+            ET.SubElement(scale_param, "parameterid").text = "scale"
+            ET.SubElement(scale_param, "name").text = "Scale"
+            ET.SubElement(scale_param, "value").text = str(round(transform["scale"] * 100, 3))
+            center_param = ET.SubElement(motion, "parameter")
+            ET.SubElement(center_param, "parameterid").text = "center"
+            ET.SubElement(center_param, "name").text = "Center"
+            center_value = ET.SubElement(center_param, "value")
+            ET.SubElement(center_value, "horiz").text = str(transform["x"])
+            ET.SubElement(center_value, "vert").text = str(transform["y"])
+
         timeline_cursor += timeline_duration
 
     body = ET.tostring(xmeml, encoding="unicode")
@@ -285,6 +343,18 @@ def generate_fcpxml(
                 {
                     "time": seconds_to_fcpx_duration(timeline_duration),
                     "value": seconds_to_fcpx_duration(clip["end_sec"]),
+                },
+            )
+        transform = clip_transform(clip)
+        if transform is not None:
+            # Digital zoom/pan/crop. Position is in this format's points; x/y are
+            # normalized offsets scaled to the frame so the reframe is visible.
+            ET.SubElement(
+                asset_clip,
+                "adjust-transform",
+                {
+                    "scale": f"{transform['scale']} {transform['scale']}",
+                    "position": f"{transform['x'] * width} {transform['y'] * height}",
                 },
             )
         timeline_cursor += timeline_duration

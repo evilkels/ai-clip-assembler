@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
 import {
   analyzeProject,
+  buildVideoMediaUrl,
   cancelAnalysis,
   getAnalysisStatus,
   listHarnesses,
@@ -142,6 +143,7 @@ export function ImportPage() {
   // Analyzed files default to unchecked so a rescan targets the new batch.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
+  const [preview, setPreview] = useState<{ fileId: string; fileName: string } | null>(null);
   const [sort, setSort] = useState<{ key: 'size' | 'date' | 'analyzed' | null; dir: 'asc' | 'desc' }>({
     key: null,
     dir: 'asc',
@@ -177,6 +179,15 @@ export function ImportPage() {
       new Set(uploadedVideos.filter((video) => analyzedIds.has(video.file_id)).map((video) => video.file_id)),
     );
   }, [projectId, uploadedVideos, analyzedIds]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreview(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [preview]);
 
   const selectedIds = uploadedVideos
     .map((v) => v.file_id)
@@ -445,6 +456,7 @@ export function ImportPage() {
                       style={{ cursor: isAnalyzing ? 'default' : 'pointer' }}
                     />
                   </th>
+                  <th style={{ padding: '6px 8px', width: 28 }} aria-label="Preview" />
                   <th style={{ padding: '6px 8px' }}>File</th>
                   <th style={{ padding: '6px 8px', textAlign: 'right' }}>Duration</th>
                   <th style={{ padding: '6px 8px', textAlign: 'right' }}>FPS</th>
@@ -497,6 +509,21 @@ export function ImportPage() {
                           aria-label={`Select ${v.file_name}`}
                           style={{ cursor: isAnalyzing ? 'default' : 'pointer' }}
                         />
+                      </td>
+                      <td style={{ padding: '6px 8px' }}>
+                        <button
+                          type="button"
+                          className="preview-eye"
+                          title={`Preview ${v.file_name}`}
+                          aria-label={`Preview ${v.file_name}`}
+                          disabled={!projectId || !v.metadata}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreview({ fileId: v.file_id, fileName: v.file_name });
+                          }}
+                        >
+                          👁
+                        </button>
                       </td>
                       <td style={{ padding: '6px 8px' }}>{v.file_name}</td>
                       <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
@@ -636,6 +663,38 @@ export function ImportPage() {
           </p>
         )}
       </div>
+
+      {preview && projectId && (
+        <div
+          className="preview-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Preview ${preview.fileName}`}
+          onClick={() => setPreview(null)}
+        >
+          <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="preview-modal-head">
+              <span className="preview-modal-title">{preview.fileName}</span>
+              <button
+                type="button"
+                className="btn subtle"
+                onClick={() => setPreview(null)}
+                aria-label="Close preview"
+              >
+                ✕
+              </button>
+            </div>
+            <video
+              key={preview.fileId}
+              src={buildVideoMediaUrl(projectId, preview.fileId)}
+              controls
+              autoPlay
+              playsInline
+              className="preview-video"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,6 +22,10 @@ export interface ClipCandidate {
   reason: string;
   suggested_speed?: number;
   thumbnail_url?: string;
+  /** ISO 8601 capture time of the source file (for chronological sorting). */
+  source_created_at?: string | null;
+  /** Full duration of the source file in seconds (for the per-file track). */
+  source_duration_sec?: number | null;
 }
 
 export interface VideoMetadata {

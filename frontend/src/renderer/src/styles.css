@@ -625,11 +625,187 @@ a {
   background: #05070a;
 }
 
+.clip-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.clip-thumb:hover .clip-play-btn,
+.clip-play-btn:focus-visible {
+  opacity: 1;
+}
+
+.clip-play-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* ---------- Import preview ---------- */
+
+.preview-eye {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.preview-eye:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--bg-3);
+}
+
+.preview-eye:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.preview-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(1100px, 92vw);
+  max-height: 90vh;
+  background: var(--bg-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.preview-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.preview-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(90vh - 60px);
+  border-radius: 6px;
+  background: #000;
+}
+
+/* ---------- Per-file source track ---------- */
+
+.source-track-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px 0;
+}
+
+.source-track {
+  position: relative;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.source-track.seekable {
+  cursor: pointer;
+}
+
+.source-track-sibling {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.source-track-clip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  border-radius: 2px;
+  min-width: 2px;
+}
+
+.source-track-playhead {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.source-track-caption {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.clip-source-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.clip-file-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
 .clip-source {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+  flex: 1;
+  min-width: 0;
+}
+
+.clip-file-group {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
 }
 
 .clip-body {
@@ -651,6 +827,98 @@ a {
   font-size: 12px;
   line-height: 1.45;
   min-height: 2.7em;
+}
+
+.clip-reason-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 4px;
+}
+
+/* ---------- Verdict badge ---------- */
+
+.clip-verdict-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.clip-verdict {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+}
+
+.clip-verdict.green {
+  color: var(--green);
+  border-color: rgba(62, 207, 142, 0.4);
+  background: rgba(62, 207, 142, 0.12);
+}
+.clip-verdict.yellow {
+  color: var(--yellow);
+  border-color: rgba(230, 180, 80, 0.4);
+  background: rgba(230, 180, 80, 0.12);
+}
+.clip-verdict.red {
+  color: var(--red);
+  border-color: rgba(240, 107, 107, 0.4);
+  background: rgba(240, 107, 107, 0.12);
+}
+
+.clip-verdict-blurb {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.clip-thumb-draft {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(62, 207, 142, 0.85);
+  color: #04130c;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---------- Scoring legend ---------- */
+
+.score-legend {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-1);
+  padding: 10px 14px;
+}
+
+.score-legend summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.score-legend-body p {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.score-legend-body .clip-verdict {
+  font-size: 10px;
+  padding: 1px 7px;
 }
 
 .score-row {
@@ -741,12 +1009,43 @@ a {
   gap: 8px;
 }
 
+.accepted-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .accepted-strip h2 {
   margin: 0;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-dim);
+}
+
+.accepted-strip-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.draft-summary {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.draft-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(230, 180, 80, 0.4);
+  background: rgba(230, 180, 80, 0.08);
+  color: var(--yellow);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .accepted-list {

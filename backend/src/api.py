@@ -570,7 +570,17 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
                     "scoring_seconds_per_clip"
                 ]
         per_video_results.append(video_metadata)
-        clips = [clip.model_dump() for clip in result.clips]
+        # Carry the source file's capture time and full duration onto each clip so
+        # the UI can place clips on a per-file track and sort by true capture time.
+        source_meta = video.get("metadata") or {}
+        source_created_at = source_meta.get("created_at")
+        source_duration_sec = source_meta.get("duration_sec")
+        clips = []
+        for clip in result.clips:
+            clip_dict = clip.model_dump()
+            clip_dict["source_created_at"] = source_created_at
+            clip_dict["source_duration_sec"] = source_duration_sec
+            clips.append(clip_dict)
         all_clips.extend(clips)
         video_timing["video_total_sec"] = round(time.monotonic() - video_started, 2)
         timings.append(video_timing)
@@ -581,6 +591,9 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         for clip in projects[project_id].get("clips", [])
         if clip.get("file_id") not in analyzed_file_ids
     )
+    # Backfill source metadata on merged-in clips from earlier runs so the per-file
+    # track and chronological sort behave consistently across the whole set.
+    enrich_clips_with_source_metadata({"clips": all_clips, "videos": projects[project_id]["videos"]})
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
     sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
@@ -701,11 +714,30 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
     return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
 
 
+def enrich_clips_with_source_metadata(project: dict) -> list:
+    """Backfill source_created_at / source_duration_sec onto clips in place.
+
+    Clips analyzed before these fields existed — or merged back from an earlier
+    partial-analysis run — lack them, which makes the per-file track render for
+    only some cards. The values live on the source video's metadata, which is
+    always available, so we fill any gaps from there.
+    """
+    videos_by_id = {video["file_id"]: video for video in project.get("videos", [])}
+    clips = project.get("clips", [])
+    for clip in clips:
+        meta = (videos_by_id.get(clip.get("file_id")) or {}).get("metadata") or {}
+        if clip.get("source_duration_sec") is None:
+            clip["source_duration_sec"] = meta.get("duration_sec")
+        if clip.get("source_created_at") is None:
+            clip["source_created_at"] = meta.get("created_at")
+    return clips
+
+
 @app.get("/projects/{project_id}/clips")
 async def get_clips(project_id: str):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    return {"clips": projects[project_id].get("clips", [])}
+    return {"clips": enrich_clips_with_source_metadata(projects[project_id])}
 
 
 @app.get("/projects/{project_id}/timeline")

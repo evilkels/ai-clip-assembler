@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import { ClipCard } from '../components/ClipCard';
 import { useReview } from '../state/ReviewContext';
@@ -94,16 +94,49 @@ export function ReviewPage() {
     resetDecision,
     moveAccepted,
     setTrim,
+    sortAcceptedChronologically,
     recommendation,
     regenerateDraft,
   } = useReview();
   const [generatingDraft, setGeneratingDraft] = useState(false);
+  // Free-text buffer for the target-seconds field. Clamping on every keystroke
+  // corrupts multi-digit entry (typing "45" snapped to "55"), so we only parse
+  // and clamp on blur / before regenerating.
+  const [secondsInput, setSecondsInput] = useState(String(targetDuration));
+  useEffect(() => {
+    setSecondsInput(String(targetDuration));
+  }, [targetDuration]);
+
+  const commitSeconds = (): number => {
+    const parsed = Math.round(Number(secondsInput));
+    const next = Number.isFinite(parsed) && parsed >= 5 ? parsed : 5;
+    setTargetDuration(next);
+    setSecondsInput(String(next));
+    return next;
+  };
 
   const ranked = useMemo(() => rankClips(clips), [clips]);
   const filtered = useMemo(
     () => ranked.filter((c) => c.scores.smoothness >= smoothnessThreshold),
     [ranked, smoothnessThreshold],
   );
+
+  const draftPositions = useMemo(
+    () => new Map(acceptedOrder.map((id, index) => [id, index + 1])),
+    [acceptedOrder],
+  );
+
+  // Group candidates by source file so each card can show its siblings on the
+  // file track ("this is candidate 2 of 3 from this clip").
+  const clipsByFile = useMemo(() => {
+    const map = new Map<string, ClipCandidate[]>();
+    for (const clip of clips) {
+      const list = map.get(clip.file_id) ?? [];
+      list.push(clip);
+      map.set(clip.file_id, list);
+    }
+    return map;
+  }, [clips]);
 
   const acceptedClips = useMemo(
     () => {
@@ -114,6 +147,22 @@ export function ReviewPage() {
     },
     [acceptedOrder, clips],
   );
+
+  const draftDurationSec = useMemo(
+    () =>
+      acceptedClips.reduce((sum, clip) => {
+        const trim = trims[clip.clip_id];
+        const start = trim?.start_sec ?? clip.start_sec;
+        const end = trim?.end_sec ?? clip.end_sec;
+        return sum + Math.max(0, end - start);
+      }, 0),
+    [acceptedClips, trims],
+  );
+
+  // Flag a draft that falls well short of the requested target so the user
+  // understands the seconds field worked but there wasn't enough usable footage.
+  const targetShortfall =
+    acceptedClips.length > 0 && draftDurationSec < targetDuration * 0.9;
 
   return (
     <div className="page">
@@ -153,6 +202,23 @@ export function ReviewPage() {
 
       <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {clips.length > 0 && (
+          <details className="score-legend">
+            <summary>How clips are scored</summary>
+            <div className="score-legend-body">
+              <p>
+                Every clip gets a <strong>verdict</strong> from its combined score:{' '}
+                <span className="clip-verdict green">Strong</span> (≥8),{' '}
+                <span className="clip-verdict yellow">Usable</span> (5–8),{' '}
+                <span className="clip-verdict red">Weak</span> (&lt;5). The combined score blends
+                technical quality (smoothness, sharpness, exposure, contrast) with AI-judged visual
+                interest. The <strong>Why</strong> line on each card is written by the local vision
+                model. Generating a draft re-picks and re-orders clips for your profile and target —
+                cards already in the timeline are tagged <em>◆ Timeline #n</em>.
+              </p>
+            </div>
+          </details>
+        )}
+        {clips.length > 0 && (
           <section className="draft-setup" aria-label="Draft setup">
             <div>
               <span className="draft-kicker">Recommended assembly</span>
@@ -176,8 +242,9 @@ export function ReviewPage() {
                 type="number"
                 min={5}
                 step={5}
-                value={targetDuration}
-                onChange={(event) => setTargetDuration(Math.max(5, Number(event.target.value)))}
+                value={secondsInput}
+                onChange={(event) => setSecondsInput(event.target.value)}
+                onBlur={commitSeconds}
               />
             </label>
             <button
@@ -189,9 +256,10 @@ export function ReviewPage() {
                   acceptedOrder.length > 0 &&
                   !window.confirm('Replace the current Timeline with a newly generated draft?')
                 ) return;
+                const seconds = commitSeconds();
                 setGeneratingDraft(true);
                 try {
-                  await regenerateDraft(profile, targetDuration);
+                  await regenerateDraft(profile, seconds);
                 } finally {
                   setGeneratingDraft(false);
                 }
@@ -203,7 +271,30 @@ export function ReviewPage() {
         )}
         {acceptedClips.length > 0 && (
           <div className="accepted-strip">
-            <h2>Accepted order — sent to export</h2>
+            <div className="accepted-strip-head">
+              <h2>Timeline — sent to export</h2>
+              <div className="accepted-strip-tools">
+                <button
+                  type="button"
+                  className="btn subtle"
+                  onClick={sortAcceptedChronologically}
+                  title="Reorder the timeline by source capture time"
+                >
+                  Sort chronologically
+                </button>
+                <span className="draft-summary">
+                  {acceptedClips.length} clip{acceptedClips.length === 1 ? '' : 's'} ·{' '}
+                  {draftDurationSec.toFixed(0)}s / {targetDuration}s target
+                </span>
+              </div>
+            </div>
+            {targetShortfall && (
+              <p className="draft-warning">
+                Draft is {draftDurationSec.toFixed(0)}s — short of the {targetDuration}s target.
+                Not enough footage clears the smoothness filter. Lower the threshold or the target
+                to fit more.
+              </p>
+            )}
             <div className="accepted-list">
               {acceptedClips.map((clip, idx) => {
                 const trim = trims[clip.clip_id];
@@ -273,6 +364,16 @@ export function ReviewPage() {
                   clip={clip}
                   rank={idx + 1}
                   decision={decision}
+                  draftPosition={draftPositions.get(clip.clip_id)}
+                  siblingRanges={(clipsByFile.get(clip.file_id) ?? [])
+                    .filter((c) => c.clip_id !== clip.clip_id)
+                    .map((c) => ({ start: c.start_sec, end: c.end_sec }))}
+                  fileClipIndex={
+                    [...(clipsByFile.get(clip.file_id) ?? [])]
+                      .sort((a, b) => a.start_sec - b.start_sec)
+                      .findIndex((c) => c.clip_id === clip.clip_id) + 1
+                  }
+                  fileClipCount={(clipsByFile.get(clip.file_id) ?? []).length}
                   mediaUrl={projectId ? buildVideoMediaUrl(projectId, clip.file_id) : undefined}
                   onToggleInclude={() =>
                     decision === 'included' ? resetDecision(clip.clip_id) : include(clip.clip_id)

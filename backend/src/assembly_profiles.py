@@ -41,6 +41,18 @@ PROFILE_DEFAULTS = {
 }
 
 
+def _capture_order_key(clip: dict) -> tuple:
+    """Sort key for chronological (shooting-order) assembly.
+
+    Prefers the source file's capture time; falls back to the filename so
+    single-camera footage (whose names embed a sortable timestamp) still
+    orders correctly when no container timestamp is present.
+    """
+    created_at = clip.get("source_created_at")
+    primary = str(created_at) if created_at else str(clip.get("file_name", "")).casefold()
+    return (primary, float(clip["start_sec"]))
+
+
 def speed_for_clip(clip: dict, policy: str) -> float:
     """Per-profile suggested playback speed; overrides the raw candidate's."""
     if policy == "slowmo_smooth":
@@ -112,9 +124,10 @@ def build_draft_timeline(
             break
 
     # "score_desc" keeps the strongest-first order from selection; the narrative
-    # profiles re-sort into shooting order.
+    # profiles re-sort into shooting order — by true capture time when available,
+    # falling back to filename so single-camera footage still sorts sensibly.
     if ordering != "score_desc":
-        selected.sort(key=lambda item: (str(item.get("file_name", "")).casefold(), float(item["start_sec"])))
+        selected.sort(key=_capture_order_key)
     return {
         "source": "draft",
         "profile": profile,

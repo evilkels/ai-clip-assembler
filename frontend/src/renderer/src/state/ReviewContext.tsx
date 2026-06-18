@@ -60,6 +60,7 @@ interface ReviewState {
   resetDecision: (clipId: string) => void;
   moveAccepted: (clipId: string, direction: -1 | 1) => void;
   reorderAccepted: (clipId: string, toIndex: number) => void;
+  sortAcceptedChronologically: () => void;
   setTrim: (clipId: string, trim: Trim) => void;
   setProjectId: (id: string | null) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
@@ -375,6 +376,23 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const sortAcceptedChronologically = useCallback(() => {
+    hasReviewEdits.current = true;
+    setAcceptedOrder((prev) => {
+      const byId = new Map(clips.map((clip) => [clip.clip_id, clip]));
+      const captureKey = (id: string): string => {
+        const clip = byId.get(id);
+        return clip?.source_created_at ?? clip?.file_name ?? '';
+      };
+      return [...prev].sort((a, b) => {
+        const ka = captureKey(a);
+        const kb = captureKey(b);
+        if (ka !== kb) return ka < kb ? -1 : 1;
+        return (byId.get(a)?.start_sec ?? 0) - (byId.get(b)?.start_sec ?? 0);
+      });
+    });
+  }, [clips]);
+
   const reorderAccepted = useCallback((clipId: string, toIndex: number) => {
     hasReviewEdits.current = true;
     setAcceptedOrder((prev) => {
@@ -428,6 +446,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       resetDecision,
       moveAccepted,
       reorderAccepted,
+      sortAcceptedChronologically,
       setTrim,
       setProjectId,
       setUploadedVideos,
@@ -468,6 +487,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       resetDecision,
       moveAccepted,
       reorderAccepted,
+      sortAcceptedChronologically,
       setTrim,
       applyAnalysisResult,
       recommendation,

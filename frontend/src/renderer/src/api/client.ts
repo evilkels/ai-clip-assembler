@@ -75,6 +75,8 @@ interface BackendClipSuggestion {
   suggested_speed?: number;
   suggested_transition?: string;
   tags?: string[];
+  source_created_at?: string | null;
+  source_duration_sec?: number | null;
 }
 
 export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
@@ -95,6 +97,8 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
     },
     reason: c.ai_reason,
     suggested_speed: c.suggested_speed,
+    source_created_at: c.source_created_at ?? null,
+    source_duration_sec: c.source_duration_sec ?? null,
   };
 }
 

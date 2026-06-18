@@ -1364,3 +1364,52 @@ a {
   padding: 0 4px;
   font-size: 10px;
 }
+
+/* In-app review agent chat panel (Phase C) */
+.review-chat {
+  margin-top: 16px;
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 10px;
+  background: var(--surface, #161a22);
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+}
+.review-chat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border, #2a2f3a);
+}
+.review-chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat-msg p { margin: 0 0 6px; }
+.chat-editor { align-self: flex-end; text-align: right; opacity: 0.85; }
+.chat-agent { align-self: flex-start; }
+.chat-busy { opacity: 0.6; font-style: italic; }
+.proposal-card {
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.proposal-summary { margin: 0 0 6px; padding-left: 18px; }
+.proposal-delta { margin: 0 0 8px; font-size: 0.85em; opacity: 0.75; }
+.proposal-actions { display: flex; gap: 8px; }
+.proposal-status { text-transform: capitalize; font-size: 0.85em; opacity: 0.8; }
+.proposal-accepted { color: #4caf50; }
+.proposal-rejected { color: #e57373; }
+.review-chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border, #2a2f3a);
+}
+.review-chat-input input { flex: 1; }

@@ -1822,3 +1822,62 @@ def test_mcp_endpoint_lists_tools_and_applies_operation(monkeypatch, tmp_path):
     # The MCP edit went through the same core, so the HTTP document reflects it.
     document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
     assert [i["source_clip_id"] for i in document["items"]] == ["clip-1"]
+
+
+def test_review_turn_proposes_then_accept_applies(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda context: {
+            "message": "Accept the first clip.",
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-1"}}],
+        },
+    )
+
+    turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
+    assert turn.status_code == 200
+    body = turn.json()
+    assert body["message"].startswith("Accept")
+    proposal_id = body["proposal"]["proposal_id"]
+    # Not applied yet.
+    assert client.get(f"/projects/{project_id}/timeline/document").json()["document"]["items"] == []
+
+    accepted = client.post(f"/projects/{project_id}/proposals/{proposal_id}/accept")
+    assert accepted.status_code == 200
+    assert [i["source_clip_id"] for i in accepted.json()["document"]["items"]] == ["clip-1"]
+
+
+def test_review_turn_reject_leaves_timeline_unchanged(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda context: {
+            "message": "Consider clip 2.",
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-2"}}],
+        },
+    )
+    proposal_id = client.post(f"/projects/{project_id}/review/turn", json={"message": "?"}).json()["proposal"]["proposal_id"]
+
+    rejected = client.post(f"/projects/{project_id}/proposals/{proposal_id}/reject")
+    assert rejected.status_code == 200
+    assert rejected.json()["proposal"]["status"] == "rejected"
+    assert client.get(f"/projects/{project_id}/timeline/document").json()["document"]["items"] == []
+
+
+def test_review_kickoff_runs_a_proactive_turn(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    seen = {}
+    def agent(context):
+        seen["user_message"] = context["user_message"]
+        return {"message": "Welcome — here's my take.", "operations": []}
+    monkeypatch.setattr(api, "_review_agent", agent)
+
+    kicked = client.post(f"/projects/{project_id}/review/kickoff")
+    assert kicked.status_code == 200
+    assert kicked.json()["message"].startswith("Welcome")
+    assert "Analysis just finished" in seen["user_message"]

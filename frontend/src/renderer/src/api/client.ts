@@ -488,6 +488,56 @@ export function subscribeTimelineEvents(
   return () => source.close();
 }
 
+// --- In-app review agent (propose mode) ------------------------------------
+
+export interface Proposal {
+  proposal_id: string;
+  project_id: string;
+  message: string;
+  operations: Array<{ operation: string; args: Record<string, unknown> }>;
+  summary: string[];
+  before_item_count: number;
+  after_item_count: number;
+  status: 'pending' | 'accepted' | 'rejected';
+}
+
+export interface ReviewTurnResult {
+  message: string;
+  proposal: Proposal | null;
+}
+
+export async function reviewTurn(projectId: string, message: string): Promise<ReviewTurnResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/review/turn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error(`Review turn failed: ${res.status}`);
+  return res.json() as Promise<ReviewTurnResult>;
+}
+
+export async function reviewKickoff(projectId: string): Promise<ReviewTurnResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/review/kickoff`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Review kickoff failed: ${res.status}`);
+  return res.json() as Promise<ReviewTurnResult>;
+}
+
+export async function acceptProposal(projectId: string, proposalId: string): Promise<TimelineDocument> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/proposals/${proposalId}/accept`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Accept proposal failed: ${res.status}`);
+  return (await res.json()).document as TimelineDocument;
+}
+
+export async function rejectProposal(projectId: string, proposalId: string): Promise<Proposal> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/proposals/${proposalId}/reject`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Reject proposal failed: ${res.status}`);
+  return (await res.json()).proposal as Proposal;
+}
+
 export async function regenerateDraft(
   projectId: string,
   profile: AssemblyProfile,

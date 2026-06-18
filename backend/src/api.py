@@ -62,6 +62,7 @@ from .project_store import (
     write_timeline_document,
 )
 from .mcp_server import TimelineMCPServer
+from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
 from .timeline_ops import SourceClip, TimelineController, TimelineOpError
 from .timeline_service import TimelineEventBroker
 from .quality_scoring import score_samples_from_images
@@ -99,6 +100,12 @@ VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 # thin live-syncing client of the document rather than the source of truth.
 _timeline_controllers: dict[str, TimelineController] = {}
 _timeline_broker = TimelineEventBroker()
+
+# In-app review agent (propose mode). The model call is injected so it is
+# testable/overridable; proposals are staged here and replayed through the
+# operations core on accept.
+_proposal_store = ProposalStore()
+_review_agent = default_review_agent
 
 # --- Analysis cancellation -------------------------------------------------
 # A SIGTERM'd ffmpeg exits 0 (looks like success), so cancelling needs an
@@ -953,6 +960,77 @@ async def mcp_endpoint(request: Request):
     if response is None:
         return Response(status_code=202)
     return response
+
+
+# --- In-app review agent (propose mode) ------------------------------------
+
+
+class ReviewTurnRequest(BaseModel):
+    message: str = ""
+
+
+async def _run_review_turn(project_id: str, user_message: str) -> dict:
+    controller = get_timeline_controller(project_id)
+    candidates = get_mcp_server()._list_candidates(project_id)
+    return await run_review_turn(
+        project_id,
+        user_message=user_message,
+        controller=controller,
+        candidates=candidates,
+        store=_proposal_store,
+        agent=_review_agent,
+    )
+
+
+@app.post("/projects/{project_id}/review/turn")
+async def review_turn(project_id: str, request: ReviewTurnRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return await _run_review_turn(project_id, request.message)
+
+
+@app.post("/projects/{project_id}/review/kickoff")
+async def review_kickoff(project_id: str):
+    """Proactive opening turn — auto-kicked when analysis completes (C.3) or
+    triggered by the GUI when the Review route mounts."""
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return await _run_review_turn(
+        project_id,
+        "Analysis just finished. Give a one-line opening take and propose your "
+        "strongest first edits.",
+    )
+
+
+@app.get("/projects/{project_id}/proposals")
+async def list_proposals(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {
+        "project_id": project_id,
+        "proposals": [p.model_dump() for p in _proposal_store.list_for_project(project_id)],
+    }
+
+
+@app.post("/projects/{project_id}/proposals/{proposal_id}/accept")
+async def accept_proposal(project_id: str, proposal_id: str):
+    controller = get_timeline_controller(project_id)
+    try:
+        document = await _proposal_store.accept(proposal_id, controller)
+    except ReviewAgentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"project_id": project_id, "document": document.model_dump()}
+
+
+@app.post("/projects/{project_id}/proposals/{proposal_id}/reject")
+async def reject_proposal(project_id: str, proposal_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        proposal = _proposal_store.reject(proposal_id)
+    except ReviewAgentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"project_id": project_id, "proposal": proposal.model_dump()}
 
 
 @app.post("/projects/{project_id}/export")

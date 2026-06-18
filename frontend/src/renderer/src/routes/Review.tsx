@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import { ClipCard } from '../components/ClipCard';
 import { useReview } from '../state/ReviewContext';
+import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import type { ClipCandidate } from '../types/clip';
 import type { AssemblyProfile } from '../types/clip';
 
@@ -387,6 +388,7 @@ export function ReviewPage() {
           </div>
         )}
       </div>
+      <ReviewChatPanel />
     </div>
   );
 }

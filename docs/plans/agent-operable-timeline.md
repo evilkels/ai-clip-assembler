@@ -178,19 +178,20 @@ propose mode, that proactively suggests edits the Editor accepts or rejects.
 accepted proposals replay through the operations core so they land in undo history.
 
 ### Task C.1 — Hosted agent loop (MCP client, propose mode)
-**Files:** new conversational harness module, `backend/tests/`
-- [ ] Agent loop that is an MCP client of our own server; reuse `pi_cli_harness` env-config (provider/model).
-- [ ] Capture mutating tool calls as a **Proposal** (staged ops + diff) instead of applying; read tools run normally.
-- [ ] Tests: proposal capture; accept replays ops through the core; reject discards.
+**Files:** `backend/src/review_agent.py` (new), `backend/tests/test_review_agent.py`
+- [x] Agent loop (`run_review_turn`) with the model call injected; `default_review_agent` reuses `pi_cli_harness` env-config (provider/model) and degrades to chat-only on failure.
+- [x] Capture mutating tool calls as a **Proposal** (staged ops + diff via `_simulate`) instead of applying; read access provided as context.
+- [x] Tests: proposal capture; accept replays ops through the core (undoable, emits event); reject discards. API endpoints `review/turn`, `proposals/{id}/accept|reject` tested.
 
 ### Task C.2 — Chat panel + proposal cards
-**Files:** `frontend/src/renderer/src/routes/Review.tsx`, new chat components, `frontend/e2e/`
-- [ ] Chat panel in the Review route; inline proposal cards with Accept/Reject; token streaming over SSE.
-- [ ] E2E: propose → accept updates the timeline; reject leaves it unchanged.
+**Files:** `frontend/src/renderer/src/components/ReviewChatPanel.tsx`, `frontend/src/renderer/src/routes/Review.tsx`, `client.ts`
+- [x] Chat panel in the Review route; inline proposal cards with Accept/Reject; client API (`reviewTurn`, `acceptProposal`, `rejectProposal`). Typecheck green.
+- [~] Token streaming over SSE deferred — turns return the full message; the timeline updates live via the existing SSE reconcile on accept.
+- [ ] E2E: propose → accept updates the timeline; reject leaves it unchanged (needs the Electron+backend stack with a stubbed agent; pending visual QA).
 
 ### Task C.3 — Proactive turn
-**Files:** `backend/src/api.py`
-- [ ] Auto-kick one agent turn when analysis completes, posting an opening message + initial proposals.
+**Files:** `backend/src/api.py`, `ReviewChatPanel.tsx`
+- [x] `POST /projects/{id}/review/kickoff` runs one proactive opening turn; the chat panel auto-kicks it on mount for a project (after analysis lands on the Review route). Tested.
 
 **Phase C verification:** backend proposal tests green; e2e propose→accept and
 proactive opening turn.

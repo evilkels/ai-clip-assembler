@@ -1,102 +1,227 @@
-# Plan: Agent-Operable Timeline
+# Agent-Operable Timeline
 
-Status: Draft, awaiting review
-Owner: Elvijs
-Related: design spec
-[`docs/specs/2026-06-19-agent-operable-timeline-design.md`](../specs/2026-06-19-agent-operable-timeline-design.md),
-`UBIQUITOUS_LANGUAGE.md`, `docs/ARCHITECTURE.md`, `backend/src/api.py`,
-`frontend/src/renderer/src/state/ReviewContext.tsx`
+> **For agentic workers:** Use the executing-plans / subagent-driven-development
+> workflow to implement this plan phase-by-phase. Steps use checkbox (`- [ ]`)
+> syntax for tracking. Read the whole phase before starting it; honor the
+> **Guardrails** in each phase and the **review gate** after Phase A1. Update the
+> status row in `docs/plans/README.md` when a phase lands. The design spec is the
+> source of truth for behaviour:
+> [`docs/specs/2026-06-19-agent-operable-timeline-design.md`](../specs/2026-06-19-agent-operable-timeline-design.md).
+>
+> **Drift check (run first):**
+> `git diff --stat ed891fd..HEAD -- backend/src frontend/src/renderer/src/state/ReviewContext.tsx docs/`
+> If any in-scope file changed since this plan was written, re-verify the cited
+> files against live code before editing; on a structural mismatch with the
+> spec, treat it as a STOP condition.
 
-## Problem
+## Status
+
+- **Priority**: P2 (after the current clip-quality-review-ux work lands)
+- **Effort**: L overall (phased; A1 and B independently shippable; A2 is the heavy one)
+- **Risk**: LOW (A1), MEDIUM-HIGH (A2 — `ReviewContext` source-of-truth refactor),
+  MEDIUM (B — MCP transport in FastAPI), MEDIUM (C — agent loop + propose UX)
+- **Depends on**: none to start; B and C build on A
+- **Category**: architecture + product
+- **Planned at**: commit `ed891fd`, 2026-06-19
+- **Progress**: not started
+
+## Why this matters
 
 The timeline is GUI-only and thin: an ordered list of accepted candidate clips
 plus per-clip trims, owned by the frontend (`ReviewContext`). It cannot be
 operated by an agent, and it cannot express real edits (split, extend, speed,
-transform, multi-instance). We want the editor itself to be a tool surface that
-the GUI, an in-app review agent, and external agents (Claude Code/Cursor) all
-drive through one shared, reversible operation set — exposed locally over MCP —
-while staying local-first and assist-don't-generate.
+transform, multi-instance). Borrowing Palmier Pro's working principle — *the
+editor itself is a tool surface an agent drives on one live timeline* — we make
+the editor agent-operable while keeping our identity: **local-first,
+assist-don't-generate** (we adopt agent-operability; we do **not** chase
+on-timeline cloud generation). The payoff: GUI, an in-app review agent, and
+external agents (Claude Code/Cursor) all drive one shared, reversible operation
+set over a local MCP server.
 
-See the design spec for full rationale and the Palmier comparison that prompted
-this.
+## Subsystems & build order
 
-## Decision
+- **A — Rich timeline document** (the editable substrate). Built first.
+- **B — Operation surface + embedded MCP server** (HTTP + MCP adapters over one core; SSE live-sync).
+- **C — In-app chat + proactive review agent** (an MCP client of our own server, propose mode).
 
-Build the three subsystems in order **A → B → C** on a single
-backend-authoritative timeline document with one operations core:
+B and C both stand on A; C reuses B's tools. Hence **A → B → C**.
 
-- **A — Rich timeline document** (the editable substrate).
-- **B — Operation surface + embedded MCP server** (HTTP + MCP adapters over the
-  same core; SSE live-sync to the GUI).
-- **C — In-app chat agent** (an MCP client of our own server, propose mode) +
-  proactive review turn.
+## Decisions locked (see spec for rationale)
 
-## Phases
+1. One spec/plan, full vision, built A → B → C.
+2. Agent reasons over the **existing local frame JPEGs** (same trust boundary as `pi_agent`).
+3. Editor ceiling: split, extend/retrim, reorder, multi-instance, **speed**, **transform**. No transitions/audio/titles/color.
+4. **Backend-authoritative** timeline; GUI live-updates via SSE; one operation set for GUI + chat + MCP.
+5. In-app agent **proposes & confirms**; external agents **apply**; **global undo/redo**.
 
-### Phase A1 — Backend timeline document + operations core
+---
 
-- New `TimelineDocument` / `TimelineItem` models (`backend/src/models.py`).
-- New `backend/src/timeline_ops.py`: the operations core (`add_item`,
-  `remove_item`, `split_item`, `set_bounds`, `reorder`, `set_speed`,
-  `set_transform`, `include`, `exclude`, `set_profile`, `set_target_duration`)
-  with validation/clamping and snapshot-based undo/redo (bounded per-project
-  history, per-project async write lock).
-- Persistence in the project store + a migration loader for the old
-  `{clip_id, start_sec, end_sec}` timeline format.
-- Unit tests: split math, speed→effective duration, transform validation,
-  extend/clamp, multi-instance identity, undo/redo, migration.
+## Phase A1 — Timeline document + operations core
 
-**STOP / review** before A2: confirm the operation set and document shape.
+**Goal:** A backend-authoritative `TimelineDocument` with a single reversible
+operations core. Backend-only; no API or frontend changes yet.
 
-### Phase A2 — HTTP operation endpoints + SSE + GUI rich editing
+**Guardrails:** Test-first — write `backend/tests/test_timeline_ops.py` before
+the implementation. Do not touch `ReviewContext` or the export engine in this
+phase. Keep the existing `PUT /projects/{id}/timeline` working until A2 replaces it.
 
-- Operation endpoints + `undo`/`redo` under
-  `/projects/{project_id}/timeline/...` in `backend/src/api.py`.
-- SSE `/projects/{project_id}/events` emitting `timeline-changed`.
-- Refactor `ReviewContext` from authoritative state to a thin client: fetch
-  document, subscribe to SSE, call operation endpoints. **Riskiest step** —
-  preserve existing accept/reject/reorder/trim UX behaviour.
-- GUI affordances for split, extend, speed, transform (zoom/pan).
-- Export: encode speed/transform into FCPXML + Resolve XML; flatten with a
-  warning for EDL (`backend/src/export_engine.py`).
-- Playwright e2e: live-update, speed/zoom edit, regression on existing review
-  flow.
+### Task A1.1 — Document & item models
+**Files:** `backend/src/models.py`, `backend/tests/test_timeline_ops.py`
+- [ ] Add `TimelineItem` (`item_id`, `source_clip_id`, `start_sec`, `end_sec`, `speed=1.0`, `transform`) and `TimelineDocument` (`items[]`, `profile`, `target_duration_sec`, `version`).
+- [ ] Add a `Transform` model (`scale`, `x`, `y`) with identity default and validation.
 
-### Phase B — Embedded MCP server
+### Task A1.2 — Operations core
+**Files:** `backend/src/timeline_ops.py` (new), `backend/tests/test_timeline_ops.py`
+- [ ] Implement operations from the spec's Section 2 table: `add_item`, `remove_item`, `split_item`, `set_bounds`, `reorder`, `set_speed`, `set_transform`, `include`, `exclude`, `set_profile`, `set_target_duration`.
+- [ ] Validation/clamping: bounds clamped to `[0, source_duration]`; `split_item` splits within bounds; `speed > 0`; transform validated.
+- [ ] Failing-then-passing tests: split math, `speed → effective duration` (`(end-start)/speed`), transform validation, extend/clamp, multi-instance identity (same candidate → distinct `item_id`s).
 
-- Mount an MCP server at `/mcp` in the FastAPI process.
-- Mutating tools 1:1 with the operations core; read tools `list_candidates`,
-  `get_timeline`, `get_project_summary`, `get_frame_paths`.
-- Tests: tool handlers called directly; one real Claude Code connection check.
-- Docs: new `docs/MCP_SERVER.md` (endpoint, port, tools, connect Claude
-  Code/Cursor).
+### Task A1.3 — Undo/redo history
+**Files:** `backend/src/timeline_ops.py`, tests
+- [ ] Snapshot-based bounded per-project history; `undo`/`redo` as snapshot pop/push.
+- [ ] Per-project async write lock so GUI + agent operations cannot interleave mid-op.
+- [ ] Tests: undo/redo correctness across each operation; lock serialization.
 
-### Phase C — In-app chat + proactive review agent
+### Task A1.4 — Persistence + migration
+**Files:** `backend/src/project_store.py`, `backend/tests/test_project_store.py`
+- [ ] Persist/load `TimelineDocument`; debounced save after each op (reuse existing save path).
+- [ ] Migration loader: upgrade old `{clip_id, start_sec, end_sec}` timelines into `TimelineItem`s (`item_id` generated, `speed=1.0`, identity transform).
+- [ ] Test: old-format round-trip opens cleanly as a `TimelineDocument`.
 
-- Hosted agent loop as an MCP client of our own server (new conversational
-  harness, reusing the `pi_cli_harness` env-config pattern).
-- Propose mode: capture mutating tool calls as Proposals (staged ops + diff);
-  Accept replays through the core, Reject discards.
-- Chat panel in the Review route with inline proposal cards; token streaming
-  over SSE.
-- Proactive: auto-kick one agent turn when analysis completes.
+**Phase A1 verification:** `cd frontend && npm run test:backend` green (or
+`backend/.venv/bin/pytest backend/tests/test_timeline_ops.py backend/tests/test_project_store.py -q`).
 
-## Documentation (cross-cutting deliverable)
+> **REVIEW GATE — STOP after A1.** Post a summary of the operation set and
+> document shape; wait for human review before starting A2.
 
-- README sections: "Controlling the app with an agent (MCP)" + "Timeline editing".
-- New `docs/MCP_SERVER.md`.
-- Update `docs/ARCHITECTURE.md` and `UBIQUITOUS_LANGUAGE.md` with the new model
-  and terms.
+---
+
+## Phase A2 — HTTP endpoints + SSE + GUI rich editing
+
+**Goal:** Expose the operations core over HTTP, make the GUI a thin live-updating
+client of the backend document, and add split/extend/speed/transform editing.
+
+**Guardrails:** Keep existing accept/reject/reorder/trim behaviour green via the
+`frontend/e2e/` review specs at every step. This is the highest-risk phase —
+land the refactor before adding new editing affordances.
+
+### Task A2.1 — Operation endpoints + undo/redo
+**Files:** `backend/src/api.py`, `backend/tests/test_api.py`
+- [ ] Add operation endpoints under `/projects/{id}/timeline/...` (per-op or one `POST .../op` with name+args) returning the resolved document, plus `POST .../undo` and `POST .../redo`.
+- [ ] API tests for each endpoint + undo/redo.
+
+### Task A2.2 — SSE live-sync
+**Files:** `backend/src/api.py`, `backend/tests/test_api.py`
+- [ ] Add SSE `/projects/{id}/events` emitting `timeline-changed` after each op.
+- [ ] Test: an operation emits the event.
+
+### Task A2.3 — ReviewContext → thin client (highest risk)
+**Files:** `frontend/src/renderer/src/state/ReviewContext.tsx`, `frontend/src/renderer/src/api/client.ts`
+- [ ] Replace authoritative state with: fetch document, subscribe to SSE, call operation endpoints; reconcile from the authoritative document.
+- [ ] Preserve existing review UX (accept/reject/reorder/trim) behaviour.
+- [ ] E2E: an agent/external edit appears live in the GUI.
+
+### Task A2.4 — GUI editing affordances
+**Files:** `frontend/src/renderer/src/components/`, `frontend/e2e/`
+- [ ] UI for split, extend, speed, transform (zoom/pan). Preview: speed via `video.playbackRate`, transform via CSS/canvas transform.
+- [ ] E2E for speed/zoom editing.
+
+### Task A2.5 — Export speed/transform
+**Files:** `backend/src/export_engine.py`, `backend/tests/test_export_engine.py`
+- [ ] Encode speed (retime) + transform (`adjust-transform`) into FCPXML and Resolve XML.
+- [ ] EDL: flatten speed/transform and surface a warning.
+- [ ] Tests for each format.
+
+**Phase A2 verification:** backend API tests green; existing review e2e still
+pass; new e2e for live-update + speed/zoom; export tests green.
+
+---
+
+## Phase B — Embedded MCP server
+
+**Goal:** An MCP server in the FastAPI process exposing the operations core plus
+read tools, so external agents drive the same live timeline.
+
+**Guardrails:** MCP tools must call the **same** operations core as the HTTP
+adapter — no parallel mutation path.
+
+### Task B.1 — Mount MCP + mutating tools
+**Files:** `backend/src/api.py` (or a new `backend/src/mcp_server.py`), tests
+- [ ] Mount MCP at `/mcp` on the backend port. Mutating tools 1:1 with the operations core.
+- [ ] Tests: call tool handlers directly; assert they mutate via the core + emit `timeline-changed`.
+
+### Task B.2 — Read tools
+**Files:** same, tests
+- [ ] `list_candidates` (scores + reasons), `get_timeline`, `get_project_summary`, `get_frame_paths(clip_id)` (returns local frame JPEG paths, as `pi_cli_harness` uses `@path`).
+- [ ] Tests for each read tool.
+
+### Task B.3 — Docs + real-agent check
+**Files:** `docs/MCP_SERVER.md` (new)
+- [ ] Document endpoint, port, tool list, and how to connect Claude Code / Cursor.
+- [ ] Record one verified real Claude Code connection that lists candidates and applies one operation.
+
+**Phase B verification:** MCP tool-handler tests green; documented Claude Code
+round-trip succeeds.
+
+---
+
+## Phase C — In-app chat + proactive review agent
+
+**Goal:** A chat panel whose agent is an MCP client of our own server, running in
+propose mode, that proactively suggests edits the Editor accepts or rejects.
+
+**Guardrails:** In-app agent edits go through Proposals (never applied silently);
+accepted proposals replay through the operations core so they land in undo history.
+
+### Task C.1 — Hosted agent loop (MCP client, propose mode)
+**Files:** new conversational harness module, `backend/tests/`
+- [ ] Agent loop that is an MCP client of our own server; reuse `pi_cli_harness` env-config (provider/model).
+- [ ] Capture mutating tool calls as a **Proposal** (staged ops + diff) instead of applying; read tools run normally.
+- [ ] Tests: proposal capture; accept replays ops through the core; reject discards.
+
+### Task C.2 — Chat panel + proposal cards
+**Files:** `frontend/src/renderer/src/routes/Review.tsx`, new chat components, `frontend/e2e/`
+- [ ] Chat panel in the Review route; inline proposal cards with Accept/Reject; token streaming over SSE.
+- [ ] E2E: propose → accept updates the timeline; reject leaves it unchanged.
+
+### Task C.3 — Proactive turn
+**Files:** `backend/src/api.py`
+- [ ] Auto-kick one agent turn when analysis completes, posting an opening message + initial proposals.
+
+**Phase C verification:** backend proposal tests green; e2e propose→accept and
+proactive opening turn.
+
+---
+
+## Documentation (cross-cutting)
+
+- [ ] README: "Controlling the app with an agent (MCP)" + "Timeline editing" sections.
+- [ ] New `docs/MCP_SERVER.md` (Phase B).
+- [ ] Update `docs/ARCHITECTURE.md` (backend-authoritative timeline, operations core, MCP, SSE).
+- [x] `UBIQUITOUS_LANGUAGE.md` updated (commit `c81e7dd`).
+
+## QA & real-footage validation
+
+> **Author these; do not fabricate real-footage results.** Per repo convention
+> (`001-real-footage-validation.md`), the coding agent writes the harness/tests
+> and the runbook flow; a human runs actual footage.
+
+- [ ] Per-phase automated tests above (pytest + Playwright) all green.
+- [ ] Extend `scripts/synthetic_e2e_qa.py` to exercise the operations core and an MCP round-trip on generated/sample media.
+- [ ] Add a real-footage QA flow to `docs/VALIDATION_RUNBOOK.md` (+ launch note in `docs/MANUAL_QA_GUIDE.md`) covering, on footage from `~/Footage/QA/`:
+  - [ ] GUI + External Agent (Claude Code over `/mcp`) editing the same open project, edits live in the GUI;
+  - [ ] split / extend / speed / transform applied and surviving save/reload;
+  - [ ] In-App Review Agent proposal → accept producing a correct edit;
+  - [ ] export of a speed/transform timeline to Resolve XML with **zero relink prompts**; EDL flatten-warning verified.
+  - [ ] Report-template section mirroring the existing one. **Never commit footage or footage reports.**
 
 ## Out of scope (YAGNI)
 
-Transitions, audio/music, titles, color, multi-track, keyframes, cross-machine
-collaboration, CRDT merge, on-timeline cloud generation.
+Transitions, audio/music, titles, color grading, multi-track, keyframes,
+cross-machine collaboration, CRDT merge, on-timeline cloud generation.
 
 ## Risks
 
-- **ReviewContext refactor** (A2) is the highest-risk change; keep the existing
-  review UX behaviour green via the Playwright suite before adding new editing.
+- **ReviewContext refactor** (A2) is highest-risk; keep existing review e2e green before adding new editing.
 - **EDL cannot express speed/transform** — accepted: flatten + warn.
-- **Two writers** (GUI + external agent) — mitigated by per-project op
-  serialization; no document-level merge.
+- **Two writers** (GUI + external agent) — mitigated by per-project op serialization; no document-level merge.

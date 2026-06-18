@@ -17,11 +17,13 @@ import {
   deleteProjectFiles,
   getClipsWithFallback,
   getSavedTimeline,
+  getTimelineDocument,
   listRecentProjects,
   relocateRecentProject,
   removeRecentProject,
   regenerateDraft as requestDraft,
   rescanProject,
+  subscribeTimelineEvents,
   updateTimeline,
 } from '../api/client';
 import type {
@@ -340,6 +342,49 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [projectId, acceptedOrder, trims, decisions, profile, targetDuration]);
+
+  // Live-sync: when an agent (in-app or external over MCP) edits the
+  // backend-authoritative Timeline Document, the backend emits `timeline-changed`
+  // and the GUI reconciles from the document so the edit appears live. The GUI's
+  // own edits use the legacy PUT path (which does not emit events), so this does
+  // not echo the editor's own changes. Reconciliation is additive — it surfaces
+  // agent-added/edited items without wiping the editor's existing selections.
+  // (Full authoritative inversion, where GUI edits also flow through the
+  // operations core, is the next step on this refactor.)
+  useEffect(() => {
+    if (!projectId) return;
+    let alive = true;
+    const reconcileFromDocument = async () => {
+      try {
+        const document = await getTimelineDocument(projectId);
+        if (!alive || document.items.length === 0) return;
+        const order: string[] = [];
+        const nextTrims: Record<string, Trim> = {};
+        const nextDecisions: Record<string, ClipDecision> = {};
+        for (const item of document.items) {
+          if (!order.includes(item.source_clip_id)) order.push(item.source_clip_id);
+          nextTrims[item.source_clip_id] = { start_sec: item.start_sec, end_sec: item.end_sec };
+          nextDecisions[item.source_clip_id] = 'included';
+        }
+        setAcceptedOrder((prev) => {
+          const next = [...prev];
+          for (const id of order) if (!next.includes(id)) next.push(id);
+          return next;
+        });
+        setTrims((current) => ({ ...current, ...nextTrims }));
+        setDecisions((current) => ({ ...current, ...nextDecisions }));
+      } catch {
+        // Transient fetch errors are ignored; the next event re-reconciles.
+      }
+    };
+    const unsubscribe = subscribeTimelineEvents(projectId, () => {
+      void reconcileFromDocument();
+    });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, [projectId]);
 
   const include = useCallback((clipId: string) => {
     hasReviewEdits.current = true;

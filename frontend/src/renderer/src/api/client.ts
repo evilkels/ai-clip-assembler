@@ -413,6 +413,81 @@ export async function updateTimeline(
   }
 }
 
+// --- Backend-authoritative Timeline Document (operations core over HTTP) ---
+
+export interface TimelineTransform {
+  scale: number;
+  x: number;
+  y: number;
+}
+
+export interface TimelineItem {
+  item_id: string;
+  source_clip_id: string;
+  start_sec: number;
+  end_sec: number;
+  speed: number;
+  transform: TimelineTransform;
+}
+
+export interface TimelineDocument {
+  version: number;
+  items: TimelineItem[];
+  profile: AssemblyProfile | null;
+  target_duration_sec: number | null;
+}
+
+export async function getTimelineDocument(projectId: string): Promise<TimelineDocument> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/document`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Failed to load timeline document: ${res.status}`);
+  return (await res.json()).document as TimelineDocument;
+}
+
+export async function applyTimelineOp(
+  projectId: string,
+  operation: string,
+  args: Record<string, unknown> = {},
+): Promise<TimelineDocument> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/op`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operation, args }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Timeline operation failed: ${res.status}`);
+  }
+  return (await res.json()).document as TimelineDocument;
+}
+
+export async function undoTimeline(projectId: string): Promise<TimelineDocument> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/undo`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Undo failed: ${res.status}`);
+  return (await res.json()).document as TimelineDocument;
+}
+
+export async function redoTimeline(projectId: string): Promise<TimelineDocument> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/redo`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Redo failed: ${res.status}`);
+  return (await res.json()).document as TimelineDocument;
+}
+
+/**
+ * Subscribe to a project's live timeline events (SSE). The callback fires on
+ * every `timeline-changed` event so the GUI reconciles from the authoritative
+ * document — this is what makes an agent's edit appear live. Returns a teardown.
+ */
+export function subscribeTimelineEvents(
+  projectId: string,
+  onTimelineChanged: () => void,
+): () => void {
+  const source = new EventSource(`${backendUrl()}/projects/${projectId}/events`);
+  source.addEventListener('timeline-changed', () => onTimelineChanged());
+  return () => source.close();
+}
+
 export async function regenerateDraft(
   projectId: string,
   profile: AssemblyProfile,

@@ -107,30 +107,34 @@ land the refactor before adding new editing affordances.
 
 ### Task A2.1 — Operation endpoints + undo/redo
 **Files:** `backend/src/api.py`, `backend/tests/test_api.py`
-- [ ] Add operation endpoints under `/projects/{id}/timeline/...` (per-op or one `POST .../op` with name+args) returning the resolved document, plus `POST .../undo` and `POST .../redo`.
-- [ ] API tests for each endpoint + undo/redo.
+- [x] Add operation endpoints under `/projects/{id}/timeline/...` (per-op or one `POST .../op` with name+args) returning the resolved document, plus `POST .../undo` and `POST .../redo`.
+- [x] API tests for each endpoint + undo/redo.
 
 ### Task A2.2 — SSE live-sync
 **Files:** `backend/src/api.py`, `backend/tests/test_api.py`
-- [ ] Add SSE `/projects/{id}/events` emitting `timeline-changed` after each op.
-- [ ] Test: an operation emits the event.
+- [x] Add SSE `/projects/{id}/events` emitting `timeline-changed` after each op.
+- [x] Test: an operation emits the event.
 
 ### Task A2.3 — ReviewContext → thin client (highest risk)
 **Files:** `frontend/src/renderer/src/state/ReviewContext.tsx`, `frontend/src/renderer/src/api/client.ts`
-- [ ] Replace authoritative state with: fetch document, subscribe to SSE, call operation endpoints; reconcile from the authoritative document.
-- [ ] Preserve existing review UX (accept/reject/reorder/trim) behaviour.
-- [ ] E2E: an agent/external edit appears live in the GUI.
+- [x] Client API for the operations core (`getTimelineDocument`, `applyTimelineOp`, `undo`/`redo`, `subscribeTimelineEvents`).
+- [x] Preserve existing review UX (accept/reject/reorder/trim) behaviour.
+- [~] Subscribe to SSE and reconcile from the document. **Partial:** additive
+  live-sync surfaces agent edits without clobbering editor state; full
+  authoritative inversion (GUI edits routed through the operations core) is
+  deferred to keep the review UX green. Typecheck green.
+- [ ] E2E: an agent/external edit appears live in the GUI (needs the Electron+backend stack; pending visual QA).
 
 ### Task A2.4 — GUI editing affordances
 **Files:** `frontend/src/renderer/src/components/`, `frontend/e2e/`
-- [ ] UI for split, extend, speed, transform (zoom/pan). Preview: speed via `video.playbackRate`, transform via CSS/canvas transform.
+- [ ] UI for split, extend, speed, transform (zoom/pan). Preview: speed via `video.playbackRate`, transform via CSS/canvas transform. **Not started** (visual UI work; the operations are reachable from the client API above).
 - [ ] E2E for speed/zoom editing.
 
 ### Task A2.5 — Export speed/transform
 **Files:** `backend/src/export_engine.py`, `backend/tests/test_export_engine.py`
-- [ ] Encode speed (retime) + transform (`adjust-transform`) into FCPXML and Resolve XML.
-- [ ] EDL: flatten speed/transform and surface a warning.
-- [ ] Tests for each format.
+- [x] Encode speed (retime) + transform (`adjust-transform`) into FCPXML and Resolve XML.
+- [x] EDL: flatten speed/transform and surface a warning.
+- [x] Tests for each format.
 
 **Phase A2 verification:** backend API tests green; existing review e2e still
 pass; new e2e for live-update + speed/zoom; export tests green.

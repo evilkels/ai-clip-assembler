@@ -214,7 +214,7 @@ export function ReviewPage() {
                 <span className="clip-verdict red">Weak</span> (&lt;5). The combined score blends
                 technical quality (smoothness, sharpness, exposure, contrast) with AI-judged visual
                 interest. The <strong>Why</strong> line on each card is written by the local vision
-                model. Generating a draft re-picks and re-orders clips for your profile and target —
+                model. Generating a draft re-picks and re-orders clips for your profile and target:
                 cards already in the timeline are tagged <em>◆ Timeline #n</em>.
               </p>
             </div>
@@ -317,7 +317,7 @@ export function ReviewPage() {
                       onChange={(s, e) => setTrim(clip.clip_id, { start_sec: s, end_sec: e })}
                     />
                     <div className="accepted-pill-controls">
-                      <button
+                      <button type="button"
                         className="btn subtle"
                         onClick={() => moveAccepted(clip.clip_id, -1)}
                         disabled={idx === 0}
@@ -325,7 +325,7 @@ export function ReviewPage() {
                       >
                         ←
                       </button>
-                      <button
+                      <button type="button"
                         className="btn subtle"
                         onClick={() => moveAccepted(clip.clip_id, 1)}
                         disabled={idx === acceptedClips.length - 1}
@@ -333,7 +333,7 @@ export function ReviewPage() {
                       >
                         →
                       </button>
-                      <button
+                      <button type="button"
                         className="btn subtle"
                         onClick={() => resetDecision(clip.clip_id)}
                         title="Remove from accepted"

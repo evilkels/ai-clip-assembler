@@ -239,13 +239,13 @@ export function ClipCard({
           </div>
         )}
         <div className="clip-actions">
-          <button
+          <button type="button"
             className={decision === 'included' ? 'btn primary' : 'btn'}
             onClick={onToggleInclude}
           >
             {decision === 'included' ? 'Included ✓' : 'Include'}
           </button>
-          <button className="btn subtle" onClick={onExclude}>
+          <button type="button" className="btn subtle" onClick={onExclude}>
             {decision === 'excluded' ? 'Excluded' : 'Exclude'}
           </button>
         </div>

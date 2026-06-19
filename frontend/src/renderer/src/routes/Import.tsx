@@ -360,11 +360,11 @@ export function ImportPage() {
       </div>
       <div className="page-body">
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
+          <button type="button" className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
             {openingFolder ? 'Opening…' : 'Create / Open Folder Project'}
           </button>
           {projectFolder && (
-            <button className="btn subtle" onClick={rescanOpenProject}>
+            <button type="button" className="btn subtle" onClick={rescanOpenProject}>
               Rescan Folder
             </button>
           )}
@@ -560,7 +560,7 @@ export function ImportPage() {
 
         {hasVideos && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
+            <button type="button"
               className="btn primary"
               onClick={handleAnalyze}
               disabled={isAnalyzing || selectedCount === 0}
@@ -574,7 +574,7 @@ export function ImportPage() {
                     : `Analyze ${selectedCount} of ${uploadedVideos.length}`}
             </button>
             {isAnalyzing && (
-              <button className="btn subtle" onClick={handleAbort} disabled={cancelling}>
+              <button type="button" className="btn subtle" onClick={handleAbort} disabled={cancelling}>
                 {cancelling ? 'Stopping…' : 'Abort'}
               </button>
             )}

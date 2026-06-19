@@ -546,7 +546,7 @@ export function Timeline() {
       />
       <div className="timeline-toolbar">
         <div className="transport">
-          <button
+          <button type="button"
             className="btn subtle"
             data-testid="transport-reverse"
             onClick={() => setDirection(-1)}
@@ -554,7 +554,7 @@ export function Timeline() {
           >
             ◀◀
           </button>
-          <button
+          <button type="button"
             className="btn subtle"
             data-testid="transport-stop"
             onClick={() => setDirection(0)}
@@ -562,7 +562,7 @@ export function Timeline() {
           >
             ■
           </button>
-          <button
+          <button type="button"
             className="btn subtle"
             data-testid="transport-play"
             onClick={() => setDirection(1)}
@@ -580,7 +580,7 @@ export function Timeline() {
           )}
         </div>
         <div className="zoom">
-          <button className="btn subtle" onClick={() => zoomBy(0.8)} title="Zoom out (-)">
+          <button type="button" className="btn subtle" onClick={() => zoomBy(0.8)} title="Zoom out (-)">
             −
           </button>
           <input
@@ -592,7 +592,7 @@ export function Timeline() {
             onChange={(e) => setPxPerSec(Number(e.target.value))}
             aria-label="Zoom"
           />
-          <button className="btn subtle" onClick={() => zoomBy(1.25)} title="Zoom in (+)">
+          <button type="button" className="btn subtle" onClick={() => zoomBy(1.25)} title="Zoom in (+)">
             +
           </button>
           <span className="zoom-label">{pxPerSec} px/s</span>

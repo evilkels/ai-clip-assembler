@@ -12,6 +12,18 @@ React files, while `--verbose --diff` still reports broader pre-existing and
 active findings. Re-run before selecting the next batch; do not use the
 original counts as the current backlog.
 
+**Re-baseline (2026-06-19):** `npx react-doctor .` now scores **44 / 100
+Critical** (the codebase grew with the agent-operable timeline UI).
+**Batch 1 quick-wins applied this session:** `button-has-type` (14 buttons
+across Timeline/ClipCard/Import/Review) and one `design-no-em-dash-in-jsx-text`
+in Review's score legend — issue count **75 → 60**, `npm run build` green, no
+behavior change. Skipped/stale: `js-tosorted-immutable` (needs a tsconfig `lib`
+bump to es2023 — out of scope for a quick win); `async-defer-await` +
+`no-initialize-state` in `App.tsx` (the file was refactored since the snapshot;
+findings gone). The remaining 44/100 is dominated by **Batch 2/3 judgment-call
+refactors** (`no-giant-component`, `no-derived-state`, `prefer-use`, a11y
+interactions) — left for a deliberate pass, not blind edits.
+
 ## How To Use This Doc
 
 Each finding has a **canonical fix recipe** at `https://www.react.doctor/prompts/rules/<rule>.md` — fetch and follow it before editing. Re-run `npm run doctor -- --verbose --diff` after each batch.

@@ -317,10 +317,12 @@ def migrate_legacy_timeline(
                 end_sec=float(end_sec),
             )
         )
+    decisions = legacy.get("decisions")
     return TimelineDocument(
         items=items,
         profile=legacy.get("profile"),
         target_duration_sec=legacy.get("target_duration_sec"),
+        decisions=decisions if isinstance(decisions, dict) else {},
     )
 
 

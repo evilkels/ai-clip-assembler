@@ -258,6 +258,32 @@ def test_exclude_removes_all_items_for_candidate():
     assert doc.items == []
 
 
+def test_include_records_included_decision():
+    sources = make_sources(("clip-a", 1.0, 3.0, 20.0))
+    doc = apply_operation(empty_doc(), sources, "include", clip_id="clip-a")
+    assert doc.decisions["clip-a"] == "included"
+
+
+def test_exclude_records_excluded_decision():
+    sources = make_sources(("clip-a", 1.0, 3.0, 20.0))
+    doc = apply_operation(empty_doc(), sources, "include", clip_id="clip-a")
+    doc = apply_operation(doc, sources, "exclude", clip_id="clip-a")
+    assert doc.decisions["clip-a"] == "excluded"
+    assert doc.items == []
+
+
+def test_reset_decision_clears_decision_and_items():
+    sources = make_sources(("clip-a", 1.0, 3.0, 20.0))
+    doc = apply_operation(empty_doc(), sources, "include", clip_id="clip-a")
+    doc = apply_operation(doc, sources, "reset_decision", clip_id="clip-a")
+    assert "clip-a" not in doc.decisions
+    assert doc.items == []
+
+
+def test_timeline_document_decisions_default_empty():
+    assert TimelineDocument().decisions == {}
+
+
 def test_set_profile_and_target_duration():
     doc = apply_operation(empty_doc(), {}, "set_profile", profile="cinematic")
     doc = apply_operation(doc, {}, "set_target_duration", target_duration_sec=42.0)

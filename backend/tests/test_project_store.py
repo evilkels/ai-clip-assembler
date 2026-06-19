@@ -285,6 +285,15 @@ def test_migrate_legacy_timeline_upgrades_old_clip_entries():
     assert len({i.item_id for i in document.items}) == 2
 
 
+def test_migrate_legacy_timeline_carries_decisions():
+    legacy = {
+        "clips": [{"clip_id": "clip-a", "start_sec": 1.0, "end_sec": 4.0}],
+        "decisions": {"clip-a": "included", "clip-b": "excluded"},
+    }
+    document = migrate_legacy_timeline(legacy)
+    assert document.decisions == {"clip-a": "included", "clip-b": "excluded"}
+
+
 def test_migrate_legacy_timeline_resolves_bare_clip_ids_from_sources():
     legacy = {"profile": "balanced", "clips": ["clip-a"]}
     sources = {

@@ -42,6 +42,7 @@ _OP_ARG_SCHEMA = {
     "set_transform": {"item_id": "string", "transform": "object"},
     "include": {"clip_id": "string"},
     "exclude": {"clip_id": "string"},
+    "reset_decision": {"clip_id": "string"},
     "set_profile": {"profile": "string?"},
     "set_target_duration": {"target_duration_sec": "number?"},
 }

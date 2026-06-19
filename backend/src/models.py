@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -144,3 +144,7 @@ class TimelineDocument(BaseModel):
     items: List[TimelineItem] = Field(default_factory=list)
     profile: Optional[str] = None
     target_duration_sec: Optional[float] = None
+    # Review-board decisions per Candidate Clip ("included" / "excluded").
+    # Item presence drives the timeline; this preserves an explicit "rejected"
+    # state distinct from "not yet reviewed" so the Review Board can grey it out.
+    decisions: Dict[str, str] = Field(default_factory=dict)

@@ -3,6 +3,7 @@ import { buildVideoMediaUrl } from '../api/client';
 import { ClipCard } from '../components/ClipCard';
 import { useReview } from '../state/ReviewContext';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
+import { TimelineEditor } from '../components/TimelineEditor';
 import type { ClipCandidate } from '../types/clip';
 import type { AssemblyProfile } from '../types/clip';
 
@@ -388,6 +389,7 @@ export function ReviewPage() {
           </div>
         )}
       </div>
+      <TimelineEditor />
       <ReviewChatPanel />
     </div>
   );

@@ -6,25 +6,26 @@ import {
   useMemo,
   useRef,
   useState,
-  type Dispatch,
   type ReactNode,
-  type SetStateAction,
 } from 'react';
 import {
   addRecentProject,
+  applyTimelineOp,
   createProject,
   createProjectFromFolder,
   deleteProjectFiles,
   getClipsWithFallback,
-  getSavedTimeline,
   getTimelineDocument,
   listRecentProjects,
+  redoTimeline,
   relocateRecentProject,
   removeRecentProject,
   regenerateDraft as requestDraft,
   rescanProject,
   subscribeTimelineEvents,
-  updateTimeline,
+  undoTimeline,
+  type TimelineDocument,
+  type TimelineItem,
 } from '../api/client';
 import type {
   AnalysisStatus,
@@ -51,6 +52,8 @@ interface ReviewState {
   decisions: Record<string, ClipDecision>;
   acceptedOrder: string[];
   trims: Record<string, Trim>;
+  /** Authoritative timeline items from the backend Timeline Document. */
+  timelineItems: TimelineItem[];
   smoothnessThreshold: number;
   setSmoothnessThreshold: (v: number) => void;
   profile: AssemblyProfile;
@@ -64,6 +67,10 @@ interface ReviewState {
   reorderAccepted: (clipId: string, toIndex: number) => void;
   sortAcceptedChronologically: () => void;
   setTrim: (clipId: string, trim: Trim) => void;
+  /** Drive any operation through the backend operations core (used by the editor). */
+  applyTimelineOperation: (operation: string, args: Record<string, unknown>) => Promise<void>;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
   setProjectId: (id: string | null) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
   setAnalysisStatus: (status: AnalysisStatus) => void;
@@ -83,73 +90,6 @@ interface ReviewState {
 
 const Ctx = createContext<ReviewState | null>(null);
 
-type Setter<T> = Dispatch<SetStateAction<T>>;
-
-function useProjectHydration(
-  projectId: string | null,
-  setLoading: Setter<boolean>,
-  setClipCandidates: Setter<ClipCandidate[]>,
-  setError: Setter<string | null>,
-  setDecisions: Setter<Record<string, ClipDecision>>,
-  setAcceptedOrder: Setter<string[]>,
-  setTrims: Setter<Record<string, Trim>>,
-  setProfile: Setter<AssemblyProfile>,
-  setTargetDuration: Setter<number>,
-) {
-  useEffect(() => {
-    if (!projectId) return;
-    let alive = true;
-    setLoading(true);
-    Promise.all([
-      getClipsWithFallback(projectId),
-      getSavedTimeline(projectId).catch(() => null),
-    ])
-      .then(([loaded, savedTimeline]) => {
-        if (!alive) return;
-        setClipCandidates(loaded);
-        setError(null);
-        const newTrims: Record<string, Trim> = Object.fromEntries(
-          loaded.map((clip) => [
-            clip.clip_id,
-            { start_sec: clip.start_sec, end_sec: clip.end_sec },
-          ]),
-        );
-        if (savedTimeline) {
-          const knownIds = new Set(loaded.map((clip) => clip.clip_id));
-          const restored = savedTimeline.clips
-            .map((entry) =>
-              typeof entry === 'string'
-                ? loaded.find((clip) => clip.clip_id === entry)
-                : entry,
-            )
-            .filter((entry): entry is { clip_id: string; start_sec: number; end_sec: number } =>
-              Boolean(entry && knownIds.has(entry.clip_id)),
-            );
-          setDecisions({
-            ...Object.fromEntries(restored.map((entry) => [entry.clip_id, 'included' as const])),
-            ...savedTimeline.decisions,
-          });
-          setAcceptedOrder(restored.map((entry) => entry.clip_id));
-          for (const entry of restored) {
-            newTrims[entry.clip_id] = { start_sec: entry.start_sec, end_sec: entry.end_sec };
-          }
-          if (savedTimeline.profile) setProfile(savedTimeline.profile);
-          if (savedTimeline.targetDurationSec) setTargetDuration(savedTimeline.targetDurationSec);
-        }
-        setTrims(newTrims);
-      })
-      .catch((reason: unknown) => {
-        if (alive) setError(reason instanceof Error ? reason.message : 'Unable to load clip candidates');
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [projectId, setAcceptedOrder, setClipCandidates, setDecisions, setError, setLoading, setProfile, setTargetDuration, setTrims]);
-}
-
 export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -163,32 +103,114 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [decisions, setDecisions] = useState<Record<string, ClipDecision>>({});
   const [acceptedOrder, setAcceptedOrder] = useState<string[]>([]);
   const [trims, setTrims] = useState<Record<string, Trim>>({});
+  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
   const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
   const [targetDuration, setTargetDuration] = useState(120);
-  const hasReviewEdits = useRef(false);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
 
-  useProjectHydration(
-    projectId,
-    setLoading,
-    setClipCandidates,
-    setError,
-    setDecisions,
-    setAcceptedOrder,
-    setTrims,
-    setProfile,
-    setTargetDuration,
+  // The latest authoritative document, kept in a ref so operation handlers can
+  // map a Candidate Clip to its Timeline Item without re-rendering churn.
+  const documentRef = useRef<TimelineDocument | null>(null);
+
+  // Reconcile local review state from the authoritative Timeline Document. The
+  // backend document is the source of truth; the GUI mirrors it.
+  const reconcileFromDocument = useCallback((document: TimelineDocument) => {
+    documentRef.current = document;
+    setTimelineItems(document.items);
+    const order: string[] = [];
+    const itemTrims: Record<string, Trim> = {};
+    for (const item of document.items) {
+      if (!order.includes(item.source_clip_id)) order.push(item.source_clip_id);
+      if (!(item.source_clip_id in itemTrims)) {
+        itemTrims[item.source_clip_id] = { start_sec: item.start_sec, end_sec: item.end_sec };
+      }
+    }
+    setAcceptedOrder(order);
+    setTrims((current) => ({ ...current, ...itemTrims }));
+    setDecisions(document.decisions as Record<string, ClipDecision>);
+    if (document.profile) setProfile(document.profile);
+    if (document.target_duration_sec) setTargetDuration(document.target_duration_sec);
+  }, []);
+
+  const itemIdForClip = useCallback((clipId: string): string | undefined => {
+    return documentRef.current?.items.find((item) => item.source_clip_id === clipId)?.item_id;
+  }, []);
+
+  // Single mutation path: every GUI edit runs through the backend operations
+  // core and reconciles from the returned document (the SSE stream reconciles
+  // the same way for edits made by agents).
+  const applyTimelineOperation = useCallback(
+    async (operation: string, args: Record<string, unknown>) => {
+      if (!projectId) return;
+      try {
+        const document = await applyTimelineOp(projectId, operation, args);
+        reconcileFromDocument(document);
+      } catch (reason: unknown) {
+        setError(reason instanceof Error ? reason.message : 'Timeline operation failed');
+        getTimelineDocument(projectId).then(reconcileFromDocument).catch(() => {});
+      }
+    },
+    [projectId, reconcileFromDocument],
   );
+
+  const refreshTimelineDocument = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      reconcileFromDocument(await getTimelineDocument(projectId));
+    } catch {
+      /* transient; SSE or the next op will reconcile */
+    }
+  }, [projectId, reconcileFromDocument]);
+
+  // Hydration: load candidates + the authoritative document for the project.
+  useEffect(() => {
+    if (!projectId) return;
+    let alive = true;
+    setLoading(true);
+    Promise.all([getClipsWithFallback(projectId), getTimelineDocument(projectId).catch(() => null)])
+      .then(([loaded, document]) => {
+        if (!alive) return;
+        setClipCandidates(loaded);
+        setError(null);
+        setTrims(
+          Object.fromEntries(
+            loaded.map((clip) => [clip.clip_id, { start_sec: clip.start_sec, end_sec: clip.end_sec }]),
+          ),
+        );
+        if (document) reconcileFromDocument(document);
+      })
+      .catch((reason: unknown) => {
+        if (alive) setError(reason instanceof Error ? reason.message : 'Unable to load clip candidates');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [projectId, reconcileFromDocument]);
+
+  // Live-sync: an agent's edit (in-app or external over MCP) emits
+  // `timeline-changed`; reconcile from the authoritative document so it appears
+  // live in the GUI.
+  useEffect(() => {
+    if (!projectId) return;
+    const unsubscribe = subscribeTimelineEvents(projectId, () => {
+      void refreshTimelineDocument();
+    });
+    return unsubscribe;
+  }, [projectId, refreshTimelineDocument]);
 
   const resetProjectSession = useCallback(() => {
     setClipCandidates([]);
     setDecisions({});
     setAcceptedOrder([]);
     setTrims({});
+    setTimelineItems([]);
+    documentRef.current = null;
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
-    hasReviewEdits.current = false;
     setRecommendation(null);
     setProfile('cinematic_highlight');
     setTargetDuration(120);
@@ -277,194 +299,158 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setClipCandidates(nextClips);
     setTrims(
       Object.fromEntries(
-        nextClips.map((clip) => [
-          clip.clip_id,
-          { start_sec: clip.start_sec, end_sec: clip.end_sec },
-        ]),
+        nextClips.map((clip) => [clip.clip_id, { start_sec: clip.start_sec, end_sec: clip.end_sec }]),
       ),
     );
     setDecisions({});
     setAcceptedOrder([]);
-    hasReviewEdits.current = false;
+    setTimelineItems([]);
   }, []);
 
-  const restoreTimelineEntries = useCallback((entries: Array<{ clip_id: string; start_sec: number; end_sec: number }>) => {
-    setAcceptedOrder(entries.map((entry) => entry.clip_id));
-    setDecisions(Object.fromEntries(entries.map((entry) => [entry.clip_id, 'included' as const])));
-    setTrims((current) => ({
-      ...current,
-      ...Object.fromEntries(
-        entries.map((entry) => [
-          entry.clip_id,
-          { start_sec: entry.start_sec, end_sec: entry.end_sec },
-        ]),
-      ),
-    }));
-  }, []);
+  const applyAnalysisResult = useCallback(
+    (result: AnalysisResult) => {
+      // Analysis rebuilt the backend draft; seed the pool, then reconcile from
+      // the freshly built Timeline Document.
+      setClips(result.clips);
+      setRecommendation(result.recommendation);
+      setProfile(result.recommendation.profile);
+      setTargetDuration(result.recommendation.target_duration_sec);
+      void refreshTimelineDocument();
+    },
+    [refreshTimelineDocument, setClips],
+  );
 
-  const applyAnalysisResult = useCallback((result: AnalysisResult) => {
-    setClips(result.clips);
-    restoreTimelineEntries(result.sequence.clips);
-    setRecommendation(result.recommendation);
-    setProfile(result.recommendation.profile);
-    setTargetDuration(result.recommendation.target_duration_sec);
-  }, [restoreTimelineEntries, setClips]);
+  const regenerateDraft = useCallback(
+    async (nextProfile: AssemblyProfile, targetDurationSec: number) => {
+      if (!projectId) return;
+      await requestDraft(projectId, nextProfile, targetDurationSec);
+      setProfile(nextProfile);
+      setTargetDuration(targetDurationSec);
+      await refreshTimelineDocument();
+    },
+    [projectId, refreshTimelineDocument],
+  );
 
-  const regenerateDraft = useCallback(async (profile: AssemblyProfile, targetDurationSec: number) => {
-    if (!projectId) return;
-    const result = await requestDraft(projectId, profile, targetDurationSec);
-    restoreTimelineEntries(result.timeline.clips);
-    setProfile(profile);
-    setTargetDuration(targetDurationSec);
-    hasReviewEdits.current = false;
-  }, [projectId, restoreTimelineEntries]);
+  const include = useCallback(
+    (clipId: string) => {
+      setDecisions((prev) => ({ ...prev, [clipId]: 'included' }));
+      setAcceptedOrder((prev) => (prev.includes(clipId) ? prev : [...prev, clipId]));
+      void applyTimelineOperation('include', { clip_id: clipId });
+    },
+    [applyTimelineOperation],
+  );
 
-  useEffect(() => {
-    if (!projectId || !hasReviewEdits.current) return;
-    const timeout = window.setTimeout(() => {
-      updateTimeline(projectId, {
-        order: acceptedOrder,
-        trims,
-        decisions: Object.fromEntries(
-          Object.entries(decisions).filter((entry): entry is [string, 'included' | 'excluded'] =>
-            entry[1] !== 'pending',
-          ),
-        ),
-        profile,
-        targetDurationSec: targetDuration,
-      })
-        .then((result) => {
-          if (!result.ok) setError('Unable to auto-save Timeline changes');
-        })
-        .catch((reason: unknown) => {
-          setError(reason instanceof Error ? reason.message : 'Unable to auto-save Timeline changes');
-        });
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [projectId, acceptedOrder, trims, decisions, profile, targetDuration]);
+  const exclude = useCallback(
+    (clipId: string) => {
+      setDecisions((prev) => ({ ...prev, [clipId]: 'excluded' }));
+      setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
+      void applyTimelineOperation('exclude', { clip_id: clipId });
+    },
+    [applyTimelineOperation],
+  );
 
-  // Live-sync: when an agent (in-app or external over MCP) edits the
-  // backend-authoritative Timeline Document, the backend emits `timeline-changed`
-  // and the GUI reconciles from the document so the edit appears live. The GUI's
-  // own edits use the legacy PUT path (which does not emit events), so this does
-  // not echo the editor's own changes. Reconciliation is additive — it surfaces
-  // agent-added/edited items without wiping the editor's existing selections.
-  // (Full authoritative inversion, where GUI edits also flow through the
-  // operations core, is the next step on this refactor.)
-  useEffect(() => {
-    if (!projectId) return;
-    let alive = true;
-    const reconcileFromDocument = async () => {
-      try {
-        const document = await getTimelineDocument(projectId);
-        if (!alive || document.items.length === 0) return;
-        const order: string[] = [];
-        const nextTrims: Record<string, Trim> = {};
-        const nextDecisions: Record<string, ClipDecision> = {};
-        for (const item of document.items) {
-          if (!order.includes(item.source_clip_id)) order.push(item.source_clip_id);
-          nextTrims[item.source_clip_id] = { start_sec: item.start_sec, end_sec: item.end_sec };
-          nextDecisions[item.source_clip_id] = 'included';
-        }
-        setAcceptedOrder((prev) => {
-          const next = [...prev];
-          for (const id of order) if (!next.includes(id)) next.push(id);
-          return next;
-        });
-        setTrims((current) => ({ ...current, ...nextTrims }));
-        setDecisions((current) => ({ ...current, ...nextDecisions }));
-      } catch {
-        // Transient fetch errors are ignored; the next event re-reconciles.
-      }
-    };
-    const unsubscribe = subscribeTimelineEvents(projectId, () => {
-      void reconcileFromDocument();
-    });
-    return () => {
-      alive = false;
-      unsubscribe();
-    };
-  }, [projectId]);
+  const resetDecision = useCallback(
+    (clipId: string) => {
+      setDecisions((prev) => {
+        const next = { ...prev };
+        delete next[clipId];
+        return next;
+      });
+      setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
+      void applyTimelineOperation('reset_decision', { clip_id: clipId });
+    },
+    [applyTimelineOperation],
+  );
 
-  const include = useCallback((clipId: string) => {
-    hasReviewEdits.current = true;
-    setDecisions((prev) => ({ ...prev, [clipId]: 'included' }));
-    setAcceptedOrder((prev) => (prev.includes(clipId) ? prev : [...prev, clipId]));
-  }, []);
+  const reorderAccepted = useCallback(
+    (clipId: string, toIndex: number) => {
+      setAcceptedOrder((prev) => {
+        const from = prev.indexOf(clipId);
+        if (from < 0) return prev;
+        const without = prev.slice();
+        without.splice(from, 1);
+        const target = Math.max(0, Math.min(toIndex, without.length));
+        without.splice(target, 0, clipId);
+        return without;
+      });
+      const itemId = itemIdForClip(clipId);
+      if (itemId) void applyTimelineOperation('reorder', { item_id: itemId, to_index: toIndex });
+    },
+    [applyTimelineOperation, itemIdForClip],
+  );
 
-  const exclude = useCallback((clipId: string) => {
-    hasReviewEdits.current = true;
-    setDecisions((prev) => ({ ...prev, [clipId]: 'excluded' }));
-    setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
-  }, []);
-
-  const resetDecision = useCallback((clipId: string) => {
-    hasReviewEdits.current = true;
-    setDecisions((prev) => {
-      const next = { ...prev };
-      delete next[clipId];
-      return next;
-    });
-    setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
-  }, []);
-
-  const moveAccepted = useCallback((clipId: string, direction: -1 | 1) => {
-    hasReviewEdits.current = true;
-    setAcceptedOrder((prev) => {
-      const idx = prev.indexOf(clipId);
-      if (idx < 0) return prev;
-      const target = idx + direction;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = prev.slice();
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
-    });
-  }, []);
+  const moveAccepted = useCallback(
+    (clipId: string, direction: -1 | 1) => {
+      const index = acceptedOrder.indexOf(clipId);
+      if (index < 0) return;
+      const target = index + direction;
+      if (target < 0 || target >= acceptedOrder.length) return;
+      reorderAccepted(clipId, target);
+    },
+    [acceptedOrder, reorderAccepted],
+  );
 
   const sortAcceptedChronologically = useCallback(() => {
-    hasReviewEdits.current = true;
-    setAcceptedOrder((prev) => {
-      const byId = new Map(clips.map((clip) => [clip.clip_id, clip]));
-      const captureKey = (id: string): string => {
-        const clip = byId.get(id);
-        return clip?.source_created_at ?? clip?.file_name ?? '';
-      };
-      return [...prev].sort((a, b) => {
-        const ka = captureKey(a);
-        const kb = captureKey(b);
-        if (ka !== kb) return ka < kb ? -1 : 1;
-        return (byId.get(a)?.start_sec ?? 0) - (byId.get(b)?.start_sec ?? 0);
-      });
+    const byId = new Map(clips.map((clip) => [clip.clip_id, clip]));
+    const captureKey = (id: string): string => {
+      const clip = byId.get(id);
+      return clip?.source_created_at ?? clip?.file_name ?? '';
+    };
+    const sorted = [...acceptedOrder].sort((a, b) => {
+      const ka = captureKey(a);
+      const kb = captureKey(b);
+      if (ka !== kb) return ka < kb ? -1 : 1;
+      return (byId.get(a)?.start_sec ?? 0) - (byId.get(b)?.start_sec ?? 0);
     });
-  }, [clips]);
+    setAcceptedOrder(sorted);
+    void (async () => {
+      for (let index = 0; index < sorted.length; index += 1) {
+        const itemId = itemIdForClip(sorted[index]);
+        if (itemId) await applyTimelineOperation('reorder', { item_id: itemId, to_index: index });
+      }
+    })();
+  }, [acceptedOrder, applyTimelineOperation, clips, itemIdForClip]);
 
-  const reorderAccepted = useCallback((clipId: string, toIndex: number) => {
-    hasReviewEdits.current = true;
-    setAcceptedOrder((prev) => {
-      const from = prev.indexOf(clipId);
-      if (from < 0) return prev;
-      const without = prev.slice();
-      without.splice(from, 1);
-      const target = Math.max(0, Math.min(toIndex, without.length));
-      without.splice(target, 0, clipId);
-      return without;
-    });
-  }, []);
+  const setTrim = useCallback(
+    (clipId: string, trim: Trim) => {
+      setTrims((prev) => ({ ...prev, [clipId]: trim }));
+      const itemId = itemIdForClip(clipId);
+      if (itemId) {
+        void applyTimelineOperation('set_bounds', {
+          item_id: itemId,
+          start_sec: trim.start_sec,
+          end_sec: trim.end_sec,
+        });
+      }
+    },
+    [applyTimelineOperation, itemIdForClip],
+  );
 
-  const setTrim = useCallback((clipId: string, trim: Trim) => {
-    hasReviewEdits.current = true;
-    setTrims((prev) => ({ ...prev, [clipId]: trim }));
-  }, []);
+  const selectProfile = useCallback(
+    (nextProfile: AssemblyProfile) => {
+      setProfile(nextProfile);
+      void applyTimelineOperation('set_profile', { profile: nextProfile });
+    },
+    [applyTimelineOperation],
+  );
 
-  const selectProfile = useCallback((nextProfile: AssemblyProfile) => {
-    hasReviewEdits.current = true;
-    setProfile(nextProfile);
-  }, []);
+  const selectTargetDuration = useCallback(
+    (seconds: number) => {
+      setTargetDuration(seconds);
+      void applyTimelineOperation('set_target_duration', { target_duration_sec: seconds });
+    },
+    [applyTimelineOperation],
+  );
 
-  const selectTargetDuration = useCallback((seconds: number) => {
-    hasReviewEdits.current = true;
-    setTargetDuration(seconds);
-  }, []);
+  const undo = useCallback(async () => {
+    if (!projectId) return;
+    reconcileFromDocument(await undoTimeline(projectId));
+  }, [projectId, reconcileFromDocument]);
+
+  const redo = useCallback(async () => {
+    if (!projectId) return;
+    reconcileFromDocument(await redoTimeline(projectId));
+  }, [projectId, reconcileFromDocument]);
 
   const value = useMemo<ReviewState>(
     () => ({
@@ -480,6 +466,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       decisions,
       acceptedOrder,
       trims,
+      timelineItems,
       smoothnessThreshold,
       setSmoothnessThreshold,
       profile,
@@ -493,6 +480,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       reorderAccepted,
       sortAcceptedChronologically,
       setTrim,
+      applyTimelineOperation,
+      undo,
+      redo,
       setProjectId,
       setUploadedVideos,
       setAnalysisStatus,
@@ -522,6 +512,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       decisions,
       acceptedOrder,
       trims,
+      timelineItems,
       smoothnessThreshold,
       profile,
       targetDuration,
@@ -534,6 +525,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       reorderAccepted,
       sortAcceptedChronologically,
       setTrim,
+      applyTimelineOperation,
+      undo,
+      redo,
       applyAnalysisResult,
       recommendation,
       regenerateDraft,

@@ -170,14 +170,23 @@ def _set_transform(doc: TimelineDocument, sources: Sources, *, item_id: str, tra
 
 
 def _include(doc: TimelineDocument, sources: Sources, *, clip_id: str) -> TimelineDocument:
-    # Review-board accept: seed an item from the candidate if none exists yet.
+    # Review-board accept: record the decision and seed an item if none exists.
+    doc.decisions[clip_id] = "included"
     if any(item.source_clip_id == clip_id for item in doc.items):
         return doc
     return _add_item(doc, sources, source_clip_id=clip_id)
 
 
 def _exclude(doc: TimelineDocument, sources: Sources, *, clip_id: str) -> TimelineDocument:
-    # Review-board reject: drop every placement of the candidate.
+    # Review-board reject: record the decision and drop every placement.
+    doc.decisions[clip_id] = "excluded"
+    doc.items = [item for item in doc.items if item.source_clip_id != clip_id]
+    return doc
+
+
+def _reset_decision(doc: TimelineDocument, sources: Sources, *, clip_id: str) -> TimelineDocument:
+    # Back to "not yet reviewed": clear the decision and any placements.
+    doc.decisions.pop(clip_id, None)
     doc.items = [item for item in doc.items if item.source_clip_id != clip_id]
     return doc
 
@@ -206,6 +215,7 @@ OPERATIONS: Dict[str, Callable[..., TimelineDocument]] = {
     "set_transform": _set_transform,
     "include": _include,
     "exclude": _exclude,
+    "reset_decision": _reset_decision,
     "set_profile": _set_profile,
     "set_target_duration": _set_target_duration,
 }

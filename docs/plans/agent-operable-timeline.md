@@ -23,12 +23,13 @@
 - **Depends on**: none to start; B and C build on A
 - **Category**: architecture + product
 - **Planned at**: commit `ed891fd`, 2026-06-19
-- **Progress**: A1–C implemented. Backend complete & test-green (243 backend
-  tests + synthetic e2e with operations-core/MCP/export flows). Docs shipped
-  (README, MCP_SERVER, ARCHITECTURE, runbook Flow F). Remaining: GUI visual
-  editing affordances (A2.4), full ReviewContext authoritative inversion (A2.3),
-  chat token streaming (C.2), and Playwright e2e — all pending visual QA on the
-  Electron stack.
+- **Progress**: A1–C implemented incl. A2.3 authoritative inversion (GUI edits
+  through the operations core, persisted `decisions`, PUT retired) and A2.4
+  `TimelineEditor` (reorder/extend/speed/transform/split/remove + undo/redo).
+  Backend test-green (248 + synthetic e2e); frontend `npm run build` green.
+  Docs shipped (README, MCP_SERVER, ARCHITECTURE, runbook Flow F). Remaining:
+  realtime speed/transform *preview* on the player, chat token streaming (C.2),
+  and Playwright e2e — all pending visual QA on the Electron stack.
 
 ## Why this matters
 
@@ -123,17 +124,14 @@ land the refactor before adding new editing affordances.
 ### Task A2.3 — ReviewContext → thin client (highest risk)
 **Files:** `frontend/src/renderer/src/state/ReviewContext.tsx`, `frontend/src/renderer/src/api/client.ts`
 - [x] Client API for the operations core (`getTimelineDocument`, `applyTimelineOp`, `undo`/`redo`, `subscribeTimelineEvents`).
-- [x] Preserve existing review UX (accept/reject/reorder/trim) behaviour.
-- [~] Subscribe to SSE and reconcile from the document. **Partial:** additive
-  live-sync surfaces agent edits without clobbering editor state; full
-  authoritative inversion (GUI edits routed through the operations core) is
-  deferred to keep the review UX green. Typecheck green.
+- [x] Preserve existing review UX (accept/reject/reorder/trim) — same context interface; consumers unchanged.
+- [x] Authoritative inversion: every GUI review edit (include/exclude/reset/reorder/trim/profile/target) now runs through the operations core and reconciles from the returned document; SSE reconcile is authoritative; the legacy PUT autosave path is retired. Resolved the flagged **`decisions`** question by adding a persisted `decisions` map to the document (so "rejected" vs "not reviewed" survives). Typecheck + full `npm run build` green.
 - [ ] E2E: an agent/external edit appears live in the GUI (needs the Electron+backend stack; pending visual QA).
 
 ### Task A2.4 — GUI editing affordances
-**Files:** `frontend/src/renderer/src/components/`, `frontend/e2e/`
-- [ ] UI for split, extend, speed, transform (zoom/pan). Preview: speed via `video.playbackRate`, transform via CSS/canvas transform. **Not started** (visual UI work; the operations are reachable from the client API above).
-- [ ] E2E for speed/zoom editing.
+**Files:** `frontend/src/renderer/src/components/TimelineEditor.tsx`, `routes/Review.tsx`
+- [x] `TimelineEditor` surface: per-item **reorder**, **extend/trim** (set bounds), **speed**, **transform** (digital zoom), **split**, **remove**, plus **undo/redo** — all through the operations core; live via the document/SSE. Mounted on the Review route; styled; build green. (Realtime speed/transform *preview* on the player is the remaining polish.)
+- [ ] E2E for speed/zoom editing (needs the Electron stack; pending visual QA).
 
 ### Task A2.5 — Export speed/transform
 **Files:** `backend/src/export_engine.py`, `backend/tests/test_export_engine.py`

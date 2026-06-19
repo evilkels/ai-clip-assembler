@@ -435,6 +435,7 @@ export interface TimelineDocument {
   items: TimelineItem[];
   profile: AssemblyProfile | null;
   target_duration_sec: number | null;
+  decisions: Record<string, 'included' | 'excluded'>;
 }
 
 export async function getTimelineDocument(projectId: string): Promise<TimelineDocument> {

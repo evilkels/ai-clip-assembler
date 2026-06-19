@@ -1413,3 +1413,32 @@ a {
   border-top: 1px solid var(--border, #2a2f3a);
 }
 .review-chat-input input { flex: 1; }
+
+/* Timeline editor (A2.4) */
+.timeline-editor {
+  margin-top: 16px;
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 10px;
+  background: var(--surface, #161a22);
+  padding: 12px 14px;
+}
+.timeline-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.timeline-editor-tools { margin-left: auto; display: flex; gap: 8px; }
+.timeline-editor-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.timeline-item-row {
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.timeline-item-head { display: flex; align-items: center; gap: 10px; }
+.timeline-item-name { font-weight: 600; }
+.timeline-item-order { margin-left: auto; display: flex; gap: 6px; }
+.timeline-item-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; align-items: flex-end; }
+.timeline-item-controls label { display: flex; flex-direction: column; font-size: 0.78em; opacity: 0.85; gap: 2px; }
+.timeline-item-controls input { width: 80px; }

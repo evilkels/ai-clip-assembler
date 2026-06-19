@@ -647,6 +647,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     projects[project_id]["clips"] = ranked_clips
     projects[project_id]["timeline"] = timeline
     projects[project_id]["harness_id"] = request.harness_id
+    invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
     response = {
         "project_id": project_id,
@@ -712,6 +713,7 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
         "target_duration_sec": request.target_duration_sec,
         "total_duration_sec": total_duration_sec,
     }
+    invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
     return {
         "project_id": project_id,
@@ -733,6 +735,7 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
         target_duration_sec=request.target_duration_sec,
     )
     project["timeline"] = timeline
+    invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
     return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
 
@@ -831,6 +834,17 @@ def _make_timeline_on_change(project_id: str):
         await publish(document)
 
     return on_change
+
+
+def invalidate_timeline_controller(project_id: str) -> None:
+    """Drop the cached controller so the next access rebuilds the document from
+    a freshly written legacy timeline (analyze/draft/PUT). Keeps the
+    backend-authoritative document in sync with those paths until the GUI drives
+    everything through the operations core."""
+    _timeline_controllers.pop(project_id, None)
+    project = projects.get(project_id)
+    if project is not None:
+        project.pop("timeline_document", None)
 
 
 def get_timeline_controller(project_id: str) -> TimelineController:

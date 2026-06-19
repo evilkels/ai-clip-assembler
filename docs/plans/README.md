@@ -19,7 +19,7 @@ Two kinds of plans live side by side:
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | [001](001-real-footage-validation.md) | Instrument analysis timing + real-footage validation runbook | P1 | S | — | DONE (2026-06-11, telemetry + runbook) |
-| [002](002-pi-harness-scaling-spike.md) | Pi harness scaling design spike (batching, retries, partial results) | P2 | M | — | TODO |
+| [002](002-pi-harness-scaling-spike.md) | Pi harness scaling design spike (batching, retries, partial results) | P2 | M | — | DONE (2026-06-19) — spec `docs/specs/2026-06-19-pi-harness-scaling-design.md` + live benchmark (`scripts/spike_pi_scaling_benchmark.py`): per-clip ~8.9s/p95 16s, batched k=2 ~5.2s/clip, 0/15 parse fails. Rec: bounded concurrency + retry-once + partial-results (neutral backfill); defer batching. Needs a follow-up impl plan. |
 | [003](003-backend-packaging-spike.md) | Backend packaging spike (bundle FastAPI into the Electron DMG) | P3 | M (spike) | 001 (sequencing) | TODO |
 | [004](done/004-timeline-sequence-playback.md) | Timeline sequence playback, video-driven and stutter-free | P1 | M | — | DONE (2026-06-11, branch `feature/timeline-sequence-playback`) |
 

@@ -1,5 +1,13 @@
 # Executor Handoff: Agent-Operable Timeline
 
+> **EXECUTED (2026-06-19, commits `431f51e`..`d012b60`).** A1→A2→B→C built
+> test-first; backend complete and test-green (243 backend tests + synthetic
+> e2e). The A1 review gate was waived by the operator ("don't stop until the
+> plan is fully implemented"). Remaining work and deferred items are tracked in
+> the plan's QA/Documentation sections and the `docs/plans/README.md` row —
+> chiefly GUI editing affordances, full ReviewContext inversion, chat token
+> streaming, Playwright e2e, and the human real-footage **Flow F** session.
+
 > **Executor instructions**: Implement the plan in
 > [`agent-operable-timeline.md`](agent-operable-timeline.md) **fully**, in the
 > phase order A1 → A2 → B → C. Work test-first. Run every verification command

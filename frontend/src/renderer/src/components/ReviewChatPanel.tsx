@@ -18,6 +18,7 @@ import {
 import { useReview } from '../state/ReviewContext';
 
 interface ChatMessage {
+  id: number;
   role: 'agent' | 'editor';
   text: string;
   proposal?: Proposal | null;
@@ -29,6 +30,11 @@ export function ReviewChatPanel() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const kickedFor = useRef<string | null>(null);
+  const nextId = useRef(0);
+  const makeMessage = (message: Omit<ChatMessage, 'id'>): ChatMessage => {
+    nextId.current += 1;
+    return { id: nextId.current, ...message };
+  };
 
   useEffect(() => {
     if (!projectId || kickedFor.current === projectId) return;
@@ -37,7 +43,7 @@ export function ReviewChatPanel() {
     setBusy(true);
     reviewKickoff(projectId)
       .then((result) =>
-        setMessages([{ role: 'agent', text: result.message, proposal: result.proposal }]),
+        setMessages([makeMessage({ role: 'agent', text: result.message, proposal: result.proposal })]),
       )
       .catch(() => {
         /* opening turn is best-effort */
@@ -49,13 +55,13 @@ export function ReviewChatPanel() {
     if (!projectId || !input.trim() || busy) return;
     const text = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, { role: 'editor', text }]);
+    setMessages((prev) => [...prev, makeMessage({ role: 'editor', text })]);
     setBusy(true);
     try {
       const result = await reviewTurn(projectId, text);
-      setMessages((prev) => [...prev, { role: 'agent', text: result.message, proposal: result.proposal }]);
+      setMessages((prev) => [...prev, makeMessage({ role: 'agent', text: result.message, proposal: result.proposal })]);
     } catch {
-      setMessages((prev) => [...prev, { role: 'agent', text: 'Sorry — I could not complete that turn.' }]);
+      setMessages((prev) => [...prev, makeMessage({ role: 'agent', text: 'Sorry — I could not complete that turn.' })]);
     } finally {
       setBusy(false);
     }
@@ -90,8 +96,8 @@ export function ReviewChatPanel() {
         <span className="draft-summary">proposes edits you accept or reject</span>
       </div>
       <div className="review-chat-log" data-testid="review-chat-log">
-        {messages.map((message, index) => (
-          <div key={index} className={`chat-msg chat-${message.role}`}>
+        {messages.map((message) => (
+          <div key={message.id} className={`chat-msg chat-${message.role}`}>
             <p>{message.text}</p>
             {message.proposal ? (
               <ProposalCard proposal={message.proposal} onResolve={resolveProposal} />
@@ -134,7 +140,7 @@ function ProposalCard({
     <div className="proposal-card" data-testid="proposal-card">
       <ul className="proposal-summary">
         {proposal.summary.map((line, index) => (
-          <li key={index}>{line}</li>
+          <li key={`${proposal.proposal_id}:${index}`}>{line}</li>
         ))}
       </ul>
       <p className="proposal-delta">

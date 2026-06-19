@@ -61,6 +61,34 @@ The active default AI harness is **`pi_agent`** — it drives the [`pi`](https:/
 
 The `manual` rule-based harness needs no AI. The **local-model harness (`local_qwen`) is postponed** — disabled in `GET /harnesses` and not selectable in `/analyze` — until the Ollama/MLX path is fully figured out (code retained for later). See [docs/HARNESS_SPEC.md](docs/HARNESS_SPEC.md).
 
+## Timeline editing
+
+The timeline is a backend-authoritative **Timeline Document** (ordered timeline
+items, each with its own in/out bounds, **speed**, and **transform**), mutated
+only through one reversible **operations core**: `split`, `extend`/retrim,
+`reorder`, multi-instance, `set_speed`, and `set_transform` (digital zoom/pan).
+Every change is a snapshot on a per-project **undo/redo** history. The GUI live-
+updates over SSE, so an edit from any client appears everywhere at once. Speed
+and transform are encoded into FCPXML and Resolve XML on export; EDL flattens
+them and surfaces a warning.
+
+## Controlling the app with an agent (MCP)
+
+While the app runs, the backend exposes a local **MCP server** at
+`http://127.0.0.1:8000/mcp`. External agents (Claude Code, Cursor) drive the
+*same* live timeline through the same operations — `list_candidates`,
+`get_frame_paths`, `include`, `set_speed`, `split_item`, … — and their edits show
+up live in the GUI. Connect Claude Code:
+
+```bash
+claude mcp add --transport http clip-assembler http://127.0.0.1:8000/mcp
+```
+
+The app also has an in-app **review agent** on the Review route that runs in
+*propose mode*: it suggests edits as Accept/Reject proposal cards; accepting
+replays them through the operations core (so they stay undoable). Full setup and
+tool list: [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
+
 ## Project Structure
 
 ```
@@ -96,6 +124,7 @@ ai-clip-assembler/
 - [Developer Setup](docs/DEVELOPER_SETUP.md) — environment, running, tests, layout
 - [Troubleshooting & FAQ](docs/TROUBLESHOOTING.md) — common issues and fixes
 - [Architecture](docs/ARCHITECTURE.md) — full system design
+- [MCP Server](docs/MCP_SERVER.md) — drive the timeline from an external agent
 - [Harness Spec](docs/HARNESS_SPEC.md) — pluggable AI-harness contract
 - [PRD](docs/PRD.md) — product requirements
 

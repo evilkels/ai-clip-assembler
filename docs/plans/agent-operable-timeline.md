@@ -23,7 +23,12 @@
 - **Depends on**: none to start; B and C build on A
 - **Category**: architecture + product
 - **Planned at**: commit `ed891fd`, 2026-06-19
-- **Progress**: Phase A1 complete (operations core, undo/redo, persistence/migration; 56 tests). At the A1 review gate — A2/B/C not started.
+- **Progress**: A1–C implemented. Backend complete & test-green (243 backend
+  tests + synthetic e2e with operations-core/MCP/export flows). Docs shipped
+  (README, MCP_SERVER, ARCHITECTURE, runbook Flow F). Remaining: GUI visual
+  editing affordances (A2.4), full ReviewContext authoritative inversion (A2.3),
+  chat token streaming (C.2), and Playwright e2e — all pending visual QA on the
+  Electron stack.
 
 ## Why this matters
 
@@ -200,9 +205,9 @@ proactive opening turn.
 
 ## Documentation (cross-cutting)
 
-- [ ] README: "Controlling the app with an agent (MCP)" + "Timeline editing" sections.
-- [ ] New `docs/MCP_SERVER.md` (Phase B).
-- [ ] Update `docs/ARCHITECTURE.md` (backend-authoritative timeline, operations core, MCP, SSE).
+- [x] README: "Controlling the app with an agent (MCP)" + "Timeline editing" sections.
+- [x] New `docs/MCP_SERVER.md` (Phase B).
+- [x] Update `docs/ARCHITECTURE.md` (backend-authoritative timeline, operations core, MCP, SSE).
 - [x] `UBIQUITOUS_LANGUAGE.md` updated (commit `c81e7dd`).
 
 ## QA & real-footage validation
@@ -211,14 +216,15 @@ proactive opening turn.
 > (`001-real-footage-validation.md`), the coding agent writes the harness/tests
 > and the runbook flow; a human runs actual footage.
 
-- [ ] Per-phase automated tests above (pytest + Playwright) all green.
-- [ ] Extend `scripts/synthetic_e2e_qa.py` to exercise the operations core and an MCP round-trip on generated/sample media.
-- [ ] Add a real-footage QA flow to `docs/VALIDATION_RUNBOOK.md` (+ launch note in `docs/MANUAL_QA_GUIDE.md`) covering, on footage from `~/Footage/QA/`:
-  - [ ] GUI + External Agent (Claude Code over `/mcp`) editing the same open project, edits live in the GUI;
-  - [ ] split / extend / speed / transform applied and surviving save/reload;
-  - [ ] In-App Review Agent proposal → accept producing a correct edit;
-  - [ ] export of a speed/transform timeline to Resolve XML with **zero relink prompts**; EDL flatten-warning verified.
-  - [ ] Report-template section mirroring the existing one. **Never commit footage or footage reports.**
+- [x] Per-phase automated **backend** tests above (pytest) all green (243). Playwright e2e for the GUI affordances + propose→accept remain (need the Electron stack; pending visual QA).
+- [x] Extend `scripts/synthetic_e2e_qa.py` to exercise the operations core and an MCP round-trip on generated/sample media (operations-core, MCP round-trip, and export speed/transform flows added; all checks pass).
+- [x] Add a real-footage QA flow (**Flow F**) to `docs/VALIDATION_RUNBOOK.md` (+ launch note in `docs/MANUAL_QA_GUIDE.md`) covering, on footage from `~/Footage/QA/`:
+  - [x] GUI + External Agent (Claude Code over `/mcp`) editing the same open project, edits live in the GUI;
+  - [x] split / extend / speed / transform applied and surviving save/reload;
+  - [x] In-App Review Agent proposal → accept producing a correct edit;
+  - [x] export of a speed/transform timeline to Resolve XML with **zero relink prompts**; EDL flatten-warning verified.
+  - [x] Report-template section mirroring the existing one. **Never commit footage or footage reports.**
+  - _(Authored for a human to run; results are not fabricated.)_
 
 ## Out of scope (YAGNI)
 

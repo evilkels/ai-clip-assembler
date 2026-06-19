@@ -371,6 +371,25 @@ Check:
 Known limitation: export metadata for non-30fps and rotated vertical media is
 tracked in GitHub issue #19.
 
+## Agent-Operable Timeline (MCP + review agent)
+
+The backend exposes a local **MCP Server** while the app runs, so an external
+agent (Claude Code/Cursor) can drive the same live timeline, and the app has an
+in-app **review agent** that proposes edits. To exercise these:
+
+1. Launch the app (so the backend runs on `http://127.0.0.1:8000`).
+2. Open and analyze a folder project; land on the Review route.
+3. **External agent:** connect Claude Code and apply an edit —
+   `claude mcp add --transport http clip-assembler http://127.0.0.1:8000/mcp`,
+   then ask it to `list_candidates` and `include`/`set_speed` a clip. The edit
+   should appear in the GUI live. See [`MCP_SERVER.md`](MCP_SERVER.md).
+4. **In-app review agent:** use the Review-route chat panel — read the opening
+   message, then Accept or Reject its proposal cards.
+
+For the full, measured real-footage version (split/extend/speed/transform,
+save+reload, Resolve handoff with zero relink prompts, EDL flatten warning), run
+**Flow F** in [`VALIDATION_RUNBOOK.md`](VALIDATION_RUNBOOK.md).
+
 ## QA Notes To Capture
 
 For each test clip, record:

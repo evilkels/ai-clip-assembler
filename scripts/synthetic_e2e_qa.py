@@ -215,8 +215,67 @@ def main() -> int:
     check("DaVinci XML references media relative to export dir", "<pathurl>../../" in resolve_text)
     check("DaVinci XML is XMEML v5", '<xmeml version="5">' in resolve_text)
 
+    print("\nFlow: operations core (HTTP) — include, speed, split, undo/redo")
+    op_clip = clips[0]["clip_id"]
+
+    def op(operation, **args):
+        return client.post(
+            f"/projects/{project_id}/timeline/op",
+            json={"operation": operation, "args": args},
+        )
+
+    doc = op("include", clip_id=op_clip).json()["document"]
+    check("include keeps/creates a timeline item", any(i["source_clip_id"] == op_clip for i in doc["items"]))
+    item = next(i for i in doc["items"] if i["source_clip_id"] == op_clip)
+    item_id = item["item_id"]
+    doc = op("set_speed", item_id=item_id, speed=0.5).json()["document"]
+    check("set_speed records 0.5x", next(i for i in doc["items"] if i["item_id"] == item_id)["speed"] == 0.5)
+    count_before_split = len(doc["items"])
+    mid = round((item["start_sec"] + item["end_sec"]) / 2, 3)
+    doc = op("split_item", item_id=item_id, at_sec=mid).json()["document"]
+    check("split adds one item", len(doc["items"]) == count_before_split + 1)
+    undo = client.post(f"/projects/{project_id}/timeline/undo").json()["document"]
+    check("undo reverts the split", len(undo["items"]) == count_before_split)
+    redo = client.post(f"/projects/{project_id}/timeline/redo").json()["document"]
+    check("redo reapplies the split", len(redo["items"]) == count_before_split + 1)
+
+    print("\nFlow: MCP round-trip — tools/list + tools/call drive the same core")
+    api._mcp_server = None
+    listed = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    tool_names = {t["name"] for t in listed.json().get("result", {}).get("tools", [])}
+    check(
+        "MCP exposes mutating + read tools",
+        {"include", "split_item", "list_candidates", "get_frame_paths"} <= tool_names,
+    )
+    second_clip = clips[1]["clip_id"] if len(clips) > 1 else op_clip
+    called = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "include", "arguments": {"project_id": project_id, "clip_id": second_clip}},
+        },
+    )
+    check(
+        "MCP tools/call succeeds",
+        called.status_code == 200 and called.json()["result"].get("isError") is not True,
+    )
+    after = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    check(
+        "MCP edit visible via HTTP document (one shared core)",
+        any(i["source_clip_id"] == second_clip for i in after["items"]),
+    )
+
+    print("\nFlow: export reflects speed + transform (Resolve) and warns (EDL)")
+    op("set_transform", item_id=after["items"][0]["item_id"], transform={"scale": 1.4, "x": 0.1, "y": 0.0})
+    client.post(f"/projects/{project_id}/export?format=resolve_xml&overwrite=true")
+    resolve_doc_text = expected_files["resolve_xml"].read_text(encoding="utf-8")
+    check("Resolve XML encodes Transform (Basic Motion)", "Basic Motion" in resolve_doc_text)
+    edl_export = client.post(f"/projects/{project_id}/export?format=edl&overwrite=true")
+    check("EDL export warns that speed/transform were flattened", bool(edl_export.json().get("warnings")))
+
     print("\nFlow: close and reopen the project")
     api.projects.clear()
+    api._timeline_controllers.clear()
     reopened = client.post("/projects/from-folder", json={"folder_path": str(folder)})
     check("reopen succeeds", reopened.status_code == 200)
     restored_clips = reopened.json().get("clips", [])

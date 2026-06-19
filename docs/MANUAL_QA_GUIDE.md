@@ -1,20 +1,39 @@
 # Manual QA Launch Guide
 
-This guide launches the current drone-first MVP on macOS for manual QA.
+This guide launches the current app on macOS for a manual QA session and walks
+the full workflow: **import → analyze → review → edit the timeline → export**,
+plus the **agent-operable timeline** (external MCP agent + in-app review agent).
+
+For the *measured* real-footage session (timings, recall, DaVinci handoff, and
+the agent-operable **Flow F**), use [`VALIDATION_RUNBOOK.md`](VALIDATION_RUNBOOK.md).
+File bugs with the template in [`QA.md`](QA.md).
 
 ## Current Product State
 
-- The Electron frontend launches and can create/open a **Project** from a footage folder.
-- The FastAPI backend can create projects, upload source videos, probe metadata, extract frames, score frame samples, and assemble rule-based smooth **Candidate Clips**.
-- The frontend can run backend analysis and export accepted timelines as FCPXML or EDL.
-- Folder-backed projects keep source videos in place and write app state into `clipassembler/`.
+- Electron frontend creates/opens a **Project** from a footage folder; source
+  videos stay in place and app state lives under `clipassembler/`.
+- FastAPI backend probes metadata, extracts frames, scores them, and assembles
+  rule-based smooth **Candidate Clips**. The default **AI harness is `pi_agent`**
+  (pi CLI → cloud model) which enriches scores with a visual-interest judgment;
+  it falls back to manual scoring on failure. `manual` is the no-AI mode.
+  `local_qwen` is **postponed/disabled**; `claude_code`/`codex` are not enabled.
+- The timeline is a **backend-authoritative Timeline Document**, edited only
+  through one reversible **operations core** with **undo/redo**. The Review
+  route has a **Timeline editor** (reorder / extend-trim / **speed** /
+  **transform** zoom / split / remove) and an in-app **review agent** that
+  proposes edits you Accept/Reject.
+- While the app runs, the backend exposes a local **MCP server** at
+  `http://127.0.0.1:8000/mcp` so an external agent (Claude Code/Cursor) can
+  drive the *same* live timeline; edits appear live in the GUI over SSE.
+- Export to **FCPXML**, **EDL**, and **Resolve XML** (DaVinci). Speed/transform
+  are encoded in FCPXML + Resolve XML; EDL flattens them and warns.
 
 ## Prerequisites
 
 Install system tools:
 
 ```bash
-brew install python@3.11 node
+brew install python node
 ```
 
 FFmpeg with the `vidstabdetect` filter is required for motion analysis:
@@ -51,30 +70,36 @@ which ffmpeg
 ffmpeg -version
 ffprobe -version
 ffmpeg -hide_banner -filters | grep vidstabdetect
-python3.11 --version
+python3 --version   # 3.9+
 node --version
 npm --version
 ```
 
-The backend MVP requires `vidstabdetect`. Both grep checks above must list the
+The backend MVP requires `vidstabdetect`. The grep check above must list the
 filter in the shell you start the backend from — the backend resolves `ffmpeg`
 from that shell's `PATH`.
 
-## Install Dependencies
-
-From the repo root:
+For the `pi_agent` AI harness, authenticate the pi CLI once (or set a provider
+key such as `OPENCODE_API_KEY`); the backend inherits that environment and reads
+`PI_PROVIDER`/`PI_MODEL`/`PI_BIN`/`PI_TIMEOUT_SEC` from the repo-root `.env`:
 
 ```bash
-cd /Users/elvijs/DEV/personal/ai-clip-assembler
+pi /login
+pi --provider openai-codex --model gpt-5.4-mini --print --mode text \
+   --no-session --no-context-files --no-skills --no-extensions "reply with ok"
 ```
 
-Backend:
+## Install Dependencies
+
+From the repo root (`/Users/elvijs/DEV/personal/ai-clip-assembler`).
+
+Backend (the repo already has `backend/.venv` on Python 3.9; recreate only if
+missing):
 
 ```bash
 cd backend
-python3.11 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-PYTHONPATH=. .venv/bin/python -m pytest
+# python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py
 ```
 
 Frontend:
@@ -85,6 +110,9 @@ npm install
 npm run typecheck
 npm run build
 ```
+
+Both should be green before manual QA. (`npm run test:backend` runs the same
+backend suite from the frontend dir.)
 
 ## Launch The App
 
@@ -104,9 +132,10 @@ Expected frontend behavior:
 - Electron opens a dark editor-style app.
 - The Import tab can create/open a folder-backed project with **Create / Open Folder Project**.
 - Source videos are listed without copying footage.
-- Smoothness threshold defaults to 7+.
-- You can include, exclude, and reorder accepted clips.
-- The Export tab can generate EDL and FCPXML files.
+- Smoothness threshold defaults to 7.
+- You can include, exclude, reorder, and trim accepted clips, and edit timeline
+  items (speed/zoom/split) in the Review-route Timeline editor.
+- The Export tab can generate EDL, FCPXML, and Resolve XML files.
 
 ## Folder Project QA Flow
 
@@ -126,16 +155,19 @@ Nested folders are intentionally ignored in the MVP.
 <footage-folder>/clipassembler/cache/.nosync
 ```
 
-5. Click **Analyze**.
+5. Pick a harness (`manual` for deterministic, `pi_agent` for AI-enhanced) and
+   click **Analyze**.
 6. Confirm frame samples appear under `clipassembler/samples/` and motion files
-   appear under `clipassembler/analysis/motion/`.
+   appear under `clipassembler/analysis/motion/`. With `pi_agent`, AI scores
+   cache under `clipassembler/analysis/ai-scores/`.
 7. Accept one or more clips on the Review tab.
-8. Export EDL and FCPXML from the Export tab.
+8. Export EDL, FCPXML, and Resolve XML from the Export tab.
 9. Confirm exports are written to:
 
 ```bash
 <footage-folder>/exports/edl/timeline.edl
 <footage-folder>/exports/fcp/timeline.fcpxml
+<footage-folder>/exports/davinci/timeline.xml
 ```
 
 Move-folder check:
@@ -179,216 +211,130 @@ Empty-folder check:
 2. Confirm the app shows an error.
 3. Confirm it did not create `clipassembler/`.
 
-## Backend Real-Footage Smoke Test
+## AI Harness (`pi_agent`) Check
+
+1. With `pi` authenticated, analyze a folder project with the **`pi_agent`**
+   harness.
+2. Confirm candidate clips carry an AI **Clip Reason** (the "Why" line) and a
+   `visual_interest` contribution to the overall score.
+3. Force a failure path: temporarily break auth (e.g. `PI_BIN=/bin/false`
+   `npm run dev:backend`) and re-analyze. Confirm the run **falls back to manual
+   scoring** with a metadata warning rather than crashing — and note the
+   fallback is per *video*, not per project.
+
+> Scaling note: `pi_agent` scores clips one subprocess call at a time
+> (~9 s/clip measured). On a large realistic set this can approach the speed
+> budget — see [`specs/2026-06-19-pi-harness-scaling-design.md`](specs/2026-06-19-pi-harness-scaling-design.md).
+> `local_qwen` is postponed/disabled; see `LOCAL_QWEN_SETUP.md` if it is re-enabled.
+
+## Timeline Editing Check (operations core + undo/redo)
+
+On the Review route, after accepting clips:
+
+1. In the **Timeline editor**, for one item:
+   - **Reorder** it (↑/↓) and confirm the order changes.
+   - **Extend/trim** via the In/Out fields; confirm bounds clamp to the source
+     video duration (you cannot extend past the source).
+   - Set **Speed** to `0.5` and `2.0`; confirm the "Ns on timeline" effective
+     duration updates.
+   - Set **Zoom** (transform scale) to `1.5`.
+   - **Split** the item; confirm it becomes two items.
+   - **Remove** an item.
+2. Use **Undo**/**Redo** and confirm each operation reverses/replays.
+3. Quit and reopen the project; confirm the timeline (speed/transform/splits)
+   is restored.
+4. Export Resolve XML and confirm speed/transform survive; export EDL and
+   confirm the response/file carries the **flatten warning**.
+
+## Backend Real-Footage Smoke Test (no GUI)
 
 Use a short local drone MP4 or MOV. Replace the path below.
 
 ```bash
 VIDEO_PATH="/absolute/path/to/your/drone-footage.mp4"
-```
-
-The easiest full backend smoke test is:
-
-```bash
 cd /Users/elvijs/DEV/personal/ai-clip-assembler
 backend/.venv/bin/python scripts/backend_smoke_test.py "$VIDEO_PATH"
 ```
 
 The script creates a project, uploads the video, runs manual analysis, prints
-candidate clip timings and scores, and generates both EDL and FCPXML exports.
+candidate clip timings and scores, and generates EDL + FCPXML exports.
 
-The equivalent manual API steps are below.
-
-Create a project:
-
-```bash
-PROJECT_ID=$(curl -s -X POST http://127.0.0.1:8000/projects | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])')
-echo "$PROJECT_ID"
-```
-
-Create/open a folder-backed project:
+The equivalent manual API steps (folder-backed project):
 
 ```bash
 PROJECT_FOLDER="/absolute/path/to/your/footage-folder"
-PROJECT_ID=$(curl -s \
-  -H "Content-Type: application/json" \
+PROJECT_ID=$(curl -s -H "Content-Type: application/json" \
   -X POST http://127.0.0.1:8000/projects/from-folder \
   -d "{\"folder_path\":\"${PROJECT_FOLDER}\"}" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])')
 echo "$PROJECT_ID"
-```
 
-Upload a source video:
-
-```bash
-curl -s \
-  -F "file=@${VIDEO_PATH}" \
-  "http://127.0.0.1:8000/projects/${PROJECT_ID}/videos" \
-  | python3 -m json.tool
-```
-
-Run manual analysis:
-
-```bash
-curl -s \
-  -H "Content-Type: application/json" \
+curl -s -H "Content-Type: application/json" \
   -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/analyze" \
-  -d "{
-    \"project_id\": \"${PROJECT_ID}\",
-    \"harness_id\": \"manual\",
-    \"preferences\": {
-      \"sample_fps\": 1,
-      \"smoothness_threshold\": 7,
-      \"min_clip_duration_sec\": 3,
-      \"max_clip_duration_sec\": 15,
-      \"target_duration_sec\": 120
-    }
-  }" \
-  | python3 -m json.tool
+  -d "{\"project_id\":\"${PROJECT_ID}\",\"harness_id\":\"manual\",\"preferences\":{
+        \"sample_fps\":1,\"smoothness_threshold\":7,
+        \"min_clip_duration_sec\":3,\"max_clip_duration_sec\":15,
+        \"target_duration_sec\":120}}" | python3 -m json.tool
 ```
+
+Swap `"harness_id":"manual"` for `"pi_agent"` to exercise the AI path.
 
 Expected backend behavior:
 
 - Metadata includes duration, FPS, resolution, and codec.
 - Analysis returns `status: "complete"`.
-- Smooth footage should produce one or more candidate clips when enough frames pass the 7+ smoothness threshold.
-- If `ffmpeg` or `ffprobe` is missing, the API should return an actionable error instead of a traceback.
-
-## Optional Local Qwen Vision Enhancement
-
-> **The manual / rule-based harness is the default reliable mode.**
-> Local Qwen is an optional enhancement. If Ollama or the model is unavailable,
-> the backend falls back to manual results automatically.
-
-Install and start Ollama (macOS):
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen3-vl:8b
-ollama serve
-```
-
-Run analysis with the local vision harness:
-
-```bash
-curl -s \
-  -H "Content-Type: application/json" \
-  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/analyze" \
-  -d "{
-    \"project_id\": \"${PROJECT_ID}\",
-    \"harness_id\": \"local_qwen\",
-    \"preferences\": {
-      \"sample_fps\": 1,
-      \"smoothness_threshold\": 7,
-      \"min_clip_duration_sec\": 3,
-      \"max_clip_duration_sec\": 15,
-      \"target_duration_sec\": 120
-    }
-  }" \
-  | python3 -m json.tool
-```
-
-Environment variables (optional):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
-| `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
-| `OLLAMA_TEMPERATURE` | `0.2` | Model sampling temperature (fixed at 0.2 by default) |
-
-Configuration is via environment variables only. No config file is required.
-
-If Ollama is not running, the response will still be HTTP 200 with manual
-results and a metadata warning such as:
-
-```json
-{
-  "metadata": {
-    "warning": "Local Qwen fallback: Ollama/model unavailable"
-  }
-}
-```
-
-Export EDL:
-
-```bash
-curl -s \
-  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/export?format=edl" \
-  | python3 -m json.tool
-```
-
-Export FCPXML:
-
-```bash
-curl -s \
-  -X POST "http://127.0.0.1:8000/projects/${PROJECT_ID}/export?format=fcpxml" \
-  | python3 -m json.tool
-```
-
-Expected export behavior:
-
-- The response includes `status: "generated"` and a local `file_path`.
-- The EDL file opens as readable text with edit events.
-- The FCPXML file can be inspected as XML and should be tried in Final Cut Pro during manual QA.
-
-## DaVinci Resolve Validation
-
-DaVinci Resolve Free is a good MVP validation target because it can import EDL
-timelines without requiring Final Cut Pro.
-
-1. Open Resolve and create a new project.
-2. Import the original source MP4/MOV into the Media Pool.
-3. Use **File > Import > Timeline > Import AAF, EDL, XML...**.
-4. For folder-backed projects, select the generated export:
-
-```bash
-<footage-folder>/exports/edl/timeline.edl
-```
-
-For legacy upload smoke tests, select:
-
-```bash
-backend/.ai-clip-assembler/projects/<project-id>/exports/timeline.edl
-```
-
-5. If Resolve cannot relink media for legacy upload projects, import the copied
-   backend media from:
-
-```bash
-backend/.ai-clip-assembler/projects/<project-id>/videos/
-```
-
-Check:
-
-- The timeline imports without an error dialog.
-- The number of clips matches the smoke-test output.
-- Each clip has plausible source timing and duration.
-- For folder-backed projects, media should resolve from the original footage
-  folder without copying source videos.
-- Vertical footage is upright or the orientation issue is recorded.
-- Playback timing is plausible and does not appear sped up or slowed down.
-
-Known limitation: export metadata for non-30fps and rotated vertical media is
-tracked in GitHub issue #19.
+- Smooth footage produces one or more candidate clips above the 7 threshold.
+- Missing `ffmpeg`/`ffprobe` yields an actionable error, not a traceback.
 
 ## Agent-Operable Timeline (MCP + review agent)
 
-The backend exposes a local **MCP Server** while the app runs, so an external
-agent (Claude Code/Cursor) can drive the same live timeline, and the app has an
-in-app **review agent** that proposes edits. To exercise these:
+External agent driving the live timeline:
 
-1. Launch the app (so the backend runs on `http://127.0.0.1:8000`).
-2. Open and analyze a folder project; land on the Review route.
-3. **External agent:** connect Claude Code and apply an edit —
-   `claude mcp add --transport http clip-assembler http://127.0.0.1:8000/mcp`,
-   then ask it to `list_candidates` and `include`/`set_speed` a clip. The edit
-   should appear in the GUI live. See [`MCP_SERVER.md`](MCP_SERVER.md).
-4. **In-app review agent:** use the Review-route chat panel — read the opening
-   message, then Accept or Reject its proposal cards.
+1. Keep the app running (backend on `http://127.0.0.1:8000`).
+2. Connect Claude Code:
+   `claude mcp add --transport http clip-assembler http://127.0.0.1:8000/mcp`.
+3. Ask it to `list_candidates` for the open `project_id`, read frames with
+   `get_frame_paths`, then apply an op (`include`, `set_speed`, `split_item`).
+4. Confirm the edit appears in the GUI **live** (no manual refresh).
+   See [`MCP_SERVER.md`](MCP_SERVER.md) for the full tool list.
 
-For the full, measured real-footage version (split/extend/speed/transform,
-save+reload, Resolve handoff with zero relink prompts, EDL flatten warning), run
-**Flow F** in [`VALIDATION_RUNBOOK.md`](VALIDATION_RUNBOOK.md).
+In-app review agent:
+
+1. On the Review route, read the chat panel's opening message + proposal cards.
+2. **Accept** a proposal → confirm the timeline updates and the change is
+   undoable. **Reject** one → confirm the timeline is unchanged.
+
+The full measured version (split/extend/speed/transform on real footage,
+save+reload, Resolve zero-relink, EDL flatten warning) is **Flow F** in
+[`VALIDATION_RUNBOOK.md`](VALIDATION_RUNBOOK.md).
+
+## DaVinci Resolve Validation
+
+Prefer **Resolve XML** (folder projects): media paths are written relative to
+the export directory, so the project folder stays portable with zero relink.
+
+1. Open Resolve and create a new project.
+2. **File > Import > Timeline > Import AAF, EDL, XML...** and choose
+   `<footage-folder>/exports/davinci/timeline.xml`.
+3. Confirm the timeline imports with **zero relink prompts**, clip count/order
+   match, and any speed/transform edits are present.
+4. Copy the whole project folder to another drive and repeat — still zero relink.
+
+EDL fallback (broad compatibility; speed/transform are flattened):
+
+1. Import the original source video into the Media Pool.
+2. Import `<footage-folder>/exports/edl/timeline.edl` the same way.
+3. Confirm clip count matches and source timing is plausible.
+
+Check:
+
+- Timeline imports without an error dialog.
+- Clip count, order, and in/out points match the app's timeline.
+- Vertical footage is upright or the orientation issue is recorded.
+- Playback timing is plausible and does not appear unintentionally sped/slowed.
+
+Known limitation: export metadata for non-30fps and rotated vertical media is
+tracked in GitHub issue #19.
 
 ## QA Notes To Capture
 
@@ -396,8 +342,12 @@ For each test clip, record:
 
 - Source video filename, duration, codec, resolution, and FPS.
 - Whether the shot is smooth, shaky, blurry, overexposed, or mixed.
-- Number of candidate clips produced.
+- Harness used (`manual` / `pi_agent`) and number of candidate clips produced.
 - Whether candidate clips match what you would keep manually.
-- Any confusing score or reason text.
+- Any confusing score or **Clip Reason** text.
+- For timeline edits: which operations were applied and whether they survived
+  save+reload and export.
+- For the agent flows: whether the external-agent edit appeared live, and
+  whether review-agent Accept/Reject behaved correctly.
 
-File bugs using the template in `docs/QA.md`.
+File bugs using the template in [`QA.md`](QA.md).

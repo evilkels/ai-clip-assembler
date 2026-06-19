@@ -2,7 +2,12 @@
 
 ## Scope
 
-This QA plan covers the drone-first MVP: importing local drone footage, scoring smooth and sharp candidate clips, reviewing suggestions, ordering accepted clips, and exporting a timeline to a professional editor format.
+This QA plan covers the drone-first workflow: importing local drone footage,
+scoring smooth/sharp candidate clips (rule-based `manual` or AI-enhanced
+`pi_agent`), reviewing suggestions, building and editing a backend-authoritative
+timeline (reorder/trim/speed/transform/split with undo/redo), optionally driving
+that timeline from an agent (in-app review agent or an external MCP agent), and
+exporting to a professional editor format (FCPXML, EDL, Resolve XML).
 
 ## Primary Persona
 
@@ -86,6 +91,32 @@ Pass criteria:
 - Source references point to the original local media.
 - Final Cut Pro imports FCPXML without errors.
 - EDL edit events have plausible source and timeline timecodes.
+- FCPXML and Resolve XML encode any **Speed**/**Transform** edits; EDL flattens
+  them and the export response carries a flatten warning.
+
+### 5a. AI Harness (`pi_agent`)
+
+1. Analyze a folder project with the `pi_agent` harness (pi CLI authenticated).
+2. Break the harness (e.g. `PI_BIN=/bin/false`) and re-analyze.
+
+Pass criteria:
+- AI scoring adds a visual-interest contribution and a written **Clip Reason**.
+- On failure the run falls back to `manual` scoring (per video) with a metadata
+  warning — no crash, no lost project.
+
+### 5b. Agent-Operable Timeline
+
+1. In the Review-route **Timeline editor**, apply reorder / extend / speed /
+   transform / split / remove, then undo/redo; save, reopen, and re-export.
+2. Connect an external agent over MCP (`/mcp`) and apply one operation.
+3. Use the in-app review agent: Accept one proposal, Reject another.
+
+Pass criteria:
+- Edits go through the operations core, are undoable, and survive save+reload.
+- The external-agent edit appears in the GUI live (SSE), driving the same
+  document.
+- Accept replays the proposal onto the timeline; Reject leaves it unchanged.
+- Full measured version: **Flow F** in `VALIDATION_RUNBOOK.md`.
 
 ### 6a. DaVinci Resolve XML Validation (folder projects)
 
@@ -117,9 +148,9 @@ Pass criteria:
 Known limitation:
 - Source frame rate and vertical orientation preservation is tracked separately in #19.
 
-## Issue #10 Closeout Checklist
+## Closeout Evidence (per validation run)
 
-Before closing #10, capture validation notes for:
+Capture validation notes for:
 
 - One smooth drone clip, ideally 10-60 seconds.
 - One shaky drone clip, ideally 10-60 seconds.
@@ -144,7 +175,7 @@ Run these after the backend and frontend MVP branches are present locally:
 
 ```bash
 cd backend
-PYTHONPATH=. .venv/bin/python -m pytest
+PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py
 ```
 
 ```bash
@@ -154,7 +185,12 @@ npm run typecheck
 npm run build
 ```
 
-If `npm run typecheck` is unavailable, the frontend MVP branch has not been merged or checked out yet.
+Synthetic end-to-end (real pipeline on generated footage; covers the operations
+core, an MCP round-trip, and export speed/transform):
+
+```bash
+backend/.venv/bin/python scripts/synthetic_e2e_qa.py
+```
 
 Add a real-video smoke test whenever `ffmpeg` and `ffprobe` are installed:
 
@@ -167,7 +203,11 @@ Add a real-video smoke test whenever `ffmpeg` and `ffprobe` are installed:
 
 - Real drone footage can vary widely by gimbal behavior, lighting, codec, and frame rate.
 - Synthetic tests can prove scoring mechanics but not editorial usefulness.
-- The first MVP may not distinguish smooth but boring footage from smooth and visually strong footage until **Local AI Harness** work starts.
+- Visual-interest discrimination depends on the `pi_agent` AI harness; with the
+  `manual` harness, smooth-but-boring and smooth-and-strong footage rank alike.
+- `pi_agent` requires the pi CLI authenticated and reachable; sequential
+  per-clip scoring can approach the speed budget on large sets (see
+  `specs/2026-06-19-pi-harness-scaling-design.md`).
 - Export validation requires the actual target editor, especially Final Cut Pro for FCPXML.
 
 ## Bug Filing Template

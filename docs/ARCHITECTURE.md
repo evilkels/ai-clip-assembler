@@ -86,7 +86,8 @@ candidate may appear as more than one item (multi-instance).
   mutated. A single `apply_operation(doc, sources, op, **args)` entry implements
   `add_item`, `remove_item`, `split_item`, `set_bounds` (trim **and** extend,
   clamped to the source), `reorder`, `set_speed`, `set_transform`,
-  `include`/`exclude`, `set_profile`, `set_target_duration`. Operations are pure
+  `include`/`exclude`, `set_profile`, `set_target_duration`, and the atomic
+  `replace_timeline` used to adopt a complete Version. Operations are pure
   (return a new document). `TimelineController` wraps the core with snapshot
   **undo/redo** history and a per-project **async write lock** so two writers
   (GUI + agent) cannot interleave mid-operation.
@@ -97,6 +98,12 @@ candidate may appear as more than one item (multi-instance).
 - **Live-sync over SSE.** `timeline_service.py` fans `timeline-changed` events to
   subscribers; `GET /projects/{id}/events` streams them so any client (the GUI)
   reconciles from the authoritative document. An agent's edit appears live.
+- **Version preview specs.** The Review Board builds mocked `Version[]` recipes
+  from Candidate Clips and previews each recipe client-side through the shared
+  video-driven sequence player. A Version has no live item ids; choosing one
+  submits its ordered item specs through `replace_timeline`, creating fresh
+  Timeline Items in one undoable snapshot while preserving one authoritative
+  live Timeline Document.
 - **In-app review agent** (`review_agent.py`): an MCP-style client in *propose
   mode*. Its mutating calls are captured as a **Proposal** (staged ops + diff)
   instead of applied; **accept** replays them through the operations core (so

@@ -37,11 +37,12 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented. Re-baselined 2026-06-19 at **44/100 Critical**; Batch 1 quick-wins (button-has-type ×14, em-dash) cut issues **75 → 60**, build green. Remaining score is Batch 2/3 judgment-call refactors (giant-component, derived-state, prefer-use, a11y) — deliberate pass, not blind. |
 | [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
-| [compare-versions-review-ui](2026-06-21-compare-versions-review-ui.md) | IN PROGRESS — Phase 5/6 complete: three-zone Review shell, atomic adopt flow, lazy Source Clips, and 8-test e2e suite green. |
+| [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE (2026-06-21) — video-forward Version gallery, shared sequence player, atomic adoption, three-zone Review shell, and lazy Source Clips. |
 
 ## Completed (`done/`)
 
 - [2026-06-15-clip-quality-and-review-ux](done/2026-06-15-clip-quality-and-review-ux.md) — 2026-06-15; scene-aware ranked windows, fitted-rotation turn-rate scoring, per-profile pacing/density/speed/ordering, export retiming, poster cards, batch visibility + cancel. Follow-up: calibrate turn-rate thresholds on real footage.
+- [2026-06-21-compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) — 2026-06-21; compare complete mocked-agent cuts, adopt one atomically, and review it in the three-zone workspace.
 - [004-timeline-sequence-playback](done/004-timeline-sequence-playback.md) — 2026-06-11
 - [2026-06-10-review-timeline-video-preview-playwright](done/2026-06-10-review-timeline-video-preview-playwright.md)
 - [2026-05-12-backend-timeline-workflow](done/2026-05-12-backend-timeline-workflow.md)

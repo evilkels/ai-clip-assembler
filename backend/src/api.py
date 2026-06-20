@@ -66,7 +66,7 @@ from .review_agent import ProposalStore, ReviewAgentError, default_review_agent,
 from .timeline_ops import SourceClip, TimelineController, TimelineOpError
 from .timeline_service import TimelineEventBroker
 from .quality_scoring import score_samples_from_images
-from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes
+from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes  # noqa: F401 - public test seam
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
 # uvicorn's logger so progress messages reach the dev console without extra config
@@ -619,9 +619,6 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     enrich_clips_with_source_metadata({"clips": all_clips, "videos": projects[project_id]["videos"]})
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
-    sequence_clip_ids = [clip["clip_id"] for clip in ranked_clips]
-    total_duration = sum(clip["duration_sec"] for clip in ranked_clips)
-
     existing_timeline = projects[project_id].get("timeline")
     existing_clips = projects[project_id].get("clips", [])
     if isinstance(existing_timeline, dict) and existing_timeline.get("source") == "manual":

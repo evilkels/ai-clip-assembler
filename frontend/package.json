@@ -12,6 +12,9 @@
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "eslint . --max-warnings=0",
+    "lint:backend": "cd ../backend && .venv/bin/ruff check src tests",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
@@ -25,6 +28,7 @@
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -33,9 +37,13 @@
     "electron": "^42.0.0",
     "electron-builder": "^26.0.0",
     "electron-vite": "^5.0.0",
+    "eslint": "^10.5.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.6.0",
     "react-doctor": "^0.2.14",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.61.1",
     "vite": "^7.0.0"
   },
   "overrides": {

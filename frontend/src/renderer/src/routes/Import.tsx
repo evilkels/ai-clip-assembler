@@ -235,7 +235,7 @@ export function ImportPage() {
         setUploading(false);
         return;
       }
-      let activeProjectId = projectId;
+      const activeProjectId = projectId;
       if (!activeProjectId) {
         await createUploadProject();
         setUploadErrors(['Legacy upload project created. Select the files again to upload.']);

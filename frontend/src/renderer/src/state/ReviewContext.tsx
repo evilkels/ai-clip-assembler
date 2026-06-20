@@ -119,9 +119,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     documentRef.current = document;
     setTimelineItems(document.items);
     const order: string[] = [];
+    const seenSourceIds = new Set<string>();
     const itemTrims: Record<string, Trim> = {};
     for (const item of document.items) {
-      if (!order.includes(item.source_clip_id)) order.push(item.source_clip_id);
+      if (!seenSourceIds.has(item.source_clip_id)) {
+        seenSourceIds.add(item.source_clip_id);
+        order.push(item.source_clip_id);
+      }
       if (!(item.source_clip_id in itemTrims)) {
         itemTrims[item.source_clip_id] = { start_sec: item.start_sec, end_sec: item.end_sec };
       }

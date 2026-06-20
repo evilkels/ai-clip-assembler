@@ -17,7 +17,7 @@ takes a ``project_id`` argument (MCP calls are stateless).
 from __future__ import annotations
 
 import json
-from typing import Awaitable, Callable, List, Optional
+from typing import Callable, List, Optional
 
 from .timeline_ops import OPERATIONS, TimelineController, TimelineOpError
 

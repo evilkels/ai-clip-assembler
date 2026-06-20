@@ -8,6 +8,8 @@ interface Range {
   end: number;
 }
 
+const EMPTY_RANGES: Range[] = [];
+
 interface Props {
   clip: ClipCandidate;
   rank: number;
@@ -103,7 +105,7 @@ export function ClipCard({
   decision,
   mediaUrl,
   draftPosition,
-  siblingRanges = [],
+  siblingRanges = EMPTY_RANGES,
   fileClipIndex,
   fileClipCount,
   onToggleInclude,

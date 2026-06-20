@@ -5,8 +5,6 @@ so the GUI (and any other connected client) reconciles from the authoritative
 document.
 """
 
-import asyncio
-
 import pytest
 
 from src.models import TimelineDocument

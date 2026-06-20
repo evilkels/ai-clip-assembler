@@ -355,6 +355,53 @@ def test_replace_timeline_empty_clears():
     assert result.items == []
 
 
+@pytest.mark.parametrize(
+    "items",
+    [
+        None,
+        "bad",
+        [42],
+        [{"start_sec": 0.0, "end_sec": 1.0}],
+        [{"source_clip_id": "c1", "end_sec": 1.0}],
+        [{"source_clip_id": "c1", "start_sec": "bad", "end_sec": 1.0}],
+        [{"source_clip_id": "c1", "start_sec": 0.0, "end_sec": float("nan")}],
+        [
+            {
+                "source_clip_id": "c1",
+                "start_sec": 0.0,
+                "end_sec": 1.0,
+                "speed": float("inf"),
+            }
+        ],
+    ],
+)
+def test_replace_timeline_rejects_malformed_specs_as_operation_errors(items):
+    sources = make_sources(("c1", 0.0, 10.0, 10.0))
+
+    with pytest.raises(TimelineOpError):
+        apply_operation(empty_doc(), sources, "replace_timeline", items=items)
+
+
+def test_replace_timeline_invalid_later_spec_does_not_mutate_input():
+    sources = make_sources(("c1", 0.0, 10.0, 10.0))
+    doc = TimelineDocument(
+        items=[make_item("old", clip_id="c1", start=0.0, end=2.0)]
+    )
+
+    with pytest.raises(TimelineOpError):
+        apply_operation(
+            doc,
+            sources,
+            "replace_timeline",
+            items=[
+                {"source_clip_id": "c1", "start_sec": 1.0, "end_sec": 3.0},
+                {"source_clip_id": "c1", "start_sec": 4.0},
+            ],
+        )
+
+    assert [item.item_id for item in doc.items] == ["old"]
+
+
 def test_unknown_operation_raises():
     with pytest.raises(TimelineOpError):
         apply_operation(empty_doc(), {}, "frobnicate", item_id="x")

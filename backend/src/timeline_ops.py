@@ -14,6 +14,7 @@ lock so a GUI edit and an external-agent edit cannot interleave mid-operation.
 from __future__ import annotations
 
 import asyncio
+import math
 import uuid
 from typing import Awaitable, Callable, Dict, List, Optional
 
@@ -209,18 +210,33 @@ def _replace_timeline(
     doc: TimelineDocument, sources: Sources, *, items: List[dict]
 ) -> TimelineDocument:
     """Replace every Timeline Item with a validated Version build recipe."""
+    if not isinstance(items, list):
+        raise TimelineOpError("items must be a list")
     rebuilt: List[TimelineItem] = []
-    for spec in items:
-        source_clip_id = spec["source_clip_id"]
+    for index, spec in enumerate(items):
+        if not isinstance(spec, dict):
+            raise TimelineOpError(f"item {index} must be an object")
+        try:
+            source_clip_id = spec["source_clip_id"]
+            requested_start = spec["start_sec"]
+            requested_end = spec["end_sec"]
+            start_value = float(requested_start)
+            end_value = float(requested_end)
+            speed = float(spec.get("speed", 1.0))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TimelineOpError(f"invalid item {index}: {exc}") from exc
+        if not isinstance(source_clip_id, str) or not source_clip_id:
+            raise TimelineOpError(f"item {index} source_clip_id must be a non-empty string")
+        if not all(math.isfinite(value) for value in (start_value, end_value, speed)):
+            raise TimelineOpError(f"item {index} bounds and speed must be finite")
         source = _require_source(sources, source_clip_id)
-        start = max(0.0, float(spec["start_sec"]))
-        end = min(source.source_duration_sec, float(spec["end_sec"]))
+        start = max(0.0, start_value)
+        end = min(source.source_duration_sec, end_value)
         if end <= start:
             raise TimelineOpError(
-                f"item bounds [{spec['start_sec']}, {spec['end_sec']}] clamp to an "
+                f"item bounds [{requested_start}, {requested_end}] clamp to an "
                 f"empty span within [0, {source.source_duration_sec}]"
             )
-        speed = float(spec.get("speed", 1.0))
         if speed <= 0:
             raise TimelineOpError("speed must be > 0")
         transform = spec.get("transform")

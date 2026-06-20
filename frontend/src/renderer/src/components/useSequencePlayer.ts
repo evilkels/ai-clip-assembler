@@ -18,11 +18,13 @@ export function useSequencePlayer({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [seek, setSeek] = useState({ time: 0, epoch: 0 });
   const advanceLockRef = useRef(false);
+  const endedRef = useRef(false);
   const segmentsRef = useRef<SequenceSegment[]>(segments);
   segmentsRef.current = segments;
 
   const seekTo = useCallback((index: number, sourceTimeSec: number) => {
     advanceLockRef.current = false;
+    endedRef.current = false;
     setCurrentIndex(index);
     setSeek((previous) => ({ time: sourceTimeSec, epoch: previous.epoch + 1 }));
   }, []);
@@ -43,6 +45,7 @@ export function useSequencePlayer({
             seekTo(0, currentSegments[0].start_sec);
             return;
           }
+          endedRef.current = true;
           setPlaying(false);
           return;
         }
@@ -57,8 +60,11 @@ export function useSequencePlayer({
   );
 
   const play = useCallback(() => {
-    if (segmentsRef.current.length > 0) setPlaying(true);
-  }, []);
+    const currentSegments = segmentsRef.current;
+    if (currentSegments.length === 0) return;
+    if (endedRef.current) seekTo(0, currentSegments[0].start_sec);
+    setPlaying(true);
+  }, [seekTo]);
   const stop = useCallback(() => setPlaying(false), []);
   const toggle = useCallback(
     () => (playing ? stop() : play()),

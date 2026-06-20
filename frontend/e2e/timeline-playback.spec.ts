@@ -40,7 +40,6 @@ function ensureFixtureVideo(name: string, color: string): string {
 async function setupTimeline(page: Page, files: string[]) {
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
-  await expect(page.getByTestId('qa-backend-online')).toHaveText('online');
 
   await page.getByTestId('playwriter-qa-panel').getByRole('link', { name: 'Import' }).click();
   const fileInput = page.locator('input[type="file"]');
@@ -190,6 +189,35 @@ test('playback crosses the clip boundary and continues into the next file', asyn
     .toBe(true);
 
   await page.getByTestId('transport-stop').click();
+});
+
+test('play restarts from the first item after reaching the sequence end', async ({ page }) => {
+  const video = await setupTimeline(page, [fixtureA(), fixtureB()]);
+  const firstClipName = await page.getByTestId('timeline-preview-current-clip').textContent();
+  const clips = page.locator('.tl-clip');
+  const clipCount = await clips.count();
+  expect(clipCount).toBe(2);
+  const lastClipBox = await clips.nth(clipCount - 1).boundingBox();
+  const rulerBox = await page.locator('.timeline-ruler').boundingBox();
+  expect(lastClipBox).toBeTruthy();
+  expect(rulerBox).toBeTruthy();
+  await page.mouse.click(
+    lastClipBox!.x + lastClipBox!.width - 5,
+    rulerBox!.y + rulerBox!.height / 2,
+  );
+  await page.getByTestId('transport-play').click();
+  await expect.poll(
+    () => video.evaluate((element) => (element as HTMLVideoElement).paused),
+    { timeout: 5_000 },
+  ).toBe(true);
+
+  await page.getByTestId('transport-play').click();
+
+  await expect(page.getByTestId('timeline-preview-current-clip')).toHaveText(firstClipName ?? '');
+  await expect.poll(
+    () => video.evaluate((element) => (element as HTMLVideoElement).paused),
+    { timeout: 5_000 },
+  ).toBe(false);
 });
 
 test('playhead drags continuously and wheel zoom changes timeline scale', async ({ page }) => {

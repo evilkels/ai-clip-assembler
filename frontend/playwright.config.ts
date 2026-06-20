@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // Specs share one local FastAPI process and its in-memory project registry.
+  // Parallel workers can clear another spec's project while analysis is running.
+  workers: 1,
   timeout: 180_000,
   expect: {
     timeout: 20_000,

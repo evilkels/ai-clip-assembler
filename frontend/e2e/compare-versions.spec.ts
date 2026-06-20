@@ -74,4 +74,10 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(page.getByTestId('working-timeline-item')).toHaveCount(4, {
     timeout: 10_000,
   });
+
+  const workingTimeline = page.getByTestId('working-timeline-strip');
+  await workingTimeline.locator('summary').click();
+  await expect(workingTimeline).not.toHaveAttribute('open');
+  await page.getByLabel('Smoothness threshold value').fill('6.5');
+  await expect(workingTimeline).not.toHaveAttribute('open');
 });

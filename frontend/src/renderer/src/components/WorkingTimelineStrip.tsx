@@ -1,11 +1,18 @@
+import { useState } from 'react';
 import { useReview } from '../state/ReviewContext';
 
 export function WorkingTimelineStrip() {
   const { applyTimelineOperation, clips, timelineItems } = useReview();
+  const [expanded, setExpanded] = useState(true);
   const clipsById = new Map(clips.map((clip) => [clip.clip_id, clip]));
 
   return (
-    <details className="working-timeline" data-testid="working-timeline-strip" open>
+    <details
+      className="working-timeline"
+      data-testid="working-timeline-strip"
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
       <summary>
         <strong>Working timeline</strong>
         <span className="draft-summary">

@@ -195,8 +195,15 @@ Configuration is via environment variables only (no config file):
 **Process:**
 1. Use vidstab motion scores
 2. Use blur/brightness/contrast thresholds
-3. Select clips purely on technical quality
-4. No semantic understanding
+3. Discover a bounded Candidate Clip pool across eligible detected Scenes
+4. Keep one honestly scored fallback when a Scene has no threshold-passing range
+5. Leave non-overlap, target duration, and scene-density constraints to draft selection
+6. No semantic understanding
+
+Candidate discovery uses Frame Sample intervals when a range ends at a quality
+boundary, so three one-second samples cover approximately three seconds rather
+than being measured only from first timestamp to last timestamp. The default
+pool is capped at 12 Candidate Clips per Source Video before Pi enhancement.
 
 **Config:**
 ```json

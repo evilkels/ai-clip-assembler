@@ -13,6 +13,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-21)
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED (changes the population stored as Candidate Clips)
@@ -95,6 +96,7 @@ The pool algorithm must:
 - `backend/tests/test_clip_assembly.py`
 - `backend/tests/test_api.py`
 - `backend/tests/test_pi_cli_harness.py` if the pool contract changes its fixtures
+- `scripts/synthetic_e2e_qa.py`
 - `docs/HARNESS_SPEC.md`
 - `docs/plans/README.md` status only
 
@@ -228,3 +230,10 @@ Reviewers should scrutinize boundary math, stable IDs, pool-size growth, and
 whether low-quality fallback ranges are visually distinguished rather than
 misrepresented. Plan 007 will consume this pool for project-level creative
 Versions; future candidate changes must retain that separation.
+
+## Completion record
+
+- Exact-source validation on `IMG_0888.MOV` returned four candidates spanning
+  all detected Scenes: Scene 1 (`0-3`, `2-5`), Scene 2 (`34-37`), and Scene 3
+  (`38-41`). No project files were overwritten.
+- Full backend verification: 266 tests passed; Ruff and synthetic E2E passed.

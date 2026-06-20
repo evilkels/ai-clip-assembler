@@ -541,6 +541,13 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             file_name=video["file_name"],
             frames=frame_scores,
             preferences=preferences,
+            scene_bounds={
+                scene.scene_id: (scene.start_sec, scene.end_sec)
+                for scene in scenes
+            },
+            source_duration_sec=float(
+                (video.get("metadata") or {}).get("duration_sec") or 0.0
+            ) or None,
         )
         video_timing["assembly_sec"] = round(time.monotonic() - phase_started, 2)
         video_timing["ai_scoring_sec"] = 0.0
@@ -1408,13 +1415,12 @@ def round_edl_fps(fps: float) -> int:
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:
     return AssemblyPreferences(
         min_clip_duration_sec=float(preferences.get("min_clip_duration_sec", 3.0)),
-        # Retain sustained stable ranges once; assembly profiles trim them
-        # later without repeating expensive footage analysis.
-        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 30.0)),
+        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 10.0)),
         smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
         max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 12.0)),
         max_clips_per_scene=int(preferences.get("max_clips_per_scene", 2)),
+        max_candidates_per_video=int(preferences.get("max_candidates_per_video", 12)),
     )
 
 

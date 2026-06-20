@@ -158,6 +158,7 @@ def main() -> int:
         print(
             f"    {clip['file_name']}  {clip['start_sec']:.1f}s–{clip['end_sec']:.1f}s"
             f"  smoothness {clip['smoothness_score']:.1f}  overall {clip['overall_score']:.1f}"
+            f"  tags {','.join(clip.get('tags', []))}"
         )
 
     smooth_clips = by_file.get("hover_smooth.mp4", [])
@@ -168,11 +169,26 @@ def main() -> int:
         "smooth hover clips score high",
         all(clip["smoothness_score"] >= 9 for clip in smooth_clips),
     )
-    check("shaky footage produces no clips above threshold", len(shaky_clips) == 0)
-    check("mixed footage produces at least one clip", len(mixed_clips) >= 1)
     check(
-        "mixed clips come from the smooth half only",
-        all(clip["start_sec"] < MIXED_SMOOTH_SEC and clip["end_sec"] <= MIXED_SMOOTH_SEC + 1.5 for clip in mixed_clips),
+        "shaky footage is retained only as low-scoring fallback",
+        bool(shaky_clips)
+        and all(
+            "fallback" in clip.get("tags", []) and clip["smoothness_score"] < 7
+            for clip in shaky_clips
+        ),
+    )
+    check("mixed footage produces at least one clip", len(mixed_clips) >= 1)
+    primary_mixed_clips = [
+        clip for clip in mixed_clips if "fallback" not in clip.get("tags", [])
+    ]
+    check(
+        "primary mixed clips come from the smooth half",
+        bool(primary_mixed_clips)
+        and all(
+            clip["start_sec"] < MIXED_SMOOTH_SEC
+            and clip["end_sec"] <= MIXED_SMOOTH_SEC + 1.5
+            for clip in primary_mixed_clips
+        ),
     )
 
     results_json = folder / "clipassembler" / "analysis" / "results.json"

@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass
-from typing import Iterable, List
+from statistics import median
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from .models import AssemblyResult, ClipSuggestion, FrameScore, TimelineSequence
 from .scoring_weights import DRONE_SCORE_WEIGHTS
@@ -14,6 +15,14 @@ class AssemblyPreferences:
     target_duration_sec: float = 120.0
     max_turn_rate_deg_per_sec: float = 12.0
     max_clips_per_scene: int = 2
+    max_candidates_per_video: int = 12
+
+
+@dataclass(frozen=True)
+class CandidateWindow:
+    frames: List[FrameScore]
+    start_sec: float
+    end_sec: float
 
 
 def average(values: Iterable[float]) -> float:
@@ -38,15 +47,29 @@ def candidate_windows(
     frames: List[FrameScore],
     min_duration: float,
     max_duration: float,
-) -> List[List[FrameScore]]:
+    scene_end_sec: Optional[float] = None,
+) -> List[CandidateWindow]:
     windows = []
+    timestamps = [frame.timestamp for frame in frames]
+    gaps = [b - a for a, b in zip(timestamps, timestamps[1:]) if b > a]
+    sample_interval = median(gaps) if gaps else 1.0
     for start_index, start_frame in enumerate(frames):
         for end_index in range(start_index + 1, len(frames)):
-            duration = frames[end_index].timestamp - start_frame.timestamp
+            end_sec = frames[end_index].timestamp
+            duration = end_sec - start_frame.timestamp
+            if duration < min_duration and scene_end_sec is not None:
+                end_sec = min(scene_end_sec, end_sec + sample_interval)
+                duration = end_sec - start_frame.timestamp
             if duration > max_duration:
                 break
             if duration >= min_duration:
-                windows.append(frames[start_index : end_index + 1])
+                windows.append(
+                    CandidateWindow(
+                        frames=frames[start_index : end_index + 1],
+                        start_sec=start_frame.timestamp,
+                        end_sec=end_sec,
+                    )
+                )
     return windows
 
 
@@ -84,9 +107,16 @@ def build_reason(frames: List[FrameScore]) -> str:
     )
 
 
-def make_clip(file_id: str, file_name: str, frames: List[FrameScore]) -> ClipSuggestion:
-    start = frames[0].timestamp
-    end = frames[-1].timestamp
+def make_clip(
+    file_id: str,
+    file_name: str,
+    window: CandidateWindow,
+    *,
+    fallback: bool = False,
+) -> ClipSuggestion:
+    frames = window.frames
+    start = window.start_sec
+    end = window.end_sec
     clip_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{file_id}:{start:.3f}:{end:.3f}"))
     return ClipSuggestion(
         clip_id=clip_id,
@@ -103,14 +133,57 @@ def make_clip(file_id: str, file_name: str, frames: List[FrameScore]) -> ClipSug
         max_turn_rate_deg_per_sec=round(max(frame.turn_rate_deg_per_sec for frame in frames), 2),
         visual_interest_score=average(frame.visual_interest_score for frame in frames),
         overall_score=weighted_overall(frames),
-        ai_reason=build_reason(frames),
+        ai_reason=(f"{build_reason(frames)}; fallback for scene coverage" if fallback else build_reason(frames)),
         suggested_speed=0.5
         if average(frame.smoothness_score for frame in frames) >= 9.0
         and max(frame.turn_rate_deg_per_sec for frame in frames) <= 3.0
         else 1.0,
         suggested_transition=None,
-        tags=["drone", "smooth"],
+        tags=["drone", "fallback"] if fallback else ["drone", "smooth"],
     )
+
+
+def _rank_clips(clips: List[ClipSuggestion]) -> List[ClipSuggestion]:
+    return sorted(
+        clips,
+        key=lambda clip: (clip.overall_score, clip.duration_sec),
+        reverse=True,
+    )
+
+
+def _bounded_scene_pool(
+    clips: List[ClipSuggestion],
+    preferences: AssemblyPreferences,
+) -> List[ClipSuggestion]:
+    by_scene: Dict[int, List[ClipSuggestion]] = {}
+    for clip in _rank_clips(clips):
+        by_scene.setdefault(clip.scene_id, []).append(clip)
+
+    selected: List[ClipSuggestion] = []
+    selected_ids = set()
+    scene_counts: Dict[int, int] = {}
+
+    # Preserve scene coverage before filling the remaining quality-ranked slots.
+    for scene_id in sorted(by_scene):
+        if len(selected) >= preferences.max_candidates_per_video:
+            break
+        clip = by_scene[scene_id][0]
+        selected.append(clip)
+        selected_ids.add(clip.clip_id)
+        scene_counts[scene_id] = 1
+
+    for clip in _rank_clips(clips):
+        if len(selected) >= preferences.max_candidates_per_video:
+            break
+        if clip.clip_id in selected_ids:
+            continue
+        if scene_counts.get(clip.scene_id, 0) >= preferences.max_clips_per_scene:
+            continue
+        selected.append(clip)
+        selected_ids.add(clip.clip_id)
+        scene_counts[clip.scene_id] = scene_counts.get(clip.scene_id, 0) + 1
+
+    return _rank_clips(selected)
 
 
 def assemble_smooth_clips(
@@ -118,43 +191,57 @@ def assemble_smooth_clips(
     file_name: str,
     frames: List[FrameScore],
     preferences: AssemblyPreferences = AssemblyPreferences(),
+    *,
+    scene_bounds: Optional[Dict[int, Tuple[float, float]]] = None,
+    source_duration_sec: Optional[float] = None,
 ) -> AssemblyResult:
-    clips = []
+    bounds = scene_bounds or {}
+    clips: List[ClipSuggestion] = []
     for run in candidate_runs(
         frames,
         preferences.smoothness_threshold,
         preferences.max_turn_rate_deg_per_sec,
     ):
+        scene_end = bounds.get(run[0].scene_id, (0.0, source_duration_sec or float("inf")))[1]
+        if source_duration_sec is not None:
+            scene_end = min(scene_end, source_duration_sec)
         for window in candidate_windows(
             run,
             preferences.min_clip_duration_sec,
             preferences.max_clip_duration_sec,
+            scene_end_sec=scene_end if scene_end != float("inf") else None,
         ):
             clips.append(make_clip(file_id, file_name, window))
 
-    ranked = sorted(
-        clips,
-        key=lambda clip: (clip.overall_score, clip.duration_sec),
-        reverse=True,
-    )
-    selected = []
-    total = 0.0
-    scene_counts = {}
-    for clip in ranked:
-        if total >= preferences.target_duration_sec:
-            break
-        if scene_counts.get(clip.scene_id, 0) >= preferences.max_clips_per_scene:
+    scenes_with_candidates = {clip.scene_id for clip in clips}
+    frames_by_scene: Dict[int, List[FrameScore]] = {}
+    for frame in sorted(frames, key=lambda item: item.timestamp):
+        frames_by_scene.setdefault(frame.scene_id, []).append(frame)
+    for scene_id, scene_frames in frames_by_scene.items():
+        if scene_id in scenes_with_candidates:
             continue
-        if any(
-            selected_clip.file_id == clip.file_id
-            and selected_clip.start_sec < clip.end_sec
-            and clip.start_sec < selected_clip.end_sec
-            for selected_clip in selected
-        ):
+        scene_start, scene_end = bounds.get(
+            scene_id,
+            (scene_frames[0].timestamp, source_duration_sec or scene_frames[-1].timestamp),
+        )
+        if source_duration_sec is not None:
+            scene_end = min(scene_end, source_duration_sec)
+        if scene_end - scene_start < preferences.min_clip_duration_sec:
             continue
-        selected.append(clip)
-        total += clip.duration_sec
-        scene_counts[clip.scene_id] = scene_counts.get(clip.scene_id, 0) + 1
+        fallback_windows = candidate_windows(
+            scene_frames,
+            preferences.min_clip_duration_sec,
+            preferences.max_clip_duration_sec,
+            scene_end_sec=scene_end,
+        )
+        if fallback_windows:
+            fallback_clips = [
+                make_clip(file_id, file_name, window, fallback=True)
+                for window in fallback_windows
+            ]
+            clips.append(_rank_clips(fallback_clips)[0])
+
+    selected = _bounded_scene_pool(clips, preferences)
 
     return AssemblyResult(
         clips=selected,

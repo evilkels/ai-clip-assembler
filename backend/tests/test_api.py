@@ -163,7 +163,7 @@ def test_analyze_folder_project_writes_work_files_under_clipassembler(monkeypatc
     monkeypatch.setattr(
         api,
         "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
             clips=[],
             sequence=TimelineSequence(total_duration_sec=0, clips=[]),
         ),
@@ -195,7 +195,7 @@ def analyze_folder_project_with_one_clip(monkeypatch, client, project_folder, pr
     monkeypatch.setattr(
         api,
         "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
             clips=[
                 ClipSuggestion(
                     clip_id="clip-1",
@@ -699,7 +699,7 @@ def test_analyze_manual_harness_extracts_scores_and_stores_clips(monkeypatch, tm
     monkeypatch.setattr(
         api,
         "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
             clips=[
                 ClipSuggestion(
                     clip_id="clip-1",
@@ -766,14 +766,16 @@ def test_analyze_runs_motion_and_scene_detection_before_scoring(monkeypatch, tmp
         return []
 
     monkeypatch.setattr(api, "score_samples_rule_based", fake_score)
-    monkeypatch.setattr(
-        api,
-        "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+    assembled_with = {}
+
+    def fake_assemble(file_id, file_name, frames, preferences, **kwargs):
+        assembled_with.update(kwargs)
+        return AssemblyResult(
             clips=[],
             sequence=TimelineSequence(total_duration_sec=0, clips=[]),
-        ),
-    )
+        )
+
+    monkeypatch.setattr(api, "assemble_smooth_clips", fake_assemble)
 
     response = client.post(
         f"/projects/{project_id}/analyze",
@@ -782,6 +784,8 @@ def test_analyze_runs_motion_and_scene_detection_before_scoring(monkeypatch, tmp
 
     assert response.status_code == 200
     assert calls["vidstab"] is True
+    assert assembled_with["scene_bounds"] == {7: (0, 5)}
+    assert assembled_with["source_duration_sec"] == 10.0
 
 
 def test_analyze_rejects_invalid_sample_fps(monkeypatch, tmp_path):
@@ -797,6 +801,14 @@ def test_analyze_rejects_invalid_sample_fps(monkeypatch, tmp_path):
 
     assert response.status_code == 422
     assert "sample_fps" in response.json()["detail"]
+
+
+def test_default_analysis_preferences_cap_candidate_windows_at_ten_seconds():
+    preferences = api.preferences_from_request({})
+
+    assert preferences.min_clip_duration_sec == 3.0
+    assert preferences.max_clip_duration_sec == 10.0
+    assert preferences.max_candidates_per_video == 12
 
 
 def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_path):
@@ -842,7 +854,7 @@ def test_analyze_ranks_clips_globally_across_videos(monkeypatch, tmp_path):
     monkeypatch.setattr(api, "extract_frames", lambda **kwargs: [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")])
     monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: [])
 
-    def fake_assemble(file_id, file_name, frames, preferences):
+    def fake_assemble(file_id, file_name, frames, preferences, **_kwargs):
         score = 9 if file_id == "high" else 7
         clip_id = f"{file_id}-clip"
         return AssemblyResult(
@@ -1069,7 +1081,7 @@ def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
     monkeypatch.setattr(
         api,
         "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
             clips=[
                 ClipSuggestion(
                     clip_id="clip-1",
@@ -1166,7 +1178,7 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
     monkeypatch.setattr(
         api,
         "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
             clips=[
                 ClipSuggestion(
                     clip_id="clip-1",
@@ -1608,7 +1620,7 @@ def test_analysis_status_complete_after_successful_analyze(monkeypatch, tmp_path
     monkeypatch.setattr(
         api,
         "assemble_smooth_clips",
-        lambda file_id, file_name, frames, preferences: AssemblyResult(
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
             clips=[], sequence=TimelineSequence(total_duration_sec=0, clips=[])
         ),
     )

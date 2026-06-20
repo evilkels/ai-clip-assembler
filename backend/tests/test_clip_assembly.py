@@ -173,3 +173,68 @@ def test_assembly_caps_clips_per_scene():
     )
 
     assert len(result.clips) == 2
+
+
+def test_candidate_pool_keeps_each_scene_and_counts_sample_interval_at_boundary():
+    frames = [
+        *[frame(second, 9.0, scene_id=1) for second in range(0, 19)],
+        *[frame(second, 9.0, scene_id=2) for second in range(34, 38)],
+        *[frame(second, 9.0, scene_id=3) for second in range(38, 41)],
+        *[frame(second, 2.0, scene_id=3, turn_rate=20) for second in range(41, 49)],
+    ]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "IMG_0888.MOV",
+        frames,
+        AssemblyPreferences(
+            min_clip_duration_sec=3,
+            max_clip_duration_sec=10,
+            max_clips_per_scene=4,
+            max_candidates_per_video=12,
+        ),
+        scene_bounds={1: (0.0, 21.21), 2: (21.21, 37.21), 3: (37.21, 49.03)},
+        source_duration_sec=49.03,
+    )
+
+    assert {clip.scene_id for clip in result.clips} == {1, 2, 3}
+    scene_three = [clip for clip in result.clips if clip.scene_id == 3]
+    assert any(clip.start_sec == 38 and clip.end_sec == 41 for clip in scene_three)
+    assert all(clip.duration_sec >= 3 for clip in result.clips)
+    assert len(result.clips) <= 12
+
+
+def test_candidate_pool_keeps_one_honestly_scored_fallback_for_weak_scene():
+    frames = [frame(second, 3.0, scene_id=4, turn_rate=18) for second in range(10, 16)]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "weak.MOV",
+        frames,
+        AssemblyPreferences(
+            min_clip_duration_sec=3,
+            max_clip_duration_sec=10,
+            max_clips_per_scene=4,
+            max_candidates_per_video=12,
+        ),
+        scene_bounds={4: (10.0, 16.0)},
+        source_duration_sec=16.0,
+    )
+
+    assert len(result.clips) == 1
+    assert result.clips[0].scene_id == 4
+    assert result.clips[0].smoothness_score == 3.0
+    assert "fallback" in result.clips[0].tags
+
+
+def test_candidate_pool_skips_scene_shorter_than_minimum_duration():
+    result = assemble_smooth_clips(
+        "file-1",
+        "short.MOV",
+        [frame(0, 9.0, scene_id=1), frame(1, 9.0, scene_id=1)],
+        AssemblyPreferences(min_clip_duration_sec=3),
+        scene_bounds={1: (0.0, 2.0)},
+        source_duration_sec=2.0,
+    )
+
+    assert result.clips == []

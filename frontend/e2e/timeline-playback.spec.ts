@@ -56,7 +56,7 @@ async function setupTimeline(page: Page, files: string[]) {
   });
 
   await page.goto('/#/review');
-  await expect(page.getByLabel(/Poster for/).first()).toBeVisible();
+  await expect(page.getByLabel(/Preview /).first()).toBeVisible();
   // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
   const includeButton = page.getByRole('button', { name: 'Include', exact: true });
   for (let i = 0; i < 6 && (await includeButton.count()) > 0; i++) {
@@ -85,7 +85,7 @@ test('timeline preview has no native controls; review cards use poster videos', 
   await expect(timelineVideo).not.toHaveAttribute('controls');
 
   await page.goto('/#/review');
-  const reviewVideo = page.getByLabel(/Poster for/).first();
+  const reviewVideo = page.getByLabel(/Preview /).first();
   await expect(reviewVideo).toBeVisible();
   await expect(reviewVideo).not.toHaveAttribute('controls');
 });

@@ -37,7 +37,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented. Re-baselined 2026-06-19 at **44/100 Critical**; Batch 1 quick-wins (button-has-type ×14, em-dash) cut issues **75 → 60**, build green. Remaining score is Batch 2/3 judgment-call refactors (giant-component, derived-state, prefer-use, a11y) — deliberate pass, not blind. |
 | [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
-| [compare-versions-review-ui](2026-06-21-compare-versions-review-ui.md) | IN PROGRESS — Phase 2/6 complete: atomic adoption operation plus the deterministic preview-spec Version seam. |
+| [compare-versions-review-ui](2026-06-21-compare-versions-review-ui.md) | IN PROGRESS — Phase 3/6 complete: shared video-driven sequence player extracted and Timeline migration e2e-gated. |
 
 ## Completed (`done/`)
 

@@ -23,6 +23,10 @@ interface ClipPreviewProps {
   seek?: SeekCommand;
   /** Reports video.currentTime every animation frame while playing. */
   onPlaybackTime?: (sourceTimeSec: number) => void;
+  /** Source playback speed. */
+  playbackRate?: number;
+  /** Digital zoom applied to the rendered video. */
+  scale?: number;
 }
 
 function boundedStart(startSec: number, endSec: number): number {
@@ -41,6 +45,8 @@ export function ClipPreview({
   controls = true,
   seek,
   onPlaybackTime,
+  playbackRate = 1,
+  scale = 1,
 }: ClipPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const appliedSeekRef = useRef<{ epoch: number; mediaUrl: string } | null>(null);
@@ -86,6 +92,11 @@ export function ClipPreview({
     }
   }, [mediaUrl, playing]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) video.playbackRate = playbackRate;
+  }, [mediaUrl, playbackRate]);
+
   // Report the video clock while playing (RAF for smooth playhead motion).
   useEffect(() => {
     if (!playing || !onPlaybackTime) return;
@@ -120,6 +131,7 @@ export function ClipPreview({
         preload="metadata"
         playsInline
         aria-label={label}
+        style={{ transform: scale !== 1 ? `scale(${scale})` : undefined }}
         onLoadedMetadata={(event) => {
           if (!seek) event.currentTarget.currentTime = targetTime;
         }}

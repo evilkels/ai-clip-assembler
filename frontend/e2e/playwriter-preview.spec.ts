@@ -48,7 +48,7 @@ test('analysis completes and review/timeline previews render playable videos', a
   });
 
   await page.goto('/#/review');
-  const reviewPreview = page.getByLabel(/Poster for/).first();
+  const reviewPreview = page.getByLabel(/Preview /).first();
   await expect(reviewPreview).toBeVisible();
   await expect
     .poll(async () => reviewPreview.evaluate((video) => (video as HTMLVideoElement).readyState), {

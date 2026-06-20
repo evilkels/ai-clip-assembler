@@ -9,10 +9,10 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import { buildVideoMediaUrl } from '../api/client';
 import { useReview } from '../state/ReviewContext';
 import type { ClipCandidate } from '../types/clip';
 import { ClipPreview } from './ClipPreview';
+import { useSequencePlayer } from './useSequencePlayer';
 
 const MIN_PX_PER_SEC = 6;
 const MAX_PX_PER_SEC = 160;
@@ -21,7 +21,6 @@ const TICK_TARGET_PX = 80;
 const NICE_STEPS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
 const PLAYHEAD_THROTTLE_MS = 150;
 const REVERSE_SEEK_HZ = 4;
-const SEGMENT_END_EPSILON = 0.05;
 const SNAP_DISTANCE_PX = 10;
 const PREVIEW_HEIGHT_KEY = 'ai-clip-assembler:timeline-preview-height:v1';
 const MIN_PREVIEW_HEIGHT = 220;
@@ -66,8 +65,6 @@ export function Timeline() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [canDrag, setCanDrag] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [seek, setSeek] = useState<{ time: number; epoch: number }>({ time: 0, epoch: 0 });
   const [previewHeight, setPreviewHeight] = useState(() => {
     const stored = Number(window.localStorage.getItem(PREVIEW_HEIGHT_KEY));
     return Number.isFinite(stored) ? clamp(stored, MIN_PREVIEW_HEIGHT, MAX_PREVIEW_HEIGHT) : 360;
@@ -86,7 +83,6 @@ export function Timeline() {
   const directionRef = useRef<-1 | 0 | 1>(0);
   const lastReverseSeekRef = useRef(0);
   const lastPlayheadSetRef = useRef(0);
-  const advanceLockRef = useRef(false);
   const didInitialSeekRef = useRef(false);
 
   const acceptedClips = useMemo(() => {
@@ -113,6 +109,16 @@ export function Timeline() {
     ? segments[segments.length - 1].offset + segments[segments.length - 1].duration
     : 0;
 
+  const sequenceSegments = useMemo(
+    () =>
+      segments.map((segment) => ({
+        file_id: segment.clip.file_id,
+        start_sec: segment.trimStart,
+        end_sec: segment.trimEnd,
+      })),
+    [segments],
+  );
+
   segmentsRef.current = segments;
   totalDurationRef.current = totalDuration;
   pxPerSecRef.current = pxPerSec;
@@ -131,12 +137,6 @@ export function Timeline() {
   const selectedSegment = selectedId
     ? segments.find((seg) => seg.clip.clip_id === selectedId)
     : undefined;
-  const previewSegment = segments[currentIndex] ?? selectedSegment ?? segments[0];
-  const previewMediaUrl =
-    projectId && previewSegment
-      ? buildVideoMediaUrl(projectId, previewSegment.clip.file_id)
-      : undefined;
-
   // Keep the playhead inside the timeline when durations change.
   useEffect(() => {
     setPlayhead((p) => {
@@ -145,13 +145,6 @@ export function Timeline() {
       return clamped;
     });
   }, [totalDuration]);
-
-  // Keep currentIndex valid when clips are removed.
-  useEffect(() => {
-    if (segments.length > 0 && currentIndex >= segments.length) {
-      setCurrentIndex(segments.length - 1);
-    }
-  }, [segments.length, currentIndex]);
 
   const paintPlayhead = useCallback((timelineSec: number) => {
     playheadRef.current = timelineSec;
@@ -168,20 +161,61 @@ export function Timeline() {
     }
   }, []);
 
-  // Explicit jump: position playhead and command the video to the same spot.
-  const jumpTo = useCallback((timelineSec: number) => {
-    const segs = segmentsRef.current;
-    const clamped = clamp(timelineSec, 0, totalDurationRef.current);
-    playheadRef.current = clamped;
-    advanceLockRef.current = false;
-    setPlayhead(clamped);
-    let idx = segs.findIndex((seg) => clamped >= seg.offset && clamped < seg.offset + seg.duration);
-    if (idx < 0) idx = Math.max(0, segs.length - 1);
-    const seg = segs[idx];
-    if (!seg) return;
-    setCurrentIndex(idx);
-    setSeek((prev) => ({ time: seg.trimStart + (clamped - seg.offset), epoch: prev.epoch + 1 }));
-  }, []);
+  const onSequenceProgress = useCallback(
+    (index: number, sourceTimeSec: number) => {
+      const segment = segmentsRef.current[index];
+      if (!segment) return;
+      paintPlayhead(
+        clamp(
+          segment.offset + (sourceTimeSec - segment.trimStart),
+          segment.offset,
+          segment.offset + segment.duration,
+        ),
+      );
+    },
+    [paintPlayhead],
+  );
+
+  const sequencePlayer = useSequencePlayer({
+    projectId,
+    segments: sequenceSegments,
+    onProgress: onSequenceProgress,
+  });
+  const { currentIndex, play, playing, previewProps, seekTo, stop } = sequencePlayer;
+  const previewSegment = segments[currentIndex] ?? selectedSegment ?? segments[0];
+
+  const jumpTo = useCallback(
+    (timelineSec: number) => {
+      const currentSegments = segmentsRef.current;
+      const clamped = clamp(timelineSec, 0, totalDurationRef.current);
+      playheadRef.current = clamped;
+      setPlayhead(clamped);
+      let index = currentSegments.findIndex(
+        (segment) =>
+          clamped >= segment.offset && clamped < segment.offset + segment.duration,
+      );
+      if (index < 0) index = Math.max(0, currentSegments.length - 1);
+      const segment = currentSegments[index];
+      if (!segment) return;
+      seekTo(index, segment.trimStart + (clamped - segment.offset));
+    },
+    [seekTo],
+  );
+
+  const playForward = useCallback(() => {
+    setDirection(1);
+    play();
+  }, [play]);
+
+  const stopPlayback = useCallback(() => {
+    setDirection(0);
+    stop();
+  }, [stop]);
+
+  const playReverse = useCallback(() => {
+    stop();
+    setDirection(-1);
+  }, [stop]);
 
   // Show the first clip's trimmed start frame instead of the source's frame 0.
   useEffect(() => {
@@ -190,47 +224,23 @@ export function Timeline() {
     jumpTo(playheadRef.current);
   }, [segments.length, jumpTo]);
 
+  // Keep the shared player's index valid when Timeline Items are removed.
+  useEffect(() => {
+    if (segments.length > 0 && currentIndex >= segments.length) {
+      const lastIndex = segments.length - 1;
+      seekTo(lastIndex, segments[lastIndex].trimStart);
+    }
+  }, [currentIndex, seekTo, segments]);
+
+  // The shared player stops itself at the end of a non-looping sequence.
+  useEffect(() => {
+    if (direction === 1 && !playing) setDirection(0);
+  }, [direction, playing]);
+
   // Settle React state on the engine's last position when playback stops.
   useEffect(() => {
-    if (direction === 0) setPlayhead(playheadRef.current);
-  }, [direction]);
-
-  // Forward play: the video drives the playhead; at a segment's trim end,
-  // advance to the next segment (same file → cheap seek; different file →
-  // src swap + seek, resumed by the playing prop).
-  const onPlaybackTime = useCallback(
-    (sourceTimeSec: number) => {
-      if (directionRef.current !== 1) return;
-      const segs = segmentsRef.current;
-      const seg = segs[currentIndex];
-      if (!seg) return;
-
-      if (sourceTimeSec >= seg.trimEnd - SEGMENT_END_EPSILON) {
-        // Advance once per boundary; the lock swallows RAF ticks that land
-        // before the commanded seek does.
-        if (advanceLockRef.current) return;
-        advanceLockRef.current = true;
-        const nextIdx = currentIndex + 1;
-        if (nextIdx >= segs.length) {
-          playheadRef.current = totalDurationRef.current;
-          setPlayhead(totalDurationRef.current);
-          setDirection(0);
-          return;
-        }
-        setCurrentIndex(nextIdx);
-        setSeek((prev) => ({ time: segs[nextIdx].trimStart, epoch: prev.epoch + 1 }));
-        return;
-      }
-      advanceLockRef.current = false;
-
-      // Clamp so a not-yet-seeked video (e.g. a cross-file load still at 0)
-      // cannot drag the playhead outside the current segment.
-      paintPlayhead(
-        clamp(seg.offset + (sourceTimeSec - seg.trimStart), seg.offset, seg.offset + seg.duration),
-      );
-    },
-    [currentIndex, paintPlayhead],
-  );
+    if (direction === 0 && !playing) setPlayhead(playheadRef.current);
+  }, [direction, playing]);
 
   // Reverse is scrub-style: HTML5 video cannot play backwards, so walk the
   // playhead with the video paused and command coarse seeks at most 4 Hz.
@@ -251,8 +261,7 @@ export function Timeline() {
         if (idx < 0) idx = 0;
         const seg = segs[idx];
         if (seg) {
-          setCurrentIndex(idx);
-          setSeek((prev) => ({ time: seg.trimStart + (next - seg.offset), epoch: prev.epoch + 1 }));
+          seekTo(idx, seg.trimStart + (next - seg.offset));
         }
       }
 
@@ -264,7 +273,7 @@ export function Timeline() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [direction, totalDuration, paintPlayhead]);
+  }, [direction, totalDuration, paintPlayhead, seekTo]);
 
   const zoomBy = useCallback((factor: number) => {
     setPxPerSec((p) => clamp(Math.round(p * factor), MIN_PX_PER_SEC, MAX_PX_PER_SEC));
@@ -299,19 +308,20 @@ export function Timeline() {
       switch (e.key) {
         case 'l':
         case 'L':
-          setDirection(1);
+          playForward();
           break;
         case 'k':
         case 'K':
-          setDirection(0);
+          stopPlayback();
           break;
         case 'j':
         case 'J':
-          setDirection(-1);
+          playReverse();
           break;
         case ' ':
           e.preventDefault();
-          setDirection((d) => (d === 0 ? 1 : 0));
+          if (directionRef.current === 0 && !playing) playForward();
+          else stopPlayback();
           break;
         case 'ArrowLeft':
           e.preventDefault();
@@ -360,6 +370,10 @@ export function Timeline() {
     selectRelative,
     zoomBy,
     jumpTo,
+    playForward,
+    playReverse,
+    playing,
+    stopPlayback,
   ]);
 
   const scrub = useCallback(
@@ -384,7 +398,7 @@ export function Timeline() {
     (e: ReactPointerEvent) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      setDirection(0);
+      stopPlayback();
       scrub(e.clientX);
       const onMove = (event: PointerEvent) => scrub(event.clientX);
       const onUp = () => {
@@ -394,7 +408,7 @@ export function Timeline() {
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     },
-    [scrub],
+    [scrub, stopPlayback],
   );
 
   const handleWheelZoom = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
@@ -514,16 +528,9 @@ export function Timeline() {
             style={{ height: previewHeight }}
           >
           <ClipPreview
-            mediaUrl={previewMediaUrl}
-            startSec={previewSegment.trimStart}
-            endSec={previewSegment.trimEnd}
-            playing={direction === 1}
-            loop={false}
+            {...previewProps}
             label={previewSegment.clip.file_name}
             testId="timeline-preview-video"
-            controls={false}
-            seek={seek}
-            onPlaybackTime={onPlaybackTime}
           />
           <div className="timeline-preview-meta">
             <strong data-testid="timeline-preview-current-clip">
@@ -549,7 +556,7 @@ export function Timeline() {
           <button type="button"
             className="btn subtle"
             data-testid="transport-reverse"
-            onClick={() => setDirection(-1)}
+            onClick={playReverse}
             title="Reverse (J)"
           >
             ◀◀
@@ -557,7 +564,7 @@ export function Timeline() {
           <button type="button"
             className="btn subtle"
             data-testid="transport-stop"
-            onClick={() => setDirection(0)}
+            onClick={stopPlayback}
             title="Stop (K)"
           >
             ■
@@ -565,7 +572,7 @@ export function Timeline() {
           <button type="button"
             className="btn subtle"
             data-testid="transport-play"
-            onClick={() => setDirection(1)}
+            onClick={playForward}
             title="Play (L)"
           >
             ▶

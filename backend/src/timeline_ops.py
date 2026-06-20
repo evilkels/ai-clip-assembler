@@ -205,6 +205,47 @@ def _set_target_duration(
     return doc
 
 
+def _replace_timeline(
+    doc: TimelineDocument, sources: Sources, *, items: List[dict]
+) -> TimelineDocument:
+    """Replace every Timeline Item with a validated Version build recipe."""
+    rebuilt: List[TimelineItem] = []
+    for spec in items:
+        source_clip_id = spec["source_clip_id"]
+        source = _require_source(sources, source_clip_id)
+        start = max(0.0, float(spec["start_sec"]))
+        end = min(source.source_duration_sec, float(spec["end_sec"]))
+        if end <= start:
+            raise TimelineOpError(
+                f"item bounds [{spec['start_sec']}, {spec['end_sec']}] clamp to an "
+                f"empty span within [0, {source.source_duration_sec}]"
+            )
+        speed = float(spec.get("speed", 1.0))
+        if speed <= 0:
+            raise TimelineOpError("speed must be > 0")
+        transform = spec.get("transform")
+        try:
+            resolved_transform = (
+                Transform.model_validate(transform)
+                if transform is not None
+                else Transform()
+            )
+        except Exception as exc:
+            raise TimelineOpError(f"invalid transform: {exc}") from exc
+        rebuilt.append(
+            TimelineItem(
+                item_id=_new_item_id(),
+                source_clip_id=source_clip_id,
+                start_sec=start,
+                end_sec=end,
+                speed=speed,
+                transform=resolved_transform,
+            )
+        )
+    doc.items = rebuilt
+    return doc
+
+
 OPERATIONS: Dict[str, Callable[..., TimelineDocument]] = {
     "add_item": _add_item,
     "remove_item": _remove_item,
@@ -218,6 +259,7 @@ OPERATIONS: Dict[str, Callable[..., TimelineDocument]] = {
     "reset_decision": _reset_decision,
     "set_profile": _set_profile,
     "set_target_duration": _set_target_duration,
+    "replace_timeline": _replace_timeline,
 }
 
 

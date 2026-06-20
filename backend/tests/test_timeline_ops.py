@@ -291,6 +291,70 @@ def test_set_profile_and_target_duration():
     assert doc.target_duration_sec == 42.0
 
 
+def test_replace_timeline_swaps_all_items():
+    sources = make_sources(("c1", 0.0, 10.0, 10.0))
+    doc = TimelineDocument(
+        items=[make_item("old", clip_id="c1", start=0.0, end=2.0)]
+    )
+
+    result = apply_operation(
+        doc,
+        sources,
+        "replace_timeline",
+        items=[
+            {
+                "source_clip_id": "c1",
+                "start_sec": 1.0,
+                "end_sec": 3.0,
+                "speed": 2.0,
+            },
+            {"source_clip_id": "c1", "start_sec": 4.0, "end_sec": 5.0},
+        ],
+    )
+
+    assert [item.source_clip_id for item in result.items] == ["c1", "c1"]
+    assert (result.items[0].start_sec, result.items[0].end_sec) == (1.0, 3.0)
+    assert result.items[0].speed == 2.0
+    assert result.items[1].speed == 1.0
+    assert result.items[0].item_id != "old"
+    assert len({item.item_id for item in result.items}) == 2
+    assert doc.items[0].item_id == "old"
+
+
+def test_replace_timeline_clamps_bounds_to_source():
+    sources = make_sources(("c1", 0.0, 10.0, 10.0))
+    result = apply_operation(
+        empty_doc(),
+        sources,
+        "replace_timeline",
+        items=[{"source_clip_id": "c1", "start_sec": -5.0, "end_sec": 99.0}],
+    )
+
+    assert (result.items[0].start_sec, result.items[0].end_sec) == (0.0, 10.0)
+
+
+def test_replace_timeline_unknown_source_raises():
+    with pytest.raises(TimelineOpError):
+        apply_operation(
+            empty_doc(),
+            {},
+            "replace_timeline",
+            items=[
+                {"source_clip_id": "missing", "start_sec": 0.0, "end_sec": 1.0}
+            ],
+        )
+
+
+def test_replace_timeline_empty_clears():
+    doc = TimelineDocument(
+        items=[make_item("old", clip_id="c1", start=0.0, end=2.0)]
+    )
+
+    result = apply_operation(doc, {}, "replace_timeline", items=[])
+
+    assert result.items == []
+
+
 def test_unknown_operation_raises():
     with pytest.raises(TimelineOpError):
         apply_operation(empty_doc(), {}, "frobnicate", item_id="x")
@@ -315,6 +379,27 @@ async def test_controller_undo_restores_previous_document():
     assert len(controller.document.items) == 1
     await controller.undo()
     assert controller.document.items == []
+
+
+@pytest.mark.asyncio
+async def test_replace_timeline_is_one_undoable_step():
+    sources = make_sources(("c1", 0.0, 10.0, 10.0))
+    doc = TimelineDocument(
+        items=[make_item("old", clip_id="c1", start=0.0, end=2.0)]
+    )
+    controller = TimelineController(doc, sources)
+
+    await controller.apply(
+        "replace_timeline",
+        items=[
+            {"source_clip_id": "c1", "start_sec": 1.0, "end_sec": 3.0},
+            {"source_clip_id": "c1", "start_sec": 4.0, "end_sec": 6.0},
+        ],
+    )
+
+    assert len(controller.document.items) == 2
+    reverted = await controller.undo()
+    assert [item.item_id for item in reverted.items] == ["old"]
 
 
 @pytest.mark.asyncio

@@ -56,6 +56,7 @@ async function setupTimeline(page: Page, files: string[]) {
   });
 
   await page.goto('/#/review');
+  await page.getByTestId('source-clips-panel').locator('summary').click();
   await expect(page.getByLabel(/Preview /).first()).toBeVisible();
   // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
   const includeButton = page.getByRole('button', { name: 'Include', exact: true });
@@ -85,6 +86,7 @@ test('timeline preview has no native controls; review cards use poster videos', 
   await expect(timelineVideo).not.toHaveAttribute('controls');
 
   await page.goto('/#/review');
+  await page.getByTestId('source-clips-panel').locator('summary').click();
   const reviewVideo = page.getByLabel(/Preview /).first();
   await expect(reviewVideo).toBeVisible();
   await expect(reviewVideo).not.toHaveAttribute('controls');

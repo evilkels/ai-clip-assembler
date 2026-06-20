@@ -451,6 +451,167 @@ a {
 
 /* ---------- Review board ---------- */
 
+.review-shell {
+  height: 100%;
+}
+
+.review-shell-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.review-spine {
+  width: 300px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.review-spine .review-chat {
+  height: 100%;
+  max-height: none;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.review-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.version-zone {
+  display: grid;
+  gap: 12px;
+}
+
+.version-zone-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.version-zone-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.source-clips-panel {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.source-clips-panel > summary,
+.working-timeline > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.source-clips-panel > summary .draft-summary,
+.working-timeline > summary .draft-summary {
+  margin-left: auto;
+}
+
+.source-clips-content {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.working-timeline {
+  flex-shrink: 0;
+  max-height: 240px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+}
+
+.working-timeline > summary {
+  min-height: 42px;
+  padding: 0 24px;
+}
+
+.working-timeline-list {
+  display: flex;
+  gap: 10px;
+  overflow: auto;
+  padding: 0 24px 14px;
+}
+
+.working-timeline-item {
+  flex: 0 0 240px;
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+
+.working-timeline-frame {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: #05070a;
+}
+
+.working-timeline-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.working-timeline-copy {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.working-timeline-copy strong,
+.working-timeline-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.working-timeline-copy span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.working-timeline-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.working-timeline-empty {
+  margin: 0;
+  padding: 0 24px 14px;
+  color: var(--text-muted);
+}
+
 .draft-setup {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) auto auto auto;

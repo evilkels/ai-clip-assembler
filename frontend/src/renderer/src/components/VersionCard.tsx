@@ -24,7 +24,15 @@ export function VersionCard({
       <div
         className="version-card-surface"
         data-testid="version-card-surface"
+        role="button"
+        tabIndex={0}
         onClick={() => onExpand(version.version_id)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onExpand(version.version_id);
+          }
+        }}
       >
         <VersionPlayer
           version={version}

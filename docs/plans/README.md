@@ -37,7 +37,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented. Re-baselined 2026-06-19 at **44/100 Critical**; Batch 1 quick-wins (button-has-type ×14, em-dash) cut issues **75 → 60**, build green. Remaining score is Batch 2/3 judgment-call refactors (giant-component, derived-state, prefer-use, a11y) — deliberate pass, not blind. |
 | [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
-| [compare-versions-review-ui](2026-06-21-compare-versions-review-ui.md) | IN PROGRESS — Phase 4/6 complete: playable Version cards, gallery, and expand-to-focus UI compile and build cleanly. |
+| [compare-versions-review-ui](2026-06-21-compare-versions-review-ui.md) | IN PROGRESS — Phase 5/6 complete: three-zone Review shell, atomic adopt flow, lazy Source Clips, and 8-test e2e suite green. |
 
 ## Completed (`done/`)
 

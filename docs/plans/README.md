@@ -29,7 +29,7 @@ Two kinds of plans live side by side:
 | [006](done/006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | DONE (2026-06-21) — backend-authoritative session JSON + stable frontend hydration |
 | [007](done/007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
 | [008](done/008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | DONE (2026-06-21) — persistent accessible bubbles + interaction feedback |
-| [009](009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | TODO |
+| [009](009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | IN PROGRESS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

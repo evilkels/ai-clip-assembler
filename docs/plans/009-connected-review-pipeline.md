@@ -46,7 +46,7 @@ TypeScript, Playwright, CSS.
 
 ## Status
 
-- **Status**: TODO
+- **Status**: IN PROGRESS
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH (persisted schema, concurrency, agent/session and UI state)
@@ -61,14 +61,14 @@ implementation worker for the phases explicitly marked **CLAUDE**.
 
 Before Task 1, the orchestrator must:
 
-- [ ] Confirm only the two known user changes are dirty, then create the ledger:
+- [x] Confirm only the two known user changes are dirty, then create the ledger:
 
 ```bash
 mkdir -p "$(git rev-parse --git-path sdd)"
 printf 'Implementation base: %s\n' "$(git rev-parse HEAD)" > "$(git rev-parse --git-path sdd)/progress.md"
 ```
 
-- [ ] Change this plan and its README row to `IN PROGRESS`; commit only those
+- [x] Change this plan and its README row to `IN PROGRESS`; commit only those
       docs with `docs(plans): start connected review pipeline`.
 
 Exact Claude commands appear in Tasks 1 and 3. Each command constrains Claude

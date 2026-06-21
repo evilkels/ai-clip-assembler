@@ -33,13 +33,15 @@ function latestVersions(messages: ReviewMessage[]): Version[] {
   return [];
 }
 
+const messageTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 function formatMessageTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return messageTimeFormatter.format(date);
 }
 
 export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
@@ -48,7 +50,6 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [announcementsEnabled, setAnnouncementsEnabled] = useState(false);
   const activeProject = useRef<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -93,10 +94,6 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
     }
     hydrated.current = true;
   }, [messages, busy, error]);
-
-  useEffect(() => {
-    if (!busy && !announcementsEnabled) setAnnouncementsEnabled(true);
-  }, [busy, announcementsEnabled]);
 
   const send = useCallback(async () => {
     if (!projectId || !input.trim() || busy) return;
@@ -146,7 +143,7 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
         className="review-chat-log"
         data-testid="review-chat-log"
         aria-busy={busy}
-        aria-live={announcementsEnabled ? 'polite' : 'off'}
+        aria-live={!busy && hydrated.current ? 'polite' : 'off'}
         aria-relevant="additions text"
         role="log"
         onScroll={() => {
@@ -181,11 +178,11 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
           </article>
         ) : null}
         {busy ? (
-          <div className="chat-busy" role="status" aria-label="Review agent is thinking">
+          <output className="chat-busy" aria-label="Review agent is thinking">
             <span />
             <span />
             <span />
-          </div>
+          </output>
         ) : null}
         <div ref={endRef} className="chat-log-end" aria-hidden="true" />
       </div>
@@ -222,8 +219,8 @@ function ProposalCard({
   return (
     <div className="proposal-card" data-testid="proposal-card">
       <ul className="proposal-summary">
-        {proposal.summary.map((line, index) => (
-          <li key={`${proposal.proposal_id}:${index}`}>{line}</li>
+        {proposal.summary.map((line) => (
+          <li key={`${proposal.proposal_id}:${line}`}>{line}</li>
         ))}
       </ul>
       <p className="proposal-delta">

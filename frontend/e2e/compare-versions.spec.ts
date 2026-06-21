@@ -30,6 +30,74 @@ function ensureFixtureVideo(): string {
 test('compares, focuses, and adopts complete versions in the Review workspace', async ({
   page,
 }) => {
+  const reviewSession = {
+    schema_version: 1,
+    session_id: 'session-e2e',
+    updated_at: '2026-06-21T10:01:00Z',
+    messages: [
+      {
+        message_id: 'agent-opening',
+        role: 'agent',
+        text: 'I would open on the shoreline and let the movement build.',
+        created_at: '2026-06-21T10:00:00Z',
+        payload: {},
+        proposal: {
+          proposal_id: 'proposal-e2e',
+          project_id: 'project-e2e',
+          message: 'Open on the shoreline.',
+          operations: [{ operation: 'include', args: { clip_id: 'clip-e2e' } }],
+          summary: ['Add the shoreline opening'],
+          before_item_count: 0,
+          after_item_count: 1,
+          status: 'pending',
+        },
+      },
+      {
+        message_id: 'editor-direction',
+        role: 'editor',
+        text: 'Keep it calm and cinematic.',
+        created_at: '2026-06-21T10:01:00Z',
+        payload: {},
+        proposal: null,
+      },
+    ],
+  };
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/projects/*/review/session', async (route) => {
+    await route.fulfill({ json: reviewSession });
+  });
+  await page.route('**/projects/*/review/turn', async (route) => {
+    const request = route.request().postDataJSON() as { message: string };
+    reviewSession.messages.push(
+      {
+        message_id: 'editor-follow-up',
+        role: 'editor',
+        text: request.message,
+        created_at: '2026-06-21T10:02:00Z',
+        payload: {},
+        proposal: null,
+      },
+      {
+        message_id: 'agent-follow-up',
+        role: 'agent',
+        text: 'I kept the pacing measured and the visual progression clear.',
+        created_at: '2026-06-21T10:02:01Z',
+        payload: {},
+        proposal: null,
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({
+      json: {
+        message: reviewSession.messages.at(-1)?.text,
+        proposal: null,
+        agent_message: reviewSession.messages.at(-1),
+        session: reviewSession,
+      },
+    });
+  });
+
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('qa-backend-online')).toHaveText('online');
   await page.getByTestId('playwriter-qa-panel').getByRole('link', { name: 'Import' }).click();
@@ -58,6 +126,35 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(cards.first()).toHaveClass(/expanded/);
 
   await expect(page.getByTestId('review-chat-panel')).toBeVisible();
+  const agentMessage = page.locator('[data-message-id="agent-opening"]');
+  const editorMessage = page.locator('[data-message-id="editor-direction"]');
+  await expect(agentMessage).toHaveAccessibleName(/Review agent/);
+  await expect(editorMessage).toHaveAccessibleName(/You/);
+  await expect(agentMessage.locator('time')).toHaveAttribute(
+    'datetime',
+    '2026-06-21T10:00:00Z',
+  );
+  await expect(agentMessage.getByTestId('proposal-card')).toBeVisible();
+  await expect(editorMessage).toHaveCSS('text-align', 'right');
+  await expect(agentMessage).toHaveCSS('max-width', /^(82|100)%$/);
+  expect(
+    await agentMessage.evaluate(
+      (node) => node.getBoundingClientRect().width <= (node.parentElement?.clientWidth ?? 0),
+    ),
+  ).toBe(true);
+  expect(await agentMessage.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(
+    await editorMessage.evaluate((node) => getComputedStyle(node).backgroundColor),
+  );
+
+  await page.getByLabel('Message the review agent').fill('Make the ending breathe.');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByRole('status', { name: 'Review agent is thinking' })).toBeVisible();
+  await expect(page.locator('[data-message-id="agent-follow-up"]')).toBeVisible();
+
+  await page.getByRole('link', { name: 'Timeline' }).click();
+  await page.getByRole('link', { name: 'Review' }).click();
+  await expect(page.locator('[data-message-id="agent-opening"]')).toBeVisible();
+  await expect(page.locator('[data-message-id="editor-direction"]')).toBeVisible();
   const sourcePanel = page.getByTestId('source-clips-panel');
   await expect(sourcePanel).not.toHaveAttribute('open');
   await expect(sourcePanel.locator('video')).toHaveCount(0);

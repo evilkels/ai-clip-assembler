@@ -33,12 +33,27 @@ function latestVersions(messages: ReviewMessage[]): Version[] {
   return [];
 }
 
+function formatMessageTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
 export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
   const { projectId } = useReview();
   const [messages, setMessages] = useState<ReviewMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [announcementsEnabled, setAnnouncementsEnabled] = useState(false);
   const activeProject = useRef<string | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const hydrated = useRef(false);
+  const nearBottom = useRef(true);
   const applySession = useCallback(
     (session: ReviewSession) => {
       setMessages(session.messages);
@@ -69,10 +84,25 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
     };
   }, [projectId, applySession]);
 
+  useEffect(() => {
+    if (!hydrated.current || nearBottom.current) {
+      endRef.current?.scrollIntoView({
+        behavior: hydrated.current ? 'smooth' : 'auto',
+        block: 'end',
+      });
+    }
+    hydrated.current = true;
+  }, [messages, busy, error]);
+
+  useEffect(() => {
+    if (!busy && !announcementsEnabled) setAnnouncementsEnabled(true);
+  }, [busy, announcementsEnabled]);
+
   const send = useCallback(async () => {
     if (!projectId || !input.trim() || busy) return;
     const text = input.trim();
     setInput('');
+    setError(null);
     setBusy(true);
     try {
       const result = await reviewTurn(projectId, text);
@@ -80,6 +110,9 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
     } catch {
       const session = await getReviewSession(projectId).catch(() => null);
       if (session && activeProject.current === projectId) applySession(session);
+      if (activeProject.current === projectId) {
+        setError('The review agent could not complete that turn. Check the conversation before retrying.');
+      }
     } finally {
       if (activeProject.current === projectId) setBusy(false);
     }
@@ -108,20 +141,53 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
         <strong>Review agent</strong>
         <span className="draft-summary">proposes edits you accept or reject</span>
       </div>
-      <div className="review-chat-log" data-testid="review-chat-log">
+      <div
+        ref={logRef}
+        className="review-chat-log"
+        data-testid="review-chat-log"
+        aria-busy={busy}
+        aria-live={announcementsEnabled ? 'polite' : 'off'}
+        aria-relevant="additions text"
+        role="log"
+        onScroll={() => {
+          const log = logRef.current;
+          if (!log) return;
+          nearBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+        }}
+      >
         {messages.map((message) => (
-          <div
+          <article
             key={message.message_id}
             className={`chat-msg chat-${message.role}`}
             data-message-id={message.message_id}
+            aria-label={`${message.role === 'agent' ? 'Review agent' : 'You'} message at ${formatMessageTime(message.created_at)}`}
           >
-            <p>{message.text}</p>
+            <header className="chat-msg-meta">
+              <span>{message.role === 'agent' ? 'Review agent' : 'You'}</span>
+              <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>
+            </header>
+            <p className="chat-msg-body">{message.text}</p>
             {message.proposal ? (
               <ProposalCard proposal={message.proposal} onResolve={resolveProposal} />
             ) : null}
-          </div>
+          </article>
         ))}
-        {busy ? <p className="chat-busy">Thinking…</p> : null}
+        {error ? (
+          <article className="chat-msg chat-agent chat-error" role="alert">
+            <header className="chat-msg-meta">
+              <span>Review agent</span>
+            </header>
+            <p className="chat-msg-body">{error}</p>
+          </article>
+        ) : null}
+        {busy ? (
+          <div className="chat-busy" role="status" aria-label="Review agent is thinking">
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : null}
+        <div ref={endRef} className="chat-log-end" aria-hidden="true" />
       </div>
       <form
         className="review-chat-input"

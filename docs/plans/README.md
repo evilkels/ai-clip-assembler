@@ -26,7 +26,7 @@ Two kinds of plans live side by side:
 | [005](done/005-rich-candidate-pool.md) | Separate rich Candidate Clip discovery from draft selection | P1 | M | — | DONE (2026-06-21) — bounded scene-first pool; exact `IMG_0888.MOV` validation covers all 3 Scenes |
 | [006](done/006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | DONE (2026-06-21) — backend-authoritative session JSON + stable frontend hydration |
 | [007](done/007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
-| [008](008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | TODO |
+| [008](done/008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | DONE (2026-06-21) — persistent accessible bubbles + interaction feedback |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -51,6 +51,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - [005-rich-candidate-pool](done/005-rich-candidate-pool.md) — 2026-06-21; bounded scene-first Candidate Clip pool validated against all three Scenes in `IMG_0888.MOV`.
 - [006-persist-review-session](done/006-persist-review-session.md) — 2026-06-21; backend-authoritative persisted Review Sessions and Proposals.
 - [007-creative-visual-review-agent](done/007-creative-visual-review-agent.md) — 2026-06-21; bounded visual context and persisted validated creative Versions.
+- [008-chat-bubbles-and-interactions](done/008-chat-bubbles-and-interactions.md) — 2026-06-21; persistent accessible conversation bubbles, attached Proposals, conditional scrolling, and interaction feedback.
 - [2026-06-11-real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) — 2026-06-11; persistence, scoring, draft, Timeline UX, and DaVinci handoff improvements.
 - [agent-operable-timeline-handoff](done/agent-operable-timeline-handoff.md) — 2026-06-19; executed A1-C handoff, retained as the delivery record for the still-active parent plan.
 - [2026-06-15-clip-quality-and-review-ux](done/2026-06-15-clip-quality-and-review-ux.md) — 2026-06-15; scene-aware ranked windows, fitted-rotation turn-rate scoring, per-profile pacing/density/speed/ordering, export retiming, poster cards, batch visibility + cancel. Follow-up: calibrate turn-rate thresholds on real footage.
@@ -68,8 +69,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - 001 and 002 both touch nothing in common (001: `api.py` + tests + docs; 002: new spec + scratch script only).
 - 005 and 006 landed before 007: creative curation now consumes the bounded
   Candidate Clip pool and persisted Review Messages.
-- 006 satisfies 008's data dependency by providing stable message IDs, roles,
-  timestamps, and Proposal state. Plan 008 remains the active presentation pass.
+- 006 supplied stable message IDs, roles, timestamps, and Proposal state for
+  008's completed accessible conversation presentation.
 
 ## Direction findings not turned into plans
 

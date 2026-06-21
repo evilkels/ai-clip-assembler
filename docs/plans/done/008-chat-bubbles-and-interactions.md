@@ -11,6 +11,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-21)
 - **Priority**: P2
 - **Effort**: S
 - **Risk**: LOW
@@ -148,13 +149,13 @@ does not replace automated structure/accessibility assertions.
 
 ## Done criteria
 
-- [ ] Editor and agent turns render as visually distinct bubbles.
-- [ ] Role label, timestamp, and stable message ID render for every persisted turn.
-- [ ] Proposal cards are attached to the owning agent bubble.
-- [ ] New messages auto-scroll only when already near the bottom.
-- [ ] Busy state is accessible and reduced-motion compliant.
-- [ ] Typecheck, build, lint, and focused E2E pass.
-- [ ] Only in-scope files plus this status row are modified.
+- [x] Editor and agent turns render as visually distinct bubbles.
+- [x] Role label, timestamp, and stable message ID render for every persisted turn.
+- [x] Proposal cards are attached to the owning agent bubble.
+- [x] New messages auto-scroll only when already near the bottom.
+- [x] Busy state is accessible and reduced-motion compliant.
+- [x] Typecheck, build, lint, and focused E2E pass.
+- [x] Only in-scope files plus plan completion records are modified.
 
 ## STOP conditions
 
@@ -171,3 +172,17 @@ Plan 007 may attach Version proposals or richer structured content to an agent
 message. Keep message chrome generic and render new payload cards inside the
 same agent bubble. Reviewers should check narrow widths, long filenames/IDs,
 keyboard focus, and a long restored conversation.
+
+## Completion record
+
+- Added distinct agent/editor conversation bubbles with visible role and time
+  metadata, stable message IDs, preserved line breaks, and attached Proposal
+  cards.
+- Added near-bottom-aware scrolling, post-hydration live announcements, an
+  accessible delayed-response indicator, reduced-motion behavior, and a
+  recoverable error bubble.
+- Extended the Review E2E flow to cover message semantics, responsive width,
+  visual distinction, Proposal ownership, busy feedback, and persistence after
+  route navigation.
+- Verification: `npm run build`, `npm run lint:frontend`, and
+  `npm run test:e2e -- compare-versions.spec.ts` passed on 2026-06-21.

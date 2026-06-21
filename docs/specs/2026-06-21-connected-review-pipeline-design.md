@@ -1,7 +1,7 @@
 # Connected Review Pipeline Design
 
 Date: 2026-06-21
-Status: Draft for review
+Status: Approved
 Owner: Elvijs
 
 ## Goal

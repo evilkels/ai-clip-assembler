@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { VersionGallery } from '../components/VersionGallery';
@@ -13,6 +13,7 @@ function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
 }
 
 export function ReviewPage() {
+  const [agentVersions, setAgentVersions] = useState<Version[]>([]);
   const {
     acceptedOrder,
     applyTimelineOperation,
@@ -33,7 +34,10 @@ export function ReviewPage() {
     () => ranked.filter((clip) => clip.scores.smoothness >= smoothnessThreshold),
     [ranked, smoothnessThreshold],
   );
-  const versions = useMemo(() => proposeVersions(filtered), [filtered]);
+  const versions = useMemo(
+    () => (agentVersions.length > 0 ? agentVersions : proposeVersions(filtered)),
+    [agentVersions, filtered],
+  );
   const draftPositions = useMemo(
     () => new Map(acceptedOrder.map((id, index) => [id, index + 1])),
     [acceptedOrder],
@@ -108,7 +112,7 @@ export function ReviewPage() {
 
       <div className="review-shell-body">
         <aside className="review-spine">
-          <ReviewChatPanel />
+          <ReviewChatPanel key={projectId} onVersionsChange={setAgentVersions} />
         </aside>
         <main className="review-main">
           <section className="version-zone" aria-label="Proposed versions">

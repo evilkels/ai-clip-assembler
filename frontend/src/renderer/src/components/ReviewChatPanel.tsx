@@ -16,28 +16,47 @@ import {
   reviewTurn,
   type Proposal,
   type ReviewMessage,
+  type ReviewSession,
 } from '../api/client';
 import { useReview } from '../state/ReviewContext';
+import type { Version } from '../types/version';
 
-export function ReviewChatPanel() {
+interface ReviewChatPanelProps {
+  onVersionsChange?: (versions: Version[]) => void;
+}
+
+function latestVersions(messages: ReviewMessage[]): Version[] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const versions = messages[index].payload.versions;
+    if (Array.isArray(versions)) return versions as Version[];
+  }
+  return [];
+}
+
+export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
   const { projectId } = useReview();
   const [messages, setMessages] = useState<ReviewMessage[]>([]);
   const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const activeProject = useRef<string | null>(null);
+  const applySession = useCallback(
+    (session: ReviewSession) => {
+      setMessages(session.messages);
+      onVersionsChange?.(latestVersions(session.messages));
+    },
+    [onVersionsChange],
+  );
 
   useEffect(() => {
     if (!projectId) return;
     let alive = true;
     activeProject.current = projectId;
-    setMessages([]);
-    setBusy(true);
     getReviewSession(projectId)
       .then((session) =>
         session.messages.length > 0 ? session : reviewKickoff(projectId).then((result) => result.session),
       )
       .then((session) => {
-        if (alive && activeProject.current === projectId) setMessages(session.messages);
+        if (alive && activeProject.current === projectId) applySession(session);
       })
       .catch(() => {
         /* opening turn is best-effort */
@@ -48,7 +67,7 @@ export function ReviewChatPanel() {
     return () => {
       alive = false;
     };
-  }, [projectId]);
+  }, [projectId, applySession]);
 
   const send = useCallback(async () => {
     if (!projectId || !input.trim() || busy) return;
@@ -57,14 +76,14 @@ export function ReviewChatPanel() {
     setBusy(true);
     try {
       const result = await reviewTurn(projectId, text);
-      if (activeProject.current === projectId) setMessages(result.session.messages);
+      if (activeProject.current === projectId) applySession(result.session);
     } catch {
       const session = await getReviewSession(projectId).catch(() => null);
-      if (session && activeProject.current === projectId) setMessages(session.messages);
+      if (session && activeProject.current === projectId) applySession(session);
     } finally {
       if (activeProject.current === projectId) setBusy(false);
     }
-  }, [projectId, input, busy]);
+  }, [projectId, input, busy, applySession]);
 
   const resolveProposal = useCallback(
     async (proposalId: string, accept: boolean) => {
@@ -73,12 +92,12 @@ export function ReviewChatPanel() {
         if (accept) await acceptProposal(projectId, proposalId);
         else await rejectProposal(projectId, proposalId);
         const session = await getReviewSession(projectId);
-        if (activeProject.current === projectId) setMessages(session.messages);
+        if (activeProject.current === projectId) applySession(session);
       } catch {
         /* surfaced by the disabled state below; keep the panel resilient */
       }
     },
-    [projectId],
+    [projectId, applySession],
   );
 
   if (!projectId) return null;

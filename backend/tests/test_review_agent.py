@@ -11,7 +11,7 @@ import pytest
 from src.models import TimelineDocument
 from src.timeline_ops import SourceClip, TimelineController
 from src.timeline_service import TimelineEventBroker
-from src.review_agent import ProposalStore, run_review_turn
+from src.review_agent import ProposalStore, _parse_agent_json, _validate_versions, run_review_turn
 
 
 def _sources():
@@ -164,3 +164,114 @@ async def test_run_review_turn_with_no_operations_returns_message_only():
     )
     assert result["message"] == "Looks great already!"
     assert result["proposal"] is None
+
+
+def test_parse_agent_json_preserves_creative_versions():
+    parsed = _parse_agent_json(
+        '''{"message":"Three directions.","operations":[],"versions":[{"version_id":"v1","title":"Calm","vibe":"slow","rationale":"Let it breathe.","profile":"long_scenic","items":[]}]}'''
+    )
+
+    assert parsed["versions"][0]["title"] == "Calm"
+
+
+def test_validate_versions_rejects_unknown_sources_and_recomputes_duration():
+    candidates = [
+        {
+            "clip_id": "clip-a",
+            "file_id": "file-a",
+            "file_name": "A.MOV",
+            "start_sec": 1.0,
+            "end_sec": 7.0,
+        }
+    ]
+    raw = [
+        {
+            "version_id": "valid",
+            "title": "Calm",
+            "vibe": "slow",
+            "rationale": "One clean beat.",
+            "profile": "long_scenic",
+            "total_duration_sec": 999,
+            "items": [
+                {
+                    "source_clip_id": "clip-a",
+                    "file_id": "file-a",
+                    "file_name": "A.MOV",
+                    "start_sec": 1.0,
+                    "end_sec": 7.0,
+                    "speed": 0.5,
+                    "transform": {"scale": 1, "x": 0, "y": 0},
+                }
+            ],
+        },
+        {
+            "version_id": "bad",
+            "title": "Bad",
+            "vibe": "bad",
+            "rationale": "Unknown source.",
+            "profile": "short_social",
+            "items": [{"source_clip_id": "missing"}],
+        },
+    ]
+
+    versions = _validate_versions(raw, candidates)
+
+    assert [version["version_id"] for version in versions] == ["valid"]
+    assert versions[0]["total_duration_sec"] == 12.0
+
+
+def test_validate_versions_rejects_invalid_transform():
+    candidates = [
+        {
+            "clip_id": "clip-a",
+            "file_id": "file-a",
+            "file_name": "A.MOV",
+            "start_sec": 0,
+            "end_sec": 4,
+        }
+    ]
+    raw = [
+        {
+            "version_id": "bad-transform",
+            "title": "Bad",
+            "vibe": "broken",
+            "rationale": "Invalid transform.",
+            "profile": "short_social",
+            "items": [
+                {
+                    "source_clip_id": "clip-a",
+                    "start_sec": 0,
+                    "end_sec": 4,
+                    "speed": 1,
+                    "transform": {"scale": 0, "x": 0, "y": 0},
+                }
+            ],
+        }
+    ]
+
+    assert _validate_versions(raw, candidates) == []
+
+
+@pytest.mark.asyncio
+async def test_run_review_turn_persists_versions_and_history_in_agent_message():
+    controller = _controller()
+    store = ProposalStore()
+
+    def creative_agent(context):
+        assert [message["role"] for message in context["history"]] == ["editor"]
+        return {
+            "message": "I made a calm version.",
+            "operations": [],
+            "versions": [{"version_id": "v1", "title": "Calm"}],
+        }
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Make it calm",
+        controller=controller,
+        candidates=[],
+        store=store,
+        agent=creative_agent,
+    )
+
+    assert result["agent_message"]["payload"]["versions"][0]["title"] == "Calm"

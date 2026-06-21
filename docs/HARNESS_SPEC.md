@@ -115,6 +115,12 @@
 4. Blend the score (70 % original technical + 30 % visual interest) and re-rank clips.
 5. Fall back to the rule-based result if the CLI is unavailable or every clip fails to score.
 
+Still-frame enhancement judges semantic Visual Interest only. The response keeps
+a neutral `smoothness` compatibility field, but the application ignores it;
+vidstab/OpenCV remains authoritative for Smoothness Score. In Review, the same
+Pi configuration receives at most 12 labelled, scene-diverse Frame Samples plus
+recent conversation history and may propose validated complete Versions.
+
 **Config (environment variables only):**
 
 | Variable | Default | Description |

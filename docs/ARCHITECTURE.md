@@ -115,6 +115,12 @@ candidate may appear as more than one item (multi-instance).
   `clipassembler/analysis/review-session.json`; legacy upload projects retain
   the same contract for the backend process lifetime. Kickoff is idempotent and
   the Review panel hydrates the saved session when it mounts.
+- **Creative Versions**: Pi-mode Review turns receive bounded, labelled Frame
+  Samples plus recent Review Session history and may return 2-4 validated
+  preview-spec Versions. Source IDs, bounds, speed, transform, and effective
+  duration are checked before the gallery can adopt a Version. Manual Harness
+  projects keep the deterministic local Version recipes and make no review-model
+  call.
 - **Persistence/migration** (`project_store.py`): the document is saved per
   project; a migration loader upgrades the legacy `{clip_id, start_sec, end_sec}`
   timeline into timeline items.

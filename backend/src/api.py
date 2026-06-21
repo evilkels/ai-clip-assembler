@@ -991,16 +991,52 @@ class ReviewTurnRequest(BaseModel):
     message: str = ""
 
 
+def _review_inputs(project_id: str) -> tuple[list, list, object]:
+    candidates = get_mcp_server()._list_candidates(project_id)
+    candidate_frames = []
+    for candidate in candidates:
+        paths = mcp_frame_paths(project_id, candidate.get("clip_id"))
+        if not paths:
+            continue
+        for path in dict.fromkeys([paths[0], paths[len(paths) // 2], paths[-1]]):
+            candidate_frames.append(
+                {
+                    "clip_id": candidate.get("clip_id"),
+                    "file_name": candidate.get("file_name"),
+                    "scene_id": candidate.get("scene_id"),
+                    "start_sec": candidate.get("start_sec"),
+                    "end_sec": candidate.get("end_sec"),
+                    "frame_path": path,
+                }
+            )
+            if len(candidate_frames) >= 12:
+                break
+        if len(candidate_frames) >= 12:
+            break
+    agent = _review_agent
+    if projects[project_id].get("harness_id") != "pi_agent" and agent is default_review_agent:
+        def manual_review_agent(_context):
+            return {
+                "message": "Manual analysis is ready. Creative versions remain deterministic and local.",
+                "operations": [],
+                "versions": [],
+            }
+
+        agent = manual_review_agent
+    return candidates, candidate_frames, agent
+
+
 async def _run_review_turn(project_id: str, user_message: str) -> dict:
     controller = get_timeline_controller(project_id)
-    candidates = get_mcp_server()._list_candidates(project_id)
+    candidates, candidate_frames, agent = _review_inputs(project_id)
     return await run_review_turn(
         project_id,
         user_message=user_message,
         controller=controller,
         candidates=candidates,
         store=_proposal_store,
-        agent=_review_agent,
+        agent=agent,
+        candidate_frames=candidate_frames,
     )
 
 
@@ -1034,7 +1070,7 @@ async def review_kickoff(project_id: str):
                 "session": session.model_dump(),
             }
         controller = get_timeline_controller(project_id)
-        candidates = get_mcp_server()._list_candidates(project_id)
+        candidates, candidate_frames, agent = _review_inputs(project_id)
         return await run_review_turn(
             project_id,
             user_message=(
@@ -1044,8 +1080,9 @@ async def review_kickoff(project_id: str):
             controller=controller,
             candidates=candidates,
             store=_proposal_store,
-            agent=_review_agent,
+            agent=agent,
             record_user_message=False,
+            candidate_frames=candidate_frames,
         )
 
 

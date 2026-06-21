@@ -11,6 +11,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-21)
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: MED-HIGH (changes model context and the Version producer)
@@ -249,3 +250,13 @@ Changing prompt/model invalidates the existing Pi score cache. Reviewers should
 focus on privacy mode, context bounds, hallucination rejection, deterministic
 fallback, and whether follow-up requests genuinely use persisted history rather
 than only the latest message.
+
+## Completion record
+
+- Added bounded Frame Sample attachments and recent persisted conversation to
+  the creative prompt; still-image scoring now treats technical smoothness as
+  deterministic input rather than a visual-model judgment.
+- Added typed/validated preview-spec Versions, persisted them on Review
+  Messages, and made them the Version gallery's primary Pi-mode source.
+- Manual Harness and model-failure paths retain deterministic local Versions.
+- Full verification: 274 backend tests passed; frontend typecheck/build passed.

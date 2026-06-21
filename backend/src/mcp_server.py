@@ -164,6 +164,7 @@ class TimelineMCPServer:
                     "clip_id": clip.get("clip_id"),
                     "file_id": clip.get("file_id"),
                     "file_name": clip.get("file_name"),
+                    "scene_id": clip.get("scene_id"),
                     "start_sec": clip.get("start_sec"),
                     "end_sec": clip.get("end_sec"),
                     "overall_score": clip.get("overall_score"),

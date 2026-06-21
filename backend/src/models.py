@@ -110,6 +110,26 @@ class ReviewSession(BaseModel):
     updated_at: str
 
 
+class CreativeVersionItem(BaseModel):
+    source_clip_id: str
+    file_id: str
+    file_name: str
+    start_sec: float
+    end_sec: float
+    speed: float = 1.0
+    transform: dict = Field(default_factory=lambda: {"scale": 1.0, "x": 0.0, "y": 0.0})
+
+
+class CreativeVersion(BaseModel):
+    version_id: str
+    title: str
+    vibe: str
+    rationale: str
+    profile: Literal["short_social", "cinematic_highlight", "long_scenic", "custom"]
+    total_duration_sec: float
+    items: List[CreativeVersionItem]
+
+
 class Transform(BaseModel):
     """A Timeline Item's digital zoom/pan/crop. Identity by default.
 

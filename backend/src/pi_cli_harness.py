@@ -53,9 +53,10 @@ DEFAULT_PROMPT_TEMPLATE = (
     "You are a drone-video quality analyst. Use your read tool to view each of "
     "these {frame_count} frame image(s) sampled from a SINGLE candidate video clip:\n"
     "{frame_list}\n"
-    "Judge the clip as a whole and score it 0-10 for: "
-    "1) smoothness/stability (10 = perfectly smooth, no camera shake), "
-    "2) visual_interest (composition, lighting, subject). "
+    "Judge composition, lighting, subject, moment, and progression. Do not infer "
+    "camera stability from still images; deterministic motion analysis owns that "
+    "metric, so return smoothness=5 as a neutral compatibility value. Score "
+    "visual_interest from 0-10. "
     "Respond with ONLY one JSON object and nothing else, in this exact format: "
     '{"smoothness": N, "visual_interest": N, "reason": "brief explanation"}'
 )

@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from .models import Proposal, ReviewMessage, ReviewSession, TimelineDocument
+from .models import CreativeVersion, CreativeVersionItem, Proposal, ReviewMessage, ReviewSession, TimelineDocument
 from .pi_cli_harness import PI_BIN, PI_MODEL, PI_PROVIDER, REPO_ROOT
 from .project_store import read_review_session, write_review_session
 from .timeline_ops import OPERATIONS, Sources, TimelineController, apply_operation
@@ -228,6 +228,7 @@ async def run_review_turn(
     store: ProposalStore,
     agent: ReviewAgent,
     record_user_message: bool = True,
+    candidate_frames: Optional[List[dict]] = None,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -243,6 +244,7 @@ async def run_review_turn(
         "candidates": candidates,
         "timeline": controller.document.model_dump(),
         "history": [message.model_dump() for message in store.session(project_id).messages],
+        "candidate_frames": candidate_frames or [],
     }
     reply = agent(context)
     message = reply.get("message", "")
@@ -261,7 +263,10 @@ async def run_review_turn(
         role="agent",
         text=message,
         proposal=proposal,
-        payload=reply.get("payload") or {},
+        payload={
+            **(reply.get("payload") or {}),
+            **({"versions": reply.get("versions")} if reply.get("versions") else {}),
+        },
     )
     return {
         "message": message,
@@ -280,20 +285,28 @@ async def run_review_turn(
 OPERATION_CATALOGUE = ", ".join(OPERATIONS.keys())
 
 _AGENT_PROMPT = (
-    "You are the in-app review agent for a local drone-footage editor. You help "
-    "the editor assemble a timeline from candidate clips. You PROPOSE edits; the "
-    "editor accepts or rejects them.\n\n"
+    "You are a creative video editor reviewing local drone footage. Compare the "
+    "labelled frame samples and technical scores. Technical smoothness is "
+    "authoritative; use images for subject, composition, progression, and "
+    "redundancy. You PROPOSE edits; the editor accepts or rejects them.\n\n"
     "Available timeline operations (and their args): {catalogue}.\n"
     "include/exclude take {{clip_id}}; add_item takes {{source_clip_id}}; "
     "set_speed takes {{item_id, speed}}; split_item takes {{item_id, at_sec}}; "
     "set_bounds takes {{item_id, start_sec, end_sec}}; set_transform takes "
     "{{item_id, transform:{{scale,x,y}}}}.\n\n"
     "Candidates (JSON): {candidates}\n"
+    "Labelled frame samples (JSON): {candidate_frames}\n"
     "Current timeline (JSON): {timeline}\n"
+    "Recent conversation (JSON): {history}\n"
     "Editor said: {user_message}\n\n"
     "Reply with ONLY a JSON object: "
-    '{{"message": "<one short sentence>", "operations": [{{"operation": "<name>", "args": {{...}}}}]}}. '
-    "Use an empty operations list if no edit is warranted."
+    '{{"message":"<concise rationale>","operations":[],"versions":['
+    '{{"version_id":"...","title":"...","vibe":"...","rationale":"...",'
+    '"profile":"short_social|cinematic_highlight|long_scenic","items":['
+    '{{"source_clip_id":"...","file_id":"...","file_name":"...",'
+    '"start_sec":N,"end_sec":N,"speed":N,"transform":{{"scale":1,"x":0,"y":0}}}}]}}]}}. '
+    "Return 2-4 distinct complete versions when enough candidates exist. Mention "
+    "filenames and timecodes, not UUIDs, in prose."
 )
 
 
@@ -311,7 +324,86 @@ def _parse_agent_json(raw: str) -> dict:
         for op in operations
         if isinstance(op, dict) and op.get("operation") in OPERATIONS
     ]
-    return {"message": message, "operations": cleaned}
+    versions = parsed.get("versions") or []
+    return {"message": message, "operations": cleaned, "versions": versions}
+
+
+def _validate_versions(raw_versions: list, candidates: List[dict]) -> List[dict]:
+    candidate_by_id = {candidate.get("clip_id"): candidate for candidate in candidates}
+    validated = []
+    for raw in raw_versions[:4]:
+        if not isinstance(raw, dict):
+            continue
+        items = []
+        valid = True
+        for raw_item in raw.get("items") or []:
+            if not isinstance(raw_item, dict):
+                valid = False
+                break
+            candidate = candidate_by_id.get(raw_item.get("source_clip_id"))
+            if candidate is None:
+                valid = False
+                break
+            try:
+                start = float(raw_item.get("start_sec"))
+                end = float(raw_item.get("end_sec"))
+                speed = float(raw_item.get("speed", 1.0))
+            except (TypeError, ValueError):
+                valid = False
+                break
+            if (
+                start < float(candidate.get("start_sec", 0.0))
+                or end > float(candidate.get("end_sec", 0.0))
+                or end <= start
+                or speed < 0.25
+                or speed > 4.0
+            ):
+                valid = False
+                break
+            transform = raw_item.get("transform") or {"scale": 1.0, "x": 0.0, "y": 0.0}
+            try:
+                transform = {
+                    "scale": float(transform.get("scale", 1.0)),
+                    "x": float(transform.get("x", 0.0)),
+                    "y": float(transform.get("y", 0.0)),
+                }
+            except (AttributeError, TypeError, ValueError):
+                valid = False
+                break
+            if transform["scale"] <= 0:
+                valid = False
+                break
+            try:
+                item = CreativeVersionItem(
+                    source_clip_id=candidate["clip_id"],
+                    file_id=candidate["file_id"],
+                    file_name=candidate["file_name"],
+                    start_sec=start,
+                    end_sec=end,
+                    speed=speed,
+                    transform=transform,
+                )
+            except (KeyError, ValueError):
+                valid = False
+                break
+            items.append(item)
+        if not valid or not items:
+            continue
+        total = round(sum((item.end_sec - item.start_sec) / item.speed for item in items), 1)
+        try:
+            version = CreativeVersion(
+                version_id=str(raw.get("version_id") or uuid.uuid4().hex),
+                title=str(raw.get("title") or "Creative cut"),
+                vibe=str(raw.get("vibe") or "editorial"),
+                rationale=str(raw.get("rationale") or "Selected from the strongest moments."),
+                profile=raw.get("profile") or "cinematic_highlight",
+                total_duration_sec=total,
+                items=items,
+            )
+        except ValueError:
+            continue
+        validated.append(version.model_dump())
+    return validated
 
 
 def default_review_agent(context: dict) -> dict:
@@ -319,13 +411,21 @@ def default_review_agent(context: dict) -> dict:
     prompt = _AGENT_PROMPT.format(
         catalogue=OPERATION_CATALOGUE,
         candidates=json.dumps(context.get("candidates", []))[:6000],
+        candidate_frames=json.dumps(context.get("candidate_frames", []))[:4000],
         timeline=json.dumps(context.get("timeline", {}))[:6000],
+        history=json.dumps(context.get("history", [])[-12:])[:6000],
         user_message=context.get("user_message", ""),
     )
+    frame_paths = [
+        frame["frame_path"]
+        for frame in context.get("candidate_frames", [])[:12]
+        if frame.get("frame_path")
+    ]
     command = [
         PI_BIN, "--provider", PI_PROVIDER, "--model", PI_MODEL,
         "--print", "--mode", "text", "--no-session", "--no-context-files",
-        "--no-skills", "--no-extensions", "--tools", "read", prompt,
+        "--no-skills", "--no-extensions", "--tools", "read",
+        *[f"@{path}" for path in frame_paths], prompt,
     ]
     try:
         completed = subprocess.run(
@@ -334,7 +434,11 @@ def default_review_agent(context: dict) -> dict:
         )
         if completed.returncode != 0 or not (completed.stdout or "").strip():
             raise ReviewAgentError((completed.stderr or "pi CLI returned no output").strip())
-        return _parse_agent_json(completed.stdout)
+        parsed = _parse_agent_json(completed.stdout)
+        parsed["versions"] = _validate_versions(
+            parsed.get("versions") or [], context.get("candidates", [])
+        )
+        return parsed
     except (OSError, ValueError, ReviewAgentError, subprocess.TimeoutExpired) as exc:
         logger.warning("review agent unavailable, replying chat-only: %s", exc)
         return {

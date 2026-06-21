@@ -109,6 +109,12 @@ candidate may appear as more than one item (multi-instance).
   instead of applied; **accept** replays them through the operations core (so
   they land in undo history), **reject** discards. Read access is provided as
   context. The model call reuses the `pi_cli_harness` provider/model env-config.
+- **Review Session persistence** (`review_agent.py` / `project_store.py`): chat
+  messages and embedded Proposal status are backend-authoritative. Folder
+  projects persist stable message IDs, timestamps, and Proposal operations in
+  `clipassembler/analysis/review-session.json`; legacy upload projects retain
+  the same contract for the backend process lifetime. Kickoff is idempotent and
+  the Review panel hydrates the saved session when it mounts.
 - **Persistence/migration** (`project_store.py`): the document is saved per
   project; a migration loader upgrades the legacy `{clip_id, start_sec, end_sec}`
   timeline into timeline items.

@@ -10,60 +10,59 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   acceptProposal,
+  getReviewSession,
   rejectProposal,
   reviewKickoff,
   reviewTurn,
   type Proposal,
+  type ReviewMessage,
 } from '../api/client';
 import { useReview } from '../state/ReviewContext';
 
-interface ChatMessage {
-  id: number;
-  role: 'agent' | 'editor';
-  text: string;
-  proposal?: Proposal | null;
-}
-
 export function ReviewChatPanel() {
   const { projectId } = useReview();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ReviewMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const kickedFor = useRef<string | null>(null);
-  const nextId = useRef(0);
-  const makeMessage = (message: Omit<ChatMessage, 'id'>): ChatMessage => {
-    nextId.current += 1;
-    return { id: nextId.current, ...message };
-  };
+  const activeProject = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!projectId || kickedFor.current === projectId) return;
-    kickedFor.current = projectId;
+    if (!projectId) return;
+    let alive = true;
+    activeProject.current = projectId;
     setMessages([]);
     setBusy(true);
-    reviewKickoff(projectId)
-      .then((result) =>
-        setMessages([makeMessage({ role: 'agent', text: result.message, proposal: result.proposal })]),
+    getReviewSession(projectId)
+      .then((session) =>
+        session.messages.length > 0 ? session : reviewKickoff(projectId).then((result) => result.session),
       )
+      .then((session) => {
+        if (alive && activeProject.current === projectId) setMessages(session.messages);
+      })
       .catch(() => {
         /* opening turn is best-effort */
       })
-      .finally(() => setBusy(false));
+      .finally(() => {
+        if (alive && activeProject.current === projectId) setBusy(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [projectId]);
 
   const send = useCallback(async () => {
     if (!projectId || !input.trim() || busy) return;
     const text = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, makeMessage({ role: 'editor', text })]);
     setBusy(true);
     try {
       const result = await reviewTurn(projectId, text);
-      setMessages((prev) => [...prev, makeMessage({ role: 'agent', text: result.message, proposal: result.proposal })]);
+      if (activeProject.current === projectId) setMessages(result.session.messages);
     } catch {
-      setMessages((prev) => [...prev, makeMessage({ role: 'agent', text: 'Sorry — I could not complete that turn.' })]);
+      const session = await getReviewSession(projectId).catch(() => null);
+      if (session && activeProject.current === projectId) setMessages(session.messages);
     } finally {
-      setBusy(false);
+      if (activeProject.current === projectId) setBusy(false);
     }
   }, [projectId, input, busy]);
 
@@ -73,16 +72,11 @@ export function ReviewChatPanel() {
       try {
         if (accept) await acceptProposal(projectId, proposalId);
         else await rejectProposal(projectId, proposalId);
+        const session = await getReviewSession(projectId);
+        if (activeProject.current === projectId) setMessages(session.messages);
       } catch {
         /* surfaced by the disabled state below; keep the panel resilient */
       }
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.proposal?.proposal_id === proposalId
-            ? { ...message, proposal: { ...message.proposal, status: accept ? 'accepted' : 'rejected' } }
-            : message,
-        ),
-      );
     },
     [projectId],
   );
@@ -97,7 +91,11 @@ export function ReviewChatPanel() {
       </div>
       <div className="review-chat-log" data-testid="review-chat-log">
         {messages.map((message) => (
-          <div key={message.id} className={`chat-msg chat-${message.role}`}>
+          <div
+            key={message.message_id}
+            className={`chat-msg chat-${message.role}`}
+            data-message-id={message.message_id}
+          >
             <p>{message.text}</p>
             {message.proposal ? (
               <ProposalCard proposal={message.proposal} onResolve={resolveProposal} />

@@ -19,12 +19,13 @@ import logging
 import os
 import subprocess
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from pydantic import BaseModel, Field
-
-from .models import TimelineDocument
+from .models import Proposal, ReviewMessage, ReviewSession, TimelineDocument
 from .pi_cli_harness import PI_BIN, PI_MODEL, PI_PROVIDER, REPO_ROOT
+from .project_store import read_review_session, write_review_session
 from .timeline_ops import OPERATIONS, Sources, TimelineController, apply_operation
 
 
@@ -35,15 +36,8 @@ class ReviewAgentError(Exception):
     pass
 
 
-class Proposal(BaseModel):
-    proposal_id: str
-    project_id: str
-    message: str
-    operations: List[dict] = Field(default_factory=list)
-    summary: List[str] = Field(default_factory=list)
-    before_item_count: int = 0
-    after_item_count: int = 0
-    status: str = "pending"  # pending | accepted | rejected
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _describe(operation: str, args: dict) -> str:
@@ -88,10 +82,60 @@ def _simulate(
 
 
 class ProposalStore:
-    """Per-process registry of staged Proposals."""
+    """Backend-authoritative Review Sessions and staged Proposals."""
 
     def __init__(self) -> None:
-        self._proposals: Dict[str, Proposal] = {}
+        self._sessions: Dict[str, ReviewSession] = {}
+        self._folders: Dict[str, Path] = {}
+
+    def configure_project(self, project_id: str, project_folder: Optional[Path] = None) -> None:
+        if project_folder is not None:
+            self._folders[project_id] = project_folder
+            saved = read_review_session(project_folder)
+            if saved is not None:
+                for message in saved.messages:
+                    if message.proposal is not None:
+                        message.proposal.project_id = project_id
+                self._sessions[project_id] = saved
+                return
+        self._sessions.setdefault(
+            project_id,
+            ReviewSession(session_id=uuid.uuid4().hex, updated_at=_now()),
+        )
+
+    def session(self, project_id: str) -> ReviewSession:
+        if project_id not in self._sessions:
+            self.configure_project(project_id)
+        return self._sessions[project_id]
+
+    def append_message(
+        self,
+        project_id: str,
+        *,
+        role: str,
+        text: str,
+        proposal: Optional[Proposal] = None,
+        payload: Optional[dict] = None,
+    ) -> ReviewMessage:
+        timestamp = _now()
+        message = ReviewMessage(
+            message_id=uuid.uuid4().hex,
+            role=role,
+            text=text,
+            created_at=timestamp,
+            proposal=proposal,
+            payload=payload or {},
+        )
+        session = self.session(project_id)
+        session.messages.append(message)
+        session.updated_at = timestamp
+        self._save(project_id)
+        return message
+
+    def _save(self, project_id: str) -> None:
+        folder = self._folders.get(project_id)
+        if folder is not None:
+            write_review_session(folder, self.session(project_id))
 
     def create(
         self,
@@ -100,6 +144,7 @@ class ProposalStore:
         *,
         message: str,
         operations: List[dict],
+        record_message: bool = True,
     ) -> Proposal:
         # Validate by simulating on a copy of the live document (no mutation).
         resulting = _simulate(controller.document, controller.sources, operations)
@@ -112,17 +157,37 @@ class ProposalStore:
             before_item_count=len(controller.document.items),
             after_item_count=len(resulting.items),
         )
-        self._proposals[proposal.proposal_id] = proposal
+        if record_message:
+            self.append_message(
+                project_id,
+                role="agent",
+                text=message,
+                proposal=proposal,
+            )
         return proposal
 
-    def get(self, proposal_id: str) -> Optional[Proposal]:
-        return self._proposals.get(proposal_id)
+    def get(self, proposal_id: str, project_id: Optional[str] = None) -> Optional[Proposal]:
+        project_ids = [project_id] if project_id is not None else list(self._sessions)
+        for candidate_project_id in project_ids:
+            for message in self.session(candidate_project_id).messages:
+                if message.proposal and message.proposal.proposal_id == proposal_id:
+                    return message.proposal
+        return None
 
     def list_for_project(self, project_id: str) -> List[Proposal]:
-        return [p for p in self._proposals.values() if p.project_id == project_id]
+        return [
+            message.proposal
+            for message in self.session(project_id).messages
+            if message.proposal is not None
+        ]
 
-    async def accept(self, proposal_id: str, controller: TimelineController) -> TimelineDocument:
-        proposal = self._require(proposal_id)
+    async def accept(
+        self,
+        proposal_id: str,
+        controller: TimelineController,
+        project_id: Optional[str] = None,
+    ) -> TimelineDocument:
+        proposal = self._require(proposal_id, project_id)
         if proposal.status != "pending":
             raise ReviewAgentError(f"proposal {proposal_id} is {proposal.status}, not pending")
         # Replay through the live operations core so the edits land in Undo
@@ -131,17 +196,19 @@ class ProposalStore:
         for op in proposal.operations:
             document = await controller.apply(op["operation"], **op.get("args", {}))
         proposal.status = "accepted"
+        self._save(proposal.project_id)
         return document
 
-    def reject(self, proposal_id: str) -> Proposal:
-        proposal = self._require(proposal_id)
+    def reject(self, proposal_id: str, project_id: Optional[str] = None) -> Proposal:
+        proposal = self._require(proposal_id, project_id)
         if proposal.status == "accepted":
             raise ReviewAgentError(f"proposal {proposal_id} already accepted")
         proposal.status = "rejected"
+        self._save(proposal.project_id)
         return proposal
 
-    def _require(self, proposal_id: str) -> Proposal:
-        proposal = self._proposals.get(proposal_id)
+    def _require(self, proposal_id: str, project_id: Optional[str] = None) -> Proposal:
+        proposal = self.get(proposal_id, project_id)
         if proposal is None:
             raise ReviewAgentError(f"unknown proposal: {proposal_id}")
         return proposal
@@ -160,6 +227,7 @@ async def run_review_turn(
     candidates: List[dict],
     store: ProposalStore,
     agent: ReviewAgent,
+    record_user_message: bool = True,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -168,10 +236,13 @@ async def run_review_turn(
     proposes any — captures them as a pending Proposal. Returns
     ``{"message", "proposal"}`` (``proposal`` is ``None`` for a chat-only turn).
     """
+    if record_user_message:
+        store.append_message(project_id, role="editor", text=user_message)
     context = {
         "user_message": user_message,
         "candidates": candidates,
         "timeline": controller.document.model_dump(),
+        "history": [message.model_dump() for message in store.session(project_id).messages],
     }
     reply = agent(context)
     message = reply.get("message", "")
@@ -179,9 +250,25 @@ async def run_review_turn(
     proposal = None
     if operations:
         proposal = store.create(
-            project_id, controller, message=message, operations=operations
+            project_id,
+            controller,
+            message=message,
+            operations=operations,
+            record_message=False,
         )
-    return {"message": message, "proposal": proposal.model_dump() if proposal else None}
+    agent_message = store.append_message(
+        project_id,
+        role="agent",
+        text=message,
+        proposal=proposal,
+        payload=reply.get("payload") or {},
+    )
+    return {
+        "message": message,
+        "proposal": proposal.model_dump() if proposal else None,
+        "agent_message": agent_message.model_dump(),
+        "session": store.session(project_id).model_dump(),
+    }
 
 
 # --- Default model-backed agent (reuses pi_cli_harness env-config) ----------

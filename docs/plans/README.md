@@ -24,7 +24,7 @@ Two kinds of plans live side by side:
 | [003](003-backend-packaging-spike.md) | Backend packaging spike (bundle FastAPI into the Electron DMG) | P3 | M (spike) | 001 (sequencing) | TODO |
 | [004](done/004-timeline-sequence-playback.md) | Timeline sequence playback, video-driven and stutter-free | P1 | M | — | DONE (2026-06-11, branch `feature/timeline-sequence-playback`) |
 | [005](005-rich-candidate-pool.md) | Separate rich Candidate Clip discovery from draft selection | P1 | M | — | DONE (2026-06-21) — bounded scene-first pool; exact `IMG_0888.MOV` validation covers all 3 Scenes |
-| [006](006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | TODO |
+| [006](006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | DONE (2026-06-21) — backend-authoritative session JSON + stable frontend hydration |
 | [007](007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | TODO |
 | [008](008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | TODO |
 

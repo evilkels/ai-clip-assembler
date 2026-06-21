@@ -5,6 +5,7 @@ Provides REST endpoints for local video ingestion, smooth drone clip analysis,
 timeline assembly, and editor export files.
 """
 
+import asyncio
 import json
 import logging
 import shutil
@@ -106,6 +107,7 @@ _timeline_broker = TimelineEventBroker()
 # operations core on accept.
 _proposal_store = ProposalStore()
 _review_agent = default_review_agent
+_review_locks: dict[str, asyncio.Lock] = {}
 
 # --- Analysis cancellation -------------------------------------------------
 # A SIGTERM'd ffmpeg exits 0 (looks like success), so cancelling needs an
@@ -192,6 +194,7 @@ async def create_project():
         "clips": [],
         "timeline": None,
     }
+    _proposal_store.configure_project(project_id)
     return {"project_id": project_id}
 
 
@@ -227,6 +230,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "timeline": timeline,
         "harness_id": restored.get("harness_id") if restored else None,
     }
+    _proposal_store.configure_project(project_id, folder_path)
     return {
         "project_id": project_id,
         "project_folder": str(folder_path),
@@ -1004,7 +1008,12 @@ async def _run_review_turn(project_id: str, user_message: str) -> dict:
 async def review_turn(project_id: str, request: ReviewTurnRequest):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    return await _run_review_turn(project_id, request.message)
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=422, detail="Review message must not be blank")
+    lock = _review_locks.setdefault(project_id, asyncio.Lock())
+    async with lock:
+        return await _run_review_turn(project_id, message)
 
 
 @app.post("/projects/{project_id}/review/kickoff")
@@ -1013,11 +1022,38 @@ async def review_kickoff(project_id: str):
     triggered by the GUI when the Review route mounts."""
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    return await _run_review_turn(
-        project_id,
-        "Analysis just finished. Give a one-line opening take and propose your "
-        "strongest first edits.",
-    )
+    lock = _review_locks.setdefault(project_id, asyncio.Lock())
+    async with lock:
+        session = _proposal_store.session(project_id)
+        if session.messages:
+            last = session.messages[-1]
+            return {
+                "message": last.text,
+                "proposal": last.proposal.model_dump() if last.proposal else None,
+                "agent_message": last.model_dump(),
+                "session": session.model_dump(),
+            }
+        controller = get_timeline_controller(project_id)
+        candidates = get_mcp_server()._list_candidates(project_id)
+        return await run_review_turn(
+            project_id,
+            user_message=(
+                "Analysis just finished. Give a one-line opening take and propose your "
+                "strongest first edits."
+            ),
+            controller=controller,
+            candidates=candidates,
+            store=_proposal_store,
+            agent=_review_agent,
+            record_user_message=False,
+        )
+
+
+@app.get("/projects/{project_id}/review/session")
+async def get_review_session(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return _proposal_store.session(project_id).model_dump()
 
 
 @app.get("/projects/{project_id}/proposals")
@@ -1034,7 +1070,7 @@ async def list_proposals(project_id: str):
 async def accept_proposal(project_id: str, proposal_id: str):
     controller = get_timeline_controller(project_id)
     try:
-        document = await _proposal_store.accept(proposal_id, controller)
+        document = await _proposal_store.accept(proposal_id, controller, project_id=project_id)
     except ReviewAgentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"project_id": project_id, "document": document.model_dump()}
@@ -1045,7 +1081,7 @@ async def reject_proposal(project_id: str, proposal_id: str):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     try:
-        proposal = _proposal_store.reject(proposal_id)
+        proposal = _proposal_store.reject(proposal_id, project_id=project_id)
     except ReviewAgentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"project_id": project_id, "proposal": proposal.model_dump()}

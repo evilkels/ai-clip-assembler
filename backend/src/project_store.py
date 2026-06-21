@@ -8,7 +8,7 @@ from typing import Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from .models import TimelineDocument, TimelineItem
+from .models import ReviewSession, TimelineDocument, TimelineItem
 
 
 PROJECT_STATE_DIRNAME = "clipassembler"
@@ -17,6 +17,7 @@ PROJECT_SCHEMA_VERSION = 1
 ANALYSIS_RESULTS_FILENAME = "results.json"
 ANALYSIS_RESULTS_SCHEMA_VERSION = 1
 TIMELINE_DOCUMENT_FILENAME = "timeline.json"
+REVIEW_SESSION_FILENAME = "review-session.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
 DEFAULT_HARNESS_ID = "pi_agent"
 UNSAFE_PROJECT_ROOTS = [
@@ -253,6 +254,29 @@ def read_analysis_results(project_folder: Path) -> Optional[dict]:
     if not isinstance(payload.get("clips"), list):
         return None
     return payload
+
+
+def review_session_path(project_folder: Path) -> Path:
+    return project_state_dir(project_folder) / "analysis" / REVIEW_SESSION_FILENAME
+
+
+def write_review_session(project_folder: Path, session: ReviewSession) -> None:
+    path = review_session_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(session.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+
+def read_review_session(project_folder: Path) -> Optional[ReviewSession]:
+    path = review_session_path(project_folder)
+    if not path.exists():
+        return None
+    try:
+        session = ReviewSession.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValidationError, json.JSONDecodeError):
+        return None
+    if session.schema_version != 1:
+        return None
+    return session
 
 
 def timeline_document_path(project_folder: Path) -> Path:

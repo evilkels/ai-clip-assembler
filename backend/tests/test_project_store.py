@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.models import Transform, TimelineDocument, TimelineItem
+from src.models import Proposal, ReviewMessage, ReviewSession, Transform, TimelineDocument, TimelineItem
 from src.project_store import (
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
@@ -14,15 +14,56 @@ from src.project_store import (
     load_timeline_document,
     migrate_legacy_timeline,
     open_project,
+    read_review_session,
     read_timeline_document,
     rescan_project,
     write_timeline_document,
+    write_review_session,
 )
 from src.timeline_ops import SourceClip
 
 
 def fixed_now():
     return datetime(2026, 5, 30, 19, 0, 0, tzinfo=timezone.utc)
+
+
+def test_review_session_round_trips_messages_and_proposal(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    session = ReviewSession(
+        session_id="session-1",
+        updated_at="2026-05-30T19:00:00Z",
+        messages=[
+            ReviewMessage(
+                message_id="message-1",
+                role="agent",
+                text="Use the opening shot.",
+                created_at="2026-05-30T19:00:00Z",
+                proposal=Proposal(
+                    proposal_id="proposal-1",
+                    project_id="runtime-1",
+                    message="Use the opening shot.",
+                    operations=[],
+                ),
+            )
+        ],
+    )
+
+    write_review_session(project_folder, session)
+
+    assert read_review_session(project_folder) == session
+
+
+def test_read_review_session_tolerates_missing_and_corrupt_files(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    assert read_review_session(project_folder) is None
+
+    path = project_folder / "clipassembler" / "analysis" / "review-session.json"
+    path.parent.mkdir(parents=True)
+    path.write_text("not-json", encoding="utf-8")
+
+    assert read_review_session(project_folder) is None
 
 
 def test_create_project_writes_manifest_with_relative_source_video_filenames(tmp_path):

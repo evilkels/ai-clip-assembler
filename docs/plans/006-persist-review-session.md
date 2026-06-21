@@ -10,6 +10,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-21)
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED (moves proposal/history ownership to persisted backend state)
@@ -232,3 +233,12 @@ Plan 007 will add conversational context and optional Version payloads to this
 session. Keep schema migration explicit when that happens. Reviewers should
 check project isolation, idempotent kickoff, stale frontend requests, and that
 all accepted edits still pass through Timeline operations/Undo History.
+
+## Completion record
+
+- Added backend-authoritative Review Sessions with stable message IDs,
+  timestamps, embedded Proposals, and folder-backed JSON persistence.
+- Verified idempotent kickoff, blank-message validation, folder reopen under a
+  new runtime project ID, Proposal replay, and frontend hydration.
+- Full verification: 270 backend tests passed; frontend typecheck, production
+  build, ESLint, and Ruff passed.

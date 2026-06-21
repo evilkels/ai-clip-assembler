@@ -505,6 +505,30 @@ export interface Proposal {
 export interface ReviewTurnResult {
   message: string;
   proposal: Proposal | null;
+  agent_message: ReviewMessage;
+  session: ReviewSession;
+}
+
+export interface ReviewMessage {
+  message_id: string;
+  role: 'agent' | 'editor';
+  text: string;
+  created_at: string;
+  proposal: Proposal | null;
+  payload: Record<string, unknown>;
+}
+
+export interface ReviewSession {
+  schema_version: number;
+  session_id: string;
+  messages: ReviewMessage[];
+  updated_at: string;
+}
+
+export async function getReviewSession(projectId: string): Promise<ReviewSession> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/review/session`);
+  if (!res.ok) throw new Error(`Review session failed: ${res.status}`);
+  return res.json() as Promise<ReviewSession>;
 }
 
 export async function reviewTurn(projectId: string, message: string): Promise<ReviewTurnResult> {

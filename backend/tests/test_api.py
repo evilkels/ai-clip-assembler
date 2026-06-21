@@ -1893,3 +1893,54 @@ def test_review_kickoff_runs_a_proactive_turn(monkeypatch, tmp_path):
     assert kicked.status_code == 200
     assert kicked.json()["message"].startswith("Welcome")
     assert "Analysis just finished" in seen["user_message"]
+
+
+def test_review_session_persists_across_folder_reopen_and_kickoff_is_idempotent(
+    monkeypatch, tmp_path
+):
+    api.projects.clear()
+    api._proposal_store = api.ProposalStore()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    first_project_id = client.post(
+        "/projects/from-folder", json={"folder_path": str(project_folder)}
+    ).json()["project_id"]
+    calls = []
+
+    def agent(context):
+        calls.append(context["user_message"])
+        return {"message": "Opening review.", "operations": []}
+
+    monkeypatch.setattr(api, "_review_agent", agent)
+
+    first = client.post(f"/projects/{first_project_id}/review/kickoff")
+    second = client.post(f"/projects/{first_project_id}/review/kickoff")
+    session = client.get(f"/projects/{first_project_id}/review/session")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert session.status_code == 200
+    assert len(calls) == 1
+    assert [(message["role"], message["text"]) for message in session.json()["messages"]] == [
+        ("agent", "Opening review.")
+    ]
+
+    api.projects.clear()
+    api._proposal_store = api.ProposalStore()
+    second_project_id = client.post(
+        "/projects/from-folder", json={"folder_path": str(project_folder)}
+    ).json()["project_id"]
+    restored = client.get(f"/projects/{second_project_id}/review/session")
+
+    assert restored.status_code == 200
+    assert restored.json()["messages"][0]["message_id"] == session.json()["messages"][0]["message_id"]
+
+
+def test_review_turn_rejects_blank_message(monkeypatch, tmp_path):
+    client, project_id, _source = create_folder_project_with_video(tmp_path)
+
+    response = client.post(f"/projects/{project_id}/review/turn", json={"message": "  "})
+
+    assert response.status_code == 422

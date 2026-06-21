@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -81,6 +81,33 @@ class AssemblyResult(BaseModel):
     clips: List[ClipSuggestion]
     sequence: TimelineSequence
     metadata: dict = Field(default_factory=dict)
+
+
+class Proposal(BaseModel):
+    proposal_id: str
+    project_id: str
+    message: str
+    operations: List[dict] = Field(default_factory=list)
+    summary: List[str] = Field(default_factory=list)
+    before_item_count: int = 0
+    after_item_count: int = 0
+    status: Literal["pending", "accepted", "rejected"] = "pending"
+
+
+class ReviewMessage(BaseModel):
+    message_id: str
+    role: Literal["agent", "editor"]
+    text: str
+    created_at: str
+    proposal: Optional[Proposal] = None
+    payload: dict = Field(default_factory=dict)
+
+
+class ReviewSession(BaseModel):
+    schema_version: int = 1
+    session_id: str
+    messages: List[ReviewMessage] = Field(default_factory=list)
+    updated_at: str
 
 
 class Transform(BaseModel):

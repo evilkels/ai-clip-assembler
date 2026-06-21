@@ -14,6 +14,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-11)
 - **Priority**: P1
 - **Effort**: S
 - **Risk**: LOW

@@ -14,6 +14,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-19)
 - **Priority**: P2
 - **Effort**: M (spike itself S–M; later implementation is a separate plan)
 - **Risk**: LOW (spike produces a document + scratch benchmarks, no production code)

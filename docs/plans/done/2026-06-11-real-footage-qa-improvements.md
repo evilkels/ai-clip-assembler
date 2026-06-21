@@ -125,7 +125,7 @@ TypeScript, Playwright, CSS.
 
 **Files:**
 - Modify: `docs/plans/README.md`
-- Modify: `docs/plans/2026-06-11-real-footage-qa-improvements.md`
+- Modify: `docs/plans/done/2026-06-11-real-footage-qa-improvements.md`
 
 - [x] Run the full backend suite.
 - [x] Run the frontend production build and full Playwright suite.

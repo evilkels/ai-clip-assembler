@@ -19,13 +19,13 @@ Two kinds of plans live side by side:
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-real-footage-validation.md) | Instrument analysis timing + real-footage validation runbook | P1 | S | — | DONE (2026-06-11, telemetry + runbook) |
-| [002](002-pi-harness-scaling-spike.md) | Pi harness scaling design spike (batching, retries, partial results) | P2 | M | — | DONE (2026-06-19) — spec `docs/specs/2026-06-19-pi-harness-scaling-design.md` + live benchmark (`scripts/spike_pi_scaling_benchmark.py`): per-clip ~8.9s/p95 16s, batched k=2 ~5.2s/clip, 0/15 parse fails. Rec: bounded concurrency + retry-once + partial-results (neutral backfill); defer batching. Needs a follow-up impl plan. |
+| [001](done/001-real-footage-validation.md) | Instrument analysis timing + real-footage validation runbook | P1 | S | — | DONE (2026-06-11, telemetry + runbook) |
+| [002](done/002-pi-harness-scaling-spike.md) | Pi harness scaling design spike (batching, retries, partial results) | P2 | M | — | DONE (2026-06-19) — spec `docs/specs/2026-06-19-pi-harness-scaling-design.md` + live benchmark (`scripts/spike_pi_scaling_benchmark.py`): per-clip ~8.9s/p95 16s, batched k=2 ~5.2s/clip, 0/15 parse fails. Rec: bounded concurrency + retry-once + partial-results (neutral backfill); defer batching. Needs a follow-up impl plan. |
 | [003](003-backend-packaging-spike.md) | Backend packaging spike (bundle FastAPI into the Electron DMG) | P3 | M (spike) | 001 (sequencing) | TODO |
 | [004](done/004-timeline-sequence-playback.md) | Timeline sequence playback, video-driven and stutter-free | P1 | M | — | DONE (2026-06-11, branch `feature/timeline-sequence-playback`) |
-| [005](005-rich-candidate-pool.md) | Separate rich Candidate Clip discovery from draft selection | P1 | M | — | DONE (2026-06-21) — bounded scene-first pool; exact `IMG_0888.MOV` validation covers all 3 Scenes |
-| [006](006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | DONE (2026-06-21) — backend-authoritative session JSON + stable frontend hydration |
-| [007](007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
+| [005](done/005-rich-candidate-pool.md) | Separate rich Candidate Clip discovery from draft selection | P1 | M | — | DONE (2026-06-21) — bounded scene-first pool; exact `IMG_0888.MOV` validation covers all 3 Scenes |
+| [006](done/006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | DONE (2026-06-21) — backend-authoritative session JSON + stable frontend hydration |
+| [007](done/007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
 | [008](008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
@@ -41,11 +41,18 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [agent-operable-timeline](agent-operable-timeline.md) | **A1–C implemented; backend test-green + frontend builds.** Operations core + undo/redo + write lock, HTTP op endpoints + SSE live-sync, embedded MCP server at `/mcp`, in-app review agent (propose mode) + chat panel, export speed/transform. **A2.3 authoritative inversion done** (GUI edits flow through the ops core, persisted `decisions`, PUT retired) and **A2.4 `TimelineEditor`** (reorder/extend/speed/transform/split/remove + undo/redo). 248 backend tests + synthetic e2e; `npm run build` green. Docs shipped (README, `MCP_SERVER.md`, ARCHITECTURE, runbook Flow F). **Remaining (pending visual QA on the Electron stack):** realtime speed/transform preview, chat token streaming, Playwright e2e. Spec: `docs/specs/2026-06-19-agent-operable-timeline-design.md`. |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented. Re-baselined 2026-06-19 at **44/100 Critical**; Batch 1 quick-wins (button-has-type ×14, em-dash) cut issues **75 → 60**, build green. Remaining score is Batch 2/3 judgment-call refactors (giant-component, derived-state, prefer-use, a11y) — deliberate pass, not blind. |
-| [real-footage-qa-improvements](2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
+| [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | Complete (2026-06-11); persistence, scoring, adaptive drafts, turn filtering, Timeline UX, native title, ETA, and DaVinci handoff shipped. |
 | [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE (2026-06-21) — video-forward Version gallery, shared sequence player, atomic adoption, three-zone Review shell, and lazy Source Clips. |
 
 ## Completed (`done/`)
 
+- [001-real-footage-validation](done/001-real-footage-validation.md) — 2026-06-11; analysis timing telemetry and real-footage validation runbook.
+- [002-pi-harness-scaling-spike](done/002-pi-harness-scaling-spike.md) — 2026-06-19; measured Pi latency/failure behavior and selected bounded concurrency, retry, and partial-result direction.
+- [005-rich-candidate-pool](done/005-rich-candidate-pool.md) — 2026-06-21; bounded scene-first Candidate Clip pool validated against all three Scenes in `IMG_0888.MOV`.
+- [006-persist-review-session](done/006-persist-review-session.md) — 2026-06-21; backend-authoritative persisted Review Sessions and Proposals.
+- [007-creative-visual-review-agent](done/007-creative-visual-review-agent.md) — 2026-06-21; bounded visual context and persisted validated creative Versions.
+- [2026-06-11-real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) — 2026-06-11; persistence, scoring, draft, Timeline UX, and DaVinci handoff improvements.
+- [agent-operable-timeline-handoff](done/agent-operable-timeline-handoff.md) — 2026-06-19; executed A1-C handoff, retained as the delivery record for the still-active parent plan.
 - [2026-06-15-clip-quality-and-review-ux](done/2026-06-15-clip-quality-and-review-ux.md) — 2026-06-15; scene-aware ranked windows, fitted-rotation turn-rate scoring, per-profile pacing/density/speed/ordering, export retiming, poster cards, batch visibility + cancel. Follow-up: calibrate turn-rate thresholds on real footage.
 - [2026-06-21-compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) — 2026-06-21; compare complete mocked-agent cuts, adopt one atomically, and review it in the three-zone workspace.
 - [004-timeline-sequence-playback](done/004-timeline-sequence-playback.md) — 2026-06-11
@@ -59,13 +66,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - 003 is gated on 001 by **sequencing, not code**: the packaging investment only makes sense once the validation session (the human follow-up to plan 001) confirms the workflow meets its speed/signal/handoff bar. An executor *can* run 003 independently if the operator says so.
 - 002 pairs with 001: the Flow D validation session consumes 002's recommendation if AI scoring aborts or blows the time budget. No file-level overlap; they can run in parallel.
 - 001 and 002 both touch nothing in common (001: `api.py` + tests + docs; 002: new spec + scratch script only).
-- 005 must land before 007 because the creative agent needs multiple bounded
-  Candidate Clips across Scenes rather than the current final-cut-sized list.
-- 006 must land before 007 and 008 because persisted Review Messages provide
-  conversation history plus stable IDs, roles, timestamps, and Proposal state.
-- 005 and 006 have no dependency on each other and may be executed in parallel.
-- 008 may run after 006 while 007 is in progress; it renders future structured
-  agent payloads inside the same message-bubble container.
+- 005 and 006 landed before 007: creative curation now consumes the bounded
+  Candidate Clip pool and persisted Review Messages.
+- 006 satisfies 008's data dependency by providing stable message IDs, roles,
+  timestamps, and Proposal state. Plan 008 remains the active presentation pass.
 
 ## Direction findings not turned into plans
 

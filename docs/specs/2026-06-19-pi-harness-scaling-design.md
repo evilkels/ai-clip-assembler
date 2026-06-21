@@ -2,7 +2,7 @@
 
 Date: 2026-06-19
 Status: Spike complete (design + measured benchmarks). No production code changed.
-Plan: [`docs/plans/002-pi-harness-scaling-spike.md`](../plans/002-pi-harness-scaling-spike.md)
+Plan: [`docs/plans/done/002-pi-harness-scaling-spike.md`](../plans/done/002-pi-harness-scaling-spike.md)
 Benchmark: [`scripts/spike_pi_scaling_benchmark.py`](../../scripts/spike_pi_scaling_benchmark.py)
 
 ## Question

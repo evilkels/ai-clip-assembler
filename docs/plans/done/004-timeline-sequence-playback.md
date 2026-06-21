@@ -14,6 +14,7 @@
 
 ## Status
 
+- **Status**: DONE (2026-06-11)
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED (rework of the page's central interaction; mitigated by e2e gates)

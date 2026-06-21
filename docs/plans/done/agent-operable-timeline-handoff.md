@@ -9,12 +9,12 @@
 > streaming, Playwright e2e, and the human real-footage **Flow F** session.
 
 > **Executor instructions**: Implement the plan in
-> [`agent-operable-timeline.md`](agent-operable-timeline.md) **fully**, in the
+> [`agent-operable-timeline.md`](../agent-operable-timeline.md) **fully**, in the
 > phase order A1 → A2 → B → C. Work test-first. Run every verification command
 > and confirm the expected result before moving on. Honor the **review gate**
 > after A1 and every **STOP condition** below — do not improvise past them.
 > When a phase lands, update the `agent-operable-timeline` row in
-> [`README.md`](README.md). Keep commits scoped per phase.
+> [`README.md`](../README.md). Keep commits scoped per phase.
 >
 > **Drift check (run first)**:
 > `git diff --stat c81e7dd..HEAD -- backend/src/ frontend/src/renderer/src/state/ReviewContext.tsx docs/`
@@ -25,7 +25,7 @@
 ## Mission
 
 1. Make the timeline **agent-operable** exactly as specified in
-   [`docs/specs/2026-06-19-agent-operable-timeline-design.md`](../specs/2026-06-19-agent-operable-timeline-design.md):
+   [`docs/specs/2026-06-19-agent-operable-timeline-design.md`](../../specs/2026-06-19-agent-operable-timeline-design.md):
    one backend-authoritative Timeline Document, one reversible operations core,
    an embedded local MCP server, GUI live-sync, and an in-app review agent in
    propose mode. Build A → B → C.

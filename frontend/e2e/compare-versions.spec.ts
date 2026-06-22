@@ -62,30 +62,106 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
       },
     ],
   };
+  const reviewRequestIds: string[] = [];
+  const reviewAttempts = new Map<string, number>();
+  let currentVersionSet: Record<string, unknown> | null = null;
+
+  const ensureVersionSet = async (sessionUrl: string) => {
+    if (currentVersionSet) return;
+    const clipsResponse = await page.request.get(sessionUrl.replace('/review/session', '/clips'));
+    const candidates = (await clipsResponse.json()).clips as Array<{
+      clip_id: string;
+      file_id: string;
+      file_name: string;
+      start_sec: number;
+      end_sec: number;
+    }>;
+    const recipes = [
+      ['version-a', 'Punchy Social Cut', 'fast & upbeat', 'short_social', 4, 1],
+      ['version-b', 'Cinematic Highlight', 'slow & sweeping', 'cinematic_highlight', 3, 0.5],
+      ['version-c', 'Long Scenic', 'relaxed & wide', 'long_scenic', 5, 1],
+    ] as const;
+    const versions = recipes.map(([id, title, vibe, profile, count, speed]) => {
+      const items = Array.from({ length: count }, (_, index) => {
+        const clip = candidates[index % candidates.length];
+        return {
+          source_clip_id: clip.clip_id,
+          file_id: clip.file_id,
+          file_name: clip.file_name,
+          start_sec: clip.start_sec,
+          end_sec: clip.end_sec,
+          speed,
+          transform: { scale: 1, x: 0, y: 0 },
+        };
+      });
+      return {
+        version_id: id,
+        title,
+        vibe,
+        rationale: `${title} fixture rationale.`,
+        profile,
+        total_duration_sec: items.reduce(
+          (total, item) => total + (item.end_sec - item.start_sec) / item.speed,
+          0,
+        ),
+        items,
+        sequence_fingerprint: `fixture-${id}`,
+      };
+    });
+    currentVersionSet = {
+      version_set_id: 'version-set-e2e',
+      versions,
+      created_at: '2026-06-21T10:00:00Z',
+      based_on_timeline_revision: 0,
+      based_on_sequence_fingerprint: 'fixture-sequence',
+      based_on_review_context_fingerprint: 'fixture-context',
+    };
+    reviewSession.schema_version = 2;
+    (reviewSession.messages[0].payload as Record<string, unknown>).version_set =
+      currentVersionSet;
+  };
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('**/projects/*/review/session', async (route) => {
+    await ensureVersionSet(route.request().url());
     await route.fulfill({ json: reviewSession });
   });
   await page.route('**/projects/*/review/turn', async (route) => {
-    const request = route.request().postDataJSON() as { message: string };
+    const request = route.request().postDataJSON() as {
+      message: string;
+      client_message_id: string;
+    };
+    reviewRequestIds.push(request.client_message_id);
+    const attempt = (reviewAttempts.get(request.client_message_id) ?? 0) + 1;
+    reviewAttempts.set(request.client_message_id, attempt);
+    if (request.message === 'Retry this direction.' && attempt === 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await route.fulfill({ status: 500, json: { detail: 'temporary failure' } });
+      return;
+    }
+    const editorMessage = {
+      message_id: request.client_message_id,
+      role: 'editor',
+      text: request.message,
+      created_at: '2026-06-21T10:02:00Z',
+      reply_to_message_id: null,
+      payload: {},
+      proposal: null,
+    };
+    if (!reviewSession.messages.some((message) => message.message_id === request.client_message_id)) {
+      reviewSession.messages.push(editorMessage);
+    }
+    const agentMessage = {
+      message_id: `agent-${request.client_message_id}`,
+      role: 'agent',
+      text: 'I kept the pacing measured and the visual progression clear.',
+      created_at: '2026-06-21T10:02:01Z',
+      reply_to_message_id: request.client_message_id,
+      payload: { version_set: currentVersionSet },
+      proposal: null,
+    };
     reviewSession.messages.push(
-      {
-        message_id: 'editor-follow-up',
-        role: 'editor',
-        text: request.message,
-        created_at: '2026-06-21T10:02:00Z',
-        payload: {},
-        proposal: null,
-      },
-      {
-        message_id: 'agent-follow-up',
-        role: 'agent',
-        text: 'I kept the pacing measured and the visual progression clear.',
-        created_at: '2026-06-21T10:02:01Z',
-        payload: {},
-        proposal: null,
-      },
+      agentMessage,
     );
     await new Promise((resolve) => setTimeout(resolve, 500));
     await route.fulfill({
@@ -117,6 +193,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(gallery).toBeVisible();
   const cards = gallery.getByTestId('version-card');
   await expect(cards).toHaveCount(3);
+  await expect(page.getByTestId('version-player-version-a')).toBeVisible();
   await expect(cards.getByTestId('version-vibe')).toHaveCount(3);
   for (const vibe of await cards.getByTestId('version-vibe').all()) {
     await expect(vibe).toContainText(/[1-9]\d*(?:\.\d+)?s/);
@@ -216,8 +293,27 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
 
   await page.getByLabel('Message the review agent').fill('Make the ending breathe.');
   await page.getByRole('button', { name: 'Send' }).click();
+  const optimisticBubble = page
+    .locator('.chat-msg')
+    .filter({ hasText: 'Make the ending breathe.' });
+  await expect(optimisticBubble).toBeVisible();
+  await expect(optimisticBubble).toContainText('Sending');
   await expect(page.getByRole('status', { name: 'Review agent is thinking' })).toBeVisible();
-  await expect(page.locator('[data-message-id="agent-follow-up"]')).toBeVisible();
+  await expect(page.locator(`[data-message-id="agent-${reviewRequestIds[0]}"]`)).toBeVisible();
+  await expect(optimisticBubble).not.toContainText('Sending');
+
+  await page.getByLabel('Message the review agent').fill('Retry this direction.');
+  await page.getByRole('button', { name: 'Send' }).click();
+  const failedBubble = page.locator('.chat-msg').filter({ hasText: 'Retry this direction.' });
+  await expect(failedBubble).toContainText('Not sent');
+  await expect(failedBubble.getByRole('button', { name: 'Retry' })).toBeVisible();
+  const failedMessageId = reviewRequestIds.at(-1);
+  await failedBubble.getByRole('button', { name: 'Retry' }).click();
+  await expect(failedBubble).not.toContainText('Not sent');
+  expect(reviewRequestIds.at(-1)).toBe(failedMessageId);
+  await expect(page.locator(`[data-message-id="${failedMessageId}"]`)).toHaveCount(1);
+  await expect(page.locator(`[data-message-id="agent-${failedMessageId}"]`)).toBeVisible();
+  await expect(failedBubble).not.toContainText('Sending');
 
   await page.getByRole('link', { name: 'Timeline' }).click();
   await page.getByRole('link', { name: 'Review' }).click();

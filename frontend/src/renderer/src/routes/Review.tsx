@@ -1,19 +1,21 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { VersionGallery } from '../components/VersionGallery';
 import { WorkingTimelineStrip } from '../components/WorkingTimelineStrip';
 import { useReview } from '../state/ReviewContext';
-import { proposeVersions } from '../state/mockVersions';
+import { useReviewConversation } from '../hooks/useReviewConversation';
 import type { ClipCandidate } from '../types/clip';
 import type { Version } from '../types/version';
 
 function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
+  // The project targets a pre-ES2023 TS lib, so toSorted() does not compile;
+  // spreading first keeps the prop immutable on the supported toolchain.
+  // react-doctor-disable-next-line react-doctor/js-tosorted-immutable
   return [...clips].sort((a, b) => b.scores.overall - a.scores.overall);
 }
 
 export function ReviewPage() {
-  const [agentVersions, setAgentVersions] = useState<Version[]>([]);
   const {
     acceptedOrder,
     applyTimelineOperation,
@@ -28,16 +30,14 @@ export function ReviewPage() {
     smoothnessThreshold,
     setSmoothnessThreshold,
   } = useReview();
+  const conversation = useReviewConversation(projectId);
 
   const ranked = useMemo(() => rankClips(clips), [clips]);
   const filtered = useMemo(
     () => ranked.filter((clip) => clip.scores.smoothness >= smoothnessThreshold),
     [ranked, smoothnessThreshold],
   );
-  const versions = useMemo(
-    () => (agentVersions.length > 0 ? agentVersions : proposeVersions(filtered)),
-    [agentVersions, filtered],
-  );
+  const versions = conversation.versionSet?.versions ?? [];
   const draftPositions = useMemo(
     () => new Map(acceptedOrder.map((id, index) => [id, index + 1])),
     [acceptedOrder],
@@ -112,7 +112,7 @@ export function ReviewPage() {
 
       <div className="review-shell-body">
         <aside className="review-spine">
-          <ReviewChatPanel key={projectId} onVersionsChange={setAgentVersions} />
+          <ReviewChatPanel key={projectId} conversation={conversation} />
         </aside>
         <main className="review-main">
           <section className="version-zone" aria-label="Proposed versions">

@@ -1817,6 +1817,33 @@ a {
   white-space: pre-wrap;
 }
 
+.chat-delivery {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.chat-delivery-failed {
+  color: var(--yellow);
+}
+
+.chat-retry {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.chat-retry:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .chat-error {
   border-color: var(--border-warning);
   background: var(--bg-warning);

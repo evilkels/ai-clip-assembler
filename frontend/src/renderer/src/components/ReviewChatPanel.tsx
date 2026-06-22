@@ -7,30 +7,12 @@
  * ReviewContext) and the change is undoable. The panel auto-kicks one proactive
  * opening turn when it mounts for a project.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  acceptProposal,
-  getReviewSession,
-  rejectProposal,
-  reviewKickoff,
-  reviewTurn,
-  type Proposal,
-  type ReviewMessage,
-  type ReviewSession,
-} from '../api/client';
-import { useReview } from '../state/ReviewContext';
-import type { Version } from '../types/version';
+import { useEffect, useRef, useState } from 'react';
+import { type Proposal } from '../api/client';
+import type { ReviewConversation } from '../hooks/useReviewConversation';
 
 interface ReviewChatPanelProps {
-  onVersionsChange?: (versions: Version[]) => void;
-}
-
-function latestVersions(messages: ReviewMessage[]): Version[] {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const versions = messages[index].payload.versions;
-    if (Array.isArray(versions)) return versions as Version[];
-  }
-  return [];
+  conversation: ReviewConversation;
 }
 
 const messageTimeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -44,47 +26,13 @@ function formatMessageTime(value: string): string {
   return messageTimeFormatter.format(date);
 }
 
-export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
-  const { projectId } = useReview();
-  const [messages, setMessages] = useState<ReviewMessage[]>([]);
+export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
+  const { messages, busy, error, send, resolveProposal } = conversation;
   const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const activeProject = useRef<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const hydrated = useRef(false);
   const nearBottom = useRef(true);
-  const applySession = useCallback(
-    (session: ReviewSession) => {
-      setMessages(session.messages);
-      onVersionsChange?.(latestVersions(session.messages));
-    },
-    [onVersionsChange],
-  );
-
-  useEffect(() => {
-    if (!projectId) return;
-    let alive = true;
-    activeProject.current = projectId;
-    getReviewSession(projectId)
-      .then((session) =>
-        session.messages.length > 0 ? session : reviewKickoff(projectId).then((result) => result.session),
-      )
-      .then((session) => {
-        if (alive && activeProject.current === projectId) applySession(session);
-      })
-      .catch(() => {
-        /* opening turn is best-effort */
-      })
-      .finally(() => {
-        if (alive && activeProject.current === projectId) setBusy(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [projectId, applySession]);
-
   useEffect(() => {
     if (!hydrated.current || nearBottom.current) {
       endRef.current?.scrollIntoView({
@@ -94,43 +42,6 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
     }
     hydrated.current = true;
   }, [messages, busy, error]);
-
-  const send = useCallback(async () => {
-    if (!projectId || !input.trim() || busy) return;
-    const text = input.trim();
-    setInput('');
-    setError(null);
-    setBusy(true);
-    try {
-      const result = await reviewTurn(projectId, text);
-      if (activeProject.current === projectId) applySession(result.session);
-    } catch {
-      const session = await getReviewSession(projectId).catch(() => null);
-      if (session && activeProject.current === projectId) applySession(session);
-      if (activeProject.current === projectId) {
-        setError('The review agent could not complete that turn. Check the conversation before retrying.');
-      }
-    } finally {
-      if (activeProject.current === projectId) setBusy(false);
-    }
-  }, [projectId, input, busy, applySession]);
-
-  const resolveProposal = useCallback(
-    async (proposalId: string, accept: boolean) => {
-      if (!projectId) return;
-      try {
-        if (accept) await acceptProposal(projectId, proposalId);
-        else await rejectProposal(projectId, proposalId);
-        const session = await getReviewSession(projectId);
-        if (activeProject.current === projectId) applySession(session);
-      } catch {
-        /* surfaced by the disabled state below; keep the panel resilient */
-      }
-    },
-    [projectId, applySession],
-  );
-
-  if (!projectId) return null;
 
   return (
     <aside className="review-chat" aria-label="Review agent" data-testid="review-chat-panel">
@@ -164,6 +75,25 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
               <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>
             </header>
             <p className="chat-msg-body">{message.text}</p>
+            {message.role === 'editor' && message.deliveryState !== 'persisted' ? (
+              <p className={`chat-delivery chat-delivery-${message.deliveryState}`}>
+                {message.deliveryState === 'sending' ? (
+                  'Sending'
+                ) : (
+                  <>
+                    Not sent ·{' '}
+                    <button
+                      type="button"
+                      className="chat-retry"
+                      onClick={() => void send(message.text, message.message_id)}
+                      disabled={busy}
+                    >
+                      Retry
+                    </button>
+                  </>
+                )}
+              </p>
+            ) : null}
             {message.proposal ? (
               <ProposalCard proposal={message.proposal} onResolve={resolveProposal} />
             ) : null}
@@ -190,7 +120,10 @@ export function ReviewChatPanel({ onVersionsChange }: ReviewChatPanelProps) {
         className="review-chat-input"
         onSubmit={(event) => {
           event.preventDefault();
-          void send();
+          const text = input.trim();
+          if (!text) return;
+          setInput('');
+          void send(text);
         }}
       >
         <input

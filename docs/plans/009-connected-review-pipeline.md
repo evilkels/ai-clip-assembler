@@ -439,29 +439,29 @@ interface ReviewConversation {
 }
 ```
 
-- [ ] **Step 1: Write the red delayed-response E2E.** Immediately after Send,
+- [x] **Step 1: Write the red delayed-response E2E.** Immediately after Send,
       assert the submitted editor bubble and `Sending` are visible while the
       stubbed response is unresolved. Add a failed response case asserting
       retained text and `Retry`, then retry with the same ID and assert one
       persisted editor message.
 
-- [ ] **Step 2: Run focused E2E red.** It must fail because the editor bubble
+- [x] **Step 2: Run focused E2E red.** It must fail because the editor bubble
       still waits for the response.
 
-- [ ] **Step 3: Extract `useReviewConversation`.** It owns hydration, kickoff,
+- [x] **Step 3: Extract `useReviewConversation`.** It owns hydration, kickoff,
       optimistic messages, idempotent retry, Proposal resolution, and latest
       VersionSet selection. `ReviewChatPanel` becomes presentation plus input;
       `ReviewPage` consumes the same controller for Versions.
 
-- [ ] **Step 4: Remove the runtime frontend Version producer.** Manual and
+- [x] **Step 4: Remove the runtime frontend Version producer.** Manual and
       model-failure VersionSets now arrive from the backend. No Review render
       may call `proposeVersions`.
 
-- [ ] **Step 5: Reconcile by exact message ID.** Never match by text or arrival
+- [x] **Step 5: Reconcile by exact message ID.** Never match by text or arrival
       position. A failed message stays in transcript; Retry reuses its UUID.
       Historical messages do not announce on hydration.
 
-- [ ] **Step 6: Run focused E2E, typecheck, lint, and build.**
+- [x] **Step 6: Run focused E2E, typecheck, lint, and build.**
 
 ```bash
 (cd frontend && npm run test:e2e -- compare-versions.spec.ts)
@@ -470,7 +470,7 @@ interface ReviewConversation {
 (cd frontend && npm run build)
 ```
 
-- [ ] **Step 7: Commit** with
+- [x] **Step 7: Commit** with
       `fix(review-chat): show outgoing messages immediately`.
 
 ## Task 5: Connect VersionSet, Source Clips, and Working Timeline (**ORCHESTRATOR**)

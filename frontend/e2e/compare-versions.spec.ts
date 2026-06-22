@@ -169,6 +169,20 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await scrubber.press('ArrowLeft');
   await expect(firstCard.locator('.version-scrubber-time')).toHaveText(timeAtStart ?? '');
 
+  // Dragging across the scrubber continuously seeks by Version time.
+  const scrubberBox = await scrubber.boundingBox();
+  expect(scrubberBox).not.toBeNull();
+  const beforeDrag = Number(await scrubber.getAttribute('aria-valuenow'));
+  await page.mouse.move(scrubberBox!.x + 2, scrubberBox!.y + scrubberBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    scrubberBox!.x + scrubberBox!.width * 0.6,
+    scrubberBox!.y + scrubberBox!.height / 2,
+  );
+  await page.mouse.up();
+  const afterDrag = Number(await scrubber.getAttribute('aria-valuenow'));
+  expect(afterDrag).toBeGreaterThan(beforeDrag + 1);
+
   // Exclusive playback: starting one Version pauses the previously active one.
   const firstPlay = cards.nth(0).locator('.version-player-play');
   const secondPlay = cards.nth(1).locator('.version-player-play');

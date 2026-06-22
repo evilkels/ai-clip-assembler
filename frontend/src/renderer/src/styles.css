@@ -771,6 +771,7 @@ a {
   border-radius: 999px;
   overflow: hidden;
   cursor: pointer;
+  touch-action: none;
 }
 
 .version-scrubber-track:focus-visible {

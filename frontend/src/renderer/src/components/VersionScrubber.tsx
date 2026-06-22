@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { VersionItem } from '../types/version';
 
 export interface VersionScrubberProps {
@@ -37,6 +37,7 @@ export function VersionScrubber({
   currentIndex,
   onSeek,
 }: VersionScrubberProps) {
+  const trackRef = useRef<HTMLDivElement>(null);
   const { durations, starts } = useMemo(() => {
     const computed = items.map(effectiveDuration);
     const cumulative: number[] = [];
@@ -61,9 +62,17 @@ export function VersionScrubber({
 
   const valueText = `${formatTimecode(current)} of ${formatTimecode(total)}`;
 
+  const seekFromPointer = (clientX: number) => {
+    const bounds = trackRef.current?.getBoundingClientRect();
+    if (!bounds || bounds.width <= 0) return;
+    const ratio = Math.max(0, Math.min((clientX - bounds.left) / bounds.width, 1));
+    onSeek(ratio * total);
+  };
+
   return (
     <div className="version-scrubber" data-testid="version-scrubber">
       <div
+        ref={trackRef}
         className="version-scrubber-track"
         // A segmented playback slider (clickable segments + playhead) has no
         // native HTML equivalent; the Review contract requires role="slider".
@@ -76,6 +85,22 @@ export function VersionScrubber({
         aria-valuenow={Number(current.toFixed(3))}
         aria-valuetext={valueText}
         onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          seekFromPointer(event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+          event.stopPropagation();
+          seekFromPointer(event.clientX);
+        }}
+        onPointerUp={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+          event.stopPropagation();
+          seekFromPointer(event.clientX);
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
         onKeyDown={(event) => {
           let next: number | null = null;
           if (event.key === 'ArrowRight') next = current + KEYBOARD_STEP_SEC;

@@ -188,6 +188,11 @@ class TimelineDocument(BaseModel):
     """
 
     version: int = TIMELINE_DOCUMENT_VERSION
+    # Monotonic concurrency token bumped by the TimelineController after every
+    # committed state transition. It is *not* a content identity — fingerprints
+    # (see src.review_state) determine equality and staleness. Absent in legacy
+    # persisted data, where it backfills to 0 on load.
+    revision: int = 0
     items: List[TimelineItem] = Field(default_factory=list)
     profile: Optional[str] = None
     target_duration_sec: Optional[float] = None

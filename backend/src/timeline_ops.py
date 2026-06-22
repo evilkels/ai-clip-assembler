@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import math
 import uuid
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Mapping, Optional, Sequence
 
 from pydantic import BaseModel
 
@@ -28,6 +28,25 @@ DEFAULT_HISTORY_LIMIT = 50
 
 class TimelineOpError(Exception):
     """Raised when an operation is invalid (unknown id, bad bounds, etc.)."""
+
+
+class TimelineRevisionConflict(TimelineOpError):
+    """Raised when ``expected_revision`` does not match the live document.
+
+    Prepared writes (accepted Proposal batches, Version adoption) carry the
+    revision they were prepared against. A mismatch means another writer has
+    committed since; the controller rejects the write with zero mutation and the
+    API layer maps this to HTTP 409 with the current state so the editor can
+    reconcile.
+    """
+
+    def __init__(self, expected_revision: int, current_revision: int) -> None:
+        super().__init__(
+            f"expected timeline revision {expected_revision}, "
+            f"but the live revision is {current_revision}"
+        )
+        self.expected_revision = expected_revision
+        self.current_revision = current_revision
 
 
 class SourceClip(BaseModel):
@@ -350,12 +369,68 @@ class TimelineController:
         if len(self._undo) > self._history_limit:
             self._undo.pop(0)
 
-    async def apply(self, operation: str, **args) -> TimelineDocument:
-        async with self._lock:
-            new_document = apply_operation(self._document, self._sources, operation, **args)
-            self._push_undo(self._document)
-            self._document = new_document
+    def _next_revision(self) -> int:
+        """The revision the next committed transition will carry.
+
+        Revisions climb monotonically off the *live* document, so undo/redo also
+        advance them — restored content keeps a new revision, never an old one.
+        """
+        return self._document.revision + 1
+
+    def _check_revision(self, expected_revision: Optional[int]) -> None:
+        if expected_revision is not None and expected_revision != self._document.revision:
+            raise TimelineRevisionConflict(expected_revision, self._document.revision)
+
+    def _commit(
+        self, new_document: TimelineDocument, *, clear_redo: bool
+    ) -> TimelineDocument:
+        """Stamp the next revision, snapshot for undo, and become the new state.
+
+        Caller must already hold ``self._lock`` and must ``await self._notify()``
+        once afterwards, so a transition is exactly one revision + one event.
+        """
+        stamped = new_document.model_copy(update={"revision": self._next_revision()})
+        self._push_undo(self._document)
+        self._document = stamped
+        if clear_redo:
             self._redo.clear()
+        return stamped
+
+    async def apply(
+        self,
+        operation: str,
+        *,
+        expected_revision: Optional[int] = None,
+        **args,
+    ) -> TimelineDocument:
+        async with self._lock:
+            self._check_revision(expected_revision)
+            new_document = apply_operation(self._document, self._sources, operation, **args)
+            self._commit(new_document, clear_redo=True)
+            await self._notify()
+            return self._document
+
+    async def apply_batch(
+        self,
+        operations: Sequence[Mapping[str, object]],
+        *,
+        expected_revision: int,
+    ) -> TimelineDocument:
+        """Apply several operations as one atomic, undoable transition.
+
+        All operations simulate against a single working copy before anything is
+        committed, so a later failure leaves the live document untouched. Success
+        produces exactly one revision bump, one undo snapshot, and one
+        notification.
+        """
+        async with self._lock:
+            self._check_revision(expected_revision)
+            working = self._document
+            for operation in operations:
+                name = operation["operation"]
+                args = operation.get("args", {})
+                working = apply_operation(working, self._sources, name, **args)
+            self._commit(working, clear_redo=True)
             await self._notify()
             return self._document
 
@@ -364,7 +439,10 @@ class TimelineController:
             if not self._undo:
                 return self._document
             self._redo.append(self._document)
-            self._document = self._undo.pop()
+            restored = self._undo.pop()
+            # Restore prior *content* but advance the revision: a counter that
+            # rewound would falsely read as a base another writer already saw.
+            self._document = restored.model_copy(update={"revision": self._next_revision()})
             await self._notify()
             return self._document
 
@@ -373,7 +451,8 @@ class TimelineController:
             if not self._redo:
                 return self._document
             self._push_undo(self._document)
-            self._document = self._redo.pop()
+            restored = self._redo.pop()
+            self._document = restored.model_copy(update={"revision": self._next_revision()})
             await self._notify()
             return self._document
 

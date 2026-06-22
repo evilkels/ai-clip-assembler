@@ -13,10 +13,12 @@ import pytest
 from pydantic import ValidationError
 
 from src.models import Transform, TimelineDocument, TimelineItem
+from src.review_state import review_context_fingerprint, sequence_fingerprint
 from src.timeline_ops import (
     SourceClip,
     TimelineController,
     TimelineOpError,
+    TimelineRevisionConflict,
     apply_operation,
 )
 
@@ -542,3 +544,194 @@ async def test_controller_lock_serializes_mutate_and_notify():
         # The document seen on exit is the same one seen on enter (no writer
         # slipped a mutation in across the yield).
         assert events[i][1] == events[i + 1][1]
+
+
+# --- Task 1: canonical sequence + review-context fingerprints ----------------
+
+
+def _seq_item(
+    clip="clip-a", start=1.0, end=3.0, speed=1.0, item_id="item-x", **transform
+):
+    kwargs = {}
+    if transform:
+        kwargs["transform"] = Transform(**transform)
+    return TimelineItem(
+        item_id=item_id,
+        source_clip_id=clip,
+        start_sec=start,
+        end_sec=end,
+        speed=speed,
+        **kwargs,
+    )
+
+
+def test_sequence_fingerprint_ignores_live_item_ids():
+    left = TimelineItem(item_id="left", source_clip_id="clip-a", start_sec=1, end_sec=3)
+    right = left.model_copy(update={"item_id": "right"})
+    assert sequence_fingerprint([left]) == sequence_fingerprint([right])
+
+
+def test_sequence_fingerprint_changes_with_order():
+    a = _seq_item(clip="clip-a")
+    b = _seq_item(clip="clip-b")
+    assert sequence_fingerprint([a, b]) != sequence_fingerprint([b, a])
+
+
+def test_sequence_fingerprint_changes_with_bounds():
+    assert sequence_fingerprint([_seq_item(end=3.0)]) != sequence_fingerprint(
+        [_seq_item(end=4.0)]
+    )
+
+
+def test_sequence_fingerprint_changes_with_speed():
+    assert sequence_fingerprint([_seq_item(speed=1.0)]) != sequence_fingerprint(
+        [_seq_item(speed=2.0)]
+    )
+
+
+def test_sequence_fingerprint_changes_with_transform():
+    assert sequence_fingerprint([_seq_item()]) != sequence_fingerprint(
+        [_seq_item(scale=1.5)]
+    )
+
+
+def test_sequence_fingerprint_rounds_floats_to_six_decimals():
+    # A sub-micro difference below the sixth decimal is canonically equal.
+    assert sequence_fingerprint([_seq_item(start=1.0)]) == sequence_fingerprint(
+        [_seq_item(start=1.0 + 1e-9)]
+    )
+
+
+def test_review_context_fingerprint_changes_with_candidate_context():
+    doc = TimelineDocument(items=[_seq_item()])
+    candidates_a = [{"clip_id": "clip-a", "overall_score": 0.5}]
+    candidates_b = [{"clip_id": "clip-a", "overall_score": 0.9}]
+    assert review_context_fingerprint(doc, candidates_a) != review_context_fingerprint(
+        doc, candidates_b
+    )
+
+
+def test_review_context_fingerprint_stable_for_equal_inputs():
+    doc = TimelineDocument(items=[_seq_item()])
+    candidates = [{"clip_id": "clip-a", "overall_score": 0.5}]
+    assert review_context_fingerprint(doc, candidates) == review_context_fingerprint(
+        doc, list(candidates)
+    )
+
+
+def test_review_context_fingerprint_rounds_scores_to_four_decimals():
+    doc = TimelineDocument()
+    a = [{"clip_id": "c", "overall_score": 0.5000001}]
+    b = [{"clip_id": "c", "overall_score": 0.5000002}]
+    assert review_context_fingerprint(doc, a) == review_context_fingerprint(doc, b)
+
+
+def test_review_context_fingerprint_changes_with_decisions():
+    doc_a = TimelineDocument(decisions={"clip-a": "included"})
+    doc_b = TimelineDocument(decisions={"clip-a": "excluded"})
+    assert review_context_fingerprint(doc_a, []) != review_context_fingerprint(doc_b, [])
+
+
+# --- Task 1: persisted revision + atomic concurrency ------------------------
+
+
+def test_timeline_document_defaults_revision_zero():
+    assert TimelineDocument().revision == 0
+
+
+@pytest.mark.asyncio
+async def test_controller_apply_increments_revision_monotonically():
+    sources = make_sources(("a", 0.0, 2.0, 10.0))
+    controller = TimelineController(empty_doc(), sources)
+    assert controller.document.revision == 0
+    await controller.apply("add_item", source_clip_id="a")
+    assert controller.document.revision == 1
+    await controller.apply("add_item", source_clip_id="a")
+    assert controller.document.revision == 2
+
+
+@pytest.mark.asyncio
+async def test_controller_undo_redo_keep_revision_monotonic():
+    sources = make_sources(("a", 0.0, 2.0, 10.0))
+    controller = TimelineController(empty_doc(), sources)
+    await controller.apply("add_item", source_clip_id="a")  # rev 1
+    reverted = await controller.undo()  # content empty, but revision advances
+    assert reverted.items == []
+    assert reverted.revision == 2
+    redone = await controller.redo()  # content restored, revision advances again
+    assert len(redone.items) == 1
+    assert redone.revision == 3
+
+
+@pytest.mark.asyncio
+async def test_controller_sequence_fingerprint_matches_after_undo_despite_newer_revision():
+    sources = make_sources(("a", 0.0, 2.0, 10.0))
+    controller = TimelineController(empty_doc(), sources)
+    await controller.apply("add_item", source_clip_id="a")
+    fingerprint_one_item = sequence_fingerprint(controller.document.items)
+    await controller.apply("add_item", source_clip_id="a")
+    await controller.undo()
+    # Newer revision, identical content → identical sequence fingerprint.
+    assert controller.document.revision == 3
+    assert sequence_fingerprint(controller.document.items) == fingerprint_one_item
+
+
+@pytest.mark.asyncio
+async def test_controller_apply_rejects_stale_expected_revision_without_mutation():
+    sources = make_sources(("a", 0.0, 2.0, 10.0))
+    controller = TimelineController(empty_doc(), sources)
+    await controller.apply("add_item", source_clip_id="a")  # rev 1
+    before = controller.document
+    with pytest.raises(TimelineRevisionConflict) as excinfo:
+        await controller.apply("add_item", source_clip_id="a", expected_revision=0)
+    assert controller.document is before
+    assert excinfo.value.expected_revision == 0
+    assert excinfo.value.current_revision == 1
+
+
+@pytest.mark.asyncio
+async def test_controller_apply_accepts_matching_expected_revision():
+    sources = make_sources(("a", 0.0, 2.0, 10.0))
+    controller = TimelineController(empty_doc(), sources)
+    await controller.apply("add_item", source_clip_id="a", expected_revision=0)
+    assert controller.document.revision == 1
+
+
+@pytest.mark.asyncio
+async def test_controller_apply_batch_is_one_revision_notify_and_undo():
+    sources = make_sources(("a", 0.0, 2.0, 10.0), ("b", 0.0, 2.0, 10.0))
+    notified_revisions = []
+
+    async def on_change(document):
+        notified_revisions.append(document.revision)
+
+    controller = TimelineController(empty_doc(), sources, on_change=on_change)
+    result = await controller.apply_batch(
+        [
+            {"operation": "add_item", "args": {"source_clip_id": "a"}},
+            {"operation": "add_item", "args": {"source_clip_id": "b"}},
+        ],
+        expected_revision=0,
+    )
+
+    assert [i.source_clip_id for i in result.items] == ["a", "b"]
+    # Two operations, but a single revision bump and a single notification.
+    assert result.revision == 1
+    assert notified_revisions == [1]
+    # And a single undo snapshot restoring the pre-batch document.
+    reverted = await controller.undo()
+    assert reverted.items == []
+
+
+@pytest.mark.asyncio
+async def test_controller_apply_batch_rejects_stale_revision_without_mutation():
+    sources = make_sources(("a", 0.0, 2.0, 10.0))
+    controller = TimelineController(empty_doc(), sources)
+    await controller.apply("add_item", source_clip_id="a")  # rev 1
+    before = controller.document
+    with pytest.raises(TimelineRevisionConflict):
+        await controller.apply_batch(
+            [{"operation": "add_item", "args": {"source_clip_id": "a"}}],
+            expected_revision=0,
+        )
+    assert controller.document is before

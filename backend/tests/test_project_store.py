@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -17,6 +18,7 @@ from src.project_store import (
     read_review_session,
     read_timeline_document,
     rescan_project,
+    timeline_document_path,
     write_timeline_document,
     write_review_session,
 )
@@ -376,3 +378,70 @@ def test_load_timeline_document_migrates_legacy_when_no_saved_document(tmp_path)
 def test_load_timeline_document_none_when_nothing_present(tmp_path):
     project_folder = _project_with_state(tmp_path)
     assert load_timeline_document(project_folder) is None
+
+
+# --- Task 1: persisted revision backfill ------------------------------------
+
+
+def test_read_timeline_document_backfills_missing_revision_as_zero(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    path = timeline_document_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Legacy persisted document with no `revision` field at all.
+    path.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "items": [
+                    {
+                        "item_id": "i1",
+                        "source_clip_id": "clip-a",
+                        "start_sec": 0.0,
+                        "end_sec": 1.0,
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = read_timeline_document(project_folder)
+
+    assert loaded is not None
+    assert loaded.revision == 0
+
+
+def test_read_timeline_document_does_not_rewrite_file_on_read(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    path = timeline_document_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # A legacy file lacking `revision`; reading must not normalize/rewrite it.
+    raw = json.dumps({"version": 2, "items": []}) + "\n"
+    path.write_text(raw, encoding="utf-8")
+
+    read_timeline_document(project_folder)
+
+    assert path.read_text(encoding="utf-8") == raw
+
+
+def test_migrate_legacy_timeline_defaults_revision_zero():
+    document = migrate_legacy_timeline(
+        {"clips": [{"clip_id": "clip-a", "start_sec": 1.0, "end_sec": 4.0}]}
+    )
+    assert document.revision == 0
+
+
+def test_round_trip_timeline_document_preserves_revision(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    document = TimelineDocument(
+        items=[
+            TimelineItem(item_id="i1", source_clip_id="clip-a", start_sec=0.0, end_sec=1.0)
+        ],
+    ).model_copy(update={"revision": 7})
+
+    write_timeline_document(project_folder, document)
+    loaded = read_timeline_document(project_folder)
+
+    assert loaded is not None
+    assert loaded.revision == 7

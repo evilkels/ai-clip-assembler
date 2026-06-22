@@ -23,9 +23,11 @@ import {
   regenerateDraft as requestDraft,
   rescanProject,
   subscribeTimelineEvents,
+  TimelineRevisionConflictError,
   undoTimeline,
   type TimelineDocument,
   type TimelineItem,
+  type TimelineSnapshot,
 } from '../api/client';
 import type {
   AnalysisStatus,
@@ -54,6 +56,8 @@ interface ReviewState {
   trims: Record<string, Trim>;
   /** Authoritative timeline items from the backend Timeline Document. */
   timelineItems: TimelineItem[];
+  /** One atomic authoritative document + identity snapshot. */
+  timelineSnapshot: TimelineSnapshot | null;
   smoothnessThreshold: number;
   setSmoothnessThreshold: (v: number) => void;
   profile: AssemblyProfile;
@@ -68,7 +72,11 @@ interface ReviewState {
   sortAcceptedChronologically: () => void;
   setTrim: (clipId: string, trim: Trim) => void;
   /** Drive any operation through the backend operations core (used by the editor). */
-  applyTimelineOperation: (operation: string, args: Record<string, unknown>) => Promise<void>;
+  applyTimelineOperation: (
+    operation: string,
+    args: Record<string, unknown>,
+    expectedRevision?: number,
+  ) => Promise<void>;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   setProjectId: (id: string | null) => void;
@@ -104,6 +112,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [acceptedOrder, setAcceptedOrder] = useState<string[]>([]);
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
+  const [timelineSnapshot, setTimelineSnapshot] = useState<TimelineSnapshot | null>(null);
   const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
   const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
   const [targetDuration, setTargetDuration] = useState(120);
@@ -134,8 +143,16 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setTrims((current) => ({ ...current, ...itemTrims }));
     setDecisions(document.decisions as Record<string, ClipDecision>);
     if (document.profile) setProfile(document.profile);
-    if (document.target_duration_sec) setTargetDuration(document.target_duration_sec);
+    if (document.target_duration_sec !== null) setTargetDuration(document.target_duration_sec);
   }, []);
+
+  const reconcileTimelineSnapshot = useCallback(
+    (snapshot: TimelineSnapshot) => {
+      setTimelineSnapshot(snapshot);
+      reconcileFromDocument(snapshot.document);
+    },
+    [reconcileFromDocument],
+  );
 
   const itemIdForClip = useCallback((clipId: string): string | undefined => {
     return documentRef.current?.items.find((item) => item.source_clip_id === clipId)?.item_id;
@@ -145,27 +162,37 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   // core and reconciles from the returned document (the SSE stream reconciles
   // the same way for edits made by agents).
   const applyTimelineOperation = useCallback(
-    async (operation: string, args: Record<string, unknown>) => {
+    async (
+      operation: string,
+      args: Record<string, unknown>,
+      expectedRevision?: number,
+    ): Promise<void> => {
       if (!projectId) return;
       try {
-        const document = await applyTimelineOp(projectId, operation, args);
-        reconcileFromDocument(document);
+        const snapshot = await applyTimelineOp(projectId, operation, args, expectedRevision);
+        reconcileTimelineSnapshot(snapshot);
+        return;
       } catch (reason: unknown) {
+        if (reason instanceof TimelineRevisionConflictError) {
+          reconcileTimelineSnapshot(reason.detail.current_snapshot);
+          if (expectedRevision !== undefined) throw reason;
+        }
         setError(reason instanceof Error ? reason.message : 'Timeline operation failed');
-        getTimelineDocument(projectId).then(reconcileFromDocument).catch(() => {});
+        getTimelineDocument(projectId).then(reconcileTimelineSnapshot).catch(() => {});
+        return;
       }
     },
-    [projectId, reconcileFromDocument],
+    [projectId, reconcileTimelineSnapshot],
   );
 
   const refreshTimelineDocument = useCallback(async () => {
     if (!projectId) return;
     try {
-      reconcileFromDocument(await getTimelineDocument(projectId));
+      reconcileTimelineSnapshot(await getTimelineDocument(projectId));
     } catch {
       /* transient; SSE or the next op will reconcile */
     }
-  }, [projectId, reconcileFromDocument]);
+  }, [projectId, reconcileTimelineSnapshot]);
 
   // Hydration: load candidates + the authoritative document for the project.
   useEffect(() => {
@@ -182,7 +209,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
             loaded.map((clip) => [clip.clip_id, { start_sec: clip.start_sec, end_sec: clip.end_sec }]),
           ),
         );
-        if (document) reconcileFromDocument(document);
+        if (document) reconcileTimelineSnapshot(document);
       })
       .catch((reason: unknown) => {
         if (alive) setError(reason instanceof Error ? reason.message : 'Unable to load clip candidates');
@@ -193,7 +220,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [projectId, reconcileFromDocument]);
+  }, [projectId, reconcileTimelineSnapshot]);
 
   // Live-sync: an agent's edit (in-app or external over MCP) emits
   // `timeline-changed`; reconcile from the authoritative document so it appears
@@ -212,6 +239,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setAcceptedOrder([]);
     setTrims({});
     setTimelineItems([]);
+    setTimelineSnapshot(null);
     documentRef.current = null;
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
@@ -448,13 +476,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const undo = useCallback(async () => {
     if (!projectId) return;
-    reconcileFromDocument(await undoTimeline(projectId));
-  }, [projectId, reconcileFromDocument]);
+    reconcileTimelineSnapshot(await undoTimeline(projectId));
+  }, [projectId, reconcileTimelineSnapshot]);
 
   const redo = useCallback(async () => {
     if (!projectId) return;
-    reconcileFromDocument(await redoTimeline(projectId));
-  }, [projectId, reconcileFromDocument]);
+    reconcileTimelineSnapshot(await redoTimeline(projectId));
+  }, [projectId, reconcileTimelineSnapshot]);
 
   const value = useMemo<ReviewState>(
     () => ({
@@ -471,6 +499,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       acceptedOrder,
       trims,
       timelineItems,
+      timelineSnapshot,
       smoothnessThreshold,
       setSmoothnessThreshold,
       profile,
@@ -517,6 +546,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       acceptedOrder,
       trims,
       timelineItems,
+      timelineSnapshot,
       smoothnessThreshold,
       profile,
       targetDuration,

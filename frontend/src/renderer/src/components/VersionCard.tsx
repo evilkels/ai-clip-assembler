@@ -1,4 +1,5 @@
 import type { Version } from '../types/version';
+import type { VersionDisplayState } from '../state/versionState';
 import { VersionPlayer } from './VersionPlayer';
 
 interface VersionCardProps {
@@ -8,7 +9,9 @@ interface VersionCardProps {
   playing: boolean;
   onTogglePlay: () => void;
   onExpand: (id: string) => void;
-  onAdopt: (version: Version) => void;
+  displayState: VersionDisplayState;
+  missingClipNames: string[];
+  onApply: (version: Version) => void;
 }
 
 export function VersionCard({
@@ -18,12 +21,21 @@ export function VersionCard({
   playing,
   onTogglePlay,
   onExpand,
-  onAdopt,
+  displayState,
+  missingClipNames,
+  onApply,
 }: VersionCardProps) {
+  const stateLabel = {
+    applied: 'In working timeline',
+    current: 'Current suggestion',
+    stale: 'Out of date',
+    unavailable: 'Unavailable',
+  }[displayState];
   return (
     <article
       className={`version-card${expanded ? ' expanded' : ''}`}
       data-testid="version-card"
+      data-version-state={displayState}
     >
       <div className="version-card-surface" data-testid="version-card-surface">
         <VersionPlayer
@@ -54,13 +66,18 @@ export function VersionCard({
           </button>
         </div>
         <p className="version-rationale">{version.rationale}</p>
+        <p className={`version-state version-state-${displayState}`}>{stateLabel}</p>
+        {missingClipNames.length > 0 ? (
+          <p className="version-missing">Missing Source Clips: {missingClipNames.join(', ')}</p>
+        ) : null}
         <button
           type="button"
           className="btn primary"
           data-testid="version-adopt"
-          onClick={() => onAdopt(version)}
+          onClick={() => onApply(version)}
+          disabled={displayState === 'unavailable'}
         >
-          Use this version
+          Apply to working timeline
         </button>
       </div>
     </article>

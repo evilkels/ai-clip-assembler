@@ -1,10 +1,12 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { VersionGallery } from '../components/VersionGallery';
 import { WorkingTimelineStrip } from '../components/WorkingTimelineStrip';
+import { VersionApplyDialog } from '../components/VersionApplyDialog';
 import { useReview } from '../state/ReviewContext';
 import { useReviewConversation } from '../hooks/useReviewConversation';
+import { buildVersionMembership } from '../state/versionState';
 import type { ClipCandidate } from '../types/clip';
 import type { Version } from '../types/version';
 
@@ -16,6 +18,8 @@ function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
 }
 
 export function ReviewPage() {
+  const [versionToApply, setVersionToApply] = useState<Version | null>(null);
+  const [refreshingVersions, setRefreshingVersions] = useState(false);
   const {
     acceptedOrder,
     applyTimelineOperation,
@@ -26,9 +30,9 @@ export function ReviewPage() {
     include,
     loading,
     projectId,
-    resetDecision,
     smoothnessThreshold,
     setSmoothnessThreshold,
+    timelineSnapshot,
   } = useReview();
   const conversation = useReviewConversation(projectId);
 
@@ -37,7 +41,29 @@ export function ReviewPage() {
     () => ranked.filter((clip) => clip.scores.smoothness >= smoothnessThreshold),
     [ranked, smoothnessThreshold],
   );
-  const versions = conversation.versionSet?.versions ?? [];
+  const availableClipIds = useMemo(
+    () => new Set(clips.map((clip) => clip.clip_id)),
+    [clips],
+  );
+  const versionSetIsStale = Boolean(
+    conversation.versionSet &&
+      timelineSnapshot &&
+      conversation.versionSet.based_on_review_context_fingerprint !==
+        timelineSnapshot.review_context_fingerprint &&
+      !conversation.versionSet.versions.some(
+        (version) => version.sequence_fingerprint === timelineSnapshot.sequence_fingerprint,
+      ),
+  );
+  const versionMembership = useMemo(
+    () =>
+      conversation.versionSet &&
+      timelineSnapshot &&
+      conversation.versionSet.based_on_review_context_fingerprint ===
+        timelineSnapshot.review_context_fingerprint
+        ? buildVersionMembership(conversation.versionSet)
+        : new Map<string, string[]>(),
+    [conversation.versionSet, timelineSnapshot],
+  );
   const draftPositions = useMemo(
     () => new Map(acceptedOrder.map((id, index) => [id, index + 1])),
     [acceptedOrder],
@@ -52,15 +78,9 @@ export function ReviewPage() {
     return result;
   }, [clips]);
 
-  const adoptVersion = useCallback(
-    (version: Version) => {
-      if (
-        acceptedOrder.length > 0 &&
-        !window.confirm('Replace the current timeline with this version?')
-      ) {
-        return;
-      }
-      void applyTimelineOperation('replace_timeline', {
+  const applyVersion = useCallback(
+    async (version: Version, expectedRevision: number) => {
+      await applyTimelineOperation('replace_timeline', {
         items: version.items.map(
           ({ source_clip_id, start_sec, end_sec, speed, transform }) => ({
             source_clip_id,
@@ -70,9 +90,9 @@ export function ReviewPage() {
             transform,
           }),
         ),
-      });
+      }, expectedRevision);
     },
-    [acceptedOrder.length, applyTimelineOperation],
+    [applyTimelineOperation],
   );
 
   return (
@@ -118,20 +138,45 @@ export function ReviewPage() {
           <section className="version-zone" aria-label="Proposed versions">
             <div className="version-zone-head">
               <div>
-                <span className="draft-kicker">Creative directions</span>
+                <span className="review-zone-label">2 · Compare</span>
                 <strong>Versions</strong>
               </div>
-              <span className="draft-summary">play each cut, focus it, then use one</span>
+              <span className="draft-summary">
+                {refreshingVersions ? 'Updating' : 'Preview complete proposed cuts'}
+              </span>
             </div>
+            <p className="review-pipeline-helper">
+              Versions are snapshots. Source Clip edits change the Working Timeline, not these previews.
+            </p>
+            {versionSetIsStale ? (
+              <output className="version-stale-banner">
+                <span>Working Timeline or Source Clips changed since these Versions were created.</span>
+                <button
+                  type="button"
+                  className="btn subtle"
+                  onClick={() => {
+                    setRefreshingVersions(true);
+                    void conversation
+                      .send('Refresh the three versions using my current Working Timeline and Source Clip decisions.')
+                      .finally(() => setRefreshingVersions(false));
+                  }}
+                  disabled={conversation.busy}
+                >
+                  Ask agent to refresh versions
+                </button>
+              </output>
+            ) : null}
             {loading ? (
               <div className="empty-state">Loading candidates…</div>
             ) : error ? (
               <div className="empty-state">{error}</div>
             ) : (
               <VersionGallery
-                versions={versions}
+                versionSet={conversation.versionSet}
+                snapshot={timelineSnapshot}
+                availableClipIds={availableClipIds}
                 projectId={projectId}
-                onAdopt={adoptVersion}
+                onApply={setVersionToApply}
               />
             )}
           </section>
@@ -142,16 +187,25 @@ export function ReviewPage() {
             decisions={decisions}
             draftPositions={draftPositions}
             clipsByFile={clipsByFile}
+            versionMembership={versionMembership}
             loading={loading}
             error={error}
             smoothnessThreshold={smoothnessThreshold}
             onInclude={include}
             onExclude={exclude}
-            onReset={resetDecision}
           />
         </main>
       </div>
       <WorkingTimelineStrip />
+      {versionToApply && timelineSnapshot ? (
+        <VersionApplyDialog
+          key={versionToApply.version_id}
+          version={versionToApply}
+          snapshot={timelineSnapshot}
+          onApply={applyVersion}
+          onClose={() => setVersionToApply(null)}
+        />
+      ) : null}
     </div>
   );
 }

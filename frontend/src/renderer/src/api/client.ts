@@ -459,12 +459,12 @@ export class TimelineRevisionConflictError extends Error {
   }
 }
 
-export async function getTimelineDocument(projectId: string): Promise<TimelineDocument> {
+export async function getTimelineDocument(projectId: string): Promise<TimelineSnapshot> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/document`, {
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`Failed to load timeline document: ${res.status}`);
-  return (await res.json()).document as TimelineDocument;
+  return res.json() as Promise<TimelineSnapshot>;
 }
 
 export async function applyTimelineOp(
@@ -472,7 +472,7 @@ export async function applyTimelineOp(
   operation: string,
   args: Record<string, unknown> = {},
   expectedRevision?: number,
-): Promise<TimelineDocument> {
+): Promise<TimelineSnapshot> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/op`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -485,19 +485,19 @@ export async function applyTimelineOp(
     }
     throw new Error(err.detail ?? `Timeline operation failed: ${res.status}`);
   }
-  return (await res.json()).document as TimelineDocument;
+  return res.json() as Promise<TimelineSnapshot>;
 }
 
-export async function undoTimeline(projectId: string): Promise<TimelineDocument> {
+export async function undoTimeline(projectId: string): Promise<TimelineSnapshot> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/undo`, { method: 'POST' });
   if (!res.ok) throw new Error(`Undo failed: ${res.status}`);
-  return (await res.json()).document as TimelineDocument;
+  return res.json() as Promise<TimelineSnapshot>;
 }
 
-export async function redoTimeline(projectId: string): Promise<TimelineDocument> {
+export async function redoTimeline(projectId: string): Promise<TimelineSnapshot> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/redo`, { method: 'POST' });
   if (!res.ok) throw new Error(`Redo failed: ${res.status}`);
-  return (await res.json()).document as TimelineDocument;
+  return res.json() as Promise<TimelineSnapshot>;
 }
 
 /**

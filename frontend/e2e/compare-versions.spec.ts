@@ -65,10 +65,12 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   const reviewRequestIds: string[] = [];
   const reviewAttempts = new Map<string, number>();
   let currentVersionSet: Record<string, unknown> | null = null;
+  let projectApiBase = '';
 
   const ensureVersionSet = async (sessionUrl: string) => {
     if (currentVersionSet) return;
     const clipsResponse = await page.request.get(sessionUrl.replace('/review/session', '/clips'));
+    projectApiBase = sessionUrl.replace('/review/session', '');
     const candidates = (await clipsResponse.json()).clips as Array<{
       clip_id: string;
       file_id: string;
@@ -108,13 +110,47 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
         sequence_fingerprint: `fixture-${id}`,
       };
     });
+    versions[1].items = versions[1].items.filter(
+      (item) => item.source_clip_id === candidates[0].clip_id,
+    );
+    versions[2].items.push({
+      source_clip_id: 'missing-clip',
+      file_id: 'missing-file',
+      file_name: 'MISSING.MOV',
+      start_sec: 0,
+      end_sec: 1,
+      speed: 1,
+      transform: { scale: 1, x: 0, y: 0 },
+    });
+    const preparedApplyResponse = await page.request.post(`${projectApiBase}/timeline/op`, {
+      data: {
+        operation: 'replace_timeline',
+        args: {
+          items: versions[0].items.map(
+            ({ source_clip_id, start_sec, end_sec, speed, transform }) => ({
+              source_clip_id,
+              start_sec,
+              end_sec,
+              speed,
+              transform,
+            }),
+          ),
+        },
+      },
+    });
+    expect(preparedApplyResponse.ok(), await preparedApplyResponse.text()).toBe(true);
+    const preparedSnapshot = await preparedApplyResponse.json();
+    versions[0].sequence_fingerprint = preparedSnapshot.sequence_fingerprint;
+    const restoreResponse = await page.request.post(`${projectApiBase}/timeline/undo`);
+    expect(restoreResponse.ok(), await restoreResponse.text()).toBe(true);
+    const timelineSnapshot = await restoreResponse.json();
     currentVersionSet = {
       version_set_id: 'version-set-e2e',
       versions,
       created_at: '2026-06-21T10:00:00Z',
-      based_on_timeline_revision: 0,
-      based_on_sequence_fingerprint: 'fixture-sequence',
-      based_on_review_context_fingerprint: 'fixture-context',
+      based_on_timeline_revision: timelineSnapshot.document.revision,
+      based_on_sequence_fingerprint: timelineSnapshot.sequence_fingerprint,
+      based_on_review_context_fingerprint: timelineSnapshot.review_context_fingerprint,
     };
     reviewSession.schema_version = 2;
     (reviewSession.messages[0].payload as Record<string, unknown>).version_set =
@@ -138,6 +174,18 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
       await new Promise((resolve) => setTimeout(resolve, 100));
       await route.fulfill({ status: 500, json: { detail: 'temporary failure' } });
       return;
+    }
+    if (request.message.startsWith('Refresh the three versions')) {
+      const snapshotResponse = await page.request.get(`${projectApiBase}/timeline/document`);
+      const snapshot = await snapshotResponse.json();
+      currentVersionSet = {
+        ...currentVersionSet,
+        version_set_id: `version-set-refresh-${attempt}`,
+        created_at: '2026-06-21T10:03:00Z',
+        based_on_timeline_revision: snapshot.document.revision,
+        based_on_sequence_fingerprint: snapshot.sequence_fingerprint,
+        based_on_review_context_fingerprint: snapshot.review_context_fingerprint,
+      };
     }
     const editorMessage = {
       message_id: request.client_message_id,
@@ -198,6 +246,40 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   for (const vibe of await cards.getByTestId('version-vibe').all()) {
     await expect(vibe).toContainText(/[1-9]\d*(?:\.\d+)?s/);
   }
+  await expect(page.getByText('1 · Direct', { exact: true })).toBeVisible();
+  await expect(page.getByText('2 · Compare', { exact: true })).toBeVisible();
+  await expect(page.getByText('3 · Inspect', { exact: true })).toBeVisible();
+  await expect(page.getByText('4 · Commit', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Versions are snapshots. Source Clip edits change the Working Timeline, not these previews.'),
+  ).toBeVisible();
+  await expect(cards.nth(0)).toContainText('Current suggestion');
+  await expect(cards.nth(2)).toContainText('Unavailable');
+  await expect(cards.nth(2)).toContainText('MISSING.MOV');
+  await expect(cards.nth(2).getByTestId('version-adopt')).toBeDisabled();
+
+  const sourcePanelForState = page.getByTestId('source-clips-panel');
+  await sourcePanelForState.locator('summary').first().click();
+  const sourceCards = sourcePanelForState.locator('.clip-card');
+  await expect(sourceCards.first()).toContainText(/Timeline #\d+/);
+  await expect(sourcePanelForState.getByText('Proposed in A/C')).toBeVisible();
+  const timelineSourceCard = sourceCards.first();
+  await timelineSourceCard.getByRole('button', { name: 'Remove from working timeline' }).click();
+  await expect(timelineSourceCard.getByRole('button', { name: 'Add to working timeline' })).toBeVisible();
+  await timelineSourceCard.getByRole('button', { name: 'Add to working timeline' }).click();
+  await expect(timelineSourceCard).toContainText(/Timeline #\d+/);
+  await expect(
+    page.getByText('Working Timeline or Source Clips changed since these Versions were created.'),
+  ).toBeVisible();
+  await expect(sourcePanelForState.getByText(/Proposed in/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ask agent to refresh versions' }).click();
+  await expect(
+    page.getByText('Refresh the three versions using my current Working Timeline and Source Clip decisions.'),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Working Timeline or Source Clips changed since these Versions were created.'),
+  ).toHaveCount(0);
+  await expect(sourcePanelForState.getByText('Proposed in A/C')).toBeVisible();
 
   await cards.first().getByTestId('version-card-surface').click();
   await expect(cards.first()).toHaveClass(/expanded/);
@@ -324,17 +406,49 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(sourcePanel.locator('video')).toHaveCount(0);
   await expect(page.getByTestId('working-timeline-strip')).toBeVisible();
 
-  page.on('dialog', (dialog) => dialog.accept());
+  await cards.first().getByTestId('version-adopt').click();
+  const applyDialog = page.getByRole('dialog', {
+    name: 'Apply Punchy Social Cut to working timeline?',
+  });
+  await expect(applyDialog).toBeVisible();
+  await expect(applyDialog).toContainText(/Items.*current.*proposed/s);
+  await expect(applyDialog).toContainText(/Duration.*current.*proposed/s);
+  await expect(applyDialog).toContainText(
+    'Manual trims, order, speed, transforms, and other Working Timeline changes will be replaced.',
+  );
+
+  // An external mutation after opening invalidates the prepared expected revision.
+  const externalMutation = await page.request.post(`${projectApiBase}/timeline/op`, {
+    data: {
+      operation: 'set_target_duration',
+      args: { target_duration_sec: 119 },
+    },
+  });
+  expect(externalMutation.ok(), await externalMutation.text()).toBe(true);
+  await applyDialog.getByRole('button', { name: 'Apply to working timeline' }).click();
+  await expect(applyDialog.getByRole('alert')).toContainText(
+    'Working Timeline changed while this comparison was open.',
+  );
+  await expect(cards).toHaveCount(3);
+
+  await applyDialog.getByRole('button', { name: 'Cancel' }).click();
+  await cards.first().getByTestId('version-adopt').click();
+  const reopenedDialog = page.getByRole('dialog', {
+    name: 'Apply Punchy Social Cut to working timeline?',
+  });
   const adoptResponse = page.waitForResponse(
     (response) =>
-      response.url().endsWith('/timeline/op') && response.request().method() === 'POST',
+      response.url().endsWith('/timeline/op') &&
+      response.request().method() === 'POST' &&
+      response.status() === 200,
   );
-  await cards.first().getByTestId('version-adopt').click();
+  await reopenedDialog.getByRole('button', { name: 'Apply to working timeline' }).click();
   const response = await adoptResponse;
   expect(response.ok(), await response.text()).toBe(true);
   await expect(page.getByTestId('working-timeline-item')).toHaveCount(4, {
     timeout: 10_000,
   });
+  await expect(cards.first()).toContainText('In working timeline');
 
   const workingTimeline = page.getByTestId('working-timeline-strip');
   await workingTimeline.locator('summary').click();

@@ -9,6 +9,7 @@ interface Range {
 }
 
 const EMPTY_RANGES: Range[] = [];
+const EMPTY_VERSION_LABELS: string[] = [];
 
 interface Props {
   clip: ClipCandidate;
@@ -17,6 +18,8 @@ interface Props {
   mediaUrl?: string;
   /** 1-based position in the current timeline, or undefined if not in the draft. */
   draftPosition?: number;
+  /** Current Version labels that contain this Candidate Clip. */
+  versionLabels?: string[];
   /** Other candidate clips from the same source file, for the file track. */
   siblingRanges?: Range[];
   /** 1-based index of this clip among candidates from the same source file. */
@@ -24,7 +27,6 @@ interface Props {
   /** Total candidates from the same source file. */
   fileClipCount?: number;
   onToggleInclude: () => void;
-  onExclude: () => void;
 }
 
 /** Stable, evenly-spread colour per source file so cards from the same video
@@ -68,15 +70,18 @@ function SourceTrack({
   playheadSec: number;
   siblings: Range[];
   accent: string;
-  onSeek?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onSeek?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const left = (t: number) => `${clamp01(t / durationSec) * 100}%`;
   const width = (a: number, b: number) => `${clamp01((b - a) / durationSec) * 100}%`;
   return (
     <div className="source-track-wrap">
-      <div
+      <button
+        type="button"
         className={`source-track${onSeek ? ' seekable' : ''}`}
         onClick={onSeek}
+        disabled={!onSeek}
+        aria-label={`Seek preview within ${formatTime(startSec)} to ${formatTime(endSec)}`}
         title={`Clip is ${formatTime(startSec)}–${formatTime(endSec)} of a ${formatTime(durationSec)} file`}
       >
         {siblings.map((s, i) => (
@@ -91,7 +96,7 @@ function SourceTrack({
           style={{ left: left(startSec), width: width(startSec, endSec), background: accent }}
         />
         <span className="source-track-playhead" style={{ left: left(playheadSec) }} />
-      </div>
+      </button>
       <span className="source-track-caption">
         {formatTime(startSec)}–{formatTime(endSec)} of {formatTime(durationSec)}
       </span>
@@ -105,11 +110,11 @@ export function ClipCard({
   decision,
   mediaUrl,
   draftPosition,
+  versionLabels = EMPTY_VERSION_LABELS,
   siblingRanges = EMPTY_RANGES,
   fileClipIndex,
   fileClipCount,
   onToggleInclude,
-  onExclude,
 }: Props) {
   const cls = ['clip-card', decision === 'included' ? 'included' : decision === 'excluded' ? 'excluded' : ''].join(' ');
   const verdict = verdictFor(clip.scores.overall);
@@ -133,7 +138,7 @@ export function ClipCard({
     video.play().catch(() => {});
   };
 
-  const seekFromTrack = (event: React.MouseEvent<HTMLDivElement>) => {
+  const seekFromTrack = (event: React.MouseEvent<HTMLButtonElement>) => {
     const video = videoRef.current;
     if (!video || !sourceDuration) return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -153,6 +158,9 @@ export function ClipCard({
             ◆ Timeline #{draftPosition}
           </span>
         )}
+        {versionLabels.length > 0 ? (
+          <span className="clip-thumb-proposed">Proposed in {versionLabels.join('/')}</span>
+        ) : null}
         {mediaUrl ? (
           <>
             <video
@@ -242,13 +250,12 @@ export function ClipCard({
         )}
         <div className="clip-actions">
           <button type="button"
-            className={decision === 'included' ? 'btn primary' : 'btn'}
+            className={draftPosition !== undefined ? 'btn subtle' : 'btn primary'}
             onClick={onToggleInclude}
           >
-            {decision === 'included' ? 'Included ✓' : 'Include'}
-          </button>
-          <button type="button" className="btn subtle" onClick={onExclude}>
-            {decision === 'excluded' ? 'Excluded' : 'Exclude'}
+            {draftPosition !== undefined
+              ? 'Remove from working timeline'
+              : 'Add to working timeline'}
           </button>
         </div>
       </div>

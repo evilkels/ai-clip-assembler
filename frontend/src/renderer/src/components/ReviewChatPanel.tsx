@@ -46,8 +46,11 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
   return (
     <aside className="review-chat" aria-label="Review agent" data-testid="review-chat-panel">
       <div className="review-chat-head">
-        <strong>Review agent</strong>
-        <span className="draft-summary">proposes edits you accept or reject</span>
+        <div>
+          <span className="review-zone-label">1 · Direct</span>
+          <strong>Review agent</strong>
+        </div>
+        <span className="draft-summary">Tell the agent what to change</span>
       </div>
       <div
         ref={logRef}

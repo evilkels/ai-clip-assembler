@@ -10,12 +10,12 @@ interface SourceClipsPanelProps {
   decisions: Record<string, ClipDecision>;
   draftPositions: Map<string, number>;
   clipsByFile: Map<string, ClipCandidate[]>;
+  versionMembership: Map<string, string[]>;
   loading: boolean;
   error: string | null;
   smoothnessThreshold: number;
   onInclude: (clipId: string) => void;
   onExclude: (clipId: string) => void;
-  onReset: (clipId: string) => void;
 }
 
 export function SourceClipsPanel({
@@ -25,12 +25,12 @@ export function SourceClipsPanel({
   decisions,
   draftPositions,
   clipsByFile,
+  versionMembership,
   loading,
   error,
   smoothnessThreshold,
   onInclude,
   onExclude,
-  onReset,
 }: SourceClipsPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -41,8 +41,9 @@ export function SourceClipsPanel({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        <strong>Source clips ({clips.length})</strong>
-        <span className="draft-summary">inspect Candidate Clips and technical scores</span>
+        <span className="review-zone-label">3 · Inspect</span>
+        <strong>Source Clips ({clips.length})</strong>
+        <span className="draft-summary">Add individual Source Clips to the Working Timeline</span>
       </summary>
       {/* Closed details still mount children, so conditionally render to avoid N video streams. */}
       {open ? (
@@ -87,6 +88,7 @@ export function SourceClipsPanel({
                     rank={index + 1}
                     decision={decision}
                     draftPosition={draftPositions.get(clip.clip_id)}
+                    versionLabels={versionMembership.get(clip.clip_id)}
                     siblingRanges={siblingRanges}
                     fileClipIndex={
                       [...siblings]
@@ -98,10 +100,9 @@ export function SourceClipsPanel({
                       projectId ? buildVideoMediaUrl(projectId, clip.file_id) : undefined
                     }
                     onToggleInclude={() =>
-                      decision === 'included' ? onReset(clip.clip_id) : onInclude(clip.clip_id)
-                    }
-                    onExclude={() =>
-                      decision === 'excluded' ? onReset(clip.clip_id) : onExclude(clip.clip_id)
+                      draftPositions.has(clip.clip_id)
+                        ? onExclude(clip.clip_id)
+                        : onInclude(clip.clip_id)
                     }
                   />
                 );

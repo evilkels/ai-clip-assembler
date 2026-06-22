@@ -177,13 +177,13 @@ async def TimelineController.apply_batch(
   canonical JSON with `sort_keys=True`, `separators=(",", ":")`.
 - `item_id` never contributes to a sequence fingerprint.
 
-- [ ] **Worker invocation:** From the repository root, run exactly:
+- [x] **Worker invocation:** From the repository root, run exactly:
 
 ```bash
 claude -p "Implement Task 1, Timeline identity and atomic concurrency, from docs/plans/009-connected-review-pipeline.md. Read AGENTS.md, CONTEXT.md, docs/specs/2026-06-21-connected-review-pipeline-design.md, Global Constraints, and all of Task 1 first. Work only in Task 1's file list. Use strict TDD and run the named red and green commands. Do not update docs/plans, touch .gitignore or frontend/package-lock.json, push, or begin another task. Produce exactly one scoped commit named feat(timeline): add revision-safe state identity. Return status, design summary, files changed, commit SHA, exact tests/results, and concerns."
 ```
 
-- [ ] **Step 1: Write the red fingerprint and revision tests.** Add focused
+- [x] **Step 1: Write the red fingerprint and revision tests.** Add focused
       tests proving different item IDs hash equally, order/bounds/speed/
       transform hash differently, Candidate context changes alter the context
       hash, `TimelineDocument().revision == 0`, and legacy JSON loads with zero.
@@ -195,18 +195,18 @@ def test_sequence_fingerprint_ignores_live_item_ids():
     assert sequence_fingerprint([left]) == sequence_fingerprint([right])
 ```
 
-- [ ] **Step 2: Run the tests red.**
+- [x] **Step 2: Run the tests red.**
 
 Run:
 `cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_timeline_ops.py tests/test_project_store.py -q`
 
 Expected: FAIL because fingerprint helpers/revision do not exist.
 
-- [ ] **Step 3: Implement canonical fingerprints and persisted revision.** Keep
+- [x] **Step 3: Implement canonical fingerprints and persisted revision.** Keep
       hashing pure and independent from FastAPI. Load absent revision as zero;
       do not rewrite project files merely by reading them.
 
-- [ ] **Step 4: Write red controller tests** for monotonic apply/undo/redo,
+- [x] **Step 4: Write red controller tests** for monotonic apply/undo/redo,
       stale `expected_revision` with zero mutation, and a two-operation batch
       producing one revision, notification, and undo snapshot.
 
@@ -216,15 +216,15 @@ with pytest.raises(TimelineRevisionConflict):
 assert controller.document == before
 ```
 
-- [ ] **Step 5: Implement one locked commit path.** `apply`, `apply_batch`,
+- [x] **Step 5: Implement one locked commit path.** `apply`, `apply_batch`,
       `undo`, and `redo` must assign `revision = previous_live_revision + 1`
       immediately before the single notify. Undo restores prior content but not
       the old revision number.
 
-- [ ] **Step 6: Run focused tests green**, then run:
+- [x] **Step 6: Run focused tests green**, then run:
       `cd backend && .venv/bin/ruff check src tests`.
 
-- [ ] **Step 7: Commit** with
+- [x] **Step 7: Commit** with
       `feat(timeline): add revision-safe state identity`.
 
 ## Task 2: Review provenance, VersionSets, and idempotent turns (**ORCHESTRATOR**)

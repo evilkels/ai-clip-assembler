@@ -271,12 +271,12 @@ Existing frontend Timeline API functions may continue returning the nested
 `document` during this task so current consumers compile. Task 5 migrates the
 client and `ReviewContext` together to consume the complete snapshot.
 
-- [ ] **Step 1: Add red model/agent tests** for Version fingerprints and
+- [x] **Step 1: Add red model/agent tests** for Version fingerprints and
       VersionSet provenance, Proposal baseline revision, captured Timeline
       snapshot, deterministic Manual/model-failure fallback, and existing bare
       `payload.versions` migration.
 
-- [ ] **Step 2: Add red API tests** for enriched Timeline snapshots, HTTP 409
+- [x] **Step 2: Add red API tests** for enriched Timeline snapshots, HTTP 409
       conflict detail (`expected_revision`, `current_revision`, current
       snapshot), atomic Proposal acceptance, and message idempotency:
 
@@ -287,19 +287,19 @@ assert first.json()["agent_message"]["message_id"] == second.json()["agent_messa
 assert [m["message_id"] for m in second.json()["session"]["messages"]].count(message_id) == 1
 ```
 
-- [ ] **Step 3: Run tests red.**
+- [x] **Step 3: Run tests red.**
 
 Run:
 `cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_review_agent.py tests/test_api.py -q`
 
 Expected: FAIL on missing request/model fields and conflict behavior.
 
-- [ ] **Step 4: Implement Review Session v2 compatibility.** Persist
+- [x] **Step 4: Implement Review Session v2 compatibility.** Persist
       client-generated editor IDs and agent `reply_to_message_id`. On retry,
       return the correlated completed response or resume an incomplete turn;
       never append the editor message twice.
 
-- [ ] **Step 5: Implement backend-owned VersionSet production.** The exact
+- [x] **Step 5: Implement backend-owned VersionSet production.** The exact
       bounded candidates placed in the model/fallback context feed
       `review_context_fingerprint`. Port the deterministic fallback behavior
       from `mockVersions.ts` into a typed backend factory; Manual Harness and
@@ -307,18 +307,18 @@ Expected: FAIL on missing request/model fields and conflict behavior.
       fallback temporarily so Task 3 can land independently; Task 4 removes it
       when the shared conversation controller consumes VersionSets.
 
-- [ ] **Step 6: Make Proposals snapshot-safe.** Deep-copy the Timeline Document
+- [x] **Step 6: Make Proposals snapshot-safe.** Deep-copy the Timeline Document
       before model invocation, simulate against that copy, persist its revision,
       and accept via `apply_batch(operations, expected_revision=baseline_revision)`.
 
-- [ ] **Step 7: Return `TimelineSnapshot` consistently** from get/apply/undo/
+- [x] **Step 7: Return `TimelineSnapshot` consistently** from get/apply/undo/
       redo/Proposal-accept endpoints. Map `TimelineRevisionConflict` to HTTP 409
       before the generic 422 handler.
 
-- [ ] **Step 8: Update frontend wire types only.** Do not begin UI behavior in
+- [x] **Step 8: Update frontend wire types only.** Do not begin UI behavior in
       this task.
 
-- [ ] **Step 9: Run focused backend tests, full backend lint, and frontend
+- [x] **Step 9: Run focused backend tests, full backend lint, and frontend
       typecheck.**
 
 Run:
@@ -329,7 +329,7 @@ Run:
 (cd frontend && npm run typecheck)
 ```
 
-- [ ] **Step 10: Commit** with
+- [x] **Step 10: Commit** with
       `feat(review): persist version provenance`.
 
 ## Task 3: Segmented Version playback timeline (**CLAUDE**)

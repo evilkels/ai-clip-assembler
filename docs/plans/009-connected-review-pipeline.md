@@ -365,40 +365,40 @@ interface VersionScrubberProps {
 }
 ```
 
-- [ ] **Worker invocation:** From the repository root, run exactly:
+- [x] **Worker invocation:** From the repository root, run exactly:
 
 ```bash
 claude -p "Implement Task 3, Segmented Version playback timeline, from docs/plans/009-connected-review-pipeline.md. Read AGENTS.md, CONTEXT.md, docs/specs/2026-06-21-connected-review-pipeline-design.md, Global Constraints, and all of Task 3 first. Work only in Task 3's file list. Use strict TDD and run the named red and green commands. Do not update docs/plans, touch .gitignore or frontend/package-lock.json, push, or begin another task. Produce exactly one scoped commit named feat(review): add version playback scrubbers. Return status, design summary, files changed, commit SHA, exact tests/results, and concerns."
 ```
 
-- [ ] **Step 1: Extend Playwright fixtures and write red assertions** for one
+- [x] **Step 1: Extend Playwright fixtures and write red assertions** for one
       segment per Version item, effective-duration-proportional widths,
       `current / total`, current filename/source time, click-to-seek, keyboard
       Left/Right seek, and exclusive playback.
 
-- [ ] **Step 2: Run the focused E2E red.**
+- [x] **Step 2: Run the focused E2E red.**
 
 Run: `cd frontend && npm run test:e2e -- compare-versions.spec.ts`
 
 Expected: FAIL because no Version scrubber exists.
 
-- [ ] **Step 3: Centralize timeline-time math in `useSequencePlayer`.** Convert
+- [x] **Step 3: Centralize timeline-time math in `useSequencePlayer`.** Convert
       timeline time to item index/source time using effective durations. Clamp
       seeks to `[0, totalDurationSec]`; never mutate Version items.
 
-- [ ] **Step 4: Implement accessible segmented navigation.** Use a labelled
+- [x] **Step 4: Implement accessible segmented navigation.** Use a labelled
       range-like control with clickable segment buttons, visible playhead,
       `MM:SS.s` time, `clip N of M`, filename, and source time. Segment width is
       `(end_sec - start_sec) / speed / totalDurationSec * 100%`.
 
-- [ ] **Step 5: Coordinate one active player in `VersionGallery`.** Starting a
+- [x] **Step 5: Coordinate one active player in `VersionGallery`.** Starting a
       Version stops the previously active player. Expanding/collapsing a card
       must not reset its current position.
 
-- [ ] **Step 6: Add reduced-motion CSS** and keep all new selectors scoped
+- [x] **Step 6: Add reduced-motion CSS** and keep all new selectors scoped
       under `.version-player` / `.version-scrubber`.
 
-- [ ] **Step 7: Run focused E2E, typecheck, lint, and React Doctor.**
+- [x] **Step 7: Run focused E2E, typecheck, lint, and React Doctor.**
 
 ```bash
 (cd frontend && npm run test:e2e -- compare-versions.spec.ts)
@@ -407,7 +407,7 @@ Expected: FAIL because no Version scrubber exists.
 (cd frontend && ./node_modules/.bin/react-doctor . --diff HEAD --no-score --fail-on warning)
 ```
 
-- [ ] **Step 8: Commit** with
+- [x] **Step 8: Commit** with
       `feat(review): add version playback scrubbers`.
 
 ## Task 4: Optimistic conversation controller (**ORCHESTRATOR**)

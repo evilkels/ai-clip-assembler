@@ -507,40 +507,40 @@ function buildVersionMembership(versionSet: VersionSet | null): Map<string, stri
 `ReviewContext` exposes the current `TimelineSnapshot`, not independent revision
 and hash states that can tear during rendering.
 
-- [ ] **Step 1: Write red E2E assertions** for:
+- [x] **Step 1: Write red E2E assertions** for:
       Source Clip `Timeline #N`; current-only `Proposed in A/C`; manual Include
       updating Working Timeline; stale banner retaining playable Versions;
       visible Refresh editor turn; applied/unavailable Version states; and
       numbered Direct/Compare/Inspect/Commit cues.
 
-- [ ] **Step 2: Add a red adoption-conflict E2E.** Open Apply, mutate the stubbed
+- [x] **Step 2: Add a red adoption-conflict E2E.** Open Apply, mutate the stubbed
       current snapshot before submission, return HTTP 409, and assert no success
       state or lost Version.
 
-- [ ] **Step 3: Implement pure Version state derivation.** Use only server
+- [x] **Step 3: Implement pure Version state derivation.** Use only server
       fingerprints. Hide proposed-membership badges for stale sets. Missing
       Candidate Clip IDs make Apply unavailable and list their filenames/IDs.
 
-- [ ] **Step 4: Reconcile enriched Timeline snapshots atomically** in
+- [x] **Step 4: Reconcile enriched Timeline snapshots atomically** in
       `ReviewContext`; retain existing optimistic Include/Exclude behavior but
       replace it with the returned/SSE snapshot as authority.
 
-- [ ] **Step 5: Add the stale banner and explicit refresh.** Refresh calls
+- [x] **Step 5: Add the stale banner and explicit refresh.** Refresh calls
       `conversation.send("Refresh the three versions using my current Working Timeline and Source Clip decisions.")`.
       Old Versions remain visible until a successful VersionSet arrives.
 
-- [ ] **Step 6: Implement `VersionApplyDialog`.** Compare against the current
+- [x] **Step 6: Implement `VersionApplyDialog`.** Compare against the current
       snapshot: item count/effective duration, added/removed sources, and order/
       bounds/speed/transform changes. Submit `replace_timeline` with the current
       revision captured when the dialog opened. On 409, reconcile and require a
       new review; never force apply.
 
-- [ ] **Step 7: Add relationship copy and target-specific actions.** Use
+- [x] **Step 7: Add relationship copy and target-specific actions.** Use
       `Add to working timeline`, `Remove from working timeline`, and
       `Apply to working timeline`. Label the bottom strip
       `Working Timeline · authoritative · sent to export`.
 
-- [ ] **Step 8: Run focused E2E, frontend gates, and React Doctor.**
+- [x] **Step 8: Run focused E2E, frontend gates, and React Doctor.**
 
 ```bash
 (cd frontend && npm run test:e2e -- compare-versions.spec.ts)
@@ -550,7 +550,7 @@ and hash states that can tear during rendering.
 (cd frontend && ./node_modules/.bin/react-doctor . --diff HEAD --no-score --fail-on warning)
 ```
 
-- [ ] **Step 9: Commit** with
+- [x] **Step 9: Commit** with
       `feat(review): connect review pipeline state`.
 
 ## Task 6: Whole-flow verification and independent review (**ORCHESTRATOR + CLAUDE REVIEW**)

@@ -17,6 +17,7 @@ import type {
   VideoMetadata,
 } from '../types/clip';
 import { mockClips } from './mockClips';
+import type { VersionSet } from '../types/version';
 
 declare global {
   interface Window {
@@ -432,10 +433,30 @@ export interface TimelineItem {
 
 export interface TimelineDocument {
   version: number;
+  revision: number;
   items: TimelineItem[];
   profile: AssemblyProfile | null;
   target_duration_sec: number | null;
   decisions: Record<string, 'included' | 'excluded'>;
+}
+
+export interface TimelineSnapshot {
+  document: TimelineDocument;
+  sequence_fingerprint: string;
+  review_context_fingerprint: string;
+}
+
+export interface TimelineRevisionConflictDetail {
+  expected_revision: number;
+  current_revision: number;
+  current_snapshot: TimelineSnapshot;
+}
+
+export class TimelineRevisionConflictError extends Error {
+  constructor(public readonly detail: TimelineRevisionConflictDetail) {
+    super(`Working Timeline changed from revision ${detail.expected_revision} to ${detail.current_revision}`);
+    this.name = 'TimelineRevisionConflictError';
+  }
 }
 
 export async function getTimelineDocument(projectId: string): Promise<TimelineDocument> {
@@ -450,14 +471,18 @@ export async function applyTimelineOp(
   projectId: string,
   operation: string,
   args: Record<string, unknown> = {},
+  expectedRevision?: number,
 ): Promise<TimelineDocument> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/op`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ operation, args }),
+    body: JSON.stringify({ operation, args, expected_revision: expectedRevision }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
+    if (res.status === 409 && typeof err.detail === 'object') {
+      throw new TimelineRevisionConflictError(err.detail as TimelineRevisionConflictDetail);
+    }
     throw new Error(err.detail ?? `Timeline operation failed: ${res.status}`);
   }
   return (await res.json()).document as TimelineDocument;
@@ -499,6 +524,7 @@ export interface Proposal {
   summary: string[];
   before_item_count: number;
   after_item_count: number;
+  based_on_timeline_revision: number;
   status: 'pending' | 'accepted' | 'rejected';
 }
 
@@ -514,8 +540,9 @@ export interface ReviewMessage {
   role: 'agent' | 'editor';
   text: string;
   created_at: string;
+  reply_to_message_id: string | null;
   proposal: Proposal | null;
-  payload: Record<string, unknown>;
+  payload: Record<string, unknown> & { version_set?: VersionSet };
 }
 
 export interface ReviewSession {
@@ -531,11 +558,15 @@ export async function getReviewSession(projectId: string): Promise<ReviewSession
   return res.json() as Promise<ReviewSession>;
 }
 
-export async function reviewTurn(projectId: string, message: string): Promise<ReviewTurnResult> {
+export async function reviewTurn(
+  projectId: string,
+  message: string,
+  clientMessageId: string = crypto.randomUUID(),
+): Promise<ReviewTurnResult> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/review/turn`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, client_message_id: clientMessageId }),
   });
   if (!res.ok) throw new Error(`Review turn failed: ${res.status}`);
   return res.json() as Promise<ReviewTurnResult>;
@@ -551,7 +582,13 @@ export async function acceptProposal(projectId: string, proposalId: string): Pro
   const res = await fetch(`${backendUrl()}/projects/${projectId}/proposals/${proposalId}/accept`, {
     method: 'POST',
   });
-  if (!res.ok) throw new Error(`Accept proposal failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    if (res.status === 409 && typeof err.detail === 'object') {
+      throw new TimelineRevisionConflictError(err.detail as TimelineRevisionConflictDetail);
+    }
+    throw new Error(`Accept proposal failed: ${res.status}`);
+  }
   return (await res.json()).document as TimelineDocument;
 }
 

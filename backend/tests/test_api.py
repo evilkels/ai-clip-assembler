@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from src import api
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
+from src.review_state import sequence_fingerprint
 
 
 def create_folder_project_with_video(tmp_path, content=b"folder video bytes", filename="DJI_0042.MP4"):
@@ -1744,6 +1745,41 @@ def test_timeline_op_include_seeds_item_from_candidate(monkeypatch, tmp_path):
     assert (item["start_sec"], item["end_sec"]) == (1.0, 4.0)
 
 
+def test_timeline_endpoints_return_enriched_snapshots(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+
+    fetched = client.get(f"/projects/{project_id}/timeline/document").json()
+    applied = _op(client, project_id, "include", clip_id="clip-1").json()
+    undone = client.post(f"/projects/{project_id}/timeline/undo").json()
+    redone = client.post(f"/projects/{project_id}/timeline/redo").json()
+
+    for snapshot in (fetched, applied, undone, redone):
+        assert snapshot["sequence_fingerprint"] == sequence_fingerprint(
+            snapshot["document"]["items"]
+        )
+        assert len(snapshot["review_context_fingerprint"]) == 64
+
+
+def test_timeline_stale_expected_revision_returns_409_current_snapshot(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+
+    response = client.post(
+        f"/projects/{project_id}/timeline/op",
+        json={
+            "operation": "include",
+            "args": {"clip_id": "clip-2"},
+            "expected_revision": 0,
+        },
+    )
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["expected_revision"] == 0
+    assert detail["current_revision"] == 1
+    assert detail["current_snapshot"]["document"]["revision"] == 1
+
+
 def test_timeline_op_set_bounds_clamps_to_source_duration(monkeypatch, tmp_path):
     client, project_id = _seed_analyzed_project(monkeypatch, tmp_path, duration=10.0)
     item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]
@@ -1859,6 +1895,87 @@ def test_review_turn_proposes_then_accept_applies(monkeypatch, tmp_path):
     accepted = client.post(f"/projects/{project_id}/proposals/{proposal_id}/accept")
     assert accepted.status_code == 200
     assert [i["source_clip_id"] for i in accepted.json()["document"]["items"]] == ["clip-1"]
+
+
+def test_proposal_accept_is_atomic_and_rejects_stale_baseline(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda _context: {
+            "message": "Add both.",
+            "operations": [
+                {"operation": "include", "args": {"clip_id": "clip-1"}},
+                {"operation": "include", "args": {"clip_id": "clip-2"}},
+            ],
+        },
+    )
+    proposal = client.post(
+        f"/projects/{project_id}/review/turn",
+        json={"message": "Go", "client_message_id": "3b686ab6-e329-4cb7-bf2f-61398af50422"},
+    ).json()["proposal"]
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    response = client.post(
+        f"/projects/{project_id}/proposals/{proposal['proposal_id']}/accept"
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["expected_revision"] == 0
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert [item["source_clip_id"] for item in document["items"]] == ["clip-2"]
+
+
+def test_review_turn_is_idempotent_by_client_message_id(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    calls = []
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda context: calls.append(context["user_message"])
+        or {"message": "One reply.", "operations": []},
+    )
+    message_id = "af2d6684-c209-427f-a6f9-c24d314138ce"
+
+    first = client.post(
+        f"/projects/{project_id}/review/turn",
+        json={"message": "Faster", "client_message_id": message_id},
+    )
+    second = client.post(
+        f"/projects/{project_id}/review/turn",
+        json={"message": "Faster", "client_message_id": message_id},
+    )
+
+    assert first.status_code == second.status_code == 200
+    assert first.json()["agent_message"]["message_id"] == second.json()["agent_message"]["message_id"]
+    assert [m["message_id"] for m in second.json()["session"]["messages"]].count(message_id) == 1
+    assert second.json()["agent_message"]["reply_to_message_id"] == message_id
+    assert calls == ["Faster"]
+
+
+def test_review_turn_rejects_reusing_an_id_for_different_text(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda _context: {"message": "One reply.", "operations": []},
+    )
+    message_id = "9db7bdab-921c-4472-8288-a7b10e252fd1"
+    client.post(
+        f"/projects/{project_id}/review/turn",
+        json={"message": "Faster", "client_message_id": message_id},
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/review/turn",
+        json={"message": "Slower", "client_message_id": message_id},
+    )
+
+    assert response.status_code == 409
+    assert "already used" in response.json()["detail"]
 
 
 def test_review_turn_reject_leaves_timeline_unchanged(monkeypatch, tmp_path):

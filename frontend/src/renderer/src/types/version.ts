@@ -20,4 +20,14 @@ export interface Version {
   profile: AssemblyProfile;
   total_duration_sec: number;
   items: VersionItem[];
+  sequence_fingerprint: string;
+}
+
+export interface VersionSet {
+  version_set_id: string;
+  versions: Version[];
+  created_at: string;
+  based_on_timeline_revision: number;
+  based_on_sequence_fingerprint: string;
+  based_on_review_context_fingerprint: string;
 }

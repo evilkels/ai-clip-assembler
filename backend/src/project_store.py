@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 import shutil
 import uuid
@@ -8,7 +9,8 @@ from typing import Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from .models import ReviewSession, TimelineDocument, TimelineItem
+from .models import CreativeVersion, ReviewSession, TimelineDocument, TimelineItem, VersionSet
+from .review_state import sequence_fingerprint
 
 
 PROJECT_STATE_DIRNAME = "clipassembler"
@@ -271,12 +273,58 @@ def read_review_session(project_folder: Path) -> Optional[ReviewSession]:
     if not path.exists():
         return None
     try:
-        session = ReviewSession.model_validate_json(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("schema_version") == 1:
+            payload = _migrate_review_session_v1(payload)
+        session = ReviewSession.model_validate(payload)
     except (OSError, ValidationError, json.JSONDecodeError):
         return None
-    if session.schema_version != 1:
+    if session.schema_version != 2:
         return None
     return session
+
+
+def _migrate_review_session_v1(payload: dict) -> dict:
+    """Read-upgrade bare v1 Version arrays without rewriting the project file."""
+    migrated = json.loads(json.dumps(payload))
+    migrated["schema_version"] = 2
+    for message in migrated.get("messages", []):
+        message_payload = message.get("payload")
+        if not isinstance(message_payload, dict) or "versions" not in message_payload:
+            continue
+        raw_versions = message_payload.pop("versions") or []
+        versions = []
+        for raw_version in raw_versions:
+            if not isinstance(raw_version, dict):
+                continue
+            raw_version = dict(raw_version)
+            raw_version["sequence_fingerprint"] = sequence_fingerprint(
+                raw_version.get("items") or []
+            )
+            try:
+                versions.append(CreativeVersion.model_validate(raw_version))
+            except ValidationError:
+                continue
+        canonical = json.dumps(
+            [version.model_dump() for version in versions],
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        legacy_digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        version_set = VersionSet(
+            version_set_id=f"legacy-{legacy_digest[:24]}",
+            versions=versions,
+            created_at=message.get("created_at") or migrated.get("updated_at") or "",
+            based_on_timeline_revision=0,
+            based_on_sequence_fingerprint=sequence_fingerprint([]),
+            based_on_review_context_fingerprint=hashlib.sha256(
+                f"legacy-review-context:{canonical}".encode("utf-8")
+            ).hexdigest(),
+        )
+        message_payload["version_set"] = version_set.model_dump()
+    return migrated
 
 
 def timeline_document_path(project_folder: Path) -> Path:

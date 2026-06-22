@@ -84,6 +84,8 @@ export function proposeVersions(clips: ClipCandidate[]): Version[] {
       profile: recipe.profile,
       total_duration_sec: Number(totalDuration.toFixed(1)),
       items,
+      // Fixture-only sentinel until Task 4 removes this runtime fallback.
+      sequence_fingerprint: 'frontend-fixture-only',
     };
   });
 }

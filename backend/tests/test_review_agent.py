@@ -8,10 +8,17 @@ discards them. Read access is provided as context, so reads "run normally".
 
 import pytest
 
-from src.models import TimelineDocument
+from src.models import TimelineDocument, VersionSet
+from src.review_state import review_context_fingerprint, sequence_fingerprint
 from src.timeline_ops import SourceClip, TimelineController
 from src.timeline_service import TimelineEventBroker
-from src.review_agent import ProposalStore, _parse_agent_json, _validate_versions, run_review_turn
+from src.review_agent import (
+    ProposalStore,
+    _parse_agent_json,
+    _validate_versions,
+    deterministic_versions,
+    run_review_turn,
+)
 
 
 def _sources():
@@ -83,6 +90,52 @@ async def test_accept_replays_operations_through_the_core():
     assert queue.get_nowait()["type"] == "timeline-changed"
     await controller.undo()
     assert controller.document.items == []
+
+
+@pytest.mark.asyncio
+async def test_accept_is_one_atomic_revision_event_and_undo_snapshot():
+    broker = TimelineEventBroker()
+    queue = broker.subscribe("p1")
+    controller = _controller(broker)
+    store = ProposalStore()
+    proposal = store.create(
+        "p1",
+        controller,
+        message="Add both clips.",
+        operations=[
+            {"operation": "include", "args": {"clip_id": "clip-a"}},
+            {"operation": "include", "args": {"clip_id": "clip-b"}},
+        ],
+        baseline_document=controller.document.model_copy(deep=True),
+    )
+
+    document = await store.accept(proposal.proposal_id, controller)
+
+    assert document.revision == 1
+    assert queue.qsize() == 1
+    await controller.undo()
+    assert controller.document.items == []
+
+
+@pytest.mark.asyncio
+async def test_accept_rejects_a_proposal_prepared_against_an_older_revision():
+    controller = _controller()
+    store = ProposalStore()
+    proposal = store.create(
+        "p1",
+        controller,
+        message="Add clip A.",
+        operations=[{"operation": "include", "args": {"clip_id": "clip-a"}}],
+        baseline_document=controller.document.model_copy(deep=True),
+    )
+    await controller.apply("include", clip_id="clip-b")
+    before = controller.document
+
+    with pytest.raises(Exception, match="revision"):
+        await store.accept(proposal.proposal_id, controller)
+
+    assert controller.document is before
+    assert proposal.status == "pending"
 
 
 @pytest.mark.asyncio
@@ -262,16 +315,204 @@ async def test_run_review_turn_persists_versions_and_history_in_agent_message():
         return {
             "message": "I made a calm version.",
             "operations": [],
-            "versions": [{"version_id": "v1", "title": "Calm"}],
+            "versions": [
+                {
+                    "version_id": "v1",
+                    "title": "Calm",
+                    "vibe": "slow",
+                    "rationale": "Let it breathe.",
+                    "profile": "long_scenic",
+                    "items": [
+                        {
+                            "source_clip_id": "clip-a",
+                            "start_sec": 1,
+                            "end_sec": 7,
+                        }
+                    ],
+                }
+            ],
         }
 
     result = await run_review_turn(
         "p1",
         user_message="Make it calm",
         controller=controller,
-        candidates=[],
+        candidates=[
+            {
+                "clip_id": "clip-a",
+                "file_id": "file-a",
+                "file_name": "A.MOV",
+                "start_sec": 1,
+                "end_sec": 7,
+                "overall_score": 8,
+            }
+        ],
         store=store,
         agent=creative_agent,
     )
 
-    assert result["agent_message"]["payload"]["versions"][0]["title"] == "Calm"
+    version_set = VersionSet.model_validate(result["agent_message"]["payload"]["version_set"])
+    assert version_set.versions[0].title == "Calm"
+    assert version_set.versions[0].sequence_fingerprint == sequence_fingerprint(
+        version_set.versions[0].items
+    )
+    assert version_set.based_on_timeline_revision == 0
+
+
+@pytest.mark.asyncio
+async def test_run_review_turn_uses_one_captured_snapshot_for_context_and_proposal():
+    controller = _controller()
+    store = ProposalStore()
+
+    def agent(context):
+        assert context["timeline"]["revision"] == 0
+        controller._document = controller.document.model_copy(update={"revision": 9})
+        return {
+            "message": "Add clip A.",
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+        }
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Go",
+        controller=controller,
+        candidates=[
+            {
+                "clip_id": "clip-a",
+                "file_id": "file-a",
+                "file_name": "A.MOV",
+                "start_sec": 1.0,
+                "end_sec": 7.0,
+                "overall_score": 8.0,
+            }
+        ],
+        store=store,
+        agent=agent,
+    )
+
+    assert result["proposal"]["based_on_timeline_revision"] == 0
+    assert result["agent_message"]["payload"]["version_set"][
+        "based_on_timeline_revision"
+    ] == 0
+
+
+@pytest.mark.asyncio
+async def test_run_review_turn_fingerprints_the_candidate_context_given_to_the_agent():
+    candidates = [
+        {
+            "clip_id": "clip-a",
+            "file_id": "file-a",
+            "file_name": "A.MOV",
+            "start_sec": 1.0,
+            "end_sec": 7.0,
+            "overall_score": 8.0,
+        }
+    ]
+    expected = review_context_fingerprint(TimelineDocument(), candidates)
+
+    def mutating_agent(context):
+        context["candidates"][0]["overall_score"] = 1.0
+        return {"message": "No model versions.", "operations": []}
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Go",
+        controller=_controller(),
+        candidates=candidates,
+        store=ProposalStore(),
+        agent=mutating_agent,
+    )
+
+    assert result["agent_message"]["payload"]["version_set"][
+        "based_on_review_context_fingerprint"
+    ] == expected
+
+
+def test_deterministic_versions_produce_backend_fingerprinted_recipes():
+    versions = deterministic_versions(
+        [
+            {
+                "clip_id": "clip-a",
+                "file_id": "file-a",
+                "file_name": "A.MOV",
+                "start_sec": 1.0,
+                "end_sec": 7.0,
+                "overall_score": 8.0,
+            }
+        ]
+    )
+
+    assert [version.title for version in versions] == [
+        "Punchy Social Cut",
+        "Cinematic Highlight",
+        "Long Scenic",
+    ]
+    assert all(version.sequence_fingerprint == sequence_fingerprint(version.items) for version in versions)
+
+
+@pytest.mark.asyncio
+async def test_empty_model_versions_use_deterministic_backend_fallback():
+    candidates = [
+        {
+            "clip_id": "clip-a",
+            "file_id": "file-a",
+            "file_name": "A.MOV",
+            "start_sec": 1.0,
+            "end_sec": 7.0,
+            "overall_score": 8.0,
+        }
+    ]
+    result = await run_review_turn(
+        "p1",
+        user_message="Make versions",
+        controller=_controller(),
+        candidates=candidates,
+        store=ProposalStore(),
+        agent=lambda _context: {"message": "Model unavailable", "operations": []},
+    )
+
+    version_set = result["agent_message"]["payload"]["version_set"]
+    assert len(version_set["versions"]) == 3
+    assert version_set["based_on_review_context_fingerprint"] == review_context_fingerprint(
+        TimelineDocument(), candidates
+    )
+
+
+@pytest.mark.asyncio
+async def test_retry_resumes_an_incomplete_turn_without_duplicate_editor_message():
+    store = ProposalStore()
+    message_id = "98e7804a-8128-4389-a283-15e9b482c323b"
+    calls = 0
+
+    def interrupted_then_completed(_context):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("interrupted after editor persistence")
+        return {"message": "Recovered reply.", "operations": []}
+
+    with pytest.raises(RuntimeError, match="interrupted"):
+        await run_review_turn(
+            "p1",
+            user_message="Faster",
+            client_message_id=message_id,
+            controller=_controller(),
+            candidates=[],
+            store=store,
+            agent=interrupted_then_completed,
+        )
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Faster",
+        client_message_id=message_id,
+        controller=_controller(),
+        candidates=[],
+        store=store,
+        agent=interrupted_then_completed,
+    )
+
+    assert result["message"] == "Recovered reply."
+    assert [message.message_id for message in store.session("p1").messages].count(
+        message_id
+    ) == 1

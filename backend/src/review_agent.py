@@ -19,13 +19,23 @@ import logging
 import os
 import subprocess
 import uuid
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from .models import CreativeVersion, CreativeVersionItem, Proposal, ReviewMessage, ReviewSession, TimelineDocument
+from .models import (
+    CreativeVersion,
+    CreativeVersionItem,
+    Proposal,
+    ReviewMessage,
+    ReviewSession,
+    TimelineDocument,
+    VersionSet,
+)
 from .pi_cli_harness import PI_BIN, PI_MODEL, PI_PROVIDER, REPO_ROOT
 from .project_store import read_review_session, write_review_session
+from .review_state import review_context_fingerprint, sequence_fingerprint
 from .timeline_ops import OPERATIONS, Sources, TimelineController, apply_operation
 
 
@@ -116,13 +126,16 @@ class ProposalStore:
         text: str,
         proposal: Optional[Proposal] = None,
         payload: Optional[dict] = None,
+        message_id: Optional[str] = None,
+        reply_to_message_id: Optional[str] = None,
     ) -> ReviewMessage:
         timestamp = _now()
         message = ReviewMessage(
-            message_id=uuid.uuid4().hex,
+            message_id=message_id or uuid.uuid4().hex,
             role=role,
             text=text,
             created_at=timestamp,
+            reply_to_message_id=reply_to_message_id,
             proposal=proposal,
             payload=payload or {},
         )
@@ -145,17 +158,20 @@ class ProposalStore:
         message: str,
         operations: List[dict],
         record_message: bool = True,
+        baseline_document: Optional[TimelineDocument] = None,
     ) -> Proposal:
-        # Validate by simulating on a copy of the live document (no mutation).
-        resulting = _simulate(controller.document, controller.sources, operations)
+        baseline = baseline_document or controller.document.model_copy(deep=True)
+        # Validate by simulating on the captured document (no live mutation).
+        resulting = _simulate(baseline, controller.sources, operations)
         proposal = Proposal(
             proposal_id=uuid.uuid4().hex,
             project_id=project_id,
             message=message,
             operations=operations,
             summary=[_describe(op["operation"], op.get("args", {})) for op in operations],
-            before_item_count=len(controller.document.items),
+            before_item_count=len(baseline.items),
             after_item_count=len(resulting.items),
+            based_on_timeline_revision=baseline.revision,
         )
         if record_message:
             self.append_message(
@@ -190,11 +206,10 @@ class ProposalStore:
         proposal = self._require(proposal_id, project_id)
         if proposal.status != "pending":
             raise ReviewAgentError(f"proposal {proposal_id} is {proposal.status}, not pending")
-        # Replay through the live operations core so the edits land in Undo
-        # History and emit `timeline-changed` (one snapshot per operation).
-        document = controller.document
-        for op in proposal.operations:
-            document = await controller.apply(op["operation"], **op.get("args", {}))
+        document = await controller.apply_batch(
+            proposal.operations,
+            expected_revision=proposal.based_on_timeline_revision,
+        )
         proposal.status = "accepted"
         self._save(proposal.project_id)
         return document
@@ -229,6 +244,7 @@ async def run_review_turn(
     agent: ReviewAgent,
     record_user_message: bool = True,
     candidate_frames: Optional[List[dict]] = None,
+    client_message_id: Optional[str] = None,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -237,12 +253,45 @@ async def run_review_turn(
     proposes any — captures them as a pending Proposal. Returns
     ``{"message", "proposal"}`` (``proposal`` is ``None`` for a chat-only turn).
     """
-    if record_user_message:
-        store.append_message(project_id, role="editor", text=user_message)
+    session = store.session(project_id)
+    editor_message = None
+    if record_user_message and client_message_id:
+        editor_message = next(
+            (message for message in session.messages if message.message_id == client_message_id),
+            None,
+        )
+        if editor_message is not None:
+            if editor_message.role != "editor" or editor_message.text != user_message:
+                raise ReviewAgentError(
+                    f"client message id {client_message_id} was already used for another message"
+                )
+            completed = next(
+                (
+                    message
+                    for message in session.messages
+                    if message.role == "agent"
+                    and message.reply_to_message_id == client_message_id
+                ),
+                None,
+            )
+            if completed is not None:
+                return _turn_result(completed, session)
+        else:
+            editor_message = store.append_message(
+                project_id,
+                role="editor",
+                text=user_message,
+                message_id=client_message_id,
+            )
+    elif record_user_message:
+        editor_message = store.append_message(project_id, role="editor", text=user_message)
+
+    baseline = controller.document.model_copy(deep=True)
+    bounded_candidates = deepcopy(candidates)
     context = {
         "user_message": user_message,
-        "candidates": candidates,
-        "timeline": controller.document.model_dump(),
+        "candidates": deepcopy(bounded_candidates),
+        "timeline": baseline.model_dump(),
         "history": [message.model_dump() for message in store.session(project_id).messages],
         "candidate_frames": candidate_frames or [],
     }
@@ -257,22 +306,46 @@ async def run_review_turn(
             message=message,
             operations=operations,
             record_message=False,
+            baseline_document=baseline,
         )
+    validated_versions = _validate_versions(
+        reply.get("versions") or [], bounded_candidates
+    )
+    if not validated_versions:
+        validated_versions = [
+            version.model_dump() for version in deterministic_versions(bounded_candidates)
+        ]
+    version_set = VersionSet(
+        version_set_id=uuid.uuid4().hex,
+        versions=validated_versions,
+        created_at=_now(),
+        based_on_timeline_revision=baseline.revision,
+        based_on_sequence_fingerprint=sequence_fingerprint(baseline.items),
+        based_on_review_context_fingerprint=review_context_fingerprint(
+            baseline, bounded_candidates
+        ),
+    )
+    payload = dict(reply.get("payload") or {})
+    payload.pop("versions", None)
+    payload["version_set"] = version_set.model_dump()
     agent_message = store.append_message(
         project_id,
         role="agent",
         text=message,
         proposal=proposal,
-        payload={
-            **(reply.get("payload") or {}),
-            **({"versions": reply.get("versions")} if reply.get("versions") else {}),
-        },
+        payload=payload,
+        reply_to_message_id=editor_message.message_id if editor_message else None,
     )
+    return _turn_result(agent_message, store.session(project_id))
+
+
+def _turn_result(agent_message: ReviewMessage, session: ReviewSession) -> dict:
+    proposal = agent_message.proposal
     return {
-        "message": message,
+        "message": agent_message.text,
         "proposal": proposal.model_dump() if proposal else None,
         "agent_message": agent_message.model_dump(),
-        "session": store.session(project_id).model_dump(),
+        "session": session.model_dump(),
     }
 
 
@@ -399,11 +472,104 @@ def _validate_versions(raw_versions: list, candidates: List[dict]) -> List[dict]
                 profile=raw.get("profile") or "cinematic_highlight",
                 total_duration_sec=total,
                 items=items,
+                sequence_fingerprint=sequence_fingerprint(items),
             )
         except ValueError:
             continue
         validated.append(version.model_dump())
     return validated
+
+
+_FALLBACK_RECIPES = (
+    {
+        "version_id": "v-social",
+        "title": "Punchy Social Cut",
+        "vibe": "fast & upbeat",
+        "profile": "short_social",
+        "count": 4,
+        "segment_duration": 3.0,
+        "speed": 1.0,
+        "rationale": "Quick 3s hits for a vertical-friendly social edit.",
+    },
+    {
+        "version_id": "v-cinematic",
+        "title": "Cinematic Highlight",
+        "vibe": "slow & sweeping",
+        "profile": "cinematic_highlight",
+        "count": 3,
+        "segment_duration": 6.0,
+        "speed": 0.5,
+        "rationale": "Fewer, longer beats at half-speed for a cinematic feel.",
+    },
+    {
+        "version_id": "v-scenic",
+        "title": "Long Scenic",
+        "vibe": "relaxed & wide",
+        "profile": "long_scenic",
+        "count": 5,
+        "segment_duration": 6.0,
+        "speed": 1.0,
+        "rationale": "A longer establishing montage that lets each location breathe.",
+    },
+)
+
+
+def deterministic_versions(candidates: List[dict]) -> List[CreativeVersion]:
+    """Build the backend-owned deterministic Manual/model-failure Versions."""
+    usable = [
+        candidate
+        for candidate in candidates
+        if candidate.get("clip_id")
+        and candidate.get("file_id")
+        and candidate.get("file_name")
+        and candidate.get("start_sec") is not None
+        and candidate.get("end_sec") is not None
+        and float(candidate["end_sec"]) > float(candidate["start_sec"])
+    ]
+    if not usable:
+        return []
+    ranked = sorted(
+        usable,
+        key=lambda candidate: float(candidate.get("overall_score") or 0.0),
+        reverse=True,
+    )
+    versions = []
+    for recipe in _FALLBACK_RECIPES:
+        items = []
+        for index in range(recipe["count"]):
+            candidate = ranked[index % len(ranked)]
+            lower = float(candidate["start_sec"])
+            upper = float(candidate["end_sec"])
+            offset = (index // len(ranked)) * recipe["segment_duration"]
+            start = min(lower + offset, max(lower, upper - 1.0))
+            end = min(upper, max(start + 0.5, start + recipe["segment_duration"]))
+            items.append(
+                CreativeVersionItem(
+                    source_clip_id=str(candidate["clip_id"]),
+                    file_id=str(candidate["file_id"]),
+                    file_name=str(candidate["file_name"]),
+                    start_sec=round(start, 2),
+                    end_sec=round(end, 2),
+                    speed=recipe["speed"],
+                )
+            )
+        total = round(
+            sum((item.end_sec - item.start_sec) / item.speed for item in items),
+            1,
+        )
+        versions.append(
+            CreativeVersion(
+                version_id=recipe["version_id"],
+                title=recipe["title"],
+                vibe=recipe["vibe"],
+                rationale=recipe["rationale"],
+                profile=recipe["profile"],
+                total_duration_sec=total,
+                items=items,
+                sequence_fingerprint=sequence_fingerprint(items),
+            )
+        )
+    return versions
 
 
 def default_review_agent(context: dict) -> dict:

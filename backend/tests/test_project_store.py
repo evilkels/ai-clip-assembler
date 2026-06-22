@@ -17,6 +17,7 @@ from src.project_store import (
     open_project,
     read_review_session,
     read_timeline_document,
+    review_session_path,
     rescan_project,
     timeline_document_path,
     write_timeline_document,
@@ -65,6 +66,9 @@ def test_read_review_session_tolerates_missing_and_corrupt_files(tmp_path):
     path.parent.mkdir(parents=True)
     path.write_text("not-json", encoding="utf-8")
 
+    assert read_review_session(project_folder) is None
+
+    path.write_text("[]", encoding="utf-8")
     assert read_review_session(project_folder) is None
 
 
@@ -445,3 +449,54 @@ def test_round_trip_timeline_document_preserves_revision(tmp_path):
 
     assert loaded is not None
     assert loaded.revision == 7
+
+
+def test_read_review_session_migrates_v1_bare_versions_without_rewriting(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    path = review_session_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(
+        {
+            "schema_version": 1,
+            "session_id": "legacy",
+            "updated_at": "2026-06-21T00:00:00Z",
+            "messages": [
+                {
+                    "message_id": "agent-1",
+                    "role": "agent",
+                    "text": "Three versions",
+                    "created_at": "2026-06-21T00:00:00Z",
+                    "payload": {
+                        "versions": [
+                            {
+                                "version_id": "v1",
+                                "title": "Legacy",
+                                "vibe": "calm",
+                                "rationale": "Saved before v2.",
+                                "profile": "long_scenic",
+                                "total_duration_sec": 2,
+                                "items": [
+                                    {
+                                        "source_clip_id": "clip-a",
+                                        "file_id": "file-a",
+                                        "file_name": "A.MOV",
+                                        "start_sec": 1,
+                                        "end_sec": 3,
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                }
+            ],
+        }
+    ) + "\n"
+    path.write_text(raw, encoding="utf-8")
+
+    session = read_review_session(project_folder)
+
+    assert session is not None
+    assert session.schema_version == 2
+    version_set = session.messages[0].payload["version_set"]
+    assert version_set["versions"][0]["sequence_fingerprint"]
+    assert path.read_text(encoding="utf-8") == raw

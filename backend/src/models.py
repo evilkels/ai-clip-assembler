@@ -91,6 +91,7 @@ class Proposal(BaseModel):
     summary: List[str] = Field(default_factory=list)
     before_item_count: int = 0
     after_item_count: int = 0
+    based_on_timeline_revision: int = 0
     status: Literal["pending", "accepted", "rejected"] = "pending"
 
 
@@ -99,12 +100,13 @@ class ReviewMessage(BaseModel):
     role: Literal["agent", "editor"]
     text: str
     created_at: str
+    reply_to_message_id: Optional[str] = None
     proposal: Optional[Proposal] = None
     payload: dict = Field(default_factory=dict)
 
 
 class ReviewSession(BaseModel):
-    schema_version: int = 1
+    schema_version: int = 2
     session_id: str
     messages: List[ReviewMessage] = Field(default_factory=list)
     updated_at: str
@@ -128,6 +130,16 @@ class CreativeVersion(BaseModel):
     profile: Literal["short_social", "cinematic_highlight", "long_scenic", "custom"]
     total_duration_sec: float
     items: List[CreativeVersionItem]
+    sequence_fingerprint: str
+
+
+class VersionSet(BaseModel):
+    version_set_id: str
+    versions: List[CreativeVersion]
+    created_at: str
+    based_on_timeline_revision: int
+    based_on_sequence_fingerprint: str
+    based_on_review_context_fingerprint: str
 
 
 class Transform(BaseModel):

@@ -64,7 +64,13 @@ from .project_store import (
 )
 from .mcp_server import TimelineMCPServer
 from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
-from .timeline_ops import SourceClip, TimelineController, TimelineOpError
+from .review_state import review_context_fingerprint, sequence_fingerprint
+from .timeline_ops import (
+    SourceClip,
+    TimelineController,
+    TimelineOpError,
+    TimelineRevisionConflict,
+)
 from .timeline_service import TimelineEventBroker
 from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes  # noqa: F401 - public test seam
@@ -790,6 +796,7 @@ async def get_timeline(project_id: str):
 class TimelineOpRequest(BaseModel):
     operation: str
     args: dict = {}
+    expected_revision: Optional[int] = None
 
 
 def build_timeline_sources(project: dict) -> dict[str, SourceClip]:
@@ -873,36 +880,65 @@ def get_timeline_controller(project_id: str) -> TimelineController:
     return controller
 
 
+def _timeline_snapshot(project_id: str, document: TimelineDocument) -> dict:
+    candidates = get_mcp_server()._list_candidates(project_id)
+    return {
+        "project_id": project_id,
+        "document": document.model_dump(),
+        "sequence_fingerprint": sequence_fingerprint(document.items),
+        "review_context_fingerprint": review_context_fingerprint(document, candidates),
+    }
+
+
+def _revision_conflict_detail(
+    project_id: str, conflict: TimelineRevisionConflict, controller: TimelineController
+) -> dict:
+    return {
+        "expected_revision": conflict.expected_revision,
+        "current_revision": conflict.current_revision,
+        "current_snapshot": _timeline_snapshot(project_id, controller.document),
+    }
+
+
 @app.get("/projects/{project_id}/timeline/document")
 async def get_timeline_document(project_id: str):
     controller = get_timeline_controller(project_id)
-    return {"project_id": project_id, "document": controller.document.model_dump()}
+    return _timeline_snapshot(project_id, controller.document)
 
 
 @app.post("/projects/{project_id}/timeline/op")
 async def apply_timeline_op(project_id: str, request: TimelineOpRequest):
     controller = get_timeline_controller(project_id)
     try:
-        document = await controller.apply(request.operation, **request.args)
+        document = await controller.apply(
+            request.operation,
+            expected_revision=request.expected_revision,
+            **request.args,
+        )
+    except TimelineRevisionConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=_revision_conflict_detail(project_id, exc, controller),
+        ) from exc
     except TimelineOpError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except TypeError as exc:  # bad/missing args for the operation
         raise HTTPException(status_code=422, detail=f"invalid arguments: {exc}") from exc
-    return {"project_id": project_id, "document": document.model_dump()}
+    return _timeline_snapshot(project_id, document)
 
 
 @app.post("/projects/{project_id}/timeline/undo")
 async def undo_timeline_op(project_id: str):
     controller = get_timeline_controller(project_id)
     document = await controller.undo()
-    return {"project_id": project_id, "document": document.model_dump()}
+    return _timeline_snapshot(project_id, document)
 
 
 @app.post("/projects/{project_id}/timeline/redo")
 async def redo_timeline_op(project_id: str):
     controller = get_timeline_controller(project_id)
     document = await controller.redo()
-    return {"project_id": project_id, "document": document.model_dump()}
+    return _timeline_snapshot(project_id, document)
 
 
 @app.get("/projects/{project_id}/events")
@@ -989,6 +1025,7 @@ async def mcp_endpoint(request: Request):
 
 class ReviewTurnRequest(BaseModel):
     message: str = ""
+    client_message_id: Optional[uuid.UUID] = None
 
 
 def _review_inputs(project_id: str) -> tuple[list, list, object]:
@@ -1026,7 +1063,9 @@ def _review_inputs(project_id: str) -> tuple[list, list, object]:
     return candidates, candidate_frames, agent
 
 
-async def _run_review_turn(project_id: str, user_message: str) -> dict:
+async def _run_review_turn(
+    project_id: str, user_message: str, client_message_id: Optional[str] = None
+) -> dict:
     controller = get_timeline_controller(project_id)
     candidates, candidate_frames, agent = _review_inputs(project_id)
     return await run_review_turn(
@@ -1037,6 +1076,7 @@ async def _run_review_turn(project_id: str, user_message: str) -> dict:
         store=_proposal_store,
         agent=agent,
         candidate_frames=candidate_frames,
+        client_message_id=client_message_id,
     )
 
 
@@ -1049,7 +1089,14 @@ async def review_turn(project_id: str, request: ReviewTurnRequest):
         raise HTTPException(status_code=422, detail="Review message must not be blank")
     lock = _review_locks.setdefault(project_id, asyncio.Lock())
     async with lock:
-        return await _run_review_turn(project_id, message)
+        try:
+            return await _run_review_turn(
+                project_id,
+                message,
+                str(request.client_message_id) if request.client_message_id else None,
+            )
+        except ReviewAgentError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/projects/{project_id}/review/kickoff")
@@ -1108,9 +1155,14 @@ async def accept_proposal(project_id: str, proposal_id: str):
     controller = get_timeline_controller(project_id)
     try:
         document = await _proposal_store.accept(proposal_id, controller, project_id=project_id)
+    except TimelineRevisionConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=_revision_conflict_detail(project_id, exc, controller),
+        ) from exc
     except ReviewAgentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {"project_id": project_id, "document": document.model_dump()}
+    return _timeline_snapshot(project_id, document)
 
 
 @app.post("/projects/{project_id}/proposals/{proposal_id}/reject")

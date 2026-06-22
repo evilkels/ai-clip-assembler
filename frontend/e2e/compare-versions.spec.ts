@@ -125,6 +125,60 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await cards.first().getByTestId('version-card-surface').click();
   await expect(cards.first()).toHaveClass(/expanded/);
 
+  // --- Segmented Version playback timeline ---------------------------------
+  const firstCard = cards.first();
+  const scrubber = firstCard.locator('.version-scrubber-track');
+  await expect(scrubber).toBeVisible();
+  await expect(scrubber).toHaveAttribute('role', 'slider');
+
+  // One segment per Version item, widths proportional to effective duration.
+  const segments = firstCard.locator('.version-scrubber-segment');
+  const segmentCount = await segments.count();
+  expect(segmentCount).toBeGreaterThanOrEqual(2);
+  const widths = await segments.evaluateAll((nodes) =>
+    nodes.map((node) => Number.parseFloat((node as HTMLElement).style.width)),
+  );
+  for (const width of widths) expect(width).toBeGreaterThan(0);
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+  expect(totalWidth).toBeGreaterThan(99);
+  expect(totalWidth).toBeLessThan(101);
+
+  // current / total time, clip N of M, current filename and source timecode.
+  await expect(firstCard.locator('.version-scrubber-time')).toContainText('/');
+  await expect(firstCard.locator('.version-scrubber-time')).toContainText(/\d:\d{2}\.\d/);
+  await expect(firstCard.locator('.version-scrubber-position')).toContainText(
+    `clip 1 of ${segmentCount}`,
+  );
+  await expect(firstCard.locator('.version-scrubber-source')).toContainText(/\d:\d{2}\.\d/);
+
+  // Click-to-seek into the last segment.
+  await segments.last().click();
+  await expect(firstCard.locator('.version-scrubber-position')).toContainText(
+    `clip ${segmentCount} of ${segmentCount}`,
+  );
+
+  // Keyboard Left/Right seeks by one second of Version time.
+  await segments.first().click();
+  await expect(firstCard.locator('.version-scrubber-position')).toContainText(
+    `clip 1 of ${segmentCount}`,
+  );
+  await scrubber.focus();
+  const timeAtStart = await firstCard.locator('.version-scrubber-time').textContent();
+  await scrubber.press('ArrowRight');
+  await expect(firstCard.locator('.version-scrubber-time')).not.toHaveText(timeAtStart ?? '');
+  await scrubber.press('ArrowLeft');
+  await expect(firstCard.locator('.version-scrubber-time')).toHaveText(timeAtStart ?? '');
+
+  // Exclusive playback: starting one Version pauses the previously active one.
+  const firstPlay = cards.nth(0).locator('.version-player-play');
+  const secondPlay = cards.nth(1).locator('.version-player-play');
+  await firstPlay.click();
+  await expect(firstPlay).toHaveAttribute('aria-label', /^Pause/);
+  await secondPlay.click();
+  await expect(secondPlay).toHaveAttribute('aria-label', /^Pause/);
+  await expect(firstPlay).toHaveAttribute('aria-label', /^Play/);
+  await secondPlay.click();
+
   await expect(page.getByTestId('review-chat-panel')).toBeVisible();
   const agentMessage = page.locator('[data-message-id="agent-opening"]');
   const editorMessage = page.locator('[data-message-id="editor-direction"]');

@@ -5,6 +5,8 @@ interface VersionCardProps {
   version: Version;
   projectId: string | null;
   expanded: boolean;
+  playing: boolean;
+  onTogglePlay: () => void;
   onExpand: (id: string) => void;
   onAdopt: (version: Version) => void;
 }
@@ -13,6 +15,8 @@ export function VersionCard({
   version,
   projectId,
   expanded,
+  playing,
+  onTogglePlay,
   onExpand,
   onAdopt,
 }: VersionCardProps) {
@@ -21,23 +25,14 @@ export function VersionCard({
       className={`version-card${expanded ? ' expanded' : ''}`}
       data-testid="version-card"
     >
-      <div
-        className="version-card-surface"
-        data-testid="version-card-surface"
-        role="button"
-        tabIndex={0}
-        onClick={() => onExpand(version.version_id)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onExpand(version.version_id);
-          }
-        }}
-      >
+      <div className="version-card-surface" data-testid="version-card-surface">
         <VersionPlayer
           version={version}
           projectId={projectId}
           expanded={expanded}
+          playing={playing}
+          onTogglePlay={onTogglePlay}
+          onExpand={() => onExpand(version.version_id)}
           testId={`version-player-${version.version_id}`}
         />
       </div>

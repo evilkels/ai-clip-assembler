@@ -14,9 +14,11 @@ export function VersionGallery({
   onAdopt,
 }: VersionGalleryProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Only one Version may play at a time; the gallery owns that single identity.
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   if (versions.length === 0) {
-    return <p className="draft-summary">No versions yet — ask the agent for cuts.</p>;
+    return <p className="draft-summary">No versions yet: ask the agent for cuts.</p>;
   }
 
   return (
@@ -30,6 +32,12 @@ export function VersionGallery({
           version={version}
           projectId={projectId}
           expanded={expandedId === version.version_id}
+          playing={playingId === version.version_id}
+          onTogglePlay={() =>
+            setPlayingId((current) =>
+              current === version.version_id ? null : version.version_id,
+            )
+          }
           onExpand={(id) => setExpandedId((current) => (current === id ? null : id))}
           onAdopt={onAdopt}
         />

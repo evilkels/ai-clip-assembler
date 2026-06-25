@@ -188,3 +188,6 @@ frontend/.vibe/
 frontend/.windsurf/
 frontend/.zencoder/
 frontend/skills/
+
+# Visual brainstorming companion scratch
+.superpowers/

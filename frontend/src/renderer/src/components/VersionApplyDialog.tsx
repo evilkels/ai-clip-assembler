@@ -36,6 +36,10 @@ export function VersionApplyDialog({
   onApply,
   onClose,
 }: VersionApplyDialogProps) {
+  // Intentional one-time capture: the revision is frozen at dialog-open time so
+  // a concurrent edit is detected as a 409 conflict on submit, not silently
+  // applied. It must NOT track later snapshot changes.
+  // react-doctor-disable-next-line react-doctor/no-derived-useState
   const [expectedRevision] = useState(snapshot.document.revision);
   const [applying, setApplying] = useState(false);
   const [conflict, setConflict] = useState(false);
@@ -64,6 +68,9 @@ export function VersionApplyDialog({
     <div className="version-apply-backdrop" role="presentation">
       <section
         className="version-apply-dialog"
+        // Custom modal matches the existing dark editor-console surface; a native
+        // <dialog> migration is a separate design decision (see react-doctor-triage).
+        // react-doctor-disable-next-line react-doctor/prefer-html-dialog
         role="dialog"
         aria-modal="true"
         aria-labelledby="version-apply-title"

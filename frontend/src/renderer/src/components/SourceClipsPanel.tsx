@@ -91,6 +91,8 @@ export function SourceClipsPanel({
                     versionLabels={versionMembership.get(clip.clip_id)}
                     siblingRanges={siblingRanges}
                     fileClipIndex={
+                      // ES2022 target: toSorted() unavailable; spread keeps siblings immutable.
+                      // react-doctor-disable-next-line react-doctor/js-tosorted-immutable
                       [...siblings]
                         .sort((a, b) => a.start_sec - b.start_sec)
                         .findIndex((candidate) => candidate.clip_id === clip.clip_id) + 1

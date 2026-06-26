@@ -56,11 +56,16 @@ test('analysis completes and review/timeline previews render playable videos', a
       timeout: 30_000,
     })
     .toBeGreaterThanOrEqual(1);
-  const included = page.getByRole('button', { name: 'Included ✓', exact: true });
-  if (await included.count()) {
-    await included.first().click();
+  // Ensure at least one Candidate Clip is in the Working Timeline. Candidates
+  // may already be auto-drafted (button reads "Remove from working timeline"),
+  // so only click an "Add" button when one is present.
+  const addToTimeline = page.getByRole('button', {
+    name: 'Add to working timeline',
+    exact: true,
+  });
+  if (await addToTimeline.count()) {
+    await addToTimeline.first().click();
   }
-  await page.getByRole('button', { name: 'Include', exact: true }).first().click();
   await page.goto('/#/playwriter');
   const projectId = await page.getByTestId('qa-project-id').textContent();
   await expect

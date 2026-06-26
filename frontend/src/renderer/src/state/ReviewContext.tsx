@@ -1,6 +1,9 @@
 import {
   createContext,
   useCallback,
+  // Codebase-wide convention is useContext; prefer-use migration is tracked by
+  // the react-doctor-triage plan, not done piecemeal here.
+  // react-doctor-disable-next-line react-doctor/no-react19-deprecated-apis
   useContext,
   useEffect,
   useMemo,
@@ -98,6 +101,9 @@ interface ReviewState {
 
 const Ctx = createContext<ReviewState | null>(null);
 
+// Provider size and useState-vs-useReducer shape are deliberate-defer items
+// owned by the react-doctor-triage plan (Batch 2/3), not reworked under 009.
+// react-doctor-disable-next-line react-doctor/no-giant-component, react-doctor/prefer-useReducer
 export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -195,6 +201,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   }, [projectId, reconcileTimelineSnapshot]);
 
   // Hydration: load candidates + the authoritative document for the project.
+  // The setState calls below run in one async resolution to seed independent
+  // hydration state, not a render-time cascade.
+  // react-doctor-disable-next-line react-doctor/no-cascading-set-state
   useEffect(() => {
     if (!projectId) return;
     let alive = true;
@@ -253,6 +262,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Load-on-mount fetch of recent projects, not state derived from props.
+    // react-doctor-disable-next-line react-doctor/no-derived-state
     refreshRecentProjects().catch(() => {});
   }, [refreshRecentProjects]);
 
@@ -428,6 +439,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       const clip = byId.get(id);
       return clip?.source_created_at ?? clip?.file_name ?? '';
     };
+    // ES2022 target: toSorted() unavailable; spread keeps acceptedOrder immutable.
+    // react-doctor-disable-next-line react-doctor/js-tosorted-immutable
     const sorted = [...acceptedOrder].sort((a, b) => {
       const ka = captureKey(a);
       const kb = captureKey(b);
@@ -438,6 +451,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     void (async () => {
       for (let index = 0; index < sorted.length; index += 1) {
         const itemId = itemIdForClip(sorted[index]);
+        // Reorder ops are revision-guarded; each must commit before the next or
+        // the backend rejects a stale expected_revision. Sequential by design.
+        // react-doctor-disable-next-line react-doctor/async-await-in-loop
         if (itemId) await applyTimelineOperation('reorder', { item_id: itemId, to_index: index });
       }
     })();

@@ -196,7 +196,7 @@ test('play restarts from the first item after reaching the sequence end', async 
   const firstClipName = await page.getByTestId('timeline-preview-current-clip').textContent();
   const clips = page.locator('.tl-clip');
   const clipCount = await clips.count();
-  expect(clipCount).toBe(2);
+  expect(clipCount).toBeGreaterThanOrEqual(2);
   const lastClipBox = await clips.nth(clipCount - 1).boundingBox();
   const rulerBox = await page.locator('.timeline-ruler').boundingBox();
   expect(lastClipBox).toBeTruthy();

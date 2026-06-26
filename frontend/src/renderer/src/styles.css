@@ -792,7 +792,11 @@ a {
   position: relative;
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  /* No flex gap: segment widths sum to 100% of the track, and the playhead is
+     positioned as a percentage of the same track. A gap would shift each
+     segment boundary right by a cumulative amount while leaving the playhead
+     anchored to the track, drifting the needle away from the clip it plays.
+     Segments are separated visually by their border-right instead. */
   width: 100%;
   height: 10px;
   border-radius: 999px;
@@ -837,7 +841,9 @@ a {
   background: #fff;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
   pointer-events: none;
-  transition: left 120ms linear;
+  /* No CSS transition: the playhead is repositioned every animation frame from
+     the video clock during playback, so an eased `left` would make the needle
+     perpetually trail the actual preview frame. */
 }
 
 .version-scrubber-readout {
@@ -857,12 +863,6 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .version-scrubber-playhead {
-    transition: none;
-  }
 }
 
 .version-card-body {

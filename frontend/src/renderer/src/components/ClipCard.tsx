@@ -122,6 +122,9 @@ export function ClipCard({
   const hasSiblings = (fileClipCount ?? 1) > 1;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  // Seed-only: playhead starts at the clip's in-point, then moves independently
+  // as the preview plays. Not state derived from the prop on every render.
+  // react-doctor-disable-next-line react-doctor/no-derived-useState
   const [playheadSec, setPlayheadSec] = useState(clip.start_sec);
   const sourceDuration = clip.source_duration_sec ?? null;
 

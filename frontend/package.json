@@ -11,7 +11,8 @@
     "dev:with-backend": "concurrently -k -n backend,app -c blue,green \"npm run dev:backend\" \"npm run dev\"",
     "dev:backend": "cd ../backend && PYTHONPATH=. .venv/bin/uvicorn src.api:app --reload --port 8000",
     "test:backend": "cd ../backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py",
-    "build": "npm run typecheck && electron-vite build",
+    "build": "npm run typecheck && electron-vite build && npm run copy:assets",
+    "copy:assets": "node -e \"const{join}=require('node:path');const{cpSync}=require('node:fs');cpSync('build',join('out','renderer','build'),{recursive:true});\"",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "lint": "npm run lint:frontend && npm run lint:backend",
@@ -56,11 +57,25 @@
     "appId": "com.evilkels.ai-clip-assembler",
     "productName": "AI Clip Assembler",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
+    "icon": "build/icon.png",
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.video"
+      "category": "public.app-category.video",
+      "icon": "build/icon.png"
     }
   }
 }

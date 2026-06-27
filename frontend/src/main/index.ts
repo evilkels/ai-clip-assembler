@@ -120,6 +120,16 @@ function registerIpcHandlers(): void {
   });
 }
 
+function resolveAssetPath(filename: string): string {
+  // In packaged builds assets live under resources/assets, in dev they sit
+  // next to the compiled main bundle under build/.
+  const packaged = join(process.resourcesPath ?? '', 'assets', filename);
+  if (!app.isPackaged) {
+    return join(__dirname, '..', '..', 'build', filename);
+  }
+  return packaged;
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -131,6 +141,7 @@ function createWindow(): void {
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0f12' : '#eceef2',
     title: 'AI Clip Assembler',
     show: false,
+    icon: resolveAssetPath('icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -162,6 +173,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(resolveAssetPath('icon.png'));
+  }
   registerIpcHandlers();
   createWindow();
 

@@ -30,7 +30,6 @@ The app is still early. Expect rough edges, macOS-first setup, and active change
 - Review board for accepting or rejecting candidate clips.
 - Backend-authoritative timeline with split, retrim, reorder, speed, transform, undo, and redo support.
 - Export to Final Cut Pro XML, DaVinci Resolve XML, and EDL.
-- Local MCP server so external agents can inspect and edit the same live timeline.
 
 ## Privacy model
 
@@ -178,7 +177,6 @@ ai-clip-assembler/
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - common setup and runtime issues
 - [Architecture](docs/ARCHITECTURE.md) - system design
 - [Harness Spec](docs/HARNESS_SPEC.md) - pluggable AI harness contract
-- [MCP Server](docs/MCP_SERVER.md) - agent control surface for the live timeline
 - [Media Prompt Ideas](docs/BRAND_MEDIA_PROMPTS.md) - logo, hero, and screenshot generation prompts
 - [PRD](docs/PRD.md) - product requirements
 

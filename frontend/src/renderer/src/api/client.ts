@@ -172,19 +172,6 @@ export async function rescanProject(projectId: string): Promise<FolderProjectRes
   return res.json() as Promise<FolderProjectResult>;
 }
 
-export async function deleteProjectFiles(
-  projectId: string,
-): Promise<{ project_id: string; deleted: string[] }> {
-  const res = await fetch(`${backendUrl()}/projects/${projectId}/files`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail ?? `Delete project files failed: ${res.status}`);
-  }
-  return res.json() as Promise<{ project_id: string; deleted: string[] }>;
-}
-
 export async function uploadVideo(
   projectId: string,
   file: File,

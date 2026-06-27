@@ -12,7 +12,8 @@ blended (0.7 technical + 0.3 visual interest) scores and unblended technical
 scores are not on the same scale, so the first failed clip aborts AI scoring
 for the whole run and the manual ranking is kept intact.
 
-Configuration is via environment variables only (no config file):
+Environment variables provide the defaults; user edits saved through the
+settings UI override them at runtime (see :mod:`app_settings`):
 
 | Variable         | Default        | Description                                  |
 |------------------|----------------|----------------------------------------------|
@@ -42,13 +43,8 @@ from .models import AssemblyResult, ClipSuggestion, FrameScore
 # uvicorn's logger so progress messages reach the dev console without extra config
 logger = logging.getLogger("uvicorn.error")
 
-# Back-compat aliases for the env defaults. Live values are resolved per call via
-# get_settings() so UI edits take effect without a restart; these remain for any
-# importer that wants the static default.
-PI_BIN = os.environ.get("PI_BIN", "pi")
-PI_PROVIDER = os.environ.get("PI_PROVIDER", "openai-codex")
-PI_MODEL = os.environ.get("PI_MODEL", "gpt-5.4-mini")
-DEFAULT_TIMEOUT = float(os.environ.get("PI_TIMEOUT_SEC", "180"))
+# pi config (binary, provider, model, timeout) is resolved per call via
+# get_settings() so UI edits take effect without a restart — see app_settings.
 DEFAULT_MAX_FRAMES_PER_CLIP = 4
 REQUIRED_SCORE_KEYS = {"smoothness", "visual_interest"}
 REPO_ROOT = Path(__file__).resolve().parents[2]

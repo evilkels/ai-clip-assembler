@@ -23,3 +23,4 @@ Top-level guides:
 - [QA.md](QA.md) — per-feature acceptance tests
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common failures and fixes
 - [LOCAL_QWEN_SETUP.md](LOCAL_QWEN_SETUP.md) — local model setup (postponed harness)
+- [BRAND_MEDIA_PROMPTS.md](BRAND_MEDIA_PROMPTS.md) — logo, README hero, and project media prompt ideas

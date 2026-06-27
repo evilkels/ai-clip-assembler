@@ -16,7 +16,6 @@ import {
   applyTimelineOp,
   createProject,
   createProjectFromFolder,
-  deleteProjectFiles,
   getClipsWithFallback,
   getTimelineDocument,
   listRecentProjects,
@@ -94,7 +93,6 @@ interface ReviewState {
   removeRecent: (folderPath: string) => Promise<void>;
   relocateRecent: (folderPath: string) => Promise<void>;
   rescanOpenProject: () => Promise<void>;
-  deleteOpenProjectFiles: () => Promise<void>;
   acceptedCount: number;
   totalCount: number;
 }
@@ -322,22 +320,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     }
   }, [projectId, projectFolder, resetProjectSession]);
 
-  const deleteOpenProjectFiles = useCallback(async () => {
-    if (!projectId || !projectFolder) return;
-    setLoading(true);
-    try {
-      await deleteProjectFiles(projectId);
-      setRecentProjects(await removeRecentProject(projectFolder));
-      setProjectId(null);
-      setProjectName(null);
-      setProjectFolder(null);
-      setUploadedVideos([]);
-      resetProjectSession();
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, projectFolder, resetProjectSession]);
-
   const setClips = useCallback((nextClips: ClipCandidate[]) => {
     setClipCandidates(nextClips);
     setTrims(
@@ -544,7 +526,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       removeRecent,
       relocateRecent,
       rescanOpenProject,
-      deleteOpenProjectFiles,
       acceptedCount: acceptedOrder.length,
       totalCount: clips.length,
     }),
@@ -587,7 +568,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       removeRecent,
       relocateRecent,
       rescanOpenProject,
-      deleteOpenProjectFiles,
     ],
   );
 

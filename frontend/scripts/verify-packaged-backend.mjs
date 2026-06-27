@@ -31,6 +31,8 @@ for (const snippet of [
   'CLIP_ASSEMBLER_PORT',
   'process.resourcesPath',
   "app.getPath('userData')",
+  'additionalArguments',
+  'clip-assembler-backend-url',
 ]) {
   if (!mainSource.includes(snippet)) {
     throw new Error(`Electron main process is missing packaged backend support: ${snippet}`);
@@ -38,6 +40,6 @@ for (const snippet of [
 }
 
 const preloadSource = readFileSync(join(frontendDir, 'src', 'preload', 'index.ts'), 'utf-8');
-if (!preloadSource.includes('CLIP_ASSEMBLER_BACKEND_URL')) {
-  throw new Error('preload must expose the packaged backend URL from CLIP_ASSEMBLER_BACKEND_URL');
+if (!preloadSource.includes('clip-assembler-backend-url')) {
+  throw new Error('preload must read the packaged backend URL from BrowserWindow additionalArguments');
 }

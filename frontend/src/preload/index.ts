@@ -1,9 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
+const BACKEND_URL_ARG = '--clip-assembler-backend-url=';
+
+function resolveBackendUrl(): string {
+  const arg = process.argv.find((value) => value.startsWith(BACKEND_URL_ARG));
+  return arg?.slice(BACKEND_URL_ARG.length) ?? process.env.VITE_BACKEND_URL ?? DEFAULT_BACKEND_URL;
+}
 
 const bridge = {
-  backendUrl: process.env.CLIP_ASSEMBLER_BACKEND_URL ?? process.env.VITE_BACKEND_URL ?? DEFAULT_BACKEND_URL,
+  backendUrl: resolveBackendUrl(),
   platform: process.platform,
   selectProjectFolder: () => ipcRenderer.invoke('project:select-folder') as Promise<string | null>,
   listRecentProjects: () =>

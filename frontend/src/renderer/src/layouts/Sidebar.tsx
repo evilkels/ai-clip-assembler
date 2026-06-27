@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { selectProjectFolder } from '../api/client';
 import { useReview } from '../state/ReviewContext';
+import { SettingsModal, type SettingsTab } from '../components/SettingsModal';
 
 const routes = [
   { to: '/import', label: 'Import' },
@@ -24,10 +25,9 @@ export function Sidebar() {
     createUploadProject,
     removeRecent,
     relocateRecent,
-    rescanOpenProject,
-    deleteOpenProjectFiles,
   } = useReview();
   const [error, setError] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
 
   const openFolder = async () => {
     setError(null);
@@ -35,20 +35,6 @@ export function Sidebar() {
     if (!folderPath) return;
     try {
       await openProjectFolder(folderPath);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const deleteFiles = async () => {
-    if (!projectFolder) return;
-    const confirmed = window.confirm(
-      'Delete clipassembler/ and exports/ for this project? Source videos will not be deleted.',
-    );
-    if (!confirmed) return;
-    setError(null);
-    try {
-      await deleteOpenProjectFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -116,30 +102,24 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        {projectFolder && (
-          <>
-            <button className="sidebar-action" type="button" onClick={() => rescanOpenProject()} disabled={loading}>
-              Rescan
-            </button>
-            <button className="sidebar-action" type="button" onClick={deleteFiles} disabled={loading}>
-              Delete project files
-            </button>
-          </>
-        )}
         {!projectFolder && (
           <button className="sidebar-action" type="button" onClick={() => createUploadProject()} disabled={loading}>
             Legacy upload project
           </button>
         )}
-        <button className="sidebar-action" type="button">
+        <button className="sidebar-action" type="button" onClick={() => setSettingsTab('settings')}>
           Settings
         </button>
-        <button className="sidebar-action" type="button">
+        <button className="sidebar-action" type="button" onClick={() => setSettingsTab('diagnostics')}>
           Diagnostics
         </button>
         {error && <div className="sidebar-error">{error}</div>}
         {projectName && <div className="sidebar-current">{projectName}</div>}
       </div>
+
+      {settingsTab && (
+        <SettingsModal initialTab={settingsTab} onClose={() => setSettingsTab(null)} />
+      )}
     </aside>
   );
 }

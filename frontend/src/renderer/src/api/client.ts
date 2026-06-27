@@ -623,3 +623,57 @@ export async function getClipsWithFallback(
   if (!projectId) return mockClips;
   return await getClips(projectId);
 }
+
+export interface AppSettings {
+  pi_bin: string;
+  pi_provider: string;
+  pi_model: string;
+  pi_timeout_sec: number;
+}
+
+export interface SettingsResponse {
+  settings: AppSettings;
+  editable: (keyof AppSettings)[];
+}
+
+export async function getSettings(): Promise<SettingsResponse> {
+  const res = await fetch(`${backendUrl()}/settings`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to load settings: ${res.status}`);
+  return res.json() as Promise<SettingsResponse>;
+}
+
+export type SettingsUpdate = Partial<
+  Pick<AppSettings, 'pi_provider' | 'pi_model' | 'pi_timeout_sec'>
+>;
+
+export async function updateSettings(changes: SettingsUpdate): Promise<SettingsResponse> {
+  const res = await fetch(`${backendUrl()}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Saving settings failed: ${res.status}`);
+  }
+  return res.json() as Promise<SettingsResponse>;
+}
+
+export interface ReviewModelDiagnostic {
+  binary: { configured: string; resolved: string | null; found: boolean };
+  provider: string;
+  model: string;
+  reachable: boolean;
+  elapsed_sec: number | null;
+  detail: string;
+}
+
+export interface Diagnostics {
+  review_model: ReviewModelDiagnostic;
+}
+
+export async function getDiagnostics(): Promise<Diagnostics> {
+  const res = await fetch(`${backendUrl()}/diagnostics`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Diagnostics failed: ${res.status}`);
+  return res.json() as Promise<Diagnostics>;
+}

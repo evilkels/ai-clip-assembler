@@ -36,11 +36,15 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
+from .app_settings import get_settings
 from .models import AssemblyResult, ClipSuggestion, FrameScore
 
 # uvicorn's logger so progress messages reach the dev console without extra config
 logger = logging.getLogger("uvicorn.error")
 
+# Back-compat aliases for the env defaults. Live values are resolved per call via
+# get_settings() so UI edits take effect without a restart; these remain for any
+# importer that wants the static default.
 PI_BIN = os.environ.get("PI_BIN", "pi")
 PI_PROVIDER = os.environ.get("PI_PROVIDER", "openai-codex")
 PI_MODEL = os.environ.get("PI_MODEL", "gpt-5.4-mini")
@@ -144,16 +148,22 @@ def _build_prompt(frame_paths: List[str], prompt_template: str) -> str:
 def _call_pi_cli(
     frame_paths: List[str],
     prompt_template: str = DEFAULT_PROMPT_TEMPLATE,
-    provider: str = PI_PROVIDER,
-    model: str = PI_MODEL,
-    pi_bin: str = PI_BIN,
-    timeout_sec: float = DEFAULT_TIMEOUT,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    pi_bin: Optional[str] = None,
+    timeout_sec: Optional[float] = None,
 ) -> dict:
     """Score one clip's frames by invoking the pi CLI once.
 
     Returns a single score dict ``{"smoothness", "visual_interest", "reason"}``.
     Raises :class:`PiCliUnavailableError` on any failure so callers can fall back.
+    Unset arguments fall back to the live :func:`get_settings` values.
     """
+    settings = get_settings()
+    provider = provider or settings["pi_provider"]
+    model = model or settings["pi_model"]
+    pi_bin = pi_bin or settings["pi_bin"]
+    timeout_sec = timeout_sec if timeout_sec is not None else settings["pi_timeout_sec"]
     prompt = _build_prompt(frame_paths, prompt_template)
     command = [
         pi_bin,
@@ -304,10 +314,10 @@ def enhance_clips_with_pi_cli(
     all_frames: List[FrameScore],
     max_frames_per_clip: int = DEFAULT_MAX_FRAMES_PER_CLIP,
     prompt_template: str = DEFAULT_PROMPT_TEMPLATE,
-    provider: str = PI_PROVIDER,
-    model: str = PI_MODEL,
-    pi_bin: str = PI_BIN,
-    timeout_sec: float = DEFAULT_TIMEOUT,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    pi_bin: Optional[str] = None,
+    timeout_sec: Optional[float] = None,
     progress_callback: Optional[Callable[[int, int], None]] = None,
     cache_dir: Optional[Path] = None,
 ) -> Tuple[AssemblyResult, bool]:
@@ -335,6 +345,12 @@ def enhance_clips_with_pi_cli(
     Tuple[AssemblyResult, bool]
         The (possibly enhanced) result and whether AI enhancement succeeded.
     """
+    settings = get_settings()
+    provider = provider or settings["pi_provider"]
+    model = model or settings["pi_model"]
+    pi_bin = pi_bin or settings["pi_bin"]
+    timeout_sec = timeout_sec if timeout_sec is not None else settings["pi_timeout_sec"]
+
     clip_samples: List[Tuple[ClipSuggestion, List[str]]] = []
     for clip in manual_result.clips:
         paths = _sample_frames_for_clip(clip, all_frames, max_frames=max_frames_per_clip)

@@ -8,6 +8,7 @@ timeline assembly, and editor export files.
 import asyncio
 import json
 import logging
+import os
 import shutil
 import subprocess
 import threading
@@ -34,8 +35,9 @@ from .export_engine import (
     generate_fcpxml,
     generate_resolve_xml,
 )
+from .app_settings import EDITABLE_KEYS, get_settings, update_settings
 from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (postponed; kept for future re-enable)
-from .pi_cli_harness import enhance_clips_with_pi_cli
+from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -1241,6 +1243,103 @@ async def export_timeline(
         "total_duration_sec": round(sum(clip["duration_sec"] for clip in clips), 3),
         "warnings": edl_flatten_warnings(clips) if format == "edl" else [],
     }
+
+
+class SettingsUpdateRequest(BaseModel):
+    pi_provider: Optional[str] = None
+    pi_model: Optional[str] = None
+    pi_timeout_sec: Optional[float] = None
+
+
+def _settings_payload() -> dict:
+    """Current settings plus the list of keys the UI may edit."""
+    settings = get_settings()
+    return {"settings": settings, "editable": list(EDITABLE_KEYS)}
+
+
+@app.get("/settings")
+async def read_settings():
+    return _settings_payload()
+
+
+@app.put("/settings")
+async def write_settings(request: SettingsUpdateRequest):
+    changes = request.model_dump(exclude_none=True)
+    if not changes:
+        return _settings_payload()
+    try:
+        update_settings(changes)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _settings_payload()
+
+
+# Diagnostic ping is intentionally short so the UI gets a quick verdict; a slow
+# model is itself a signal worth surfacing rather than blocking on the full
+# per-call timeout.
+_DIAGNOSTIC_TIMEOUT_SEC = 45.0
+
+
+def _ping_review_model(settings: dict) -> dict:
+    """Run a trivial pi turn to confirm the review model is reachable.
+
+    Mirrors how the review agent invokes pi (same provider/model/cwd/env) but
+    with no frames and a tiny prompt, so it isolates binary/auth/model
+    reachability from project-specific failures.
+    """
+    pi_bin = settings["pi_bin"]
+    resolved = shutil.which(pi_bin)
+    binary = {"configured": pi_bin, "resolved": resolved, "found": resolved is not None}
+    result = {
+        "binary": binary,
+        "provider": settings["pi_provider"],
+        "model": settings["pi_model"],
+        "reachable": False,
+        "elapsed_sec": None,
+        "detail": "",
+    }
+    if resolved is None:
+        result["detail"] = f"pi CLI not found on PATH ({pi_bin})"
+        return result
+
+    command = [
+        pi_bin, "--provider", settings["pi_provider"], "--model", settings["pi_model"],
+        "--print", "--mode", "text", "--no-session", "--no-context-files",
+        "--no-skills", "--no-extensions",
+        "Reply with the single word OK.",
+    ]
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            command, capture_output=True, stdin=subprocess.DEVNULL, text=True,
+            timeout=_DIAGNOSTIC_TIMEOUT_SEC, cwd=str(REPO_ROOT), env=os.environ.copy(),
+        )
+    except subprocess.TimeoutExpired:
+        result["elapsed_sec"] = round(time.monotonic() - started, 1)
+        result["detail"] = f"No response within {_DIAGNOSTIC_TIMEOUT_SEC:.0f}s"
+        return result
+    except OSError as exc:
+        result["elapsed_sec"] = round(time.monotonic() - started, 1)
+        result["detail"] = str(exc)
+        return result
+
+    result["elapsed_sec"] = round(time.monotonic() - started, 1)
+    stdout = (completed.stdout or "").strip()
+    if completed.returncode == 0 and stdout:
+        result["reachable"] = True
+        result["detail"] = stdout[:200]
+    else:
+        result["detail"] = (
+            (completed.stderr or completed.stdout or "pi CLI returned no output").strip()[:500]
+        )
+    return result
+
+
+@app.get("/diagnostics")
+async def diagnostics():
+    settings = get_settings()
+    review_model = await asyncio.to_thread(_ping_review_model, settings)
+    return {"review_model": review_model}
 
 
 @app.get("/harnesses")

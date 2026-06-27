@@ -33,7 +33,8 @@ from .models import (
     TimelineDocument,
     VersionSet,
 )
-from .pi_cli_harness import PI_BIN, PI_MODEL, PI_PROVIDER, REPO_ROOT
+from .app_settings import get_settings
+from .pi_cli_harness import REPO_ROOT
 from .project_store import read_review_session, write_review_session
 from .review_state import review_context_fingerprint, sequence_fingerprint
 from .timeline_ops import OPERATIONS, Sources, TimelineController, apply_operation
@@ -587,8 +588,10 @@ def default_review_agent(context: dict) -> dict:
         for frame in context.get("candidate_frames", [])[:12]
         if frame.get("frame_path")
     ]
+    settings = get_settings()
     command = [
-        PI_BIN, "--provider", PI_PROVIDER, "--model", PI_MODEL,
+        settings["pi_bin"], "--provider", settings["pi_provider"],
+        "--model", settings["pi_model"],
         "--print", "--mode", "text", "--no-session", "--no-context-files",
         "--no-skills", "--no-extensions", "--tools", "read",
         *[f"@{path}" for path in frame_paths], prompt,
@@ -596,7 +599,8 @@ def default_review_agent(context: dict) -> dict:
     try:
         completed = subprocess.run(
             command, capture_output=True, stdin=subprocess.DEVNULL, text=True,
-            timeout=120, cwd=str(REPO_ROOT), env=os.environ.copy(),
+            timeout=settings["pi_timeout_sec"], cwd=str(REPO_ROOT),
+            env=os.environ.copy(),
         )
         if completed.returncode != 0 or not (completed.stdout or "").strip():
             raise ReviewAgentError((completed.stderr or "pi CLI returned no output").strip())

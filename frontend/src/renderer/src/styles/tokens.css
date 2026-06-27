@@ -48,7 +48,33 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Non-color tokens shared across every theme. */
 :root {
+  --font-sans: "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --duration-fast: 80ms;
+  --duration-base: 160ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dark palette — the default. Applied when no theme is resolved yet or
+   when the resolved theme is "dark". */
+:root,
+:root[data-theme="dark"] {
   --bg-0: #090b0e;
   --bg-1: #0f1218;
   --bg-2: #151a22;
@@ -73,25 +99,69 @@
   --border-warning: rgba(230, 180, 80, 0.4);
   --text-error: var(--red);
   --text-success: var(--green);
-  --font-sans: "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-md: 14px;
-  --text-lg: 16px;
-  --text-xl: 20px;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --duration-fast: 80ms;
-  --duration-base: 160ms;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
+}
+
+/* Anti-FOUC: before React mounts and sets data-theme, honour the OS
+   preference for the very first paint. (CSP forbids an inline script, so this
+   is done in CSS.) Once data-theme is present the explicit rules below win. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg-0: #eceef2;
+    --bg-1: #f6f7f9;
+    --bg-2: #ffffff;
+    --bg-3: #e7eaf0;
+    --bg-surface: #ffffff;
+    --bg-active: #dde3ec;
+    --border: #d7dbe2;
+    --border-strong: #bcc3cf;
+    --text: #161a21;
+    --text-dim: #525c6b;
+    --text-muted: #8a94a3;
+    --accent: #e11d48;
+    --accent-hover: #be123c;
+    --accent-dim: #ffd9e1;
+    --green: #1f9d57;
+    --yellow: #b07d12;
+    --red: #dc2626;
+    --bg-warning: rgba(176, 125, 18, 0.12);
+    --border-warning: rgba(176, 125, 18, 0.45);
+    --shadow-overlay: 0 16px 48px rgba(20, 25, 35, 0.22);
+
+    color-scheme: light;
+  }
+}
+
+/* Light palette. Inverts the neutral scale while keeping the rose accent,
+   nudged slightly deeper for contrast on light surfaces. */
+:root[data-theme="light"] {
+  --bg-0: #eceef2;
+  --bg-1: #f6f7f9;
+  --bg-2: #ffffff;
+  --bg-3: #e7eaf0;
+  --bg-surface: #ffffff;
+  --bg-active: #dde3ec;
+  --border: #d7dbe2;
+  --border-strong: #bcc3cf;
+  --text: #161a21;
+  --text-dim: #525c6b;
+  --text-muted: #8a94a3;
+  --accent: #e11d48;
+  --accent-hover: #be123c;
+  --accent-dim: #ffd9e1;
+  --green: #1f9d57;
+  --yellow: #b07d12;
+  --red: #dc2626;
+  --window-close: #ff6159;
+  --window-minimize: #ffbd2e;
+  --window-zoom: #28c941;
+  --bg-warning: rgba(176, 125, 18, 0.12);
+  --border-warning: rgba(176, 125, 18, 0.45);
+  --text-error: var(--red);
+  --text-success: var(--green);
+  --shadow-overlay: 0 16px 48px rgba(20, 25, 35, 0.22);
+
+  color-scheme: light;
 }

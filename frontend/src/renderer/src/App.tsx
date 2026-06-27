@@ -6,6 +6,7 @@ import { ExportPage } from './routes/Export';
 import { PlaywriterQaPage } from './routes/PlaywriterQa';
 import { AppShell } from './layouts/AppShell';
 import { ReviewProvider } from './state/ReviewContext';
+import { ThemeProvider } from './state/ThemeContext';
 
 function Shell() {
   return (
@@ -24,8 +25,10 @@ function Shell() {
 
 export default function App() {
   return (
-    <ReviewProvider>
-      <Shell />
-    </ReviewProvider>
+    <ThemeProvider>
+      <ReviewProvider>
+        <Shell />
+      </ReviewProvider>
+    </ThemeProvider>
   );
 }

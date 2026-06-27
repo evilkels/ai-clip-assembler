@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -126,7 +126,9 @@ function createWindow(): void {
     height: 900,
     minWidth: 1024,
     minHeight: 640,
-    backgroundColor: '#0e0f12',
+    // Match the OS appearance so there's no light/dark flash before the
+    // renderer paints. The renderer can still override the theme at runtime.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0f12' : '#eceef2',
     title: 'AI Clip Assembler',
     show: false,
     webPreferences: {

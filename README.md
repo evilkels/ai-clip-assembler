@@ -1,12 +1,8 @@
 # AI Clip Assembler
 
-![AI Clip Assembler cover banner](assets/cover-banner.png)
-
 AI Clip Assembler is a local-first desktop video editor for turning raw MP4 footage into a clean, editable timeline. Import a folder of clips, let the app detect and score useful moments, review the suggestions, adjust the timeline, and export to Final Cut Pro, DaVinci Resolve, or any editor that accepts EDL.
 
 The project is built for creators who come home with long drone, action-camera, travel, or event footage and need a fast first assembly without handing private source media to a cloud service.
-
-![AI Clip Assembler logo](assets/logo.png)
 
 ## The problem
 

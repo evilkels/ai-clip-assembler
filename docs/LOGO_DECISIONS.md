@@ -47,13 +47,20 @@ Each film frame contains brain nodes, scissors at the cut point. Most "technical
 3. **v3** — increased neural network density to ~70% background coverage.
 4. **v4 (final)** — precise geometric scissors with material 3D rendering, dark charcoal on light gray, drop shadow for depth.
 
-## Asset checklist status
+## Asset usage
 
-- [x] `assets/logo.png` — main project logo
-- [x] `assets/icon.png` — square app icon (same source)
-- [ ] `assets/social-preview.png` — GitHub repository social preview, 1280×640
-- [ ] `assets/readme-hero.png` — optional README hero image
-- [ ] `assets/screenshots/` — real app screenshots once UI is public
+**Runtime only — not for README or marketing:**
+
+- `assets/logo.png` — used in the deployed app: launch screen, app window top-left, installer icon, OS dock/taskbar
+- `assets/icon.png` — same source as logo, used as the application icon
+
+These assets are NOT intended to be embedded in the README. The README is a technical product description; the brand mark lives inside the running app.
+
+**For README and other written documentation:** plain text "AI Clip Assembler" header. No image embed.
+
+**Documentation/design reference only:**
+
+- `assets/cover-banner.png` — 16:9 visual for internal design review and future launch materials, not for the current README
 
 ## Next steps (v2 if needed)
 

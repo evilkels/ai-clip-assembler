@@ -55,8 +55,25 @@ Each film frame contains brain nodes, scissors at the cut point. Most "technical
 - [ ] `assets/readme-hero.png` — optional README hero image
 - [ ] `assets/screenshots/` — real app screenshots once UI is public
 
+## OS project mark
+
+`assets/os-mark.png` (1024×1024 transparent) — a clean symbol for small-size contexts (favicon, sidebar, tray icon, badge). Constellation design: 7-9 connected nodes forming a hexagonal/diamond cluster, dark charcoal with 1-2 red accent nodes. No film strip or scissors — only the neural network language of the main logo, distilled into a single recognizable shape.
+
 ## Next steps (v2 if needed)
 
 - Explore wordmark variant (horizontal logo with text)
 - Explore OS project mark (cleaner symbol without scissors/film strip, for small-size contexts)
 - Generate README hero and social preview using the same color palette
+
+## Runtime integration (locked in this branch)
+
+The brand assets are wired into the app build pipeline so they show up where users actually see them:
+
+- **BrowserWindow icon** — `frontend/src/main/index.ts` resolves the icon path at runtime (`resources/assets/icon.png` in packaged builds, `frontend/build/icon.png` in dev) and passes it to the window.
+- **macOS dock icon** — set via `app.dock.setIcon()` on darwin at startup.
+- **Favicon** — `frontend/src/renderer/index.html` links `assets/logo.png` as the favicon.
+- **Sidebar brand** — the React sidebar renders the logo + project name at the top.
+- **Build pipeline** — `npm run build` runs a `copy:assets` post-step that copies `frontend/build/` (which is the canonical staging area, populated by whatever copies `assets/*` into it) into `out/renderer/build/` so the packaged renderer can load the assets via relative paths.
+- **electron-builder** — uses `build/icon.png` as the application icon and ships the assets directory as an `extraResource` so it lands at `resources/assets/` in the `.app` bundle.
+
+`assets/os-mark.png` is the small-size constellation mark (favicon, sidebar, tray, badge). The favicon in the renderer currently points at `logo.png`; switching it to `os-mark.png` is a one-line follow-up if a lighter mark is preferred for the browser tab.

@@ -42,6 +42,10 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar" aria-label="Project sidebar">
+      <div className="sidebar-brand" aria-label="AI Clip Assembler">
+        <img src="./build/logo.png" alt="" className="sidebar-brand-logo" width="32" height="32" />
+        <span className="sidebar-brand-name">AI Clip Assembler</span>
+      </div>
       <button className="sidebar-new-project" type="button" onClick={openFolder} disabled={loading}>
         <span aria-hidden="true">+</span>
         Open Folder

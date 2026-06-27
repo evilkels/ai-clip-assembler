@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -130,7 +131,13 @@ function resolveAssetPath(filename: string): string {
   return packaged;
 }
 
+function resolveOptionalAssetPath(filename: string): string | undefined {
+  const assetPath = resolveAssetPath(filename);
+  return existsSync(assetPath) ? assetPath : undefined;
+}
+
 function createWindow(): void {
+  const icon = resolveOptionalAssetPath('icon.png');
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -141,7 +148,7 @@ function createWindow(): void {
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0f12' : '#eceef2',
     title: 'AI Clip Assembler',
     show: false,
-    icon: resolveAssetPath('icon.png'),
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -174,7 +181,8 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) {
-    app.dock.setIcon(resolveAssetPath('icon.png'));
+    const icon = resolveOptionalAssetPath('icon.png');
+    if (icon) app.dock.setIcon(icon);
   }
   registerIpcHandlers();
   createWindow();

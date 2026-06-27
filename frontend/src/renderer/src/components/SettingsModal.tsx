@@ -95,7 +95,7 @@ function SettingsTabPanel() {
       <section className="settings-group">
         <h3 className="settings-group-title">Appearance</h3>
         <div className="settings-row">
-          <label className="settings-label">Theme</label>
+          <span className="settings-label">Theme</span>
           <ThemeToggle />
         </div>
       </section>
@@ -268,6 +268,10 @@ export function SettingsModal({ initialTab = 'settings', onClose }: SettingsModa
     >
       <section
         className="settings-dialog"
+        // Custom modal matches the existing dark editor-console surface, in line
+        // with VersionApplyDialog; a native <dialog> migration is a separate
+        // design decision tracked there.
+        // react-doctor-disable-next-line react-doctor/prefer-html-dialog
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"

@@ -62,6 +62,10 @@ These assets are NOT intended to be embedded in the README. The README is a tech
 
 - `assets/cover-banner.png` — 16:9 visual for internal design review and future launch materials, not for the current README
 
+## OS project mark
+
+`assets/os-mark.png` (1024×1024 transparent) — a clean symbol for small-size contexts (favicon, sidebar, tray icon, badge). Constellation design: 7-9 connected nodes forming a hexagonal/diamond cluster, dark charcoal with 1-2 red accent nodes. No film strip or scissors — only the neural network language of the main logo, distilled into a single recognizable shape.
+
 ## Next steps (v2 if needed)
 
 - Explore wordmark variant (horizontal logo with text)

@@ -55,6 +55,10 @@ Each film frame contains brain nodes, scissors at the cut point. Most "technical
 - [ ] `assets/readme-hero.png` — optional README hero image
 - [ ] `assets/screenshots/` — real app screenshots once UI is public
 
+## OS project mark
+
+`assets/os-mark.png` (1024×1024 transparent) — a clean symbol for small-size contexts (favicon, sidebar, tray icon, badge). Constellation design: 7-9 connected nodes forming a hexagonal/diamond cluster, dark charcoal with 1-2 red accent nodes. No film strip or scissors — only the neural network language of the main logo, distilled into a single recognizable shape.
+
 ## Next steps (v2 if needed)
 
 - Explore wordmark variant (horizontal logo with text)

@@ -17,6 +17,7 @@
     "dev:backend": "cd ../backend && PYTHONPATH=. .venv/bin/uvicorn src.api:app --reload --port 8000",
     "test:backend": "cd ../backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py",
     "build": "npm run typecheck && npm run stage:assets && electron-vite build && npm run copy:assets",
+    "build:backend": "cd ../backend && python3 -m pip install -r requirements.txt pyinstaller && python3 -m PyInstaller --noconfirm packaging/backend.spec",
     "stage:assets": "node scripts/stage-assets.mjs",
     "copy:assets": "npm run stage:assets",
     "preview": "npm run stage:assets && electron-vite preview",
@@ -28,7 +29,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "postinstall": "electron-builder install-app-deps",
-    "dist": "npm run build && electron-builder",
+    "dist": "npm run build:backend && npm run build && electron-builder",
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
@@ -74,6 +75,11 @@
       {
         "from": "build",
         "to": "assets",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../backend/dist/ai-clip-backend",
+        "to": "backend",
         "filter": ["**/*"]
       }
     ],

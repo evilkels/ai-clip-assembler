@@ -44,13 +44,12 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
   }, [messages, busy, error]);
 
   return (
-    <aside className="review-chat" aria-label="Review agent" data-testid="review-chat-panel">
+    <aside className="review-chat" aria-label="Ask the AI" data-testid="review-chat-panel">
       <div className="review-chat-head">
         <div>
-          <span className="review-zone-label">1 · Direct</span>
-          <strong>Review agent</strong>
+          <strong>Ask the AI</strong>
         </div>
-        <span className="draft-summary">Tell the agent what to change</span>
+        <span className="draft-summary">Describe the cut you want</span>
       </div>
       <div
         ref={logRef}
@@ -71,10 +70,10 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
             key={message.message_id}
             className={`chat-msg chat-${message.role}`}
             data-message-id={message.message_id}
-            aria-label={`${message.role === 'agent' ? 'Review agent' : 'You'} message at ${formatMessageTime(message.created_at)}`}
+            aria-label={`${message.role === 'agent' ? 'AI' : 'You'} message at ${formatMessageTime(message.created_at)}`}
           >
             <header className="chat-msg-meta">
-              <span>{message.role === 'agent' ? 'Review agent' : 'You'}</span>
+              <span>{message.role === 'agent' ? 'AI' : 'You'}</span>
               <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>
             </header>
             <p className="chat-msg-body">{message.text}</p>
@@ -105,13 +104,13 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
         {error ? (
           <article className="chat-msg chat-agent chat-error" role="alert">
             <header className="chat-msg-meta">
-              <span>Review agent</span>
+              <span>AI</span>
             </header>
             <p className="chat-msg-body">{error}</p>
           </article>
         ) : null}
         {busy ? (
-          <output className="chat-busy" aria-label="Review agent is thinking">
+          <output className="chat-busy" aria-label="The AI is thinking">
             <span />
             <span />
             <span />
@@ -132,9 +131,9 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
         <input
           type="text"
           value={input}
-          placeholder="Ask the review agent…"
+          placeholder="Ask the AI…"
           onChange={(event) => setInput(event.target.value)}
-          aria-label="Message the review agent"
+          aria-label="Message the AI"
         />
         <button type="submit" className="btn primary" disabled={busy || !input.trim()}>
           Send

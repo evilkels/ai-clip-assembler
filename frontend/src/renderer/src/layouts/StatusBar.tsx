@@ -23,25 +23,25 @@ export function StatusBar() {
     };
   }, []);
 
-  let statusText = 'Offline';
+  let statusText = 'Not connected';
   if (online) {
-    if (analysisStatus.phase === 'analyzing') statusText = 'Analyzing';
+    if (analysisStatus.phase === 'analyzing') statusText = 'Analyzing footage…';
     else if (uploadedVideos.length > 0 && analysisStatus.phase === 'idle') statusText = 'Ready to analyze';
     else if (analysisStatus.phase === 'complete') statusText = 'Analysis complete';
-    else statusText = `Online · v${version ?? ''}`;
+    else statusText = 'Ready';
   }
 
   return (
     <footer className="statusbar">
-      <span>
+      <span title={online && version ? `Connected · v${version}` : undefined}>
         <span className={`status-dot ${online ? 'online' : 'offline'}`} />
-        Backend {statusText}
+        {statusText}
       </span>
-      <span>ffmpeg ready</span>
-      <span>pi ready</span>
-      <span>
-        {acceptedCount} accepted / {totalCount} candidates
-      </span>
+      {totalCount > 0 && (
+        <span>
+          {acceptedCount} of {totalCount} clips kept
+        </span>
+      )}
     </footer>
   );
 }

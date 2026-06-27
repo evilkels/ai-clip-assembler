@@ -25,7 +25,7 @@ export function VersionGallery({
 
   const versions = versionSet?.versions ?? [];
   if (versions.length === 0) {
-    return <p className="draft-summary">No versions yet: ask the agent for cuts.</p>;
+    return <p className="draft-summary">No suggestions yet. Ask the AI for a cut.</p>;
   }
 
   return (

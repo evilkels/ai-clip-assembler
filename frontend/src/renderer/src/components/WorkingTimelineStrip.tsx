@@ -14,14 +14,14 @@ export function WorkingTimelineStrip() {
       onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
       <summary>
-        <span className="review-zone-label">4 · Commit</span>
-        <strong>Working Timeline · authoritative · sent to export</strong>
+        <strong>Your video</strong>
+        <span className="working-timeline-note">This is what gets exported</span>
         <span className="draft-summary">
-          {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'}
+          {timelineItems.length} clip{timelineItems.length === 1 ? '' : 's'}
         </span>
       </summary>
       {timelineItems.length === 0 ? (
-        <p className="working-timeline-empty">Add Source Clips or apply a Version to build the Working Timeline.</p>
+        <p className="working-timeline-empty">Add clips or apply a suggested cut to start building your video.</p>
       ) : (
         <div className="working-timeline-list">
           {timelineItems.map((item, index) => {

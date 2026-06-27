@@ -43,3 +43,10 @@ const preloadSource = readFileSync(join(frontendDir, 'src', 'preload', 'index.ts
 if (!preloadSource.includes('clip-assembler-backend-url')) {
   throw new Error('preload must read the packaged backend URL from BrowserWindow additionalArguments');
 }
+
+const rendererHtml = readFileSync(join(frontendDir, 'src', 'renderer', 'index.html'), 'utf-8');
+for (const snippet of ['connect-src', 'http://127.0.0.1:*', 'http://localhost:*']) {
+  if (!rendererHtml.includes(snippet)) {
+    throw new Error(`renderer CSP must allow packaged backend connections: ${snippet}`);
+  }
+}

@@ -1,14 +1,55 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { selectProjectFolder } from '../api/client';
 import { useReview } from '../state/ReviewContext';
 import { SettingsModal, type SettingsTab } from '../components/SettingsModal';
 
-const routes = [
-  { to: '/import', label: 'Import' },
-  { to: '/review', label: 'Review' },
-  { to: '/timeline', label: 'Timeline' },
-  { to: '/export', label: 'Export' },
+const ImportIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M5 21h14" />
+  </svg>
+);
+const ReviewIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="2.6" />
+  </svg>
+);
+const TimelineIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="6" width="7" height="5" rx="1" />
+    <rect x="14" y="6" width="7" height="5" rx="1" />
+    <rect x="3" y="14" width="11" height="5" rx="1" />
+  </svg>
+);
+const ExportIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 16V4" />
+    <path d="m7 9 5-5 5 5" />
+    <path d="M5 20h14" />
+  </svg>
+);
+
+const CheckIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m5 12 5 5L20 6" />
+  </svg>
+);
+
+type WorkflowStep = {
+  to: string;
+  label: string;
+  hint: string;
+  icon: ReactNode;
+};
+
+const steps: WorkflowStep[] = [
+  { to: '/import', label: 'Import', hint: 'Add your footage', icon: ImportIcon },
+  { to: '/review', label: 'Review', hint: 'Pick the best clips', icon: ReviewIcon },
+  { to: '/timeline', label: 'Timeline', hint: 'Arrange & trim', icon: TimelineIcon },
+  { to: '/export', label: 'Export', hint: 'Save your video', icon: ExportIcon },
 ];
 
 function basename(path: string): string {
@@ -25,9 +66,20 @@ export function Sidebar() {
     createUploadProject,
     removeRecent,
     relocateRecent,
+    uploadedVideos,
+    acceptedCount,
+    timelineItems,
   } = useReview();
   const [error, setError] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+
+  // Which workflow steps already have work in them — drives the progress ticks.
+  const stepDone: Record<string, boolean> = {
+    '/import': uploadedVideos.length > 0,
+    '/review': acceptedCount > 0,
+    '/timeline': timelineItems.length > 0,
+    '/export': false,
+  };
 
   const openFolder = async () => {
     setError(null);
@@ -92,23 +144,39 @@ export function Sidebar() {
 
       <nav className="sidebar-section" aria-label="Workflow">
         <div className="sidebar-section-label">Workflow</div>
-        <div className="route-list">
-          {routes.map((route) => (
-            <NavLink
-              className={({ isActive }) => (isActive ? 'route-link active' : 'route-link')}
-              key={route.to}
-              to={route.to}
-            >
-              {route.label}
-            </NavLink>
-          ))}
-        </div>
+        <ol className="workflow-steps">
+          {steps.map((step, index) => {
+            const done = stepDone[step.to];
+            return (
+              <li className="workflow-step" key={step.to}>
+                <NavLink
+                  className={({ isActive }) =>
+                    `step-link${isActive ? ' active' : ''}${done ? ' done' : ''}`
+                  }
+                  to={step.to}
+                >
+                  <span className="step-marker" aria-hidden="true">
+                    <span className="step-number">{index + 1}</span>
+                    <span className="step-check">{CheckIcon}</span>
+                  </span>
+                  <span className="step-body">
+                    <span className="step-label">
+                      <span className="step-icon">{step.icon}</span>
+                      {step.label}
+                    </span>
+                    <span className="step-hint">{step.hint}</span>
+                  </span>
+                </NavLink>
+              </li>
+            );
+          })}
+        </ol>
       </nav>
 
       <div className="sidebar-footer">
         {!projectFolder && (
           <button className="sidebar-action" type="button" onClick={() => createUploadProject()} disabled={loading}>
-            Legacy upload project
+            Upload files instead
           </button>
         )}
         <button className="sidebar-action" type="button" onClick={() => setSettingsTab('settings')}>

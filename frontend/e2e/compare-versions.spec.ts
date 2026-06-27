@@ -246,12 +246,12 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   for (const vibe of await cards.getByTestId('version-vibe').all()) {
     await expect(vibe).toContainText(/[1-9]\d*(?:\.\d+)?s/);
   }
-  await expect(page.getByText('1 · Direct', { exact: true })).toBeVisible();
-  await expect(page.getByText('2 · Compare', { exact: true })).toBeVisible();
-  await expect(page.getByText('3 · Inspect', { exact: true })).toBeVisible();
-  await expect(page.getByText('4 · Commit', { exact: true })).toBeVisible();
+  await expect(page.getByText('Ask the AI', { exact: true })).toBeVisible();
+  await expect(page.getByText('Suggested cuts', { exact: true })).toBeVisible();
+  await expect(page.getByRole('strong').filter({ hasText: /^All clips \(\d+\)$/ })).toBeVisible();
+  await expect(page.getByText('Your video', { exact: true })).toBeVisible();
   await expect(
-    page.getByText('Versions are snapshots. Source Clip edits change the Working Timeline, not these previews.'),
+    page.getByText('These are previews. Editing individual clips changes your video, not these suggestions.'),
   ).toBeVisible();
   await expect(cards.nth(0)).toContainText('Current suggestion');
   await expect(cards.nth(2)).toContainText('Unavailable');
@@ -269,15 +269,15 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await timelineSourceCard.getByRole('button', { name: 'Add to working timeline' }).click();
   await expect(timelineSourceCard).toContainText(/Timeline #\d+/);
   await expect(
-    page.getByText('Working Timeline or Source Clips changed since these Versions were created.'),
+    page.getByText('Your video or clip choices changed since these suggestions were made.'),
   ).toBeVisible();
   await expect(sourcePanelForState.getByText(/Proposed in/)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Ask agent to refresh versions' }).click();
+  await page.getByRole('button', { name: 'Ask the AI to refresh suggestions' }).click();
   await expect(
     page.getByText('Refresh the three versions using my current Working Timeline and Source Clip decisions.'),
   ).toBeVisible();
   await expect(
-    page.getByText('Working Timeline or Source Clips changed since these Versions were created.'),
+    page.getByText('Your video or clip choices changed since these suggestions were made.'),
   ).toHaveCount(0);
   await expect(sourcePanelForState.getByText('Proposed in A/C')).toBeVisible();
 
@@ -355,7 +355,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(page.getByTestId('review-chat-panel')).toBeVisible();
   const agentMessage = page.locator('[data-message-id="agent-opening"]');
   const editorMessage = page.locator('[data-message-id="editor-direction"]');
-  await expect(agentMessage).toHaveAccessibleName(/Review agent/);
+  await expect(agentMessage).toHaveAccessibleName(/AI message/);
   await expect(editorMessage).toHaveAccessibleName(/You/);
   await expect(agentMessage.locator('time')).toHaveAttribute(
     'datetime',
@@ -373,18 +373,18 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
     await editorMessage.evaluate((node) => getComputedStyle(node).backgroundColor),
   );
 
-  await page.getByLabel('Message the review agent').fill('Make the ending breathe.');
+  await page.getByLabel('Message the AI').fill('Make the ending breathe.');
   await page.getByRole('button', { name: 'Send' }).click();
   const optimisticBubble = page
     .locator('.chat-msg')
     .filter({ hasText: 'Make the ending breathe.' });
   await expect(optimisticBubble).toBeVisible();
   await expect(optimisticBubble).toContainText('Sending');
-  await expect(page.getByRole('status', { name: 'Review agent is thinking' })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'The AI is thinking' })).toBeVisible();
   await expect(page.locator(`[data-message-id="agent-${reviewRequestIds[0]}"]`)).toBeVisible();
   await expect(optimisticBubble).not.toContainText('Sending');
 
-  await page.getByLabel('Message the review agent').fill('Retry this direction.');
+  await page.getByLabel('Message the AI').fill('Retry this direction.');
   await page.getByRole('button', { name: 'Send' }).click();
   const failedBubble = page.locator('.chat-msg').filter({ hasText: 'Retry this direction.' });
   await expect(failedBubble).toContainText('Not sent');
@@ -453,6 +453,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   const workingTimeline = page.getByTestId('working-timeline-strip');
   await workingTimeline.locator('summary').click();
   await expect(workingTimeline).not.toHaveAttribute('open');
-  await page.getByLabel('Smoothness threshold value').fill('6.5');
+  await page.getByLabel('Stability threshold value').fill('6.5');
   await expect(workingTimeline).not.toHaveAttribute('open');
 });

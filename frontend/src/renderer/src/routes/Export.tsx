@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
 import { exportTimeline, openInDaVinci, updateTimeline, type ExportFormat } from '../api/client';
+import { EmptyState } from '../components/EmptyState';
 import type { ClipCandidate } from '../types/clip';
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }> = [
@@ -115,7 +116,19 @@ export function ExportPage() {
         )}
 
         {acceptedClips.length === 0 ? (
-          <div className="empty-state">No clips accepted yet. Pick keepers on the Review tab.</div>
+          <EmptyState
+            icon={
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 16V4" />
+                <path d="m7 9 5-5 5 5" />
+                <path d="M5 20h14" />
+              </svg>
+            }
+            title="Nothing to export yet"
+            hint="Choose the clips you want on the Review step, then come back here to save your video."
+            actionLabel="Go to Review"
+            actionTo="/review"
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 8 }}>

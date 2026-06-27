@@ -100,11 +100,11 @@ export function ReviewPage() {
       <div className="page-header">
         <div>
           <h1>Review</h1>
-          <p>Compare complete cuts, then choose one as the working timeline.</p>
+          <p>Let the AI suggest a full cut, or pick clips yourself, then refine.</p>
         </div>
         <div className="controls">
           <div className="control">
-            <label htmlFor="smoothness">Smoothness ≥</label>
+            <label htmlFor="smoothness">Stability ≥</label>
             <input
               id="smoothness"
               type="range"
@@ -120,12 +120,12 @@ export function ReviewPage() {
               max={10}
               step={0.5}
               value={smoothnessThreshold}
-              aria-label="Smoothness threshold value"
+              aria-label="Stability threshold value"
               onChange={(event) => setSmoothnessThreshold(Number(event.target.value))}
             />
           </div>
           <span className="draft-summary">
-            {filtered.length} / {ranked.length} pass threshold
+            {filtered.length} of {ranked.length} shown
           </span>
         </div>
       </div>
@@ -135,22 +135,21 @@ export function ReviewPage() {
           <ReviewChatPanel key={projectId} conversation={conversation} />
         </aside>
         <main className="review-main">
-          <section className="version-zone" aria-label="Proposed versions">
+          <section className="version-zone" aria-label="Suggested cuts">
             <div className="version-zone-head">
               <div>
-                <span className="review-zone-label">2 · Compare</span>
-                <strong>Versions</strong>
+                <strong>Suggested cuts</strong>
               </div>
               <span className="draft-summary">
-                {refreshingVersions ? 'Updating' : 'Preview complete proposed cuts'}
+                {refreshingVersions ? 'Updating…' : 'Full edits the AI proposes. Preview, then apply one.'}
               </span>
             </div>
             <p className="review-pipeline-helper">
-              Versions are snapshots. Source Clip edits change the Working Timeline, not these previews.
+              These are previews. Editing individual clips changes your video, not these suggestions.
             </p>
             {versionSetIsStale ? (
               <output className="version-stale-banner">
-                <span>Working Timeline or Source Clips changed since these Versions were created.</span>
+                <span>Your video or clip choices changed since these suggestions were made.</span>
                 <button
                   type="button"
                   className="btn subtle"
@@ -162,7 +161,7 @@ export function ReviewPage() {
                   }}
                   disabled={conversation.busy}
                 >
-                  Ask agent to refresh versions
+                  Ask the AI to refresh suggestions
                 </button>
               </output>
             ) : null}

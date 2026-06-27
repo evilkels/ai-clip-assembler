@@ -8,6 +8,7 @@ import { join } from 'node:path';
 const isDev = !app.isPackaged;
 const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
 let backendProcess: ChildProcessWithoutNullStreams | undefined;
+let packagedBackendUrl: string | undefined;
 
 interface RecentProject {
   folderPath: string;
@@ -198,7 +199,7 @@ async function startPackagedBackend(): Promise<void> {
   });
 
   await waitForBackend(backendUrl);
-  process.env.CLIP_ASSEMBLER_BACKEND_URL = backendUrl;
+  packagedBackendUrl = backendUrl;
 }
 
 function stopPackagedBackend(): void {
@@ -209,6 +210,9 @@ function stopPackagedBackend(): void {
 
 function createWindow(): void {
   const icon = resolveOptionalAssetPath('icon.png');
+  const additionalArguments = packagedBackendUrl
+    ? [`--clip-assembler-backend-url=${packagedBackendUrl}`]
+    : [];
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -225,6 +229,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      additionalArguments,
     },
   });
 

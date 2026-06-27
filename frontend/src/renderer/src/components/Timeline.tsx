@@ -10,6 +10,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useReview } from '../state/ReviewContext';
+import { EmptyState } from './EmptyState';
 import type { ClipCandidate } from '../types/clip';
 import { ClipPreview } from './ClipPreview';
 import { useSequencePlayer } from './useSequencePlayer';
@@ -503,9 +504,19 @@ export function Timeline() {
 
   if (acceptedClips.length === 0) {
     return (
-      <div className="empty-state">
-        No clips on the timeline yet. Accept keepers on the Review tab to assemble a sequence.
-      </div>
+      <EmptyState
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="6" width="7" height="5" rx="1" />
+            <rect x="14" y="6" width="7" height="5" rx="1" />
+            <rect x="3" y="14" width="11" height="5" rx="1" />
+          </svg>
+        }
+        title="Your timeline is empty"
+        hint="Pick the clips you want on the Review step, then arrange and trim them here."
+        actionLabel="Go to Review"
+        actionTo="/review"
+      />
     );
   }
 

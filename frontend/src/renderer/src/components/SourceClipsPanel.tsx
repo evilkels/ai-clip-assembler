@@ -41,9 +41,8 @@ export function SourceClipsPanel({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        <span className="review-zone-label">3 · Inspect</span>
-        <strong>Source Clips ({clips.length})</strong>
-        <span className="draft-summary">Add individual Source Clips to the Working Timeline</span>
+        <strong>All clips ({clips.length})</strong>
+        <span className="draft-summary">Add individual clips to your video</span>
       </summary>
       {/* Closed details still mount children, so conditionally render to avoid N video streams. */}
       {open ? (
@@ -65,7 +64,7 @@ export function SourceClipsPanel({
             <div className="empty-state">{error}</div>
           ) : clips.length === 0 ? (
             <div className="empty-state">
-              No candidates above smoothness {smoothnessThreshold}. Lower the threshold to see more.
+              No clips above stability {smoothnessThreshold}. Lower the threshold to see more.
             </div>
           ) : (
             <div className="review-grid">

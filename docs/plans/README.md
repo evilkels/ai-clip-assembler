@@ -11,7 +11,9 @@ Two kinds of plans live side by side:
   2026-06-10 direction audit at `6a39ed1`; plans 005-008 came from the focused
   candidate-quality/review-chat audit on 2026-06-21 at `6744eaa`; plan 009 came
   from real-footage Review workflow validation and its approved connected-
-  pipeline design. Execute in numbered order unless dependencies say otherwise.
+  pipeline design; plans 010-011 came from the 2026-06-28 coding-architecture
+  audit at `412ffc3` (module boundaries, coupling, FE/BE contract drift).
+  Execute in numbered order unless dependencies say otherwise.
   Each executor: read the plan fully before starting, honor its STOP conditions,
   and update the row.
 - **Named product plans** — feature/product planning docs. Each carries its
@@ -30,6 +32,8 @@ Two kinds of plans live side by side:
 | [007](done/007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
 | [008](done/008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | DONE (2026-06-21) — persistent accessible bubbles + interaction feedback |
 | [009](done/009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | DONE (2026-06-28) — Tasks 1–5 merged to `main`; 319 backend tests + ruff + typecheck + build + `compare-versions.spec.ts` green at `f469e43`. Task 6 ceremony (full Playwright, synthetic_e2e, react-doctor, independent review) not re-run — non-blocking. |
+| [010](010-shared-frontend-backend-contract.md) | Generate frontend domain types from backend models (kill contract drift) | P1 | M | — | TODO (2026-06-28 architecture audit) — highest-leverage missing abstraction; codegen via `pydantic-to-typescript`. |
+| [011](011-decompose-api-god-module.md) | Decompose `api.py` god-module — extract analysis pipeline into a service (slice 1) | P1 | L | — | TODO (2026-06-28 architecture audit) — characterization tests first; timeline/review/repository slices are later plans. |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -104,6 +108,38 @@ From the 2026-06-10 direction audit (full findings in the session report):
 - **Privacy consent + labeling** (README.md:7 "footage never leaves your machine" vs. default `pi_agent` harness sending sampled frames to a cloud model via the pi CLI; PRD requires explicit consent for cloud AI, docs/PRD.md:127): real and cheap to fix, but the operator deselected it this round. Re-surface before any public release.
 - **Finish in-flight UX backlog** (project sidebar partial, settings page draft): already planned above; needs execution, not another plan.
 - **Keyboard-first review ergonomics** (PRD Story 3: J/K/L, I/O, manual clip creation): deferred until plan 001's validation session shows where review friction actually is.
+
+## 2026-06-28 coding-architecture audit
+
+Focus: module boundaries, coupling, abstractions, structural tech debt (backend
++ frontend), at `412ffc3`. Fixed directly this session (small/safe, verified —
+no plan needed):
+
+- **Shared backend harness helpers** — `_sample_frames_for_clip` + `_clamp_score`
+  were byte-identical in `pi_cli_harness` and `local_qwen_harness`; moved to
+  `backend/src/harness_utils.py`. (commit `3bbbd29`; 321 tests + ruff green.)
+- **Centralised frontend formatters** — duplicated `formatTime`/`formatDuration`/
+  `formatDate`/`formatBytes`/`formatTimecode` consolidated into
+  `frontend/.../lib/format.ts`. (commit `374d67b`; typecheck + lint green.)
+- **Declared carried clip fields** — `source_created_at`/`source_duration_sec`
+  added to `ClipSuggestion` instead of being bolted on after `model_dump()`.
+  (commit `f0999aa`; 321 tests + ruff green.)
+
+Turned into plans: **010** (FE/BE contract codegen — highest leverage) and
+**011** (decompose `api.py`, slice 1).
+
+Deferred / folded (recorded so they aren't re-audited as new):
+
+- **`ReviewContext` god-context (581 lines) and `Timeline.tsx`/`Import.tsx`
+  god-components** — real, but overlap the existing `react-doctor-triage`
+  plan's Batch 2/3 (giant-component / derived-state). Reconcile there rather
+  than opening a competing plan.
+- **Harness registry / ABC** — `HARNESS_SPEC.md` promises 5 harnesses; only
+  `pi_agent` + `manual` are live (`local_qwen` postponed). The registry
+  abstraction is premature until more harnesses actually ship. Revisit then.
+- **`projects`-dict repository + persistence write-policy** (crash-safety
+  between mutate and `persist_project_results`; swallowed `OSError` in the
+  timeline on-change) — folded into plan 011's later slice 4, not standalone.
 
 ## Findings considered and rejected
 

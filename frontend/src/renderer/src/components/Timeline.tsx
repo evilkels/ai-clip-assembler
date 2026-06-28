@@ -14,6 +14,7 @@ import { EmptyState } from './EmptyState';
 import type { ClipCandidate } from '../types/clip';
 import { ClipPreview } from './ClipPreview';
 import { useSequencePlayer } from './useSequencePlayer';
+import { formatClock } from '../lib/format';
 
 const MIN_PX_PER_SEC = 6;
 const MAX_PX_PER_SEC = 160;
@@ -41,13 +42,6 @@ function clamp(value: number, lo: number, hi: number): number {
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
-}
-
-function formatTime(sec: number): string {
-  const safe = Math.max(0, sec);
-  const m = Math.floor(safe / 60);
-  const s = (safe - m * 60).toFixed(1);
-  return `${m}:${s.padStart(4, '0')}`;
 }
 
 function niceStep(pxPerSec: number): number {
@@ -153,7 +147,7 @@ export function Timeline() {
       playheadLineRef.current.style.left = `${timelineSec * pxPerSecRef.current}px`;
     }
     if (timecodeRef.current) {
-      timecodeRef.current.textContent = `${formatTime(timelineSec)} / ${formatTime(totalDurationRef.current)}`;
+      timecodeRef.current.textContent = `${formatClock(timelineSec)} / ${formatClock(totalDurationRef.current)}`;
     }
     const now = performance.now();
     if (now - lastPlayheadSetRef.current > PLAYHEAD_THROTTLE_MS) {
@@ -548,10 +542,10 @@ export function Timeline() {
               {previewSegment.clip.file_name}
             </strong>
             <span>
-              Source {formatTime(previewSegment.trimStart)} → {formatTime(previewSegment.trimEnd)}
+              Source {formatClock(previewSegment.trimStart)} → {formatClock(previewSegment.trimEnd)}
             </span>
             <span>
-              Timeline {formatTime(previewSegment.offset)} · {previewSegment.duration.toFixed(1)}s
+              Timeline {formatClock(previewSegment.offset)} · {previewSegment.duration.toFixed(1)}s
             </span>
           </div>
         </section>
@@ -589,7 +583,7 @@ export function Timeline() {
             ▶
           </button>
           <span className="timecode" ref={timecodeRef}>
-            {formatTime(playhead)} / {formatTime(totalDuration)}
+            {formatClock(playhead)} / {formatClock(totalDuration)}
           </span>
           {currentSegment && (
             <span className="timeline-current" title={currentSegment.clip.file_name}>
@@ -628,7 +622,7 @@ export function Timeline() {
           <div className="timeline-ruler" onPointerDown={startScrub}>
             {ticks.map((t) => (
               <div key={t} className="tick" style={{ left: t * pxPerSec }}>
-                <span className="tick-label">{formatTime(t)}</span>
+                <span className="tick-label">{formatClock(t)}</span>
               </div>
             ))}
           </div>

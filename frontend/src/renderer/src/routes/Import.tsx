@@ -11,12 +11,7 @@ import {
   type AnalysisProgress,
   type HarnessInfo,
 } from '../api/client';
-
-function formatDuration(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = (sec % 60).toFixed(1);
-  return `${m}:${s.padStart(4, '0')}`;
-}
+import { formatBytes, formatClock, formatDate } from '../lib/format';
 
 function formatResolution(metadata: {
   resolution: [number, number];
@@ -30,26 +25,6 @@ function formatResolution(metadata: {
       : metadata.resolution;
   const orientation = h > w ? ' ↕' : '';
   return `${w}×${h}${orientation}`;
-}
-
-function formatDate(iso?: string): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function formatBytes(bytes?: number): string {
-  if (!bytes || bytes <= 0) return '—';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(value >= 100 || unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
 const HARNESS_HINTS: Record<string, string> = {
@@ -527,7 +502,7 @@ export function ImportPage() {
                       </td>
                       <td style={{ padding: '6px 8px' }}>{v.file_name}</td>
                       <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {v.metadata ? formatDuration(v.metadata.duration_sec) : 'Pending'}
+                        {v.metadata ? formatClock(v.metadata.duration_sec) : 'Pending'}
                       </td>
                       <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                         {v.metadata ? v.metadata.fps.toFixed(2) : '—'}

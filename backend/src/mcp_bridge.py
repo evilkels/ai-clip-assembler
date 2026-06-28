@@ -7,7 +7,7 @@ import asyncio
 import copy
 import json
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, BinaryIO, Dict, List, Optional
 
 import httpx
 
@@ -34,7 +34,7 @@ class MCPStdioBridge:
             arguments = params.setdefault("arguments", {})
             if "project_id" not in arguments:
                 if descriptor.active_project_id is None:
-                    return self._error(message_id, "Open AI Clip Assembler and a project, then retry.")
+                    return self._error(message_id, "No project open in the app.")
                 arguments["project_id"] = descriptor.active_project_id
 
         try:
@@ -53,29 +53,71 @@ class MCPStdioBridge:
         return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32000, "message": message}}
 
 
+def read_message(stream: BinaryIO) -> Optional[Dict[str, Any]]:
+    content_length = None
+
+    while True:
+        line = stream.readline()
+        if line == b"":
+            if content_length is None:
+                return None
+            raise ValueError("Unexpected EOF while reading MCP headers")
+        if line in (b"\r\n", b"\n"):
+            break
+
+        try:
+            header_name, header_value = line.decode("ascii").split(":", 1)
+        except ValueError as exc:
+            raise ValueError("Malformed MCP header") from exc
+
+        if header_name.strip().lower() == "content-length":
+            try:
+                content_length = int(header_value.strip())
+            except ValueError as exc:
+                raise ValueError("Invalid Content-Length header") from exc
+
+    if content_length is None:
+        raise ValueError("Missing Content-Length header")
+
+    payload = stream.read(content_length)
+    if len(payload) != content_length:
+        raise ValueError("Unexpected EOF while reading MCP payload")
+
+    try:
+        return json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ValueError("Invalid MCP payload") from exc
+
+
+def write_message(stream: BinaryIO, message: Dict[str, Any]) -> None:
+    payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
+    header = "Content-Length: {length}\r\n\r\n".format(length=len(payload)).encode("ascii")
+    stream.write(header)
+    stream.write(payload)
+    stream.flush()
+
+
 async def _run_loop(runtime_file: Optional[str] = None) -> None:
     bridge = MCPStdioBridge(runtime_file)
     while True:
-        line = await asyncio.to_thread(sys.stdin.readline)
-        if line == "":
-            return
-        line = line.strip()
-        if not line:
-            continue
-
         try:
-            message = json.loads(line)
-            response = await bridge.handle_message(message)
+            message = await asyncio.to_thread(read_message, sys.stdin.buffer)
         except ValueError:
             response = {
                 "jsonrpc": "2.0",
                 "id": None,
                 "error": {"code": -32700, "message": "Parse error"},
             }
+            await asyncio.to_thread(write_message, sys.stdout.buffer, response)
+            continue
+
+        if message is None:
+            return
+
+        response = await bridge.handle_message(message)
 
         if response is not None:
-            sys.stdout.write(json.dumps(response) + "\n")
-            sys.stdout.flush()
+            await asyncio.to_thread(write_message, sys.stdout.buffer, response)
 
 
 def run_mcp_stdio(runtime_file: Optional[str] = None) -> None:

@@ -11,11 +11,11 @@ from .scoring_weights import DRONE_SCORE_WEIGHTS
 class AssemblyPreferences:
     min_clip_duration_sec: float = 3.0
     max_clip_duration_sec: float = 15.0
-    smoothness_threshold: float = 7.0
+    smoothness_threshold: float = 6.0
     target_duration_sec: float = 120.0
-    max_turn_rate_deg_per_sec: float = 12.0
-    max_clips_per_scene: int = 2
-    max_candidates_per_video: int = 12
+    max_turn_rate_deg_per_sec: float = 16.0
+    max_clips_per_scene: int = 4
+    max_candidates_per_video: int = 30
 
 
 @dataclass(frozen=True)

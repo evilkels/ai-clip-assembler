@@ -809,7 +809,7 @@ def test_default_analysis_preferences_cap_candidate_windows_at_ten_seconds():
 
     assert preferences.min_clip_duration_sec == 3.0
     assert preferences.max_clip_duration_sec == 10.0
-    assert preferences.max_candidates_per_video == 12
+    assert preferences.max_candidates_per_video == 30
 
 
 def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_path):
@@ -1307,7 +1307,7 @@ def test_regenerate_draft_uses_requested_profile(monkeypatch, tmp_path):
     assert response.status_code == 200
     body = response.json()
     assert body["profile"] == "short_social"
-    assert body["timeline"]["clips"][0]["duration_sec"] == 6
+    assert body["timeline"]["clips"][0]["duration_sec"] == 7
 
 
 def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):

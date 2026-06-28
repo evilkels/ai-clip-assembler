@@ -1640,11 +1640,11 @@ def preferences_from_request(preferences: dict) -> AssemblyPreferences:
     return AssemblyPreferences(
         min_clip_duration_sec=float(preferences.get("min_clip_duration_sec", 3.0)),
         max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 10.0)),
-        smoothness_threshold=float(preferences.get("smoothness_threshold", 7.0)),
+        smoothness_threshold=float(preferences.get("smoothness_threshold", 6.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
-        max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 12.0)),
-        max_clips_per_scene=int(preferences.get("max_clips_per_scene", 2)),
-        max_candidates_per_video=int(preferences.get("max_candidates_per_video", 12)),
+        max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 16.0)),
+        max_clips_per_scene=int(preferences.get("max_clips_per_scene", 4)),
+        max_candidates_per_video=int(preferences.get("max_candidates_per_video", 30)),
     )
 
 

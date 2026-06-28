@@ -3,12 +3,12 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
+from src.harness_utils import sample_frames_for_clip
 from src.local_qwen_harness import (
     OllamaUnavailableError,
     _call_ollama_for_batch,
     _encode_image,
     _parse_ollama_json_response,
-    _sample_frames_for_clip,
     enhance_clips_with_local_qwen,
 )
 from src.models import ClipSuggestion, FrameScore, TimelineSequence
@@ -141,7 +141,7 @@ class TestSampleFramesForClip:
             FrameScore(timestamp=0, frame_path="/tmp/0.jpg", motion_stability=8, smoothness_score=8, sharpness_score=8, exposure_score=8, contrast_score=8, overall_score=8, blur_score=8, brightness=0.5, contrast=0.5),
             FrameScore(timestamp=2, frame_path="/tmp/2.jpg", motion_stability=8, smoothness_score=8, sharpness_score=8, exposure_score=8, contrast_score=8, overall_score=8, blur_score=8, brightness=0.5, contrast=0.5),
         ]
-        result = _sample_frames_for_clip(clip, frames, max_frames=4)
+        result = sample_frames_for_clip(clip, frames, max_frames=4)
         assert result == ["/tmp/0.jpg", "/tmp/2.jpg"]
 
     def test_evenly_samples_when_more_than_max(self):
@@ -161,7 +161,7 @@ class TestSampleFramesForClip:
             FrameScore(timestamp=i, frame_path=f"/tmp/{i}.jpg", motion_stability=8, smoothness_score=8, sharpness_score=8, exposure_score=8, contrast_score=8, overall_score=8, blur_score=8, brightness=0.5, contrast=0.5)
             for i in range(11)
         ]
-        result = _sample_frames_for_clip(clip, frames, max_frames=4)
+        result = sample_frames_for_clip(clip, frames, max_frames=4)
         assert len(result) == 4
         assert result[0] == "/tmp/0.jpg"
         assert result[-1] == "/tmp/10.jpg"
@@ -182,7 +182,7 @@ class TestSampleFramesForClip:
         frames = [
             FrameScore(timestamp=0, frame_path="/tmp/0.jpg", motion_stability=8, smoothness_score=8, sharpness_score=8, exposure_score=8, contrast_score=8, overall_score=8, blur_score=8, brightness=0.5, contrast=0.5),
         ]
-        result = _sample_frames_for_clip(clip, frames, max_frames=4)
+        result = sample_frames_for_clip(clip, frames, max_frames=4)
         assert result == []
 
 

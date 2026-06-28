@@ -195,3 +195,6 @@ frontend/skills/
 
 # Visual brainstorming companion scratch
 .superpowers/
+
+# Local implementation worktrees
+.worktrees/

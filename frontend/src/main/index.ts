@@ -3,7 +3,7 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const isDev = !app.isPackaged;
 const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
@@ -169,6 +169,36 @@ async function waitForBackend(backendUrl: string, timeoutMs = 15000): Promise<vo
   throw lastError instanceof Error ? lastError : new Error('Backend health check timed out');
 }
 
+async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
+  if (process.env.PI_BIN) return process.env.PI_BIN;
+  if (process.platform !== 'darwin') return undefined;
+
+  return new Promise((resolve) => {
+    execFile('/bin/zsh', ['-lc', 'command -v pi'], { timeout: 5000 }, (error, stdout) => {
+      if (error) {
+        resolve(undefined);
+        return;
+      }
+
+      const piBin = stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find(Boolean);
+      resolve(piBin);
+    });
+  });
+}
+
+function buildPackagedBackendPath(piBin: string | undefined): string {
+  const paths = [
+    piBin ? dirname(piBin) : undefined,
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    process.env.PATH,
+  ].filter((value): value is string => Boolean(value));
+  return [...new Set(paths)].join(':');
+}
+
 async function startPackagedBackend(): Promise<void> {
   if (!app.isPackaged) return;
 
@@ -179,13 +209,15 @@ async function startPackagedBackend(): Promise<void> {
 
   const port = await findFreePort();
   const backendUrl = `http://127.0.0.1:${port}`;
-  const extraPath = ['/opt/homebrew/bin', '/usr/local/bin', process.env.PATH ?? ''].join(':');
+  const piBin = await resolvePiBinFromLoginShell();
+  const extraPath = buildPackagedBackendPath(piBin);
   backendProcess = spawn(backendExecutable, [], {
     cwd: app.getPath('userData'),
     env: {
       ...process.env,
       CLIP_ASSEMBLER_PORT: String(port),
       PATH: extraPath,
+      ...(piBin ? { PI_BIN: piBin } : {}),
       PYTHONUNBUFFERED: '1',
     },
   });

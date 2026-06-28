@@ -45,6 +45,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | [project-folder-model](project-folder-model.md) | Implementation and automated QA complete; pending real-footage/manual app QA (plan 001's validation session). |
 | [project-sidebar](project-sidebar.md) | **Status drifted** — `frontend/src/renderer/src/layouts/Sidebar.tsx` exists and shipped (incl. simpler nav, `8693bf9`). Verify against the plan's acceptance/persistence items, then close or list the true remainder. |
 | [settings-page](settings-page.md) | **Status drifted** — implemented as `frontend/src/renderer/src/components/SettingsModal.tsx` (Settings & Diagnostics, `8523ed9`) plus theme switching (`cd1ef24`). Plan still reads "draft, awaiting review"; reconcile the doc against shipped behavior and likely move to `done/`. |
+| [connect-your-ai-mcp](connect-your-ai-mcp.md) | TODO — implement approved BYO subscription/MCP Connect spec for Claude Desktop/Codex stdio clients. |
 | [agent-operable-timeline](agent-operable-timeline.md) | **A1–C implemented; backend test-green + frontend builds.** Operations core + undo/redo + write lock, HTTP op endpoints + SSE live-sync, embedded MCP server at `/mcp`, in-app review agent (propose mode) + chat panel, export speed/transform. **A2.3 authoritative inversion done** (GUI edits flow through the ops core, persisted `decisions`, PUT retired) and **A2.4 `TimelineEditor`** (reorder/extend/speed/transform/split/remove + undo/redo). 248 backend tests + synthetic e2e; `npm run build` green. Docs shipped (README, `MCP_SERVER.md`, ARCHITECTURE, runbook Flow F). **Remaining (pending visual QA on the Electron stack):** realtime speed/transform preview, chat token streaming, Playwright e2e. Spec: `docs/specs/2026-06-19-agent-operable-timeline-design.md`. |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented. Re-baselined 2026-06-19 at **44/100 Critical**; Batch 1 quick-wins (button-has-type ×14, em-dash) cut issues **75 → 60**, build green. Remaining score is Batch 2/3 judgment-call refactors (giant-component, derived-state, prefer-use, a11y) — deliberate pass, not blind. |
@@ -143,5 +144,10 @@ Deferred / folded (recorded so they aren't re-audited as new):
 
 ## Findings considered and rejected
 
-- Phase-2 PRD features (music beat sync, speed ramping, multi-track): premature before the core workflow passes its own acceptance bar; PRD itself defers them.
+- **Music BPM-assisted timeline assembly** — future Phase-2 idea: let the
+  operator enter a song's beats per minute (BPM), then let the agent arrange or
+  adjust the timeline so clip boundaries land on musically sensible beat
+  positions. Premature before the core workflow passes its own acceptance bar;
+  revisit with broader music/audio timeline work.
+- Phase-2 PRD features (speed ramping, multi-track): premature before the core workflow passes its own acceptance bar; PRD itself defers them.
 - Audio transcription (PRD open question 1): drone footage target makes it low-value for the current user; revisit if the target user broadens.

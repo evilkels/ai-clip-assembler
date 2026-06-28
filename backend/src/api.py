@@ -65,6 +65,7 @@ from .project_store import (
 from .mcp_server import TimelineMCPServer
 from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
 from .review_state import review_context_fingerprint, sequence_fingerprint
+from .runtime_descriptor import write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
     TimelineController,
@@ -96,9 +97,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+async def write_runtime_on_startup():
+    _write_runtime(_active_project_id)
+
 projects = {}
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
+_active_project_id: Optional[str] = None
 
 # Backend-authoritative Timeline Document layer. One TimelineController per
 # project owns the document + undo history + write lock; the broker fans out
@@ -119,6 +126,18 @@ _review_locks: dict[str, asyncio.Lock] = {}
 # explicit cooperative flag plus a handle on the running subprocess to kill.
 _analysis_cancel: dict[str, threading.Event] = {}
 _analysis_active_proc: dict[str, subprocess.Popen] = {}
+
+
+def _runtime_port() -> int:
+    return int(os.environ.get("CLIP_ASSEMBLER_PORT", "8000"))
+
+
+def _write_runtime(active_project_id: Optional[str] = None) -> None:
+    write_runtime_descriptor(
+        port=_runtime_port(),
+        pid=os.getpid(),
+        active_project_id=active_project_id,
+    )
 
 
 class AnalysisCancelled(Exception):
@@ -251,6 +270,16 @@ async def create_project_from_folder(request: ProjectFolderRequest):
     }
 
 
+@app.post("/projects/{project_id}/activate")
+async def activate_project(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    global _active_project_id
+    _active_project_id = project_id
+    _write_runtime(project_id)
+    return {"project_id": project_id, "active": True}
+
+
 @app.post("/projects/{project_id}/rescan")
 async def rescan_project_sources(project_id: str):
     if project_id not in projects:
@@ -287,6 +316,10 @@ async def delete_project_owned_files(project_id: str):
         raise HTTPException(status_code=400, detail="Delete project files is only available for folder projects")
 
     deleted = delete_project_files(Path(project["project_folder"]))
+    global _active_project_id
+    if _active_project_id == project_id:
+        _active_project_id = None
+        _write_runtime(None)
     del projects[project_id]
     return {"project_id": project_id, "deleted": deleted}
 

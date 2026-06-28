@@ -169,6 +169,36 @@ def test_delete_folder_project_files_keeps_source_video(tmp_path):
     assert project_id not in api.projects
 
 
+def test_activate_project_records_runtime_descriptor(monkeypatch, tmp_path):
+    api.projects.clear()
+    api._active_project_id = None
+    runtime_path = tmp_path / "runtime.json"
+    monkeypatch.setenv("CLIP_ASSEMBLER_RUNTIME_FILE", str(runtime_path))
+    monkeypatch.setenv("CLIP_ASSEMBLER_PORT", "8765")
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+
+    response = client.post(f"/projects/{project_id}/activate")
+
+    assert response.status_code == 200
+    assert response.json() == {"project_id": project_id, "active": True}
+    payload = json.loads(runtime_path.read_text(encoding="utf-8"))
+    assert payload["port"] == 8765
+    assert payload["active_project_id"] == project_id
+
+
+def test_activate_missing_project_returns_404(tmp_path, monkeypatch):
+    api.projects.clear()
+    api._active_project_id = None
+    monkeypatch.setenv("CLIP_ASSEMBLER_RUNTIME_FILE", str(tmp_path / "runtime.json"))
+    client = TestClient(api.app)
+
+    response = client.post("/projects/missing/activate")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+
+
 def test_analyze_folder_project_writes_work_files_under_clipassembler(monkeypatch, tmp_path):
     api.projects.clear()
     project_folder = tmp_path / "footage"

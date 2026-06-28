@@ -57,7 +57,7 @@
 - Produces API: `POST /projects/{project_id}/activate -> {"project_id": str, "active": true}`
 - Consumes: `CLIP_ASSEMBLER_RUNTIME_FILE`, `CLIP_ASSEMBLER_PORT`, existing `projects` dict.
 
-- [ ] **Step 1: Write failing runtime descriptor tests**
+- [x] **Step 1: Write failing runtime descriptor tests**
 
 Add `backend/tests/test_runtime_descriptor.py`:
 
@@ -112,7 +112,7 @@ def test_read_runtime_descriptor_missing_file_returns_none(tmp_path):
     assert read_runtime_descriptor(tmp_path / "missing.json") is None
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -123,7 +123,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_runtime_descriptor.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'src.runtime_descriptor'`.
 
-- [ ] **Step 3: Implement runtime descriptor helper**
+- [x] **Step 3: Implement runtime descriptor helper**
 
 Create `backend/src/runtime_descriptor.py`:
 
@@ -179,7 +179,7 @@ def write_runtime_descriptor(
     return descriptor
 ```
 
-- [ ] **Step 4: Run runtime descriptor tests**
+- [x] **Step 4: Run runtime descriptor tests**
 
 Run:
 
@@ -190,7 +190,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_runtime_descriptor.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing API activation tests**
+- [x] **Step 5: Write failing API activation tests**
 
 Append to `backend/tests/test_api.py`:
 
@@ -223,7 +223,7 @@ def test_activate_missing_project_returns_404(tmp_path, monkeypatch):
     assert response.json()["detail"] == "Project not found"
 ```
 
-- [ ] **Step 6: Run activation tests to verify they fail**
+- [x] **Step 6: Run activation tests to verify they fail**
 
 Run:
 
@@ -234,7 +234,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_api.py::test_activate_project
 
 Expected: FAIL with `404` for the missing endpoint.
 
-- [ ] **Step 7: Implement backend runtime writes and activation endpoint**
+- [x] **Step 7: Implement backend runtime writes and activation endpoint**
 
 Modify `backend/src/api.py` imports:
 
@@ -290,7 +290,7 @@ In `delete_project_owned_files`, before deleting `projects[project_id]`, clear a
         _write_runtime(None)
 ```
 
-- [ ] **Step 8: Run API activation tests**
+- [x] **Step 8: Run API activation tests**
 
 Run:
 

@@ -321,7 +321,7 @@ git commit -m "feat: track active project runtime descriptor"
 - Produces CLI: `ai-clip-backend --mcp-stdio --runtime-file <abs>`
 - Produces bridge behavior: forwards `initialize`, `tools/list`, `tools/call`, `ping`; injects `project_id` on `tools/call` when active.
 
-- [ ] **Step 1: Write failing bridge tests**
+- [x] **Step 1: Write failing bridge tests**
 
 Create `backend/tests/test_mcp_bridge.py`:
 
@@ -420,7 +420,7 @@ async def test_bridge_returns_model_friendly_error_when_app_unreachable(monkeypa
     assert "Open AI Clip Assembler and a project" in result["error"]["message"]
 ```
 
-- [ ] **Step 2: Run bridge tests to verify they fail**
+- [x] **Step 2: Run bridge tests to verify they fail**
 
 Run:
 
@@ -431,7 +431,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_mcp_bridge.py -v
 
 Expected: FAIL with `ImportError` for `src.mcp_bridge`.
 
-- [ ] **Step 3: Implement bridge**
+- [x] **Step 3: Implement bridge**
 
 Create `backend/src/mcp_bridge.py`:
 
@@ -521,7 +521,7 @@ if __name__ == "__main__":
     run_mcp_stdio(args.runtime_file)
 ```
 
-- [ ] **Step 4: Wire packaged entrypoint**
+- [x] **Step 4: Wire packaged entrypoint**
 
 Modify `backend/packaging/entry.py`:
 
@@ -552,7 +552,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 5: Run bridge tests**
+- [x] **Step 5: Run bridge tests**
 
 Run:
 
@@ -563,7 +563,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_mcp_bridge.py -v
 
 Expected: PASS.
 
-- [ ] **Step 6: Run MCP and API regression tests**
+- [x] **Step 6: Run MCP and API regression tests**
 
 Run:
 
@@ -574,7 +574,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_mcp_server.py tests/test_mcp_
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add backend/src/mcp_bridge.py backend/packaging/entry.py backend/tests/test_mcp_bridge.py

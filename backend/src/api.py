@@ -65,7 +65,7 @@ from .project_store import (
 from .mcp_server import TimelineMCPServer
 from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
 from .review_state import review_context_fingerprint, sequence_fingerprint
-from .runtime_descriptor import write_runtime_descriptor
+from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
     TimelineController,
@@ -100,7 +100,11 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def write_runtime_on_startup():
-    _write_runtime(_active_project_id)
+    write_runtime_descriptor(
+        port=int(os.environ.get("CLIP_ASSEMBLER_PORT", "8000")),
+        pid=os.getpid(),
+        active_project_id=_active_project_id,
+    )
 
 projects = {}
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
@@ -126,19 +130,6 @@ _review_locks: dict[str, asyncio.Lock] = {}
 # explicit cooperative flag plus a handle on the running subprocess to kill.
 _analysis_cancel: dict[str, threading.Event] = {}
 _analysis_active_proc: dict[str, subprocess.Popen] = {}
-
-
-def _runtime_port() -> int:
-    return int(os.environ.get("CLIP_ASSEMBLER_PORT", "8000"))
-
-
-def _write_runtime(active_project_id: Optional[str] = None) -> None:
-    write_runtime_descriptor(
-        port=_runtime_port(),
-        pid=os.getpid(),
-        active_project_id=active_project_id,
-    )
-
 
 class AnalysisCancelled(Exception):
     """Raised inside the pipeline when the user aborts an in-flight analysis."""
@@ -276,7 +267,7 @@ async def activate_project(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found")
     global _active_project_id
     _active_project_id = project_id
-    _write_runtime(project_id)
+    set_active_project(project_id)
     return {"project_id": project_id, "active": True}
 
 
@@ -319,7 +310,7 @@ async def delete_project_owned_files(project_id: str):
     global _active_project_id
     if _active_project_id == project_id:
         _active_project_id = None
-        _write_runtime(None)
+        set_active_project(None)
     del projects[project_id]
     return {"project_id": project_id, "deleted": deleted}
 

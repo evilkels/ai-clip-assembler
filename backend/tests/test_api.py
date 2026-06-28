@@ -169,6 +169,24 @@ def test_delete_folder_project_files_keeps_source_video(tmp_path):
     assert project_id not in api.projects
 
 
+def test_delete_active_folder_project_clears_runtime_descriptor(monkeypatch, tmp_path):
+    api.projects.clear()
+    api._active_project_id = None
+    runtime_path = tmp_path / "runtime.json"
+    monkeypatch.setenv("CLIP_ASSEMBLER_RUNTIME_FILE", str(runtime_path))
+    monkeypatch.setenv("CLIP_ASSEMBLER_PORT", "8765")
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+
+    activate_response = client.post(f"/projects/{project_id}/activate")
+    delete_response = client.delete(f"/projects/{project_id}/files")
+
+    assert activate_response.status_code == 200
+    assert delete_response.status_code == 200
+    payload = json.loads(runtime_path.read_text(encoding="utf-8"))
+    assert payload["port"] == 8765
+    assert payload["active_project_id"] is None
+
+
 def test_activate_project_records_runtime_descriptor(monkeypatch, tmp_path):
     api.projects.clear()
     api._active_project_id = None

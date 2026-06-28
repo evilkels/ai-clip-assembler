@@ -119,6 +119,17 @@ class ProposalStore:
             self.configure_project(project_id)
         return self._sessions[project_id]
 
+    def clear_session(self, project_id: str) -> ReviewSession:
+        """Discard the conversation and staged proposals, starting a fresh session.
+
+        Keeps the project's configured folder so the empty session persists,
+        replacing any saved transcript on disk.
+        """
+        fresh = ReviewSession(session_id=uuid.uuid4().hex, updated_at=_now())
+        self._sessions[project_id] = fresh
+        self._save(project_id)
+        return fresh
+
     def append_message(
         self,
         project_id: str,

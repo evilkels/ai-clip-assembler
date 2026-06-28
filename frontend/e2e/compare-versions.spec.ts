@@ -249,7 +249,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(page.getByText('Ask the AI', { exact: true })).toBeVisible();
   await expect(page.getByText('Suggested cuts', { exact: true })).toBeVisible();
   await expect(page.getByRole('strong').filter({ hasText: /^All clips \(\d+\)$/ })).toBeVisible();
-  await expect(page.getByText('Your video', { exact: true })).toBeVisible();
   await expect(
     page.getByText('These are previews. Editing individual clips changes your video, not these suggestions.'),
   ).toBeVisible();
@@ -404,7 +403,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   const sourcePanel = page.getByTestId('source-clips-panel');
   await expect(sourcePanel).not.toHaveAttribute('open');
   await expect(sourcePanel.locator('video')).toHaveCount(0);
-  await expect(page.getByTestId('working-timeline-strip')).toBeVisible();
 
   await cards.first().getByTestId('version-adopt').click();
   const applyDialog = page.getByRole('dialog', {
@@ -445,14 +443,10 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await reopenedDialog.getByRole('button', { name: 'Apply to working timeline' }).click();
   const response = await adoptResponse;
   expect(response.ok(), await response.text()).toBe(true);
-  await expect(page.getByTestId('working-timeline-item')).toHaveCount(4, {
-    timeout: 10_000,
-  });
   await expect(cards.first()).toContainText('In working timeline');
 
-  const workingTimeline = page.getByTestId('working-timeline-strip');
-  await workingTimeline.locator('summary').click();
-  await expect(workingTimeline).not.toHaveAttribute('open');
-  await page.getByLabel('Stability threshold value').fill('6.5');
-  await expect(workingTimeline).not.toHaveAttribute('open');
+  // The adopted cut lands on the Working Timeline; verify it on the Timeline page
+  // (the Review page no longer embeds a duplicate timeline strip).
+  await page.getByRole('link', { name: 'Timeline' }).click();
+  await expect(page.locator('.tl-clip')).toHaveCount(4, { timeout: 10_000 });
 });

@@ -61,8 +61,37 @@ a {
 
 .app-workspace {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 232px 6px minmax(0, 1fr);
   min-height: 0;
+}
+
+.resize-handle {
+  flex: 0 0 6px;
+  align-self: stretch;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  touch-action: none;
+  z-index: 5;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.resize-handle:hover::after,
+.resize-handle:active::after,
+.resize-handle:focus-visible::after {
+  background: var(--accent, var(--border));
+}
+
+.resize-handle:focus-visible {
+  outline: none;
 }
 
 .sidebar {
@@ -785,8 +814,7 @@ a {
    page reads as four plain sections rather than a numbered grid. */
 .review-chat-head strong,
 .version-zone-head strong,
-.source-clips-panel > summary strong,
-.working-timeline > summary strong {
+.source-clips-panel > summary strong {
   font-size: var(--text-md);
   font-weight: 650;
   color: var(--text);
@@ -796,14 +824,9 @@ a {
 /* Descriptive helper line sitting beside a section heading — quiet, not bold. */
 .review-chat-head .draft-summary,
 .version-zone-head .draft-summary,
-.source-clips-panel > summary .draft-summary,
-.working-timeline-note {
+.source-clips-panel > summary .draft-summary {
   font-weight: 450;
   color: var(--text-muted);
-}
-
-.working-timeline-note {
-  font-size: var(--text-xs);
 }
 
 .review-pipeline-helper {
@@ -829,8 +852,7 @@ a {
   padding-top: 12px;
 }
 
-.source-clips-panel > summary,
-.working-timeline > summary {
+.source-clips-panel > summary {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -838,8 +860,7 @@ a {
   list-style-position: inside;
 }
 
-.source-clips-panel > summary .draft-summary,
-.working-timeline > summary .draft-summary {
+.source-clips-panel > summary .draft-summary {
   margin-left: auto;
 }
 
@@ -847,85 +868,6 @@ a {
   display: grid;
   gap: 12px;
   margin-top: 14px;
-}
-
-.working-timeline {
-  flex-shrink: 0;
-  max-height: 240px;
-  overflow: hidden;
-  border-top: 1px solid var(--border);
-  background: var(--bg-1);
-}
-
-.working-timeline > summary {
-  min-height: 42px;
-  padding: 0 24px;
-}
-
-.working-timeline-list {
-  display: flex;
-  gap: 10px;
-  overflow: auto;
-  padding: 0 24px 14px;
-}
-
-.working-timeline-item {
-  flex: 0 0 240px;
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 10px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-2);
-}
-
-.working-timeline-frame {
-  grid-row: 1 / span 2;
-  display: grid;
-  place-items: center;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: 5px;
-  color: var(--text-muted);
-  background: #05070a;
-}
-
-.working-timeline-frame img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.working-timeline-copy {
-  min-width: 0;
-  display: grid;
-  align-content: center;
-  gap: 3px;
-}
-
-.working-timeline-copy strong,
-.working-timeline-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.working-timeline-copy span {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.working-timeline-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.working-timeline-empty {
-  margin: 0;
-  padding: 0 24px 14px;
-  color: var(--text-muted);
 }
 
 .draft-setup {
@@ -2146,7 +2088,7 @@ a {
 
 .review-chat-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
@@ -2155,6 +2097,14 @@ a {
 .review-chat-head > div {
   display: grid;
   gap: 2px;
+}
+
+.review-chat-clear {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 10px;
+  white-space: nowrap;
 }
 
 .review-chat-log {

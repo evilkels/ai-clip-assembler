@@ -1142,6 +1142,16 @@ async def get_review_session(project_id: str):
     return _proposal_store.session(project_id).model_dump()
 
 
+@app.delete("/projects/{project_id}/review/session")
+async def clear_review_session(project_id: str):
+    """Start a new Review chat session, discarding the transcript and proposals."""
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    lock = _review_locks.setdefault(project_id, asyncio.Lock())
+    async with lock:
+        return _proposal_store.clear_session(project_id).model_dump()
+
+
 @app.get("/projects/{project_id}/proposals")
 async def list_proposals(project_id: str):
     if project_id not in projects:

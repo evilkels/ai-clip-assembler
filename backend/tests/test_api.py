@@ -2012,6 +2012,35 @@ def test_review_kickoff_runs_a_proactive_turn(monkeypatch, tmp_path):
     assert "Analysis just finished" in seen["user_message"]
 
 
+def test_clear_review_session_starts_a_fresh_transcript(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda context: {"message": "On it.", "operations": []},
+    )
+
+    client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
+    before = client.get(f"/projects/{project_id}/review/session").json()
+    assert len(before["messages"]) > 0
+
+    cleared = client.delete(f"/projects/{project_id}/review/session")
+    assert cleared.status_code == 200
+    assert cleared.json()["messages"] == []
+    assert cleared.json()["session_id"] != before["session_id"]
+
+    after = client.get(f"/projects/{project_id}/review/session").json()
+    assert after["messages"] == []
+
+
+def test_clear_review_session_unknown_project_returns_404(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    assert client.delete("/projects/missing/review/session").status_code == 404
+
+
 def test_review_session_persists_across_folder_reopen_and_kickoff_is_idempotent(
     monkeypatch, tmp_path
 ):

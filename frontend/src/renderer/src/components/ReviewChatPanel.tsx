@@ -27,7 +27,7 @@ function formatMessageTime(value: string): string {
 }
 
 export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
-  const { messages, busy, error, send, resolveProposal } = conversation;
+  const { messages, busy, error, send, resolveProposal, clearHistory } = conversation;
   const [input, setInput] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -48,8 +48,23 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
       <div className="review-chat-head">
         <div>
           <strong>Ask the AI</strong>
+          <span className="draft-summary">Describe the cut you want</span>
         </div>
-        <span className="draft-summary">Describe the cut you want</span>
+        <button
+          type="button"
+          className="btn subtle review-chat-clear"
+          onClick={() => {
+            if (busy) return;
+            if (messages.length > 0 && !window.confirm('Start a new session and clear this chat history?')) {
+              return;
+            }
+            void clearHistory();
+          }}
+          disabled={busy}
+          title="Clear the chat history and start a new session"
+        >
+          New session
+        </button>
       </div>
       <div
         ref={logRef}

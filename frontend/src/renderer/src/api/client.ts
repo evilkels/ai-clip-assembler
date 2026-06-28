@@ -545,6 +545,14 @@ export async function getReviewSession(projectId: string): Promise<ReviewSession
   return res.json() as Promise<ReviewSession>;
 }
 
+export async function clearReviewSession(projectId: string): Promise<ReviewSession> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/review/session`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Clear review session failed: ${res.status}`);
+  return res.json() as Promise<ReviewSession>;
+}
+
 export async function reviewTurn(
   projectId: string,
   message: string,

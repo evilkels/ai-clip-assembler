@@ -14,12 +14,41 @@
 
 ## Status
 
+- **State**: DONE — SUPERSEDED by shipped production packaging (2026-06-28).
 - **Priority**: P3 (gated: start only after plan 001's validation session confirms the workflow delivers value)
 - **Effort**: L (this spike: M; productionizing is a follow-up plan)
 - **Risk**: MED (build tooling, native deps, process lifecycle)
 - **Depends on**: 001 (sequencing dependency, not technical)
 - **Category**: direction
 - **Planned at**: commit `6a39ed1`, 2026-06-10
+
+### Completion record (2026-06-28, reconcile pass)
+
+This spike was overtaken by events: rather than producing a throwaway prototype
+plus a decision document, the team shipped real self-contained packaging
+directly. As of `f469e43`:
+
+- `backend/packaging/{entry.py,backend.spec}` exist; `npm run build:backend`
+  produces a PyInstaller onedir bundle (`backend/dist/ai-clip-backend`).
+- `frontend/package.json` wires it via `extraResources` (`from
+  ../backend/dist/ai-clip-backend` → `to backend`); `dist` runs
+  `build:backend && build && electron-builder`.
+- `frontend/src/main/index.ts` spawns the bundled backend when `app.isPackaged`,
+  picks a port via `CLIP_ASSEMBLER_PORT`, extends `PATH` with
+  `/opt/homebrew/bin:/usr/local/bin` (landmine 3), health-checks `/`, exposes
+  the URL to the renderer, and the CSP allows the dynamic port (PRs #31–#33).
+- The operator installed the DMG into `/Applications` and confirmed the
+  end-to-end flow works.
+
+**Not produced:** the `docs/specs/<date>-backend-packaging-design.md` decision
+doc. The four landmines were resolved in code instead of documented. **Carried
+forward as live follow-ups** (now the top adoption blockers — see the project's
+direction notes): (a) **ffmpeg-with-vidstab is NOT bundled** — the spawn merely
+extends `PATH`, so a fresh non-developer installer still needs the 30-min
+`ffmpeg --with-libvidstab` source build (`README.md` Getting Started) before
+analysis works; (b) **code signing / notarization** — the DMG is unsigned, so
+Gatekeeper friction remains; (c) **child-process orphan/port-collision
+hardening**. These should become their own plan(s).
 
 ## Why this matters
 

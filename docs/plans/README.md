@@ -23,13 +23,13 @@ Two kinds of plans live side by side:
 |------|-------|----------|--------|------------|--------|
 | [001](done/001-real-footage-validation.md) | Instrument analysis timing + real-footage validation runbook | P1 | S | — | DONE (2026-06-11, telemetry + runbook) |
 | [002](done/002-pi-harness-scaling-spike.md) | Pi harness scaling design spike (batching, retries, partial results) | P2 | M | — | DONE (2026-06-19) — spec `docs/specs/2026-06-19-pi-harness-scaling-design.md` + live benchmark (`scripts/spike_pi_scaling_benchmark.py`): per-clip ~8.9s/p95 16s, batched k=2 ~5.2s/clip, 0/15 parse fails. Rec: bounded concurrency + retry-once + partial-results (neutral backfill); defer batching. Needs a follow-up impl plan. |
-| [003](003-backend-packaging-spike.md) | Backend packaging spike (bundle FastAPI into the Electron DMG) | P3 | M (spike) | 001 (sequencing) | TODO |
+| [003](done/003-backend-packaging-spike.md) | Backend packaging spike (bundle FastAPI into the Electron DMG) | P3 | M (spike) | 001 (sequencing) | DONE (2026-06-28) — **SUPERSEDED**: shipped real self-contained packaging (PRs #31–#33) instead of a spike+doc; DMG installs and runs. Follow-ups spun out: ffmpeg-with-vidstab not bundled, unsigned DMG, orphan/port hardening. |
 | [004](done/004-timeline-sequence-playback.md) | Timeline sequence playback, video-driven and stutter-free | P1 | M | — | DONE (2026-06-11, branch `feature/timeline-sequence-playback`) |
 | [005](done/005-rich-candidate-pool.md) | Separate rich Candidate Clip discovery from draft selection | P1 | M | — | DONE (2026-06-21) — bounded scene-first pool; exact `IMG_0888.MOV` validation covers all 3 Scenes |
 | [006](done/006-persist-review-session.md) | Persist project-scoped review conversations and Proposals | P1 | M | — | DONE (2026-06-21) — backend-authoritative session JSON + stable frontend hydration |
 | [007](done/007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
 | [008](done/008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | DONE (2026-06-21) — persistent accessible bubbles + interaction feedback |
-| [009](009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | IN PROGRESS |
+| [009](done/009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | DONE (2026-06-28) — Tasks 1–5 merged to `main`; 319 backend tests + ruff + typecheck + build + `compare-versions.spec.ts` green at `f469e43`. Task 6 ceremony (full Playwright, synthetic_e2e, react-doctor, independent review) not re-run — non-blocking. |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -39,8 +39,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 |------|--------|
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | The acceptance bar (Flows A–E). Partially automated; real-footage, performance, DaVinci, and signal QA remain — plan 001 operationalizes them. |
 | [project-folder-model](project-folder-model.md) | Implementation and automated QA complete; pending real-footage/manual app QA (plan 001's validation session). |
-| [project-sidebar](project-sidebar.md) | Partially implemented (a simpler sidebar exists); remaining UX and persistence acceptance items active. |
-| [settings-page](settings-page.md) | Draft, awaiting review. |
+| [project-sidebar](project-sidebar.md) | **Status drifted** — `frontend/src/renderer/src/layouts/Sidebar.tsx` exists and shipped (incl. simpler nav, `8693bf9`). Verify against the plan's acceptance/persistence items, then close or list the true remainder. |
+| [settings-page](settings-page.md) | **Status drifted** — implemented as `frontend/src/renderer/src/components/SettingsModal.tsx` (Settings & Diagnostics, `8523ed9`) plus theme switching (`cd1ef24`). Plan still reads "draft, awaiting review"; reconcile the doc against shipped behavior and likely move to `done/`. |
 | [agent-operable-timeline](agent-operable-timeline.md) | **A1–C implemented; backend test-green + frontend builds.** Operations core + undo/redo + write lock, HTTP op endpoints + SSE live-sync, embedded MCP server at `/mcp`, in-app review agent (propose mode) + chat panel, export speed/transform. **A2.3 authoritative inversion done** (GUI edits flow through the ops core, persisted `decisions`, PUT retired) and **A2.4 `TimelineEditor`** (reorder/extend/speed/transform/split/remove + undo/redo). 248 backend tests + synthetic e2e; `npm run build` green. Docs shipped (README, `MCP_SERVER.md`, ARCHITECTURE, runbook Flow F). **Remaining (pending visual QA on the Electron stack):** realtime speed/transform preview, chat token streaming, Playwright e2e. Spec: `docs/specs/2026-06-19-agent-operable-timeline-design.md`. |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partially implemented; component migration and command palette remain. |
 | [react-doctor-triage](react-doctor-triage.md) | Partially implemented. Re-baselined 2026-06-19 at **44/100 Critical**; Batch 1 quick-wins (button-has-type ×14, em-dash) cut issues **75 → 60**, build green. Remaining score is Batch 2/3 judgment-call refactors (giant-component, derived-state, prefer-use, a11y) — deliberate pass, not blind. |
@@ -49,6 +49,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Completed (`done/`)
 
+- [009-connected-review-pipeline](done/009-connected-review-pipeline.md) — 2026-06-28; Tasks 1–5 merged (revision-safe identity, version provenance, segmented playback, optimistic chat, connected state); core gates green at `f469e43`.
+- [003-backend-packaging-spike](done/003-backend-packaging-spike.md) — 2026-06-28; superseded by shipped self-contained DMG packaging (PRs #31–#33); follow-ups: bundle ffmpeg-with-vidstab, signing/notarization, orphan/port hardening.
 - [001-real-footage-validation](done/001-real-footage-validation.md) — 2026-06-11; analysis timing telemetry and real-footage validation runbook.
 - [002-pi-harness-scaling-spike](done/002-pi-harness-scaling-spike.md) — 2026-06-19; measured Pi latency/failure behavior and selected bounded concurrency, retry, and partial-result direction.
 - [005-rich-candidate-pool](done/005-rich-candidate-pool.md) — 2026-06-21; bounded scene-first Candidate Clip pool validated against all three Scenes in `IMG_0888.MOV`.
@@ -76,6 +78,26 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   008's completed accessible conversation presentation.
 
 ## Direction findings not turned into plans
+
+From the 2026-06-28 reconcile (now that the self-contained DMG ships and runs):
+
+- **Bundle ffmpeg-with-vidstab (or degrade gracefully)** — the DMG bundles the
+  Python backend but not ffmpeg. The spawn only extends `PATH` to
+  `/opt/homebrew/bin`, and the backend shells out to bare `ffmpeg`
+  (`backend/src/frame_extraction.py:36`, `backend/src/motion_analysis.py:112`).
+  A fresh non-developer installer must still run the 30-min
+  `ffmpeg --with-libvidstab` source build (`README.md` Getting Started) before
+  analysis works at all. **This is the single biggest adoption blocker now** —
+  the DMG is installable but not usable out of the box. Sub-options: bundle a
+  vidstab-enabled static ffmpeg; or first-run detection + guided install +
+  graceful degradation (skip motion stability when vidstab is absent rather than
+  hard-failing). Effort M–L.
+- **Code signing + notarization** — the DMG is unsigned, so Gatekeeper shows
+  "unidentified developer/damaged" to anyone who didn't build it. Required for
+  real distribution. Effort M (mostly Apple account + CI plumbing).
+- **Backend spawn hardening** — prototype-grade child-process lifecycle (no
+  orphan cleanup guarantees, no port-collision policy). An orphaned uvicorn
+  holding the port breaks the next launch. Effort S–M.
 
 From the 2026-06-10 direction audit (full findings in the session report):
 

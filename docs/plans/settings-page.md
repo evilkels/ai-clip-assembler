@@ -1,6 +1,12 @@
 # Plan: Settings Page
 
-Status: draft, awaiting review
+Status: partially implemented (reconciled 2026-07-02). Shipped: `SettingsModal.tsx`
+(theme, Diagnostics, Connect-your-AI tab, 4-field harness form) backed by
+`GET/PUT /settings` (`backend/src/app_settings.py`). Unbuilt: scoring/storage/
+export/app sections (incl. ffmpeg-path override + validation) and the entire
+per-project override model — `project.json.settings_overrides` exists but no
+code reads it as settings. The override model needs a design review before
+implementation; the flat global sections are mechanical adds.
 Owner: TBD
 Depends on: `project-folder-model.md` (global vs per-project split, `project.json::settings_overrides`)
 Pairs with: `project-sidebar.md`, `ui-polish-modern-shell.md`

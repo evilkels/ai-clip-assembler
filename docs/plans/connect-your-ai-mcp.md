@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** DONE (2026-07-02) — Tasks 1-6 implemented and automated verification green. Task 7 live-client smoke test intentionally not run because it requires a human with Claude Desktop/Codex.
+
 **Goal:** Let Editors connect Claude Desktop or Codex to AI Clip Assembler so their own MCP-capable desktop client can inspect Candidate Clips and edit the live Timeline Document through the existing MCP tools.
 
 **Architecture:** Add a runtime descriptor owned by the backend, a packaged-backend `--mcp-stdio` mode that forwards MCP stdio JSON-RPC to the running `/mcp` HTTP endpoint, and Electron IPC that safely merges MCP server entries into supported client configs. The Settings modal exposes a small "Connect your AI" surface; all Timeline edits still flow through the existing operations core, undo history, persistence, and SSE live-sync.
@@ -301,7 +303,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/test_api.py::test_activate_project
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```bash
 git add backend/src/runtime_descriptor.py backend/src/api.py backend/tests/test_runtime_descriptor.py backend/tests/test_api.py
@@ -595,7 +597,7 @@ git commit -m "feat: add mcp stdio bridge"
 - Produces IPC: `mcp:detect-clients`, `mcp:connect-client`
 - Produces preload methods: `detectMcpClients()`, `connectMcpClient(clientId)`
 
-- [ ] **Step 1: Create adapter module with exported types and pure merge functions**
+- [x] **Step 1: Create adapter module with exported types and pure merge functions**
 
 Create `frontend/src/main/mcpConnect.ts`:
 
@@ -736,7 +738,7 @@ export async function connectMcpClient(
 }
 ```
 
-- [ ] **Step 2: Run typecheck to expose any TS errors**
+- [x] **Step 2: Run typecheck to expose any TS errors**
 
 Run:
 
@@ -747,7 +749,7 @@ npm run typecheck
 
 Expected: PASS after this pure module is syntactically valid.
 
-- [ ] **Step 3: Wire runtime file and IPC in Electron main**
+- [x] **Step 3: Wire runtime file and IPC in Electron main**
 
 Modify imports in `frontend/src/main/index.ts`:
 
@@ -796,7 +798,7 @@ and add `CLIP_ASSEMBLER_RUNTIME_FILE` to `env`:
       CLIP_ASSEMBLER_RUNTIME_FILE: runtimeFile,
 ```
 
-- [ ] **Step 4: Expose IPC through preload and frontend API**
+- [x] **Step 4: Expose IPC through preload and frontend API**
 
 Modify `frontend/src/preload/index.ts` bridge:
 
@@ -855,7 +857,7 @@ export async function connectMcpClient(clientId: McpClientId): Promise<McpConnec
 }
 ```
 
-- [ ] **Step 5: Run frontend checks**
+- [x] **Step 5: Run frontend checks**
 
 Run:
 
@@ -867,7 +869,7 @@ npm run lint:frontend
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add frontend/src/main/mcpConnect.ts frontend/src/main/index.ts frontend/src/preload/index.ts frontend/src/renderer/src/api/client.ts
@@ -885,7 +887,7 @@ git commit -m "feat: configure desktop mcp clients"
 - Produces: Settings tab `connect-ai`
 - Produces user states: installed, connected, needs restart, write failure/manual snippet.
 
-- [ ] **Step 1: Extend Settings tab types and imports**
+- [x] **Step 1: Extend Settings tab types and imports**
 
 Modify `frontend/src/renderer/src/components/SettingsModal.tsx` imports:
 
@@ -917,7 +919,7 @@ to:
 export type SettingsTab = 'settings' | 'connect-ai' | 'diagnostics';
 ```
 
-- [ ] **Step 2: Add the Connect AI panel**
+- [x] **Step 2: Add the Connect AI panel**
 
 Add this component before `DiagnosticsTabPanel`:
 
@@ -1002,7 +1004,7 @@ function ConnectAiTabPanel() {
 }
 ```
 
-- [ ] **Step 3: Add tab button and panel routing**
+- [x] **Step 3: Add tab button and panel routing**
 
 In the settings tab list, insert between Settings and Diagnostics:
 
@@ -1032,7 +1034,7 @@ with:
         {tab === 'diagnostics' && <DiagnosticsTabPanel />}
 ```
 
-- [ ] **Step 4: Add styles**
+- [x] **Step 4: Add styles**
 
 Append to `frontend/src/renderer/src/styles.css`:
 
@@ -1082,7 +1084,7 @@ Append to `frontend/src/renderer/src/styles.css`:
 }
 ```
 
-- [ ] **Step 5: Run frontend checks**
+- [x] **Step 5: Run frontend checks**
 
 Run:
 
@@ -1094,7 +1096,7 @@ npm run lint:frontend
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add frontend/src/renderer/src/components/SettingsModal.tsx frontend/src/renderer/src/styles.css
@@ -1111,7 +1113,7 @@ git commit -m "feat: add connect your ai settings panel"
 - Produces: `activateProject(projectId: string): Promise<void>`
 - Consumes: existing ReviewContext `projectId` state.
 
-- [ ] **Step 1: Add frontend API helper**
+- [x] **Step 1: Add frontend API helper**
 
 Add to `frontend/src/renderer/src/api/client.ts`:
 
@@ -1127,7 +1129,7 @@ export async function activateProject(projectId: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Call activation when ReviewContext opens a project**
+- [x] **Step 2: Call activation when ReviewContext opens a project**
 
 In `frontend/src/renderer/src/state/ReviewContext.tsx`, import:
 
@@ -1146,7 +1148,7 @@ Add an effect near the existing `projectId` effects:
   }, [projectId]);
 ```
 
-- [ ] **Step 3: Run frontend checks**
+- [x] **Step 3: Run frontend checks**
 
 Run:
 
@@ -1158,7 +1160,7 @@ npm run lint:frontend
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit Task 5**
+- [x] **Step 4: Commit Task 5**
 
 ```bash
 git add frontend/src/renderer/src/api/client.ts frontend/src/renderer/src/state/ReviewContext.tsx
@@ -1175,7 +1177,7 @@ git commit -m "feat: notify backend of active project"
 - Consumes: bridge CLI `ai-clip-backend --mcp-stdio --runtime-file <abs>`
 - Produces: Flow G manual validation steps.
 
-- [ ] **Step 1: Document stdio bridge in MCP docs**
+- [x] **Step 1: Document stdio bridge in MCP docs**
 
 Add to `docs/MCP_SERVER.md`:
 
@@ -1195,7 +1197,7 @@ client omits it. If the app is closed, the runtime file is stale, or no project
 is open, the bridge returns a model-readable MCP error instead of crashing.
 ```
 
-- [ ] **Step 2: Add Flow G to validation runbook**
+- [x] **Step 2: Add Flow G to validation runbook**
 
 Add to `docs/VALIDATION_RUNBOOK.md`:
 
@@ -1215,7 +1217,7 @@ Add to `docs/VALIDATION_RUNBOOK.md`:
 11. Confirm it returns "Open AI Clip Assembler and a project, then retry."
 ```
 
-- [ ] **Step 3: Run docs grep checks**
+- [x] **Step 3: Run docs grep checks**
 
 Run:
 
@@ -1225,7 +1227,7 @@ rg "Desktop Client Stdio Bridge|Flow G" docs/MCP_SERVER.md docs/VALIDATION_RUNBO
 
 Expected: both headings are found.
 
-- [ ] **Step 4: Commit Task 6**
+- [x] **Step 4: Commit Task 6**
 
 ```bash
 git add docs/MCP_SERVER.md docs/VALIDATION_RUNBOOK.md
@@ -1241,7 +1243,7 @@ git commit -m "docs: add mcp desktop client validation"
 - Consumes all previous task outputs.
 - Produces confidence that backend, frontend, package entrypoint, and docs are coherent.
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run:
 
@@ -1252,7 +1254,7 @@ PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py
 
 Expected: PASS.
 
-- [ ] **Step 2: Run backend lint**
+- [x] **Step 2: Run backend lint**
 
 Run:
 
@@ -1263,7 +1265,7 @@ cd backend
 
 Expected: PASS.
 
-- [ ] **Step 3: Run frontend checks**
+- [x] **Step 3: Run frontend checks**
 
 Run:
 
@@ -1278,6 +1280,8 @@ Expected: PASS.
 
 - [ ] **Step 4: Run a bridge smoke check**
 
+Not run in this executor pass: live-client smoke requires a human with Claude Desktop/Codex and an activated packaged app.
+
 With the app backend running and a project activated, run:
 
 ```bash
@@ -1286,7 +1290,9 @@ printf '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n' | backend/
 
 Expected: JSON-RPC response with `result.tools` and no `error`.
 
-- [ ] **Step 5: Commit verification fixes only if needed**
+- [x] **Step 5: Commit verification fixes only if needed**
+
+No verification fixes were needed after the final automated checks.
 
 If any command fails, fix the failing code in the smallest relevant file set, rerun the failing command, then commit:
 

@@ -20,6 +20,20 @@ The backend must be running (launch the app, or `cd backend && PYTHONPATH=.
 .venv/bin/uvicorn src.api:app`). If you run the backend on a non-default port,
 use that port in the URL.
 
+## Desktop Client Stdio Bridge
+
+Packaged builds include a stdio MCP bridge:
+
+```bash
+ai-clip-backend --mcp-stdio --runtime-file /absolute/path/runtime.json
+```
+
+Claude Desktop and Codex spawn this command from their MCP config. The bridge is
+stateless: on every tool call it re-reads `runtime.json`, forwards JSON-RPC to
+`POST http://127.0.0.1:<port>/mcp`, and injects the active `project_id` when the
+client omits it. If the app is closed, the runtime file is stale, or no project
+is open, the bridge returns a model-readable MCP error instead of crashing.
+
 ## Tools
 
 Every tool takes a `project_id` argument (MCP calls are stateless). Open the

@@ -19,6 +19,7 @@ import type {
   VideoMetadata,
 } from '../types/clip';
 import { mockClips } from './mockClips';
+import type { ClipSuggestion } from '../types/generated';
 import type { VersionSet } from '../types/version';
 
 declare global {
@@ -60,28 +61,7 @@ export async function pingBackend(): Promise<BackendStatus> {
   }
 }
 
-interface BackendClipSuggestion {
-  clip_id: string;
-  file_id: string;
-  file_name: string;
-  scene_id?: number;
-  start_sec: number;
-  end_sec: number;
-  duration_sec: number;
-  smoothness_score: number;
-  sharpness_score?: number | null;
-  exposure_score?: number | null;
-  contrast_score?: number | null;
-  max_turn_rate_deg_per_sec?: number | null;
-  visual_interest_score: number;
-  overall_score: number;
-  ai_reason: string;
-  suggested_speed?: number;
-  suggested_transition?: string;
-  tags?: string[];
-  source_created_at?: string | null;
-  source_duration_sec?: number | null;
-}
+type BackendClipSuggestion = ClipSuggestion;
 
 export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
   return {

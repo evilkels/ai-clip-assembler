@@ -1,33 +1,22 @@
 import type { AssemblyProfile } from './clip';
+import type {
+  CreativeVersion,
+  CreativeVersionItem,
+  VersionSet as GeneratedVersionSet,
+} from './generated';
 
 /** One placement in a proposed cut; it has no live Timeline Item id yet. */
-export interface VersionItem {
-  source_clip_id: string;
-  file_id: string;
-  file_name: string;
-  start_sec: number;
-  end_sec: number;
-  speed: number;
+export interface VersionItem extends Omit<CreativeVersionItem, 'speed' | 'transform'> {
+  speed: NonNullable<CreativeVersionItem['speed']>;
   transform: { scale: number; x: number; y: number };
 }
 
 /** A complete alternative cut that the Editor can preview and adopt. */
-export interface Version {
-  version_id: string;
-  title: string;
-  vibe: string;
-  rationale: string;
+export interface Version extends Omit<CreativeVersion, 'profile' | 'items'> {
   profile: AssemblyProfile;
-  total_duration_sec: number;
   items: VersionItem[];
-  sequence_fingerprint: string;
 }
 
-export interface VersionSet {
-  version_set_id: string;
+export interface VersionSet extends Omit<GeneratedVersionSet, 'versions'> {
   versions: Version[];
-  created_at: string;
-  based_on_timeline_revision: number;
-  based_on_sequence_fingerprint: string;
-  based_on_review_context_fingerprint: string;
 }

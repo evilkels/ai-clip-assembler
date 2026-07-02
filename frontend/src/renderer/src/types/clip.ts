@@ -2,6 +2,21 @@
  * Clip and project types — frontend mirror of backend shapes.
  */
 
+import type { ClipSuggestion, CreativeVersion } from './generated';
+
+type BackendScoreKey = Extract<keyof ClipSuggestion, `${string}_score`>;
+type MappedScoreKey =
+  | 'smoothness_score'
+  | 'sharpness_score'
+  | 'exposure_score'
+  | 'contrast_score'
+  | 'visual_interest_score'
+  | 'overall_score';
+type AssertNever<T extends never> = T;
+
+// Compile-time guard: every backend score field must be mapped into ClipScores.
+export type _AssertNoUnmappedScores = AssertNever<Exclude<BackendScoreKey, MappedScoreKey>>;
+
 export interface ClipScores {
   smoothness: number;
   sharpness?: number;
@@ -11,23 +26,23 @@ export interface ClipScores {
   overall: number;
 }
 
-export interface ClipCandidate {
-  clip_id: string;
-  file_id: string;
-  file_name: string;
-  scene_id?: number;
-  start_sec: number;
-  end_sec: number;
+type BackendClipFields = Omit<
+  ClipSuggestion,
+  | 'duration_sec'
+  | 'smoothness_score'
+  | 'sharpness_score'
+  | 'exposure_score'
+  | 'contrast_score'
+  | 'visual_interest_score'
+  | 'overall_score'
+  | 'ai_reason'
+  | 'suggested_transition'
+>;
+
+export interface ClipCandidate extends BackendClipFields {
   scores: ClipScores;
-  reason: string;
-  suggested_speed?: number;
-  tags?: string[];
-  max_turn_rate_deg_per_sec?: number | null;
+  reason: ClipSuggestion['ai_reason'];
   thumbnail_url?: string;
-  /** ISO 8601 capture time of the source file (for chronological sorting). */
-  source_created_at?: string | null;
-  /** Full duration of the source file in seconds (for the per-file track). */
-  source_duration_sec?: number | null;
 }
 
 export interface VideoMetadata {
@@ -109,11 +124,7 @@ export interface ClipGenerationStats {
   preferences: Partial<ClipGenerationPreferences>;
 }
 
-export type AssemblyProfile =
-  | 'short_social'
-  | 'cinematic_highlight'
-  | 'long_scenic'
-  | 'custom';
+export type AssemblyProfile = NonNullable<CreativeVersion['profile']>;
 
 export interface AssemblyRecommendation {
   profile: AssemblyProfile;

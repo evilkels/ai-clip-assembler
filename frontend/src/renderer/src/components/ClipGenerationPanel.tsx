@@ -44,6 +44,7 @@ export function ClipGenerationPanel({ stats, disabled = false, onRegenerate }: P
   );
   const [draft, setDraft] = useState<ClipGenerationPreferences>(effective);
   const [busy, setBusy] = useState(false);
+  const invalidDurationRange = draft.max_clip_duration_sec < draft.min_clip_duration_sec;
 
   useEffect(() => setDraft(effective), [effective]);
 
@@ -136,13 +137,15 @@ export function ClipGenerationPanel({ stats, disabled = false, onRegenerate }: P
         </div>
         <div className="clip-generation-footer">
           <span className="clip-generation-warning">
-            Regenerating resets manual decisions and the working timeline.
+            {invalidDurationRange
+              ? 'Max duration must be at least the min duration.'
+              : 'Regenerating resets manual decisions and the working timeline.'}
           </span>
           <button
             type="button"
             className="btn primary"
             onClick={() => void regenerate()}
-            disabled={disabled || busy}
+            disabled={disabled || busy || invalidDurationRange}
           >
             {busy ? 'Regenerating…' : 'Regenerate clips'}
           </button>

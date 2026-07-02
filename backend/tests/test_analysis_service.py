@@ -153,6 +153,75 @@ def test_run_analysis_pipeline_returns_per_file_outputs(tmp_path):
     assert finalized["generation_stats"]["totals"]["candidates_kept"] == 3
 
 
+def test_finalize_clip_set_carries_generation_stats_for_unanalyzed_files(tmp_path):
+    old_file_stats = {
+        "candidates_generated": 5,
+        "candidates_kept": 4,
+        "scenes_total": 2,
+        "scenes_at_cap": 1,
+        "preferences": {},
+    }
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path), _source_video(tmp_path, file_id="file-2")],
+        "clips": [
+            {
+                "clip_id": "clip-old",
+                "file_id": "file-2",
+                "scene_id": 1,
+                "start_sec": 0.0,
+                "end_sec": 10.0,
+                "duration_sec": 10.0,
+                "smoothness_score": 7.0,
+                "overall_score": 7.0,
+            }
+        ],
+        "timeline": None,
+        "generation_stats": {
+            "per_file": {
+                "file-1": {**old_file_stats, "candidates_kept": 9},
+                "file-2": old_file_stats,
+                "file-removed": old_file_stats,
+            },
+            "totals": {},
+            "preferences": {},
+        },
+    }
+    per_file_results = [
+        {
+            "file_id": "file-1",
+            "clips": [_clip("clip-a", 0.0, 10.0, 8.0).model_dump()],
+            "result": SimpleNamespace(
+                metadata={
+                    "generation_stats": {
+                        "candidates_generated": 3,
+                        "candidates_kept": 3,
+                        "scenes_total": 1,
+                        "scenes_at_cap": 0,
+                        "preferences": {"max_candidates_per_video": 30},
+                    }
+                }
+            ),
+        }
+    ]
+
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    stats = finalized["generation_stats"]
+    # file-1 reflects the fresh run, file-2 is carried, file-removed is dropped.
+    assert set(stats["per_file"]) == {"file-1", "file-2"}
+    assert stats["per_file"]["file-1"]["candidates_kept"] == 3
+    assert stats["per_file"]["file-2"] == old_file_stats
+    assert stats["totals"]["candidates_kept"] == 7
+    assert stats["totals"]["videos"] == 2
+    assert stats["totals"]["max_candidates_per_video"] == 30
+
+
 def test_run_analysis_pipeline_handles_empty_video_list(tmp_path):
     result = _run_service(
         {"project_id": "project-1", "videos": [], "clips": [], "timeline": None},

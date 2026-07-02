@@ -333,11 +333,42 @@ def finalize_clip_set(
         )
 
     recommendation = recommend_assembly_profile(ranked_clips)
+    generation_stats = aggregate_generation_stats(per_file_results)
+    # A partial run (explicit file_ids) keeps clips from the other files, so
+    # carry their previous per-file stats forward instead of dropping them.
+    previous_per_file = (project.get("generation_stats") or {}).get("per_file", {})
+    video_ids = {video["file_id"] for video in project.get("videos", [])}
+    carried = {
+        file_id: file_stats
+        for file_id, file_stats in previous_per_file.items()
+        if file_id in video_ids and file_id not in analyzed_file_ids
+    }
+    if carried:
+        merged = {**carried, **generation_stats["per_file"]}
+        generation_stats = {
+            "per_file": merged,
+            "totals": {
+                **{
+                    key: sum(int(file_stats.get(key, 0)) for file_stats in merged.values())
+                    for key in (
+                        "candidates_generated",
+                        "candidates_kept",
+                        "scenes_total",
+                        "scenes_at_cap",
+                    )
+                },
+                "videos": len(merged),
+                "max_candidates_per_video": generation_stats["totals"].get(
+                    "max_candidates_per_video"
+                ),
+            },
+            "preferences": generation_stats.get("preferences") or {},
+        }
     return {
         "clips": ranked_clips,
         "timeline": timeline,
         "recommendation": recommendation,
-        "generation_stats": aggregate_generation_stats(per_file_results),
+        "generation_stats": generation_stats,
     }
 
 

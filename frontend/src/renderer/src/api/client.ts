@@ -22,6 +22,24 @@ import { mockClips } from './mockClips';
 import type { ClipSuggestion } from '../types/generated';
 import type { VersionSet } from '../types/version';
 
+export type McpClientId = 'claude_desktop' | 'codex';
+
+export interface McpClientStatus {
+  id: McpClientId;
+  name: string;
+  configPath: string;
+  installed: boolean;
+  connected: boolean;
+  needsRestart: boolean;
+  /** Set when the client's config exists but could not be read — connect is unsafe. */
+  detectError?: string;
+}
+
+export interface McpConnectResult extends McpClientStatus {
+  backupPath?: string;
+  snippet: string;
+}
+
 declare global {
   interface Window {
     clipAssembler?: {
@@ -34,6 +52,8 @@ declare global {
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
       openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
+      detectMcpClients?: () => Promise<McpClientStatus[]>;
+      connectMcpClient?: (clientId: McpClientId) => Promise<McpConnectResult>;
     };
   }
 }
@@ -145,6 +165,27 @@ export async function setWindowTitle(projectName?: string): Promise<void> {
 export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
   const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
   return result?.opened ?? false;
+}
+
+export async function detectMcpClients(): Promise<McpClientStatus[]> {
+  return window.clipAssembler?.detectMcpClients?.() ?? [];
+}
+
+export async function connectMcpClient(clientId: McpClientId): Promise<McpConnectResult> {
+  if (!window.clipAssembler?.connectMcpClient) {
+    throw new Error('MCP client connection is only available in the desktop app');
+  }
+  return window.clipAssembler.connectMcpClient(clientId);
+}
+
+export async function activateProject(projectId: string): Promise<void> {
+  const res = await fetch(`${backendUrl()}/projects/${encodeURIComponent(projectId)}/activate`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ detail: res.statusText }))) as { detail?: string };
+    throw new Error(err.detail ?? `Failed to activate project: ${res.status}`);
+  }
 }
 
 export async function rescanProject(projectId: string): Promise<FolderProjectResult> {

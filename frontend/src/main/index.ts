@@ -4,9 +4,11 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
+import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
 
 const isDev = !app.isPackaged;
 const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
+const runtimeFilePath = () => join(app.getPath('userData'), '.ai-clip-assembler', 'runtime.json');
 let backendProcess: ChildProcessWithoutNullStreams | undefined;
 let packagedBackendUrl: string | undefined;
 
@@ -48,6 +50,10 @@ async function enrichRecentProjects(): Promise<RecentProject[]> {
 async function writeRecentProjects(projects: RecentProject[]): Promise<void> {
   await mkdir(app.getPath('userData'), { recursive: true });
   await writeFile(recentProjectsPath(), JSON.stringify(projects, null, 2) + '\n', 'utf-8');
+}
+
+function packagedBackendExecutablePath(): string {
+  return join(process.resourcesPath, 'backend', 'ai-clip-backend');
 }
 
 function registerIpcHandlers(): void {
@@ -121,6 +127,14 @@ function registerIpcHandlers(): void {
     }
     if (sourceFolder) shell.showItemInFolder(sourceFolder);
     return { opened: true };
+  });
+
+  ipcMain.handle('mcp:detect-clients', async () => {
+    return detectMcpClients(packagedBackendExecutablePath(), runtimeFilePath());
+  });
+
+  ipcMain.handle('mcp:connect-client', async (_event, clientId: McpClientId) => {
+    return connectMcpClient(clientId, packagedBackendExecutablePath(), runtimeFilePath());
   });
 }
 
@@ -202,7 +216,8 @@ function buildPackagedBackendPath(piBin: string | undefined): string {
 async function startPackagedBackend(): Promise<void> {
   if (!app.isPackaged) return;
 
-  const backendExecutable = join(process.resourcesPath, 'backend', 'ai-clip-backend');
+  const backendExecutable = packagedBackendExecutablePath();
+  const runtimeFile = runtimeFilePath();
   if (!existsSync(backendExecutable)) {
     throw new Error(`Packaged backend not found at ${backendExecutable}`);
   }
@@ -216,6 +231,7 @@ async function startPackagedBackend(): Promise<void> {
     env: {
       ...process.env,
       CLIP_ASSEMBLER_PORT: String(port),
+      CLIP_ASSEMBLER_RUNTIME_FILE: runtimeFile,
       PATH: extraPath,
       ...(piBin ? { PI_BIN: piBin } : {}),
       PYTHONUNBUFFERED: '1',

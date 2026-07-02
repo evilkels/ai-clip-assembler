@@ -14,6 +14,7 @@ import {
 import {
   addRecentProject,
   applyTimelineOp,
+  activateProject,
   createProject,
   createProjectFromFolder,
   getClipsWithFallback,
@@ -103,6 +104,10 @@ interface ReviewState {
 }
 
 const Ctx = createContext<ReviewState | null>(null);
+
+// Serializes MCP project activations: rapid project switches must not
+// interleave and leave the backend runtime descriptor on a stale project.
+let activationChain: Promise<void> = Promise.resolve();
 
 // Provider size and useState-vs-useReducer shape are deliberate-defer items
 // owned by the react-doctor-triage plan (Batch 2/3), not reworked under 009.
@@ -234,6 +239,15 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       alive = false;
     };
   }, [projectId, reconcileTimelineSnapshot]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    activationChain = activationChain
+      .then(() => activateProject(projectId))
+      .catch((err) => {
+        console.warn('Failed to activate project for MCP clients', err);
+      });
+  }, [projectId]);
 
   // Live-sync: an agent's edit (in-app or external over MCP) emits
   // `timeline-changed`; reconcile from the authoritative document so it appears

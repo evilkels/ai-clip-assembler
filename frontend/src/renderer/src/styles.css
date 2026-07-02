@@ -2510,6 +2510,7 @@ a {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 
 .diagnostics-list {
@@ -2549,4 +2550,50 @@ a {
 .diagnostics-badge.fail {
   background: var(--accent-dim);
   color: var(--red);
+}
+
+.mcp-client-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mcp-client-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+
+.mcp-client-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mcp-client-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mcp-connect-result {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mcp-snippet {
+  overflow: auto;
+  max-height: 180px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-0);
+  color: var(--text);
+  font-size: var(--text-xs);
 }

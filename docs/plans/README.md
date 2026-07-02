@@ -34,6 +34,7 @@ Two kinds of plans live side by side:
 | [009](done/009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | DONE (2026-06-28) — Tasks 1–5 merged to `main`; 319 backend tests + ruff + typecheck + build + `compare-versions.spec.ts` green at `f469e43`. Task 6 ceremony (full Playwright, synthetic_e2e, react-doctor, independent review) not re-run — non-blocking. |
 | [010](010-shared-frontend-backend-contract.md) | Generate frontend domain types from backend models (kill contract drift) | P1 | M | — | TODO (2026-06-28 architecture audit) — highest-leverage missing abstraction; codegen via `pydantic-to-typescript`. |
 | [011](011-decompose-api-god-module.md) | Decompose `api.py` god-module — extract analysis pipeline into a service (slice 1) | P1 | L | — | TODO (2026-06-28 architecture audit) — characterization tests first; timeline/review/repository slices are later plans. |
+| [012](012-adjustable-clip-generation.md) | Transparent, adjustable clip generation (persist frame scores → live re-derive) | P1 | M | — | DONE (2026-06-28) — frame-score sidecar, live rule-based re-derive, generation stats, GUI knobs, counts, and per-clip why shipped. |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -41,6 +42,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 | Plan | Status |
 |------|--------|
+| [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE (2026-07-02) — operating manual + ordered roadmap (trust → installability → presentability → arch debt → launch) for the public/monetized release, driven with Codex CLI. |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | The acceptance bar (Flows A–E). Partially automated; real-footage, performance, DaVinci, and signal QA remain — plan 001 operationalizes them. |
 | [project-folder-model](project-folder-model.md) | Implementation and automated QA complete; pending real-footage/manual app QA (plan 001's validation session). |
 | [project-sidebar](project-sidebar.md) | **Status drifted** — `frontend/src/renderer/src/layouts/Sidebar.tsx` exists and shipped (incl. simpler nav, `8693bf9`). Verify against the plan's acceptance/persistence items, then close or list the true remainder. |

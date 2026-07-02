@@ -749,6 +749,25 @@ a {
   transition: width 160ms var(--ease-out);
 }
 
+/* No value set (percent unknown): restore the scanning sweep the old custom
+   bar showed, since appearance:none suppresses the native indeterminate look. */
+.analysis-progress-bar.indeterminate::-webkit-progress-bar {
+  background:
+    linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat,
+    var(--bg-3);
+  background-size: 36% 100%;
+  animation: analysis-progress-scan 1.2s linear infinite;
+}
+
+@keyframes analysis-progress-scan {
+  from {
+    background-position: -60% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
 .drop-zone {
   display: block;
   width: 100%;

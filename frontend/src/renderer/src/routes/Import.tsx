@@ -445,13 +445,17 @@ export function ImportPage() {
                   <th style={{ padding: '6px 8px', textAlign: 'right' }}>Resolution</th>
                   <th
                     aria-sort={sort.key === 'size' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    style={{ padding: '6px 8px', textAlign: 'right' }}
+                    style={{ padding: 0, textAlign: 'right' }}
                   >
                     <button
                       type="button"
                       onClick={() => toggleSort('size')}
                       style={{
                         all: 'unset',
+                        display: 'block',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '6px 8px',
                         cursor: 'pointer',
                         userSelect: 'none',
                       }}
@@ -462,13 +466,17 @@ export function ImportPage() {
                   </th>
                   <th
                     aria-sort={sort.key === 'date' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    style={{ padding: '6px 8px', textAlign: 'right' }}
+                    style={{ padding: 0, textAlign: 'right' }}
                   >
                     <button
                       type="button"
                       onClick={() => toggleSort('date')}
                       style={{
                         all: 'unset',
+                        display: 'block',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '6px 8px',
                         cursor: 'pointer',
                         userSelect: 'none',
                       }}
@@ -480,13 +488,17 @@ export function ImportPage() {
                   <th style={{ padding: '6px 8px' }}>Codec</th>
                   <th
                     aria-sort={sort.key === 'analyzed' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    style={{ padding: '6px 8px' }}
+                    style={{ padding: 0 }}
                   >
                     <button
                       type="button"
                       onClick={() => toggleSort('analyzed')}
                       style={{
                         all: 'unset',
+                        display: 'block',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '6px 8px',
                         cursor: 'pointer',
                         userSelect: 'none',
                       }}
@@ -679,6 +691,9 @@ export function ImportPage() {
           className="preview-overlay"
           aria-label={`Preview ${preview.fileName}`}
           onCancel={() => setPreview(null)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreview(null);
+          }}
         >
           <div className="preview-modal">
             <div className="preview-modal-head">

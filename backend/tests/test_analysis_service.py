@@ -1,0 +1,292 @@
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from src import analysis_service
+from src.clip_assembly import AssemblyPreferences
+from src.frame_extraction import FFmpegError
+from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
+from src.motion_analysis import FFmpegVidstabUnavailableError
+
+
+def _source_video(tmp_path: Path, *, file_id: str = "file-1") -> dict:
+    video_path = tmp_path / f"{file_id}.MP4"
+    video_path.write_bytes(b"video")
+    return {
+        "file_id": file_id,
+        "file_name": video_path.name,
+        "file_path": str(video_path),
+        "status": "ready",
+        "metadata": {
+            "duration_sec": 90.0,
+            "fps": 30.0,
+            "created_at": "2026-06-01T12:00:00",
+        },
+    }
+
+
+def _request(**overrides):
+    values = {
+        "project_id": "project-1",
+        "harness_id": "manual",
+        "preferences": {},
+        "file_ids": None,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def _clip(clip_id: str, start: float, end: float, score: float) -> ClipSuggestion:
+    return ClipSuggestion(
+        clip_id=clip_id,
+        file_id="file-1",
+        file_name="file-1.MP4",
+        scene_id=1,
+        start_sec=start,
+        end_sec=end,
+        duration_sec=end - start,
+        smoothness_score=score,
+        sharpness_score=8.0,
+        exposure_score=8.0,
+        contrast_score=8.0,
+        max_turn_rate_deg_per_sec=2.0,
+        visual_interest_score=0.0,
+        overall_score=score,
+        ai_reason=f"Stable {score}/10",
+    )
+
+
+def _frame(timestamp: float, smoothness: float = 8.0) -> FrameScore:
+    return FrameScore(
+        timestamp=timestamp,
+        frame_path=f"/tmp/{timestamp}.jpg",
+        motion_stability=smoothness,
+        smoothness_score=smoothness,
+        sharpness_score=8.0,
+        exposure_score=8.0,
+        contrast_score=8.0,
+        visual_interest_score=0.0,
+        overall_score=smoothness,
+        blur_score=8.0,
+        brightness=0.8,
+        contrast=0.8,
+        scene_id=1,
+        is_keyframe=True,
+        turn_rate_deg_per_sec=2.0,
+    )
+
+
+def _run_service(project, request, tmp_path, **overrides):
+    dependencies = {
+        "run_vidstabdetect_fn": lambda **_kwargs: None,
+        "extract_frames_fn": lambda **_kwargs: [
+            FrameSample(timestamp=0.0, frame_path="/tmp/frame.jpg")
+        ],
+        "detect_scenes_fn": lambda _path: [],
+        "assign_scene_ids_fn": lambda samples, _scenes: samples,
+        "score_samples_fn": lambda _samples: [],
+        "assemble_clips_fn": lambda **_kwargs: AssemblyResult(
+            clips=[],
+            sequence=TimelineSequence(total_duration_sec=0.0, clips=[]),
+            metadata={},
+        ),
+    }
+    dependencies.update(overrides)
+    return analysis_service.run_analysis_pipeline(
+        project,
+        request,
+        project_id=request.project_id,
+        analysis_path=tmp_path / "analysis",
+        samples_path=tmp_path / "samples",
+        preferences=AssemblyPreferences(),
+        sample_fps=1.0,
+        cancellable_runner=lambda *_args, **_kwargs: None,
+        check_cancelled=lambda: None,
+        set_progress=lambda **_fields: None,
+        **dependencies,
+    )
+
+
+def test_run_analysis_pipeline_returns_per_file_outputs(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+
+    result = _run_service(
+        project,
+        _request(),
+        tmp_path,
+        assemble_clips_fn=lambda **_kwargs: AssemblyResult(
+            clips=[
+                _clip("clip-a", 0.0, 22.0, 8.5),
+                _clip("clip-b", 30.0, 52.0, 9.0),
+                _clip("clip-c", 60.0, 82.0, 7.5),
+            ],
+            sequence=TimelineSequence(total_duration_sec=66.0, clips=["clip-a", "clip-b", "clip-c"]),
+            metadata={
+                "generation_stats": {
+                    "candidates_generated": 3,
+                    "candidates_kept": 3,
+                    "scenes_total": 1,
+                    "scenes_at_cap": 0,
+                    "preferences": {"max_candidates_per_video": 30},
+                }
+            },
+        ),
+    )
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        result.per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    assert len(result.per_file_results[0]["clips"]) == 3
+    assert result.per_file_frames["file-1"]["source_duration_sec"] == 90.0
+    assert result.timings[0]["file_name"] == "file-1.MP4"
+    assert finalized["timeline"]["source"] == "draft"
+    assert finalized["recommendation"]["profile"] == "long_scenic"
+    assert finalized["generation_stats"]["totals"]["candidates_kept"] == 3
+
+
+def test_run_analysis_pipeline_handles_empty_video_list(tmp_path):
+    result = _run_service(
+        {"project_id": "project-1", "videos": [], "clips": [], "timeline": None},
+        _request(),
+        tmp_path,
+    )
+
+    assert result.per_file_results == []
+    assert result.per_file_frames == {}
+    assert result.timings == []
+
+
+def test_run_analysis_pipeline_uses_fallback_when_all_frames_are_below_threshold(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+    low_frames = [_frame(second, smoothness=4.0) for second in range(5)]
+
+    result = _run_service(
+        project,
+        _request(),
+        tmp_path,
+        score_samples_fn=lambda _samples: low_frames,
+        assemble_clips_fn=analysis_service.assemble_smooth_clips,
+    )
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        result.per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    assert len(result.per_file_results[0]["clips"]) == 1
+    assert result.per_file_results[0]["clips"][0]["tags"] == ["drone", "fallback"]
+    assert len(finalized["timeline"]["clips"]) == 1
+    assert finalized["recommendation"]["profile"] == "short_social"
+
+
+def test_run_analysis_pipeline_propagates_cancellation(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+
+    class Cancelled(Exception):
+        pass
+
+    with pytest.raises(Cancelled):
+        analysis_service.run_analysis_pipeline(
+            project,
+            _request(),
+            project_id="project-1",
+            analysis_path=tmp_path / "analysis",
+            samples_path=tmp_path / "samples",
+            preferences=AssemblyPreferences(),
+            sample_fps=1.0,
+            cancellable_runner=lambda *_args, **_kwargs: None,
+            check_cancelled=lambda: (_ for _ in ()).throw(Cancelled()),
+            set_progress=lambda **_fields: None,
+        )
+
+
+def test_early_stage_ffmpeg_errors_map_to_typed_analysis_errors(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+
+    def raise_ffmpeg(**_kwargs):
+        raise FFmpegError("bad media")
+
+    with pytest.raises(analysis_service.AnalysisInputError):
+        _run_service(project, _request(), tmp_path, extract_frames_fn=raise_ffmpeg)
+
+    def raise_vidstab_unavailable(**_kwargs):
+        raise FFmpegVidstabUnavailableError("ffmpeg lacks vidstabdetect")
+
+    with pytest.raises(analysis_service.AnalysisDependencyUnavailableError):
+        _run_service(project, _request(), tmp_path, run_vidstabdetect_fn=raise_vidstab_unavailable)
+
+
+def test_late_stage_ffmpeg_errors_propagate_untranslated(tmp_path):
+    # Pi enhancement also shells out to ffmpeg; its failures must not be
+    # relabeled as early-stage analysis errors (pre-extraction behavior).
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+
+    def raise_ffmpeg(*_args, **_kwargs):
+        raise FFmpegError("late-stage failure")
+
+    with pytest.raises(FFmpegError):
+        _run_service(
+            project,
+            _request(harness_id="pi_agent"),
+            tmp_path,
+            assemble_clips_fn=lambda **_kwargs: AssemblyResult(
+                clips=[_clip("clip-a", 0.0, 22.0, 8.5)],
+                sequence=TimelineSequence(total_duration_sec=22.0, clips=["clip-a"]),
+                metadata={},
+            ),
+            enhance_clips_fn=raise_ffmpeg,
+        )
+
+
+def test_finalize_clip_set_recommendation_boundaries():
+    def finalize(clips):
+        return analysis_service.finalize_clip_set(
+            {"videos": [], "clips": [], "timeline": None},
+            [{"file_id": "file-1", "clips": clips, "result": SimpleNamespace(metadata={})}],
+            preserve_manual_timeline=True,
+            enrich_clips=lambda data: data["clips"],
+        )
+
+    short = finalize([_clip("short", 0.0, 7.0, 8.0).model_dump()])
+    cinematic = finalize([_clip("cinematic", 0.0, 8.0, 8.0).model_dump()])
+    long = finalize(
+        [
+            _clip("long-a", 0.0, 20.0, 8.0).model_dump(),
+            _clip("long-b", 20.0, 40.0, 8.0).model_dump(),
+            _clip("long-c", 40.0, 60.0, 8.0).model_dump(),
+        ]
+    )
+
+    assert short["recommendation"]["profile"] == "short_social"
+    assert cinematic["recommendation"]["profile"] == "cinematic_highlight"
+    assert long["recommendation"]["profile"] == "long_scenic"

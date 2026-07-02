@@ -89,6 +89,13 @@ export interface AnalysisResult {
   sequence: DraftTimeline;
   recommendation: AssemblyRecommendation;
   generation_stats?: ClipGenerationStats;
+  notices?: AnalysisNotice[];
+}
+
+export interface AnalysisNotice {
+  code: string;
+  level: 'info' | 'warning' | 'error';
+  message: string;
 }
 
 export interface ClipGenerationPreferences {
@@ -179,4 +186,5 @@ export interface AnalysisStatus {
   started_at?: number;
   updated_at?: number;
   error?: string | null;
+  notices?: AnalysisNotice[];
 }

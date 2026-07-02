@@ -2,7 +2,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from .assembly_profiles import build_draft_timeline, recommend_assembly_profile
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
@@ -36,6 +36,19 @@ class AnalysisPipelineResult:
     per_video_metadata: list[dict]
     timings: list[dict]
     pipeline_total_sec: float
+    notices: list[dict]
+
+
+MOTION_ANALYSIS_NOTICE = {
+    "code": "motion_analysis_unavailable",
+    "level": "warning",
+    "message": "Motion-stability analysis was skipped because ffmpeg lacks vidstabdetect.",
+}
+
+
+def _append_notice_once(notices: list[dict], notice: dict) -> None:
+    if not any(item.get("code") == notice["code"] for item in notices):
+        notices.append(dict(notice))
 
 
 def selected_videos(project: dict, request: Any) -> list[dict]:
@@ -67,12 +80,15 @@ def run_analysis_pipeline(
     assemble_clips_fn: Callable = assemble_smooth_clips,
     enhance_clips_fn: Callable = enhance_clips_with_pi_cli,
     parse_transforms_fn: Callable = parse_trf,
+    motion_analysis_enabled: bool = True,
+    motion_analysis_unavailable_reason: Optional[str] = None,
 ) -> AnalysisPipelineResult:
     pipeline_started = time.monotonic()
     per_video_results = []
     per_file_results = []
     timings = []
     per_file_frames = {}
+    notices = []
     score_samples = score_samples_fn or score_samples_rule_based
     videos_to_analyze = selected_videos(project, request)
     total_videos = len(videos_to_analyze)
@@ -89,6 +105,29 @@ def run_analysis_pipeline(
         )
         # Only the FFmpeg-driven stages (motion, frames, scenes) map to typed
         # analysis errors; failures in later stages propagate untranslated.
+        transforms_path = analysis_path / "motion" / f"{video['file_id']}.trf"
+
+        def skip_motion_analysis(reason: object) -> None:
+            if transforms_path.exists():
+                transforms_path.unlink()
+            logger.warning(
+                "Analyze %d/%d %s: skipping motion analysis: %s",
+                index,
+                total_videos,
+                video["file_name"],
+                reason,
+            )
+            _append_notice_once(notices, MOTION_ANALYSIS_NOTICE)
+            set_progress(
+                step="motion_analysis",
+                message=(
+                    f"Video {index}/{total_videos}: skipping motion-stability analysis "
+                    "(ffmpeg lacks vidstabdetect)"
+                ),
+                notices=notices,
+            )
+            video_timing["motion_analysis_skipped"] = True
+
         try:
             logger.info(
                 "Analyze %d/%d %s: motion analysis (vidstabdetect)",
@@ -96,20 +135,25 @@ def run_analysis_pipeline(
                 total_videos,
                 video["file_name"],
             )
-            set_progress(
-                step="motion_analysis",
-                message=(
-                    f"Video {index}/{total_videos}: running FFmpeg motion analysis "
-                    "(this can take a while on long clips)"
-                ),
-            )
             phase_started = time.monotonic()
-            transforms_path = analysis_path / "motion" / f"{video['file_id']}.trf"
-            run_vidstabdetect_fn(
-                input_path=Path(video["file_path"]),
-                transforms_path=transforms_path,
-                runner=cancellable_runner,
-            )
+            if motion_analysis_enabled:
+                set_progress(
+                    step="motion_analysis",
+                    message=(
+                        f"Video {index}/{total_videos}: running FFmpeg motion analysis "
+                        "(this can take a while on long clips)"
+                    ),
+                )
+                try:
+                    run_vidstabdetect_fn(
+                        input_path=Path(video["file_path"]),
+                        transforms_path=transforms_path,
+                        runner=cancellable_runner,
+                    )
+                except FFmpegVidstabUnavailableError as exc:
+                    skip_motion_analysis(exc)
+            else:
+                skip_motion_analysis(motion_analysis_unavailable_reason or "vidstabdetect unavailable")
             video_timing["motion_analysis_sec"] = round(time.monotonic() - phase_started, 2)
             logger.info(
                 "Analyze %d/%d %s: extracting frame samples",
@@ -145,7 +189,7 @@ def run_analysis_pipeline(
             scenes = detect_scenes_fn(Path(video["file_path"]))
             samples = assign_scene_ids_fn(samples, scenes)
             video_timing["scene_detection_sec"] = round(time.monotonic() - phase_started, 2)
-        except (FFmpegVidstabUnavailableError, FFmpegUnavailableError) as exc:
+        except FFmpegUnavailableError as exc:
             raise AnalysisDependencyUnavailableError(str(exc)) from exc
         except (FFmpegVidstabError, FFmpegError) as exc:
             raise AnalysisInputError(str(exc)) from exc
@@ -250,6 +294,7 @@ def run_analysis_pipeline(
         per_video_metadata=per_video_results,
         timings=timings,
         pipeline_total_sec=round(time.monotonic() - pipeline_started, 2),
+        notices=notices,
     )
 
 

@@ -41,7 +41,12 @@ from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (pos
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
 from .frame_extraction import extract_frames
 from .models import FrameScore
-from .motion_analysis import parse_trf, run_vidstabdetect
+from .motion_analysis import (
+    FFmpegVidstabCapability,
+    ffmpeg_supports_vidstab,
+    parse_trf,
+    run_vidstabdetect,
+)
 from .models import TimelineDocument
 from .project_store import (
     InvalidProjectManifestError,
@@ -100,6 +105,10 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def write_runtime_on_startup():
+    global _motion_analysis_capability
+    _motion_analysis_capability = ffmpeg_supports_vidstab()
+    if not _motion_analysis_capability.available:
+        logger.warning("Motion-stability analysis unavailable: %s", _motion_analysis_capability.reason)
     write_runtime_descriptor(
         port=int(os.environ.get("CLIP_ASSEMBLER_PORT", "8000")),
         pid=os.getpid(),
@@ -110,6 +119,7 @@ projects = {}
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 _active_project_id: Optional[str] = None
+_motion_analysis_capability = FFmpegVidstabCapability(available=True)
 
 # Backend-authoritative Timeline Document layer. One TimelineController per
 # project owns the document + undo history + write lock; the broker fans out
@@ -453,6 +463,7 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
         step="complete",
         message="Analysis complete",
         timings=response["timings"],
+        notices=response.get("notices", []),
     )
     return response
 
@@ -500,6 +511,8 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             assemble_clips_fn=assemble_smooth_clips,
             enhance_clips_fn=enhance_clips_with_pi_cli,
             parse_transforms_fn=parse_trf,
+            motion_analysis_enabled=_motion_analysis_capability.available,
+            motion_analysis_unavailable_reason=_motion_analysis_capability.reason,
         )
     except analysis_service.AnalysisDependencyUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -540,6 +553,8 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             "pipeline_total_sec": pipeline.pipeline_total_sec,
         },
     }
+    if pipeline.notices:
+        response["notices"] = pipeline.notices
     logger.info(
         "Analyze timings: total %.1fs, per-video %s",
         response["timings"]["pipeline_total_sec"],

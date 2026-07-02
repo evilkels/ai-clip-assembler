@@ -258,7 +258,7 @@ export function ImportPage() {
         file_ids: selectedIds,
       });
       applyAnalysisResult(result);
-      setAnalysisStatus({ phase: 'complete' });
+      setAnalysisStatus({ phase: 'complete', notices: result.notices });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (/cancel/i.test(message)) {
@@ -673,9 +673,23 @@ export function ImportPage() {
         )}
 
         {isComplete && (
-          <p style={{ color: 'var(--text-success)', marginTop: 12, fontSize: 13 }}>
-            Analysis complete. Head to Review to see clip candidates.
-          </p>
+          <div style={{ marginTop: 12 }}>
+            <p style={{ color: 'var(--text-success)', margin: 0, fontSize: 13 }}>
+              Analysis complete. Head to Review to see clip candidates.
+            </p>
+            {analysisStatus.notices?.map((notice) => (
+              <p
+                key={notice.code}
+                style={{
+                  color: notice.level === 'warning' ? 'var(--color-warning)' : 'var(--text-muted)',
+                  margin: '6px 0 0',
+                  fontSize: 13,
+                }}
+              >
+                {notice.message}
+              </p>
+            ))}
+          </div>
         )}
 
         {isCancelled && (

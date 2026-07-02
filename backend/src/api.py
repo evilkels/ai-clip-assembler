@@ -26,8 +26,9 @@ from pydantic import BaseModel
 # Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
 load_dotenv()
 
+from . import analysis_service
+from .assembly_profiles import AssemblyProfile, build_draft_timeline
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
-from .assembly_profiles import AssemblyProfile, build_draft_timeline, recommend_assembly_profile
 from .export_engine import (
     choose_timeline_fps,
     edl_flatten_warnings,
@@ -38,15 +39,9 @@ from .export_engine import (
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
 from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (postponed; kept for future re-enable)
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
-from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
-from .models import FrameSample
+from .frame_extraction import extract_frames
 from .models import FrameScore
-from .motion_analysis import (
-    FFmpegVidstabError,
-    FFmpegVidstabUnavailableError,
-    parse_trf,
-    run_vidstabdetect,
-)
+from .motion_analysis import parse_trf, run_vidstabdetect
 from .models import TimelineDocument
 from .project_store import (
     InvalidProjectManifestError,
@@ -77,7 +72,6 @@ from .timeline_ops import (
     TimelineRevisionConflict,
 )
 from .timeline_service import TimelineEventBroker
-from .quality_scoring import score_samples_from_images
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes  # noqa: F401 - public test seam
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
@@ -440,15 +434,7 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
 
 
 def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
-    """Source videos to analyze: the requested subset, or all when unfiltered.
-
-    Order follows the project's video order so progress indices stay stable.
-    """
-    videos = projects[project_id]["videos"]
-    if request.file_ids is None:
-        return list(videos)
-    wanted = set(request.file_ids)
-    return [v for v in videos if v["file_id"] in wanted]
+    return analysis_service.selected_videos(projects[project_id], request)
 
 
 @app.post("/projects/{project_id}/analyze/cancel")
@@ -468,185 +454,36 @@ async def cancel_analysis(project_id: str):
 
 
 def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
-    pipeline_started = time.monotonic()
-    per_video_results = []
-    per_file_results = []
-    timings = []
-    per_file_frames = {}
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
-    cancellable_runner = _make_cancellable_runner(project_id)
-    videos_to_analyze = selected_videos(project_id, request)
-    total_videos = len(videos_to_analyze)
-    for index, video in enumerate(videos_to_analyze, start=1):
-        _check_cancelled(project_id)
-        video_started = time.monotonic()
-        video_timing = {"file_name": video["file_name"]}
-        set_analysis_progress(
-            project_id,
-            video_index=index,
-            file_name=video["file_name"],
-            clip_index=0,
-            clip_total=0,
-            message=f"Preparing video {index}/{total_videos}: {video['file_name']}",
-        )
-        try:
-            logger.info(
-                "Analyze %d/%d %s: motion analysis (vidstabdetect)",
-                index, total_videos, video["file_name"],
-            )
-            set_analysis_progress(
-                project_id,
-                step="motion_analysis",
-                message=(
-                    f"Video {index}/{total_videos}: running FFmpeg motion analysis "
-                    "(this can take a while on long clips)"
-                ),
-            )
-            phase_started = time.monotonic()
-            transforms_path = analysis_dir(project_id) / "motion" / f"{video['file_id']}.trf"
-            run_vidstabdetect(
-                input_path=Path(video["file_path"]),
-                transforms_path=transforms_path,
-                runner=cancellable_runner,
-            )
-            video_timing["motion_analysis_sec"] = round(time.monotonic() - phase_started, 2)
-            logger.info(
-                "Analyze %d/%d %s: extracting frame samples",
-                index, total_videos, video["file_name"],
-            )
-            set_analysis_progress(
-                project_id,
-                step="frame_extraction",
-                message=f"Video {index}/{total_videos}: extracting frame samples",
-            )
-            phase_started = time.monotonic()
-            samples = extract_frames(
-                input_path=Path(video["file_path"]),
-                frames_dir=samples_dir(project_id) / video["file_id"],
-                file_id=video["file_id"],
-                sample_fps=sample_fps,
-                max_width=int(request.preferences.get("max_width", 960)),
-                runner=cancellable_runner,
-            )
-            video_timing["frame_extraction_sec"] = round(time.monotonic() - phase_started, 2)
-            logger.info(
-                "Analyze %d/%d %s: detecting scenes",
-                index, total_videos, video["file_name"],
-            )
-            set_analysis_progress(
-                project_id,
-                step="scene_detection",
-                message=f"Video {index}/{total_videos}: detecting scene boundaries",
-            )
-            phase_started = time.monotonic()
-            scenes = detect_scenes(Path(video["file_path"]))
-            samples = assign_scene_ids(samples, scenes)
-            video_timing["scene_detection_sec"] = round(time.monotonic() - phase_started, 2)
-        except FFmpegVidstabUnavailableError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except FFmpegVidstabError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        except FFmpegUnavailableError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except FFmpegError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        phase_started = time.monotonic()
-        if transforms_path.exists():
-            fps = float((video.get("metadata") or {}).get("fps") or 30.0)
-            frame_scores = score_samples_rule_based(samples, parse_trf(transforms_path, fps=fps))
-        else:
-            frame_scores = score_samples_rule_based(samples)
-        scene_bounds = {
-            scene.scene_id: (scene.start_sec, scene.end_sec)
-            for scene in scenes
-        }
-        source_duration_sec = float(
-            (video.get("metadata") or {}).get("duration_sec") or 0.0
-        ) or None
-        result = assemble_smooth_clips(
-            file_id=video["file_id"],
-            file_name=video["file_name"],
-            frames=frame_scores,
+    try:
+        pipeline = analysis_service.run_analysis_pipeline(
+            projects[project_id],
+            request,
+            project_id=project_id,
+            analysis_path=analysis_dir(project_id),
+            samples_path=samples_dir(project_id),
             preferences=preferences,
-            scene_bounds=scene_bounds,
-            source_duration_sec=source_duration_sec,
+            sample_fps=sample_fps,
+            cancellable_runner=_make_cancellable_runner(project_id),
+            check_cancelled=lambda: _check_cancelled(project_id),
+            set_progress=lambda **fields: set_analysis_progress(project_id, **fields),
+            run_vidstabdetect_fn=run_vidstabdetect,
+            extract_frames_fn=extract_frames,
+            detect_scenes_fn=detect_scenes,
+            assign_scene_ids_fn=assign_scene_ids,
+            score_samples_fn=score_samples_rule_based,
+            assemble_clips_fn=assemble_smooth_clips,
+            enhance_clips_fn=enhance_clips_with_pi_cli,
+            parse_transforms_fn=parse_trf,
         )
-        per_file_frames[video["file_id"]] = {
-            "frames": [frame.model_dump() for frame in frame_scores],
-            "scene_bounds": {
-                str(scene_id): [start, end]
-                for scene_id, (start, end) in scene_bounds.items()
-            },
-            "source_duration_sec": source_duration_sec,
-            "fps": float((video.get("metadata") or {}).get("fps") or 30.0),
-        }
-        video_timing["assembly_sec"] = round(time.monotonic() - phase_started, 2)
-        video_timing["ai_scoring_sec"] = 0.0
-        logger.info(
-            "Analyze %d/%d %s: %d candidate clip(s) assembled",
-            index, total_videos, video["file_name"], len(result.clips),
-        )
-        video_metadata = {}
-        if request.harness_id == "pi_agent":
-            logger.info(
-                "Analyze %d/%d %s: scoring %d clip(s) with pi — one CLI call per clip, can take minutes",
-                index, total_videos, video["file_name"], len(result.clips),
-            )
-            set_analysis_progress(
-                project_id,
-                step="scoring_clips",
-                clip_index=0,
-                clip_total=len(result.clips),
-                message=(
-                    f"Video {index}/{total_videos}: scoring {len(result.clips)} clip(s) "
-                    "with Pi"
-                ),
-            )
-            phase_started = time.monotonic()
-            def pi_progress(done, total, _index=index):
-                # Abort between clips when the user cancels (pi runs its own
-                # subprocess per clip, so we can't kill it mid-call).
-                _check_cancelled(project_id)
-                set_analysis_progress(
-                    project_id,
-                    clip_index=done,
-                    clip_total=total,
-                    message=f"Video {_index}/{total_videos}: Pi scored {done}/{total} clip(s)",
-                )
+    except analysis_service.AnalysisDependencyUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except analysis_service.AnalysisInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-            result, used_ai = enhance_clips_with_pi_cli(
-                result,
-                frame_scores,
-                progress_callback=pi_progress,
-                cache_dir=analysis_dir(project_id) / "ai-scores",
-            )
-            video_timing["ai_scoring_sec"] = round(time.monotonic() - phase_started, 2)
-            video_metadata["used_ai"] = used_ai
-            video_metadata["model_used"] = result.metadata.get("model_used")
-            video_metadata["file_id"] = video["file_id"]
-            if result.metadata.get("warning"):
-                video_metadata["warning"] = result.metadata["warning"]
-            if result.metadata.get("scoring_seconds_per_clip"):
-                video_metadata["scoring_seconds_per_clip"] = result.metadata[
-                    "scoring_seconds_per_clip"
-                ]
-        per_video_results.append(video_metadata)
-        # Carry the source file's capture time and full duration onto each clip so
-        # the UI can place clips on a per-file track and sort by true capture time.
-        source_meta = video.get("metadata") or {}
-        source_created_at = source_meta.get("created_at")
-        source_duration_sec = source_meta.get("duration_sec")
-        clips = []
-        for clip in result.clips:
-            clip_dict = clip.model_dump()
-            clip_dict["source_created_at"] = source_created_at
-            clip_dict["source_duration_sec"] = source_duration_sec
-            clips.append(clip_dict)
-        per_file_results.append({"file_id": video["file_id"], "clips": clips, "result": result})
-        video_timing["video_total_sec"] = round(time.monotonic() - video_started, 2)
-        timings.append(video_timing)
-
+    per_file_results = pipeline.per_file_results
+    total_videos = len(selected_videos(project_id, request))
     analyzed_file_ids = {result["file_id"] for result in per_file_results}
     existing_frame_scores = projects[project_id].get("frame_scores") or {"per_file": {}}
     merged_frame_scores = {
@@ -654,7 +491,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         for file_id, entry in existing_frame_scores.get("per_file", {}).items()
         if file_id not in analyzed_file_ids
     }
-    merged_frame_scores.update(per_file_frames)
+    merged_frame_scores.update(pipeline.per_file_frames)
     projects[project_id]["frame_scores"] = {"per_file": merged_frame_scores}
     if projects[project_id].get("project_folder"):
         write_frame_scores(Path(projects[project_id]["project_folder"]), merged_frame_scores)
@@ -675,24 +512,24 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         "recommendation": finalized["recommendation"],
         "generation_stats": finalized["generation_stats"],
         "timings": {
-            "per_video": timings,
-            "pipeline_total_sec": round(time.monotonic() - pipeline_started, 2),
+            "per_video": pipeline.timings,
+            "pipeline_total_sec": pipeline.pipeline_total_sec,
         },
     }
     logger.info(
         "Analyze timings: total %.1fs, per-video %s",
         response["timings"]["pipeline_total_sec"],
-        timings,
+        pipeline.timings,
     )
     if request.harness_id == "pi_agent":
-        harness_metadata = {"per_video": per_video_results}
-        all_ai = all(v.get("used_ai") for v in per_video_results)
-        any_ai = any(v.get("used_ai") for v in per_video_results)
-        any_fallback = any(v.get("warning") for v in per_video_results)
+        harness_metadata = {"per_video": pipeline.per_video_metadata}
+        all_ai = all(v.get("used_ai") for v in pipeline.per_video_metadata)
+        any_ai = any(v.get("used_ai") for v in pipeline.per_video_metadata)
+        any_fallback = any(v.get("warning") for v in pipeline.per_video_metadata)
         if any_fallback or not all_ai:
             harness_metadata["used_ai"] = any_ai
             fallback_videos = [
-                v["file_id"] for v in per_video_results if v.get("warning")
+                v["file_id"] for v in pipeline.per_video_metadata if v.get("warning")
             ]
             harness_metadata["warning"] = (
                 f"pi harness fallback for video(s): {', '.join(fallback_videos)}"
@@ -701,7 +538,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         else:
             harness_metadata["used_ai"] = True
         models_used = list({
-            v["model_used"] for v in per_video_results if v.get("model_used")
+            v["model_used"] for v in pipeline.per_video_metadata if v.get("model_used")
         })
         if len(models_used) == 1:
             harness_metadata["model_used"] = models_used[0]
@@ -719,93 +556,24 @@ def _finalize_clip_set(
     harness_id: str,
     preserve_manual_timeline: bool,
 ) -> dict:
-    analyzed_file_ids = {result["file_id"] for result in per_file_results}
-    all_clips = [
-        clip
-        for result in per_file_results
-        for clip in result["clips"]
-    ]
-    all_clips.extend(
-        clip
-        for clip in projects[project_id].get("clips", [])
-        if clip.get("file_id") not in analyzed_file_ids
+    finalized = analysis_service.finalize_clip_set(
+        projects[project_id],
+        per_file_results,
+        preserve_manual_timeline=preserve_manual_timeline,
+        enrich_clips=enrich_clips_with_source_metadata,
     )
-    # Backfill source metadata on merged-in clips from earlier runs so the per-file
-    # track and chronological sort behave consistently across the whole set.
-    enrich_clips_with_source_metadata({"clips": all_clips, "videos": projects[project_id]["videos"]})
-    ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
-    existing_timeline = projects[project_id].get("timeline")
-    existing_clips = projects[project_id].get("clips", [])
-    if preserve_manual_timeline and isinstance(existing_timeline, dict) and existing_timeline.get("source") == "manual":
-        accepted_ids = {
-            entry["clip_id"]
-            for entry in existing_timeline.get("clips", [])
-            if isinstance(entry, dict) and entry.get("clip_id")
-        }
-        new_ids = {clip["clip_id"] for clip in ranked_clips}
-        ranked_clips.extend(
-            clip for clip in existing_clips
-            if clip.get("clip_id") in accepted_ids and clip.get("clip_id") not in new_ids
-        )
-        timeline = existing_timeline
-    else:
-        recommendation = recommend_assembly_profile(ranked_clips)
-        timeline = build_draft_timeline(
-            ranked_clips,
-            profile=recommendation["profile"],
-            target_duration_sec=recommendation["target_duration_sec"],
-        )
-
-    recommendation = recommend_assembly_profile(ranked_clips)
+    ranked_clips = finalized["clips"]
     projects[project_id]["clips"] = ranked_clips
-    projects[project_id]["timeline"] = timeline
+    projects[project_id]["timeline"] = finalized["timeline"]
     projects[project_id]["harness_id"] = harness_id
-    generation_stats = aggregate_generation_stats(per_file_results)
-    projects[project_id]["generation_stats"] = generation_stats
+    projects[project_id]["generation_stats"] = finalized["generation_stats"]
     invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
-    return {
-        "clips": ranked_clips,
-        "timeline": timeline,
-        "recommendation": recommendation,
-        "generation_stats": generation_stats,
-    }
+    return finalized
 
 
 def aggregate_generation_stats(per_file_results: list[dict]) -> dict:
-    per_file = {}
-    totals = {
-        "candidates_generated": 0,
-        "candidates_kept": 0,
-        "scenes_total": 0,
-        "scenes_at_cap": 0,
-    }
-    effective_preferences = None
-    max_candidates_per_video = None
-    for result in per_file_results:
-        stats = (result.get("result").metadata or {}).get("generation_stats", {})
-        file_stats = {
-            "candidates_generated": int(stats.get("candidates_generated", 0)),
-            "candidates_kept": int(stats.get("candidates_kept", 0)),
-            "scenes_total": int(stats.get("scenes_total", 0)),
-            "scenes_at_cap": int(stats.get("scenes_at_cap", 0)),
-            "preferences": stats.get("preferences") or {},
-        }
-        per_file[result["file_id"]] = file_stats
-        for key in totals:
-            totals[key] += file_stats[key]
-        if effective_preferences is None:
-            effective_preferences = file_stats["preferences"]
-            max_candidates_per_video = effective_preferences.get("max_candidates_per_video")
-    return {
-        "per_file": per_file,
-        "totals": {
-            **totals,
-            "videos": len(per_file_results),
-            "max_candidates_per_video": max_candidates_per_video,
-        },
-        "preferences": effective_preferences or {},
-    }
+    return analysis_service.aggregate_generation_stats(per_file_results)
 
 
 @app.put("/projects/{project_id}/timeline")
@@ -1822,11 +1590,7 @@ def sample_fps_from_request(preferences: dict) -> float:
 
 
 def score_samples_rule_based(samples: list, transforms=None) -> list:
-    frame_samples = [
-        sample if isinstance(sample, FrameSample) else FrameSample.model_validate(sample)
-        for sample in samples
-    ]
-    return score_samples_from_images(frame_samples, transforms=transforms)
+    return analysis_service.score_samples_rule_based(samples, transforms=transforms)
 
 
 if __name__ == "__main__":

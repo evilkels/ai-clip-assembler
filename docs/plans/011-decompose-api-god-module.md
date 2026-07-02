@@ -13,7 +13,7 @@
 
 ## Status
 
-- **Status**: TODO
+- **Status**: DONE — slice 1 of 4 (2026-07-02). Analysis pipeline extracted to `analysis_service.py`; `enrich_clips_with_source_metadata` stayed in `api.py` (shared with `GET /clips`, per STOP guidance). Remaining slices: timeline lifecycle service, review/proposal service, projects repository/write-policy.
 - **Priority**: P1
 - **Effort**: L (do it in slices; this plan is **slice 1 only**)
 - **Risk**: HIGH (api.py is the central coordination point; every route and most tests touch it)

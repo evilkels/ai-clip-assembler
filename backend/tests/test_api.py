@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src import api
+from src.frame_extraction import FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 from src.review_state import sequence_fingerprint
 
@@ -945,7 +946,7 @@ def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_pat
         }
     )
     monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
-    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: (_ for _ in ()).throw(api.FFmpegUnavailableError("ffmpeg missing")))
+    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: (_ for _ in ()).throw(FFmpegUnavailableError("ffmpeg missing")))
 
     response = client.post(
         f"/projects/{project_id}/analyze",
@@ -1779,7 +1780,7 @@ def test_analysis_status_error_after_failed_analyze(monkeypatch, tmp_path):
     monkeypatch.setattr(
         api,
         "extract_frames",
-        lambda **kwargs: (_ for _ in ()).throw(api.FFmpegUnavailableError("ffmpeg missing")),
+        lambda **kwargs: (_ for _ in ()).throw(FFmpegUnavailableError("ffmpeg missing")),
     )
 
     analyze = client.post(

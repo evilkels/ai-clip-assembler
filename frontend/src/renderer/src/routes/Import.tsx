@@ -13,6 +13,8 @@ import {
 } from '../api/client';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
 
+type SortKey = 'size' | 'date' | 'analyzed';
+
 function formatResolution(metadata: {
   resolution: [number, number];
   display_resolution?: [number, number];
@@ -119,12 +121,12 @@ export function ImportPage() {
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; fileName: string } | null>(null);
-  const [sort, setSort] = useState<{ key: 'size' | 'date' | 'analyzed' | null; dir: 'asc' | 'desc' }>({
+  const [sort, setSort] = useState<{ key: SortKey | null; dir: 'asc' | 'desc' }>({
     key: null,
     dir: 'asc',
   });
 
-  const toggleSort = useCallback((key: 'size' | 'date' | 'analyzed') => {
+  const toggleSort = useCallback((key: SortKey) => {
     setSort((prev) =>
       prev.key === key
         ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
@@ -146,13 +148,19 @@ export function ImportPage() {
     return [...uploadedVideos].sort((a, b) => (value(a) - value(b)) * factor);
   }, [uploadedVideos, sort, analyzedIds]);
 
-  const sortArrow = (key: 'size' | 'date' | 'analyzed') =>
+  const sortArrow = (key: SortKey) =>
     sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 
+  const triggerFilePicker = useCallback(() => {
+    if (!projectFolder) fileInputRef.current?.click();
+  }, [projectFolder]);
+
   useEffect(() => {
-    setDeselected(
-      new Set(uploadedVideos.filter((video) => analyzedIds.has(video.file_id)).map((video) => video.file_id)),
-    );
+    const next = new Set<string>();
+    for (const video of uploadedVideos) {
+      if (analyzedIds.has(video.file_id)) next.add(video.file_id);
+    }
+    setDeselected(next);
   }, [projectId, uploadedVideos, analyzedIds]);
 
   useEffect(() => {
@@ -164,9 +172,13 @@ export function ImportPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [preview]);
 
-  const selectedIds = uploadedVideos
-    .map((v) => v.file_id)
-    .filter((id) => !deselected.has(id));
+  const selectedIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const video of uploadedVideos) {
+      if (!deselected.has(video.file_id)) ids.push(video.file_id);
+    }
+    return ids;
+  }, [uploadedVideos, deselected]);
   const selectedCount = selectedIds.length;
   const allSelected = uploadedVideos.length > 0 && selectedCount === uploadedVideos.length;
 
@@ -345,31 +357,26 @@ export function ImportPage() {
           )}
         </div>
 
-        <div
+        <input
+          id="source-video-picker"
+          ref={fileInputRef}
+          type="file"
+          accept=".mp4,.mov,video/mp4,video/quicktime"
+          multiple
+          aria-label="Select MP4 or MOV files"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            if (e.target.files) handleFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <button
+          type="button"
           className="drop-zone"
-          onClick={() => {
-            if (!projectFolder) fileInputRef.current?.click();
-          }}
-          style={{
-            border: '1px dashed var(--border)',
-            borderRadius: 8,
-            padding: 24,
-            textAlign: 'center',
-            cursor: projectFolder ? 'default' : 'pointer',
-            marginBottom: 16,
-          }}
+          aria-controls="source-video-picker"
+          onClick={triggerFilePicker}
+          disabled={Boolean(projectFolder)}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".mp4,.mov,video/mp4,video/quicktime"
-            multiple
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              if (e.target.files) handleFiles(e.target.files);
-              e.target.value = '';
-            }}
-          />
           <p style={{ margin: 0 }}>
             {uploading
               ? 'Uploading…'
@@ -379,12 +386,12 @@ export function ImportPage() {
                   ? 'Add videos to the folder, then rescan'
                   : 'Click to select MP4/MOV files'}
           </p>
-        </div>
+        </button>
 
         {uploadErrors.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            {uploadErrors.map((e, i) => (
-              <p key={i} style={{ color: 'var(--text-error)', margin: '2px 0', fontSize: 12 }}>
+            {uploadErrors.map((e) => (
+              <p key={e} style={{ color: 'var(--text-error)', margin: '2px 0', fontSize: 12 }}>
                 {e}
               </p>
             ))}
@@ -437,26 +444,56 @@ export function ImportPage() {
                   <th style={{ padding: '6px 8px', textAlign: 'right' }}>FPS</th>
                   <th style={{ padding: '6px 8px', textAlign: 'right' }}>Resolution</th>
                   <th
-                    onClick={() => toggleSort('size')}
-                    style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
-                    title="Sort by size"
+                    aria-sort={sort.key === 'size' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    style={{ padding: '6px 8px', textAlign: 'right' }}
                   >
-                    Size{sortArrow('size')}
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('size')}
+                      style={{
+                        all: 'unset',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                      title="Sort by size"
+                    >
+                      Size{sortArrow('size')}
+                    </button>
                   </th>
                   <th
-                    onClick={() => toggleSort('date')}
-                    style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
-                    title="Sort by date"
+                    aria-sort={sort.key === 'date' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    style={{ padding: '6px 8px', textAlign: 'right' }}
                   >
-                    Date{sortArrow('date')}
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('date')}
+                      style={{
+                        all: 'unset',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                      title="Sort by date"
+                    >
+                      Date{sortArrow('date')}
+                    </button>
                   </th>
                   <th style={{ padding: '6px 8px' }}>Codec</th>
                   <th
-                    onClick={() => toggleSort('analyzed')}
-                    style={{ padding: '6px 8px', cursor: 'pointer', userSelect: 'none' }}
-                    title="Sort by analysis status"
+                    aria-sort={sort.key === 'analyzed' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    style={{ padding: '6px 8px' }}
                   >
-                    Analysis{sortArrow('analyzed')}
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('analyzed')}
+                      style={{
+                        all: 'unset',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                      title="Sort by analysis status"
+                    >
+                      Analysis{sortArrow('analyzed')}
+                    </button>
                   </th>
                 </tr>
               </thead>
@@ -595,15 +632,12 @@ export function ImportPage() {
                 {eta && <span>{eta}</span>}
               </div>
             </div>
-            <div
+            <progress
               className={`analysis-progress-bar ${activePercent === null ? 'indeterminate' : ''}`}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={activePercent ?? undefined}
-            >
-              <span style={{ width: activePercent === null ? '36%' : `${activePercent}%` }} />
-            </div>
+              value={activePercent ?? undefined}
+              max={100}
+              aria-label="Analysis progress"
+            />
             <div className="analysis-progress-meta">
               <span>{STEP_LABELS[activeProgress.step ?? ''] ?? activeProgress.step ?? 'Starting'}</span>
               {activeProgress.video_total ? (
@@ -640,14 +674,13 @@ export function ImportPage() {
       </div>
 
       {preview && projectId && (
-        <div
+        <dialog
+          open
           className="preview-overlay"
-          role="dialog"
-          aria-modal="true"
           aria-label={`Preview ${preview.fileName}`}
-          onClick={() => setPreview(null)}
+          onCancel={() => setPreview(null)}
         >
-          <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="preview-modal">
             <div className="preview-modal-head">
               <span className="preview-modal-title">{preview.fileName}</span>
               <button
@@ -665,10 +698,13 @@ export function ImportPage() {
               controls
               autoPlay
               playsInline
+              aria-label={`Preview video for ${preview.fileName}`}
               className="preview-video"
-            />
+            >
+              <track kind="captions" label="No captions available" />
+            </video>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   );

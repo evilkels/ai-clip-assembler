@@ -240,13 +240,13 @@ function ConnectAiTabPanel() {
         </div>
 
         {lastResult && (
-          <div className="mcp-connect-result" role="status">
+          <output className="mcp-connect-result">
             <p className="settings-saved">Connected. Restart {lastResult.name} to finish.</p>
             {lastResult.backupPath && (
               <p className="settings-muted">Backup created at {lastResult.backupPath}</p>
             )}
             <pre className="mcp-snippet">{lastResult.snippet}</pre>
-          </div>
+          </output>
         )}
       </section>
     </div>

@@ -2,6 +2,21 @@
  * Clip and project types — frontend mirror of backend shapes.
  */
 
+import type { ClipSuggestion, CreativeVersion } from './generated';
+
+type BackendScoreKey = Extract<keyof ClipSuggestion, `${string}_score`>;
+type MappedScoreKey =
+  | 'smoothness_score'
+  | 'sharpness_score'
+  | 'exposure_score'
+  | 'contrast_score'
+  | 'visual_interest_score'
+  | 'overall_score';
+type AssertNever<T extends never> = T;
+
+// Compile-time guard: every backend score field must be mapped into ClipScores.
+export type _AssertNoUnmappedScores = AssertNever<Exclude<BackendScoreKey, MappedScoreKey>>;
+
 export interface ClipScores {
   smoothness: number;
   sharpness?: number;
@@ -11,21 +26,23 @@ export interface ClipScores {
   overall: number;
 }
 
-export interface ClipCandidate {
-  clip_id: string;
-  file_id: string;
-  file_name: string;
-  scene_id?: number;
-  start_sec: number;
-  end_sec: number;
+type BackendClipFields = Omit<
+  ClipSuggestion,
+  | 'duration_sec'
+  | 'smoothness_score'
+  | 'sharpness_score'
+  | 'exposure_score'
+  | 'contrast_score'
+  | 'visual_interest_score'
+  | 'overall_score'
+  | 'ai_reason'
+  | 'suggested_transition'
+>;
+
+export interface ClipCandidate extends BackendClipFields {
   scores: ClipScores;
-  reason: string;
-  suggested_speed?: number;
+  reason: ClipSuggestion['ai_reason'];
   thumbnail_url?: string;
-  /** ISO 8601 capture time of the source file (for chronological sorting). */
-  source_created_at?: string | null;
-  /** Full duration of the source file in seconds (for the per-file track). */
-  source_duration_sec?: number | null;
 }
 
 export interface VideoMetadata {
@@ -71,13 +88,43 @@ export interface AnalysisResult {
   clips: ClipCandidate[];
   sequence: DraftTimeline;
   recommendation: AssemblyRecommendation;
+  generation_stats?: ClipGenerationStats;
 }
 
-export type AssemblyProfile =
-  | 'short_social'
-  | 'cinematic_highlight'
-  | 'long_scenic'
-  | 'custom';
+export interface ClipGenerationPreferences {
+  min_clip_duration_sec: number;
+  max_clip_duration_sec: number;
+  smoothness_threshold: number;
+  target_duration_sec: number;
+  max_turn_rate_deg_per_sec: number;
+  max_clips_per_scene: number;
+  max_candidates_per_video: number;
+}
+
+export type ClipGenerationPreferenceUpdate = Partial<ClipGenerationPreferences>;
+
+export interface ClipGenerationFileStats {
+  candidates_generated: number;
+  candidates_kept: number;
+  scenes_total: number;
+  scenes_at_cap: number;
+  preferences: Partial<ClipGenerationPreferences>;
+}
+
+export interface ClipGenerationStats {
+  per_file: Record<string, ClipGenerationFileStats>;
+  totals: {
+    candidates_generated: number;
+    candidates_kept: number;
+    scenes_total: number;
+    scenes_at_cap: number;
+    videos: number;
+    max_candidates_per_video?: number | null;
+  };
+  preferences: Partial<ClipGenerationPreferences>;
+}
+
+export type AssemblyProfile = NonNullable<CreativeVersion['profile']>;
 
 export interface AssemblyRecommendation {
   profile: AssemblyProfile;

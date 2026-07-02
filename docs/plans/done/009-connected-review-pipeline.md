@@ -46,12 +46,28 @@ TypeScript, Playwright, CSS.
 
 ## Status
 
-- **Status**: IN PROGRESS
+- **Status**: DONE (2026-06-28, reconcile pass)
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH (persisted schema, concurrency, agent/session and UI state)
 - **Depends on**: 005, 006, 007, 008
 - **Planned at**: commit `f6dedc6`, 2026-06-21
+
+### Completion record (2026-06-28, reconcile pass)
+
+All five implementation tasks landed on `main` (commits `2ed448c`
+revision-safe state identity, `a1caad8` version provenance, `173bbbc`/`c093a6f`
+version playback scrubbers, `279778d` optimistic chat, `7d1900e`/`9db763e`
+connected pipeline state, `95b2262` scrubber/playhead alignment). Verified green
+at `f469e43`: **319 backend tests** (`pytest --ignore=tests/test_codex_cli_harness.py`),
+**ruff** (`ruff check src tests`), **frontend typecheck**, **frontend build**,
+and **`e2e/compare-versions.spec.ts`** (1 passed).
+
+**Not re-run in this reconcile pass** (Task 6 steps 1–4 ceremony): the full
+3-spec Playwright suite (only the 009 spec was run), `synthetic_e2e_qa.py`, the
+`react-doctor` diff gate, and the optional independent Claude whole-branch
+review. The implementation is merged and the core gates pass; run those four if
+a formal Task 6 sign-off is wanted, but they are not blocking — closing the plan.
 
 ## Collaboration Protocol
 

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ClipCandidate, ClipDecision } from '../types/clip';
 import { verdictFor } from '../lib/scoring';
+import { formatClock } from '../lib/format';
 import { ScoreChip } from './ScoreChip';
 
 interface Range {
@@ -39,18 +40,21 @@ function fileColor(fileId: string): string {
   return `hsl(${hash}, 70%, 62%)`;
 }
 
-function formatTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = (sec - m * 60).toFixed(1);
-  return `${m}:${s.padStart(4, '0')}`;
-}
-
 function formatRange(start: number, end: number): string {
-  return `${formatTime(start)} → ${formatTime(end)} (${(end - start).toFixed(1)}s)`;
+  return `${formatClock(start)} → ${formatClock(end)} (${(end - start).toFixed(1)}s)`;
 }
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function generationWhy(clip: ClipCandidate): string {
+  const kind = clip.tags?.includes('fallback') ? 'fallback' : 'smooth';
+  const turn =
+    typeof clip.max_turn_rate_deg_per_sec === 'number'
+      ? `${clip.max_turn_rate_deg_per_sec.toFixed(1)}°/s turn`
+      : 'turn unavailable';
+  return `Scene ${clip.scene_id ?? '—'} · ${kind} · smooth ${clip.scores.smoothness.toFixed(1)} · ${turn}`;
 }
 
 /** A bar spanning the full source file with the clip region, sibling candidates
@@ -81,8 +85,8 @@ function SourceTrack({
         className={`source-track${onSeek ? ' seekable' : ''}`}
         onClick={onSeek}
         disabled={!onSeek}
-        aria-label={`Seek preview within ${formatTime(startSec)} to ${formatTime(endSec)}`}
-        title={`Clip is ${formatTime(startSec)}–${formatTime(endSec)} of a ${formatTime(durationSec)} file`}
+        aria-label={`Seek preview within ${formatClock(startSec)} to ${formatClock(endSec)}`}
+        title={`Clip is ${formatClock(startSec)}–${formatClock(endSec)} of a ${formatClock(durationSec)} file`}
       >
         {siblings.map((s, i) => (
           <span
@@ -98,7 +102,7 @@ function SourceTrack({
         <span className="source-track-playhead" style={{ left: left(playheadSec) }} />
       </button>
       <span className="source-track-caption">
-        {formatTime(startSec)}–{formatTime(endSec)} of {formatTime(durationSec)}
+        {formatClock(startSec)}–{formatClock(endSec)} of {formatClock(durationSec)}
       </span>
     </div>
   );
@@ -246,6 +250,7 @@ export function ClipCard({
             <ScoreChip label="contrast" value={clip.scores.contrast} />
           </div>
         </details>
+        <div className="clip-generation-why">{generationWhy(clip)}</div>
         {clip.reason && (
           <div className="clip-reason">
             <span className="clip-reason-label">Why</span> {clip.reason}

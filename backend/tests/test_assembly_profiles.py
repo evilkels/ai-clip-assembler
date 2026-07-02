@@ -22,7 +22,7 @@ def test_recommendation_prefers_long_scenic_when_sustained_ranges_exist():
     recommendation = recommend_assembly_profile(clips)
 
     assert recommendation["profile"] == "long_scenic"
-    assert recommendation["target_duration_sec"] == 300
+    assert recommendation["target_duration_sec"] == 480
 
 
 def test_draft_selects_strongest_clips_then_orders_them_chronologically():
@@ -43,8 +43,8 @@ def test_short_social_trims_long_candidates_without_padding_target():
 
     draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=60)
 
-    assert draft["clips"][0]["end_sec"] - draft["clips"][0]["start_sec"] == 6
-    assert draft["total_duration_sec"] == 6
+    assert draft["clips"][0]["end_sec"] - draft["clips"][0]["start_sec"] == 7
+    assert draft["total_duration_sec"] == 7
 
 
 def test_profiles_alternate_clip_lengths_for_rhythm():
@@ -52,7 +52,7 @@ def test_profiles_alternate_clip_lengths_for_rhythm():
 
     draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
 
-    assert [entry["duration_sec"] for entry in draft["clips"][:3]] == [6.0, 3.0, 6.0]
+    assert [entry["duration_sec"] for entry in draft["clips"][:3]] == [7.0, 4.0, 6.0]
 
 
 def test_short_social_orders_strongest_first_not_chronologically():
@@ -67,17 +67,21 @@ def test_short_social_orders_strongest_first_not_chronologically():
     assert [entry["clip_id"] for entry in draft["clips"]] == ["late-best", "mid", "early-weak"]
 
 
-def test_long_scenic_caps_one_clip_per_scene():
+def test_long_scenic_caps_clips_per_scene():
     clips = [
         clip("s0-a", 0, 30, score=9.5, scene_id=0),
         clip("s0-b", 40, 70, score=9.0, scene_id=0),
-        clip("s1-a", 80, 110, score=8.5, scene_id=1),
+        clip("s0-c", 80, 110, score=8.5, scene_id=0),
+        clip("s0-d", 120, 150, score=8.0, scene_id=0),
+        clip("s1-a", 160, 190, score=7.5, scene_id=1),
     ]
 
-    draft = build_draft_timeline(clips, profile="long_scenic", target_duration_sec=300)
+    draft = build_draft_timeline(clips, profile="long_scenic", target_duration_sec=480)
     scene_ids = [entry["scene_id"] for entry in draft["clips"]]
 
-    assert sorted(scene_ids) == [0, 1]  # one per scene, s0-b dropped
+    # Up to 3 clips per scene, so the weakest scene-0 candidate (s0-d) is dropped.
+    assert sorted(scene_ids) == [0, 0, 0, 1]
+    assert "s0-d" not in {entry["clip_id"] for entry in draft["clips"]}
 
 
 def test_cinematic_applies_slowmo_to_very_smooth_clips_only():

@@ -29,6 +29,9 @@ const mainSource = readFileSync(join(frontendDir, 'src', 'main', 'index.ts'), 'u
 for (const snippet of [
   'startPackagedBackend',
   'CLIP_ASSEMBLER_PORT',
+  'resolvePiBinFromLoginShell',
+  'command -v pi',
+  'PI_BIN',
   'process.resourcesPath',
   "app.getPath('userData')",
   'additionalArguments',

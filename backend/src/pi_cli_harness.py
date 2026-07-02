@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from .app_settings import get_settings
+from .harness_utils import clamp_score, sample_frames_for_clip
 from .models import AssemblyResult, ClipSuggestion, FrameScore
 
 # uvicorn's logger so progress messages reach the dev console without extra config
@@ -225,30 +226,6 @@ def _call_pi_cli(
         raise PiCliUnavailableError(f"Failed to parse pi JSON output: {exc}") from exc
 
 
-def _sample_frames_for_clip(
-    clip: ClipSuggestion,
-    all_frames: List[FrameScore],
-    max_frames: int = DEFAULT_MAX_FRAMES_PER_CLIP,
-) -> List[str]:
-    """Pick up to *max_frames* representative frame paths inside *clip*."""
-    clip_frames = [
-        f for f in all_frames if clip.start_sec <= f.timestamp <= clip.end_sec
-    ]
-    if not clip_frames:
-        return []
-    if len(clip_frames) <= max_frames:
-        return [f.frame_path for f in clip_frames]
-    indices = [int(i * (len(clip_frames) - 1) / (max_frames - 1)) for i in range(max_frames)]
-    return [clip_frames[i].frame_path for i in indices]
-
-
-def _clamp_score(value) -> float:
-    try:
-        return max(0.0, min(10.0, float(value)))
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _score_cache_key(
     frame_paths: List[str], provider: str, model: str, prompt_template: str
 ) -> str:
@@ -349,7 +326,7 @@ def enhance_clips_with_pi_cli(
 
     clip_samples: List[Tuple[ClipSuggestion, List[str]]] = []
     for clip in manual_result.clips:
-        paths = _sample_frames_for_clip(clip, all_frames, max_frames=max_frames_per_clip)
+        paths = sample_frames_for_clip(clip, all_frames, max_frames=max_frames_per_clip)
         if paths:
             clip_samples.append((clip, paths))
 
@@ -424,7 +401,7 @@ def enhance_clips_with_pi_cli(
     enhanced_clips: List[ClipSuggestion] = []
     sampled_clip_ids = {clip.clip_id for clip, _ in clip_samples}
     for (original_clip, _paths), score in zip(clip_samples, clip_scores):
-        new_visual_interest = round(_clamp_score(score.get("visual_interest", 0)), 2)
+        new_visual_interest = round(clamp_score(score.get("visual_interest", 0)), 2)
         new_overall = round(
             0.7 * original_clip.overall_score + 0.3 * new_visual_interest, 2
         )

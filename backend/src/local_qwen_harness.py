@@ -14,6 +14,7 @@ from typing import List, Tuple
 import httpx
 
 from .clip_assembly import AssemblyResult
+from .harness_utils import clamp_score, sample_frames_for_clip
 from .models import ClipSuggestion, FrameScore
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -115,30 +116,6 @@ def _call_ollama_for_batch(
         raise OllamaUnavailableError(f"Failed to parse Ollama JSON response: {exc}") from exc
 
 
-def _sample_frames_for_clip(
-    clip: ClipSuggestion,
-    all_frames: List[FrameScore],
-    max_frames: int = 4,
-) -> List[str]:
-    """Pick up to *max_frames* representative frame paths inside *clip*."""
-    clip_frames = [
-        f for f in all_frames if clip.start_sec <= f.timestamp <= clip.end_sec
-    ]
-    if not clip_frames:
-        return []
-    if len(clip_frames) <= max_frames:
-        return [f.frame_path for f in clip_frames]
-    indices = [int(i * (len(clip_frames) - 1) / (max_frames - 1)) for i in range(max_frames)]
-    return [clip_frames[i].frame_path for i in indices]
-
-
-def _clamp_score(value) -> float:
-    try:
-        return max(0.0, min(10.0, float(value)))
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def enhance_clips_with_local_qwen(
     manual_result: AssemblyResult,
     all_frames: List[FrameScore],
@@ -172,7 +149,7 @@ def enhance_clips_with_local_qwen(
     # Sample frames for each clip
     clip_samples: List[Tuple[ClipSuggestion, List[str]]] = []
     for clip in manual_result.clips:
-        paths = _sample_frames_for_clip(clip, all_frames)
+        paths = sample_frames_for_clip(clip, all_frames)
         if paths:
             clip_samples.append((clip, paths))
 
@@ -287,7 +264,7 @@ def enhance_clips_with_local_qwen(
     for (original_clip, _), scores in zip(clip_samples, clip_scores):
         if scores:
             avg_visual_interest = sum(
-                _clamp_score(s.get("visual_interest", 0)) for s in scores
+                clamp_score(s.get("visual_interest", 0)) for s in scores
             ) / len(scores)
             reasons = [
                 str(s.get("reason", "")).strip()

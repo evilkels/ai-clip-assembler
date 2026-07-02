@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   acceptProposal,
+  clearReviewSession,
   getReviewSession,
   rejectProposal,
   reviewKickoff,
@@ -20,6 +21,7 @@ export interface ReviewConversation {
   error: string | null;
   send: (text: string, existingMessageId?: string) => Promise<void>;
   resolveProposal: (proposalId: string, accept: boolean) => Promise<void>;
+  clearHistory: () => Promise<void>;
 }
 
 function latestVersionSet(messages: ReviewMessage[]): VersionSet | null {
@@ -150,5 +152,26 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     [projectId, applySession],
   );
 
-  return { messages, versionSet, busy, error, send, resolveProposal };
+  const clearHistory = useCallback(async () => {
+    if (!projectId || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await clearReviewSession(projectId);
+      if (activeProject.current !== projectId) return;
+      setMessages([]);
+      setVersionSet(null);
+      // Re-kick a fresh opening turn so the new session isn't left empty.
+      const result = await reviewKickoff(projectId);
+      if (activeProject.current === projectId) applySession(result.session);
+    } catch {
+      if (activeProject.current === projectId) {
+        setError('Could not start a new session.');
+      }
+    } finally {
+      if (activeProject.current === projectId) setBusy(false);
+    }
+  }, [projectId, busy, applySession]);
+
+  return { messages, versionSet, busy, error, send, resolveProposal, clearHistory };
 }

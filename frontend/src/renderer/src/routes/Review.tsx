@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
+import { ResizeHandle } from '../components/ResizeHandle';
+import { ClipGenerationPanel } from '../components/ClipGenerationPanel';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { VersionGallery } from '../components/VersionGallery';
-import { WorkingTimelineStrip } from '../components/WorkingTimelineStrip';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
 import { useReview } from '../state/ReviewContext';
+import { usePanelWidth } from '../hooks/usePanelWidth';
 import { useReviewConversation } from '../hooks/useReviewConversation';
 import { buildVersionMembership } from '../state/versionState';
 import type { ClipCandidate } from '../types/clip';
@@ -27,14 +29,17 @@ export function ReviewPage() {
     decisions,
     error,
     exclude,
+    generationStats,
     include,
     loading,
     projectId,
+    rederiveClips,
     smoothnessThreshold,
     setSmoothnessThreshold,
     timelineSnapshot,
   } = useReview();
   const conversation = useReviewConversation(projectId);
+  const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 300, 240, 560);
 
   const ranked = useMemo(() => rankClips(clips), [clips]);
   const filtered = useMemo(
@@ -104,7 +109,7 @@ export function ReviewPage() {
         </div>
         <div className="controls">
           <div className="control">
-            <label htmlFor="smoothness">Stability ≥</label>
+            <label htmlFor="smoothness">Display filter</label>
             <input
               id="smoothness"
               type="range"
@@ -120,7 +125,7 @@ export function ReviewPage() {
               max={10}
               step={0.5}
               value={smoothnessThreshold}
-              aria-label="Stability threshold value"
+              aria-label="Display filter threshold value"
               onChange={(event) => setSmoothnessThreshold(Number(event.target.value))}
             />
           </div>
@@ -131,10 +136,16 @@ export function ReviewPage() {
       </div>
 
       <div className="review-shell-body">
-        <aside className="review-spine">
+        <aside className="review-spine" style={{ width: chatWidth }}>
           <ReviewChatPanel key={projectId} conversation={conversation} />
         </aside>
+        <ResizeHandle ariaLabel="Resize the Ask the AI panel" onResize={resizeChat} />
         <main className="review-main">
+          <ClipGenerationPanel
+            stats={generationStats}
+            disabled={loading || !projectId}
+            onRegenerate={rederiveClips}
+          />
           <section className="version-zone" aria-label="Suggested cuts">
             <div className="version-zone-head">
               <div>
@@ -187,6 +198,7 @@ export function ReviewPage() {
             draftPositions={draftPositions}
             clipsByFile={clipsByFile}
             versionMembership={versionMembership}
+            generationStats={generationStats}
             loading={loading}
             error={error}
             smoothnessThreshold={smoothnessThreshold}
@@ -195,7 +207,6 @@ export function ReviewPage() {
           />
         </main>
       </div>
-      <WorkingTimelineStrip />
       {versionToApply && timelineSnapshot ? (
         <VersionApplyDialog
           key={versionToApply.version_id}

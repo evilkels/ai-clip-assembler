@@ -79,6 +79,7 @@ def test_assemble_smooth_clips_respects_duration_and_thresholds():
             max_clip_duration_sec=5,
             smoothness_threshold=7.0,
             target_duration_sec=8,
+            max_clips_per_scene=2,
         ),
     )
 

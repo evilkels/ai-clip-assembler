@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  connectMcpClient,
+  detectMcpClients,
   getDiagnostics,
   getSettings,
   updateSettings,
   type AppSettings,
   type Diagnostics,
+  type McpClientId,
+  type McpClientStatus,
+  type McpConnectResult,
   type SettingsUpdate,
 } from '../api/client';
 import { useTheme, type ThemePreference } from '../state/ThemeContext';
 
-export type SettingsTab = 'settings' | 'diagnostics';
+export type SettingsTab = 'settings' | 'connect-ai' | 'diagnostics';
 
 interface SettingsModalProps {
   initialTab?: SettingsTab;
@@ -161,6 +166,93 @@ function SettingsTabPanel() {
   );
 }
 
+function ConnectAiTabPanel() {
+  const [clients, setClients] = useState<McpClientStatus[]>([]);
+  const [connecting, setConnecting] = useState<McpClientId | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<McpConnectResult | null>(null);
+
+  const refresh = useCallback(() => {
+    setError(null);
+    detectMcpClients()
+      .then(setClients)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const connect = (clientId: McpClientId) => {
+    setConnecting(clientId);
+    setError(null);
+    connectMcpClient(clientId)
+      .then((result) => {
+        setLastResult(result);
+        refresh();
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setConnecting(null));
+  };
+
+  return (
+    <div className="settings-panel">
+      <section className="settings-group">
+        <h3 className="settings-group-title">Connect your AI</h3>
+        <p className="settings-hint">
+          Connect an MCP-capable desktop client so it can inspect candidates and edit the open Timeline.
+        </p>
+
+        {error && (
+          <p className="settings-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="mcp-client-list">
+          {clients.map((client) => (
+            <div key={client.id} className="mcp-client-row">
+              <div>
+                <div className="mcp-client-name">{client.name}</div>
+                <div className="settings-muted">{client.configPath}</div>
+              </div>
+              <div className="mcp-client-actions">
+                <span className={client.connected ? 'diagnostics-badge ok' : 'diagnostics-badge'}>
+                  {client.detectError
+                    ? 'Config unreadable'
+                    : client.connected
+                      ? 'Connected'
+                      : client.installed
+                        ? 'Detected'
+                        : 'Not installed'}
+                </span>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => connect(client.id)}
+                  disabled={connecting === client.id || !client.installed || Boolean(client.detectError)}
+                >
+                  {connecting === client.id ? 'Connecting...' : client.connected ? 'Reconnect' : 'Connect'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {lastResult && (
+          <output className="mcp-connect-result">
+            <p className="settings-saved">Connected. Restart {lastResult.name} to finish.</p>
+            {lastResult.backupPath && (
+              <p className="settings-muted">Backup created at {lastResult.backupPath}</p>
+            )}
+            <pre className="mcp-snippet">{lastResult.snippet}</pre>
+          </output>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function DiagnosticsTabPanel() {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -296,6 +388,15 @@ export function SettingsModal({ initialTab = 'settings', onClose }: SettingsModa
           <button
             type="button"
             role="tab"
+            aria-selected={tab === 'connect-ai'}
+            className={tab === 'connect-ai' ? 'settings-tab active' : 'settings-tab'}
+            onClick={() => setTab('connect-ai')}
+          >
+            Connect your AI
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={tab === 'diagnostics'}
             className={tab === 'diagnostics' ? 'settings-tab active' : 'settings-tab'}
             onClick={() => setTab('diagnostics')}
@@ -304,7 +405,9 @@ export function SettingsModal({ initialTab = 'settings', onClose }: SettingsModa
           </button>
         </div>
 
-        {tab === 'settings' ? <SettingsTabPanel /> : <DiagnosticsTabPanel />}
+        {tab === 'settings' && <SettingsTabPanel />}
+        {tab === 'connect-ai' && <ConnectAiTabPanel />}
+        {tab === 'diagnostics' && <DiagnosticsTabPanel />}
       </section>
     </div>
   );

@@ -23,9 +23,11 @@
     "preview": "npm run stage:assets && electron-vite preview",
     "start": "npm run preview",
     "lint": "npm run lint:frontend && npm run lint:backend",
-    "lint:frontend": "eslint . --max-warnings=0",
+    "lint:frontend": "eslint . --max-warnings=0 --ignore-pattern src/renderer/src/types/generated.ts",
     "lint:backend": "cd ../backend && .venv/bin/ruff check src tests",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "gen:types": "cd ../backend && PYTHONPATH=. .venv/bin/pydantic2ts --module src.models --output ../frontend/src/renderer/src/types/generated.ts --json2ts-cmd \"$(pwd)/../frontend/node_modules/.bin/json2ts\"",
+    "check:types-fresh": "tmp=$(mktemp) && cd ../backend && PYTHONPATH=. .venv/bin/pydantic2ts --module src.models --output \"$tmp\" --json2ts-cmd \"$(pwd)/../frontend/node_modules/.bin/json2ts\" && diff -u ../frontend/src/renderer/src/types/generated.ts \"$tmp\" && rm \"$tmp\"",
+    "typecheck": "npm run check:types-fresh && tsc --noEmit -p tsconfig.json",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "postinstall": "electron-builder install-app-deps",
@@ -50,6 +52,7 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.6.0",
+    "json-schema-to-typescript": "^15.0.4",
     "react-doctor": "^0.2.14",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
@@ -75,12 +78,16 @@
       {
         "from": "build",
         "to": "assets",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../backend/dist/ai-clip-backend",
         "to": "backend",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "icon": "build/icon.png",

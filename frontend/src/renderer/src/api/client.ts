@@ -10,6 +10,8 @@ import type {
   AnalysisStatus,
   AssemblyProfile,
   ClipCandidate,
+  ClipGenerationPreferenceUpdate,
+  ClipGenerationStats,
   DraftResult,
   ProjectManifest,
   RecentProject,
@@ -17,7 +19,26 @@ import type {
   VideoMetadata,
 } from '../types/clip';
 import { mockClips } from './mockClips';
+import type { ClipSuggestion } from '../types/generated';
 import type { VersionSet } from '../types/version';
+
+export type McpClientId = 'claude_desktop' | 'codex';
+
+export interface McpClientStatus {
+  id: McpClientId;
+  name: string;
+  configPath: string;
+  installed: boolean;
+  connected: boolean;
+  needsRestart: boolean;
+  /** Set when the client's config exists but could not be read — connect is unsafe. */
+  detectError?: string;
+}
+
+export interface McpConnectResult extends McpClientStatus {
+  backupPath?: string;
+  snippet: string;
+}
 
 declare global {
   interface Window {
@@ -31,6 +52,8 @@ declare global {
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
       openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
+      detectMcpClients?: () => Promise<McpClientStatus[]>;
+      connectMcpClient?: (clientId: McpClientId) => Promise<McpConnectResult>;
     };
   }
 }
@@ -58,27 +81,7 @@ export async function pingBackend(): Promise<BackendStatus> {
   }
 }
 
-interface BackendClipSuggestion {
-  clip_id: string;
-  file_id: string;
-  file_name: string;
-  scene_id?: number;
-  start_sec: number;
-  end_sec: number;
-  duration_sec: number;
-  smoothness_score: number;
-  sharpness_score?: number | null;
-  exposure_score?: number | null;
-  contrast_score?: number | null;
-  visual_interest_score: number;
-  overall_score: number;
-  ai_reason: string;
-  suggested_speed?: number;
-  suggested_transition?: string;
-  tags?: string[];
-  source_created_at?: string | null;
-  source_duration_sec?: number | null;
-}
+type BackendClipSuggestion = ClipSuggestion;
 
 export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
   return {
@@ -98,6 +101,8 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
     },
     reason: c.ai_reason,
     suggested_speed: c.suggested_speed,
+    tags: c.tags,
+    max_turn_rate_deg_per_sec: c.max_turn_rate_deg_per_sec ?? null,
     source_created_at: c.source_created_at ?? null,
     source_duration_sec: c.source_duration_sec ?? null,
   };
@@ -114,6 +119,7 @@ export interface FolderProjectResult {
   project_folder: string;
   project: ProjectManifest;
   videos: UploadedVideo[];
+  generation_stats?: ClipGenerationStats | null;
 }
 
 export async function createProjectFromFolder(folderPath: string): Promise<FolderProjectResult> {
@@ -159,6 +165,27 @@ export async function setWindowTitle(projectName?: string): Promise<void> {
 export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
   const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
   return result?.opened ?? false;
+}
+
+export async function detectMcpClients(): Promise<McpClientStatus[]> {
+  return window.clipAssembler?.detectMcpClients?.() ?? [];
+}
+
+export async function connectMcpClient(clientId: McpClientId): Promise<McpConnectResult> {
+  if (!window.clipAssembler?.connectMcpClient) {
+    throw new Error('MCP client connection is only available in the desktop app');
+  }
+  return window.clipAssembler.connectMcpClient(clientId);
+}
+
+export async function activateProject(projectId: string): Promise<void> {
+  const res = await fetch(`${backendUrl()}/projects/${encodeURIComponent(projectId)}/activate`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ detail: res.statusText }))) as { detail?: string };
+    throw new Error(err.detail ?? `Failed to activate project: ${res.status}`);
+  }
 }
 
 export async function rescanProject(projectId: string): Promise<FolderProjectResult> {
@@ -255,6 +282,7 @@ export async function analyzeProject(
     clips: BackendClipSuggestion[];
     sequence: AnalysisResult['sequence'];
     recommendation: AnalysisResult['recommendation'];
+    generation_stats?: ClipGenerationStats;
   };
   return {
     project_id: raw.project_id,
@@ -263,6 +291,40 @@ export async function analyzeProject(
     clips: raw.clips.map(mapBackendClip),
     sequence: raw.sequence,
     recommendation: raw.recommendation,
+    generation_stats: raw.generation_stats,
+  };
+}
+
+export async function rederiveClips(
+  projectId: string,
+  preferences: ClipGenerationPreferenceUpdate,
+): Promise<AnalysisResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/clips/rederive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(preferences),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Clip regeneration failed: ${res.status}`);
+  }
+  const raw = (await res.json()) as {
+    project_id: string;
+    harness_id: string;
+    status: string;
+    clips: BackendClipSuggestion[];
+    sequence: AnalysisResult['sequence'];
+    recommendation: AnalysisResult['recommendation'];
+    generation_stats?: ClipGenerationStats;
+  };
+  return {
+    project_id: raw.project_id,
+    harness_id: raw.harness_id,
+    status: raw.status,
+    clips: raw.clips.map(mapBackendClip),
+    sequence: raw.sequence,
+    recommendation: raw.recommendation,
+    generation_stats: raw.generation_stats,
   };
 }
 
@@ -542,6 +604,14 @@ export interface ReviewSession {
 export async function getReviewSession(projectId: string): Promise<ReviewSession> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/review/session`);
   if (!res.ok) throw new Error(`Review session failed: ${res.status}`);
+  return res.json() as Promise<ReviewSession>;
+}
+
+export async function clearReviewSession(projectId: string): Promise<ReviewSession> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/review/session`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Clear review session failed: ${res.status}`);
   return res.json() as Promise<ReviewSession>;
 }
 

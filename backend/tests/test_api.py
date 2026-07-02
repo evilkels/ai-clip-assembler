@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src import api
+from src.frame_extraction import FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 from src.review_state import sequence_fingerprint
 
@@ -22,6 +23,36 @@ def create_folder_project_with_video(tmp_path, content=b"folder video bytes", fi
         json={"folder_path": str(project_folder)},
     ).json()["project_id"]
     return client, project_id, source_video
+
+
+def scored_frame(timestamp, smoothness=8.0, scene_id=1, turn_rate=0.0):
+    return FrameScore(
+        timestamp=timestamp,
+        frame_path=f"/tmp/{timestamp}.jpg",
+        motion_stability=smoothness,
+        smoothness_score=smoothness,
+        sharpness_score=8.0,
+        exposure_score=8.0,
+        contrast_score=8.0,
+        visual_interest_score=0.0,
+        overall_score=smoothness,
+        blur_score=8.0,
+        brightness=0.8,
+        contrast=0.8,
+        scene_id=scene_id,
+        is_keyframe=True,
+        turn_rate_deg_per_sec=turn_rate,
+    )
+
+
+def stub_expensive_analysis(monkeypatch, frame_scores, scenes=None):
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
+    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: [
+        FrameSample(timestamp=score.timestamp, frame_path=score.frame_path, scene_id=score.scene_id)
+        for score in frame_scores
+    ])
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: scenes or [])
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: frame_scores)
 
 
 def test_create_project_from_folder_registers_source_videos_without_copying(tmp_path):
@@ -138,6 +169,54 @@ def test_delete_folder_project_files_keeps_source_video(tmp_path):
     assert project_id not in api.projects
 
 
+def test_delete_active_folder_project_clears_runtime_descriptor(monkeypatch, tmp_path):
+    api.projects.clear()
+    api._active_project_id = None
+    runtime_path = tmp_path / "runtime.json"
+    monkeypatch.setenv("CLIP_ASSEMBLER_RUNTIME_FILE", str(runtime_path))
+    monkeypatch.setenv("CLIP_ASSEMBLER_PORT", "8765")
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+
+    activate_response = client.post(f"/projects/{project_id}/activate")
+    delete_response = client.delete(f"/projects/{project_id}/files")
+
+    assert activate_response.status_code == 200
+    assert delete_response.status_code == 200
+    payload = json.loads(runtime_path.read_text(encoding="utf-8"))
+    assert payload["port"] == 8765
+    assert payload["active_project_id"] is None
+
+
+def test_activate_project_records_runtime_descriptor(monkeypatch, tmp_path):
+    api.projects.clear()
+    api._active_project_id = None
+    runtime_path = tmp_path / "runtime.json"
+    monkeypatch.setenv("CLIP_ASSEMBLER_RUNTIME_FILE", str(runtime_path))
+    monkeypatch.setenv("CLIP_ASSEMBLER_PORT", "8765")
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+
+    response = client.post(f"/projects/{project_id}/activate")
+
+    assert response.status_code == 200
+    assert response.json() == {"project_id": project_id, "active": True}
+    payload = json.loads(runtime_path.read_text(encoding="utf-8"))
+    assert payload["port"] == 8765
+    assert payload["active_project_id"] == project_id
+
+
+def test_activate_missing_project_returns_404(tmp_path, monkeypatch):
+    api.projects.clear()
+    api._active_project_id = None
+    monkeypatch.setenv("CLIP_ASSEMBLER_RUNTIME_FILE", str(tmp_path / "runtime.json"))
+    client = TestClient(api.app)
+
+    response = client.post("/projects/missing/activate")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+
+
 def test_analyze_folder_project_writes_work_files_under_clipassembler(monkeypatch, tmp_path):
     api.projects.clear()
     project_folder = tmp_path / "footage"
@@ -238,11 +317,12 @@ def test_analyze_folder_project_persists_results_json(monkeypatch, tmp_path):
     results_path = project_folder / "clipassembler" / "analysis" / "results.json"
     assert results_path.exists()
     results = json.loads(results_path.read_text(encoding="utf-8"))
-    assert results["schema_version"] == 1
+    assert results["schema_version"] == 2
     assert results["harness_id"] == "manual"
     assert results["clips"][0]["clip_id"] == "clip-1"
     assert results["timeline"]["source"] == "draft"
     assert results["timeline"]["clips"][0]["clip_id"] == "clip-1"
+    assert "generation_stats" in results
 
 
 def test_reopen_folder_project_restores_clips_and_timeline(monkeypatch, tmp_path):
@@ -267,6 +347,93 @@ def test_reopen_folder_project_restores_clips_and_timeline(monkeypatch, tmp_path
     clips = client.get(f"/projects/{reopened['project_id']}/clips").json()["clips"]
     assert clips[0]["clip_id"] == "clip-1"
     assert api.projects[reopened["project_id"]]["timeline"]["clips"][0]["clip_id"] == "clip-1"
+
+
+def test_analyze_folder_project_persists_and_reloads_frame_scores(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    frames = [scored_frame(second, scene_id=1) for second in range(5)]
+    scenes = [api.SceneBoundary(scene_id=1, start_sec=0.0, end_sec=5.0)]
+    stub_expensive_analysis(monkeypatch, frames, scenes)
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["generation_stats"]["totals"]["candidates_kept"] == 4
+    scores_path = project_folder / "clipassembler" / "analysis" / "frame_scores.json"
+    assert scores_path.exists()
+    cached = json.loads(scores_path.read_text(encoding="utf-8"))
+    assert cached["per_file"]["DJI_0042.MP4"]["frames"][0]["timestamp"] == 0
+
+    api.projects.clear()
+    reopened = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()
+
+    frame_scores = api.projects[reopened["project_id"]]["frame_scores"]
+    assert frame_scores["per_file"]["DJI_0042.MP4"]["frames"][0]["timestamp"] == 0
+    assert api.projects[reopened["project_id"]]["generation_stats"]["totals"]["candidates_kept"] == 4
+
+
+def test_rederive_clips_reuses_cached_frame_scores_and_changes_generation_stats(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    frames = [scored_frame(second, scene_id=1) for second in range(8)]
+    scenes = [api.SceneBoundary(scene_id=1, start_sec=0.0, end_sec=8.0)]
+    stub_expensive_analysis(monkeypatch, frames, scenes)
+    prefs = {
+        "min_clip_duration_sec": 2,
+        "max_clip_duration_sec": 3,
+        "max_clips_per_scene": 1,
+        "max_candidates_per_video": 10,
+    }
+    analyzed = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": prefs},
+    )
+    assert analyzed.status_code == 200
+    original_ids = [clip["clip_id"] for clip in analyzed.json()["clips"]]
+
+    same = client.post(f"/projects/{project_id}/clips/rederive", json=prefs)
+
+    assert same.status_code == 200
+    assert [clip["clip_id"] for clip in same.json()["clips"]] == original_ids
+    assert same.json()["generation_stats"]["totals"]["candidates_kept"] == 1
+
+    changed = client.post(
+        f"/projects/{project_id}/clips/rederive",
+        json={**prefs, "max_clips_per_scene": 3},
+    )
+
+    assert changed.status_code == 200
+    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 3
+
+
+def test_rederive_clips_returns_422_without_cached_frame_scores(tmp_path):
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+
+    response = client.post(f"/projects/{project_id}/clips/rederive", json={})
+
+    assert response.status_code == 422
+    assert "Analyze once" in response.json()["detail"]
 
 
 def test_reopen_folder_project_restores_edited_timeline(monkeypatch, tmp_path):
@@ -809,7 +976,7 @@ def test_default_analysis_preferences_cap_candidate_windows_at_ten_seconds():
 
     assert preferences.min_clip_duration_sec == 3.0
     assert preferences.max_clip_duration_sec == 10.0
-    assert preferences.max_candidates_per_video == 12
+    assert preferences.max_candidates_per_video == 30
 
 
 def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_path):
@@ -827,7 +994,7 @@ def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_pat
         }
     )
     monkeypatch.setattr(api, "run_vidstabdetect", lambda **kwargs: None)
-    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: (_ for _ in ()).throw(api.FFmpegUnavailableError("ffmpeg missing")))
+    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: (_ for _ in ()).throw(FFmpegUnavailableError("ffmpeg missing")))
 
     response = client.post(
         f"/projects/{project_id}/analyze",
@@ -1307,7 +1474,7 @@ def test_regenerate_draft_uses_requested_profile(monkeypatch, tmp_path):
     assert response.status_code == 200
     body = response.json()
     assert body["profile"] == "short_social"
-    assert body["timeline"]["clips"][0]["duration_sec"] == 6
+    assert body["timeline"]["clips"][0]["duration_sec"] == 7
 
 
 def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):
@@ -1661,7 +1828,7 @@ def test_analysis_status_error_after_failed_analyze(monkeypatch, tmp_path):
     monkeypatch.setattr(
         api,
         "extract_frames",
-        lambda **kwargs: (_ for _ in ()).throw(api.FFmpegUnavailableError("ffmpeg missing")),
+        lambda **kwargs: (_ for _ in ()).throw(FFmpegUnavailableError("ffmpeg missing")),
     )
 
     analyze = client.post(
@@ -2010,6 +2177,35 @@ def test_review_kickoff_runs_a_proactive_turn(monkeypatch, tmp_path):
     assert kicked.status_code == 200
     assert kicked.json()["message"].startswith("Welcome")
     assert "Analysis just finished" in seen["user_message"]
+
+
+def test_clear_review_session_starts_a_fresh_transcript(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    monkeypatch.setattr(
+        api,
+        "_review_agent",
+        lambda context: {"message": "On it.", "operations": []},
+    )
+
+    client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
+    before = client.get(f"/projects/{project_id}/review/session").json()
+    assert len(before["messages"]) > 0
+
+    cleared = client.delete(f"/projects/{project_id}/review/session")
+    assert cleared.status_code == 200
+    assert cleared.json()["messages"] == []
+    assert cleared.json()["session_id"] != before["session_id"]
+
+    after = client.get(f"/projects/{project_id}/review/session").json()
+    assert after["messages"] == []
+
+
+def test_clear_review_session_unknown_project_returns_404(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    assert client.delete("/projects/missing/review/session").status_code == 404
 
 
 def test_review_session_persists_across_folder_reopen_and_kickoff_is_idempotent(

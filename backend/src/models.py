@@ -67,6 +67,12 @@ class ClipSuggestion(BaseModel):
     suggested_speed: float = 1.0
     suggested_transition: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
+    # Carried from the source file's metadata during analysis (see
+    # run_analysis_pipeline in api.py) so the UI can place clips on a per-file
+    # track and sort by true capture time. Declared here so the contract is
+    # explicit rather than bolted on after model_dump().
+    source_created_at: Optional[str] = None
+    source_duration_sec: Optional[float] = None
 
 
 class TimelineSequence(BaseModel):

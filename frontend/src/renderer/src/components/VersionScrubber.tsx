@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import type { VersionItem } from '../types/version';
+import { formatTimecode } from '../lib/format';
 
 export interface VersionScrubberProps {
   items: VersionItem[];
@@ -14,15 +15,6 @@ const KEYBOARD_STEP_SEC = 1;
 function effectiveDuration(item: VersionItem): number {
   const span = Math.max(0, item.end_sec - item.start_sec);
   return span / (item.speed ?? 1);
-}
-
-/** `M:SS.s` total-time format shared by the playhead and source readouts. */
-function formatTimecode(totalSeconds: number): string {
-  const safe = Math.max(0, totalSeconds);
-  const minutes = Math.floor(safe / 60);
-  const seconds = Math.floor(safe % 60);
-  const tenths = Math.floor((safe * 10) % 10);
-  return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
 }
 
 /**

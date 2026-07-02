@@ -15,11 +15,13 @@ from src.project_store import (
     load_timeline_document,
     migrate_legacy_timeline,
     open_project,
+    read_frame_scores,
     read_review_session,
     read_timeline_document,
     review_session_path,
     rescan_project,
     timeline_document_path,
+    write_frame_scores,
     write_timeline_document,
     write_review_session,
 )
@@ -55,6 +57,41 @@ def test_review_session_round_trips_messages_and_proposal(tmp_path):
     write_review_session(project_folder, session)
 
     assert read_review_session(project_folder) == session
+
+
+def test_frame_scores_round_trip_as_schema_versioned_sidecar(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    per_file = {
+        "DJI_0042.MP4": {
+            "frames": [
+                {
+                    "timestamp": 1.0,
+                    "frame_path": "/tmp/frame.jpg",
+                    "motion_stability": 8.0,
+                    "smoothness_score": 8.0,
+                    "sharpness_score": 7.0,
+                    "exposure_score": 6.0,
+                    "contrast_score": 5.0,
+                    "visual_interest_score": 0.0,
+                    "overall_score": 7.0,
+                    "blur_score": 7.0,
+                    "brightness": 0.6,
+                    "contrast": 0.5,
+                    "scene_id": 2,
+                    "is_keyframe": True,
+                    "turn_rate_deg_per_sec": 3.0,
+                }
+            ],
+            "scene_bounds": {"2": [0.0, 5.0]},
+            "source_duration_sec": 5.0,
+            "fps": 29.97,
+        }
+    }
+
+    write_frame_scores(project_folder, per_file)
+
+    assert read_frame_scores(project_folder) == {"per_file": per_file}
 
 
 def test_read_review_session_tolerates_missing_and_corrupt_files(tmp_path):

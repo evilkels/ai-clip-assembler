@@ -5,36 +5,43 @@ AssemblyProfile = Literal["short_social", "cinematic_highlight", "long_scenic", 
 
 # Each profile parameterises four levers applied at draft time (candidate
 # generation stays profile-agnostic, so switching profiles re-drafts instantly):
-#   clip_lengths        — alternating cut-length range (rhythm/pacing)
+#   clip_lengths        — cut-length cycle (rhythm/pacing); cycled per clip, so a
+#                         longer list yields more varied durations
 #   max_clips_per_scene — scene density; low spreads the edit across scenes
+#   max_clips           — hard cap on clip count, so density no longer depends
+#                         solely on hitting target_duration_sec
 #   speed_policy        — "none" or "slowmo_smooth" (0.5× on very-smooth clips)
 #   ordering            — "score_desc" (punchy) or "chronological" (narrative)
 PROFILE_DEFAULTS = {
     "short_social": {
-        "clip_lengths": [6.0, 3.0],
-        "target_duration_sec": 45.0,
+        "clip_lengths": [7.0, 4.0, 6.0, 3.0, 5.0],
+        "target_duration_sec": 60.0,
         "max_clips_per_scene": 99,
+        "max_clips": 24,
         "speed_policy": "none",
         "ordering": "score_desc",
     },
     "cinematic_highlight": {
-        "clip_lengths": [15.0, 10.0],
-        "target_duration_sec": 120.0,
-        "max_clips_per_scene": 2,
+        "clip_lengths": [18.0, 10.0, 14.0, 7.0, 20.0, 12.0],
+        "target_duration_sec": 240.0,
+        "max_clips_per_scene": 4,
+        "max_clips": 40,
         "speed_policy": "slowmo_smooth",
         "ordering": "chronological",
     },
     "long_scenic": {
-        "clip_lengths": [30.0, 20.0],
-        "target_duration_sec": 300.0,
-        "max_clips_per_scene": 1,
+        "clip_lengths": [35.0, 22.0, 28.0, 18.0, 30.0],
+        "target_duration_sec": 480.0,
+        "max_clips_per_scene": 3,
+        "max_clips": 32,
         "speed_policy": "slowmo_smooth",
         "ordering": "chronological",
     },
     "custom": {
-        "clip_lengths": [30.0, 15.0],
-        "target_duration_sec": 120.0,
-        "max_clips_per_scene": 2,
+        "clip_lengths": [25.0, 12.0, 30.0, 18.0, 15.0],
+        "target_duration_sec": 180.0,
+        "max_clips_per_scene": 4,
+        "max_clips": 40,
         "speed_policy": "none",
         "ordering": "chronological",
     },
@@ -94,6 +101,7 @@ def build_draft_timeline(
     target = max(1.0, float(target_duration_sec or defaults["target_duration_sec"]))
     clip_lengths = defaults["clip_lengths"]
     max_per_scene = int(defaults.get("max_clips_per_scene", 2))
+    max_clips = int(defaults.get("max_clips", 0))
     speed_policy = str(defaults.get("speed_policy", "none"))
     ordering = str(defaults.get("ordering", "chronological"))
     selected = []
@@ -101,6 +109,8 @@ def build_draft_timeline(
     scene_counts: dict = {}
     index = 0
     for clip in sorted(clips, key=lambda item: float(item.get("overall_score", 0)), reverse=True):
+        if max_clips and len(selected) >= max_clips:
+            break
         scene_id = clip.get("scene_id", 0)
         if scene_counts.get(scene_id, 0) >= max_per_scene:
             continue
@@ -120,7 +130,8 @@ def build_draft_timeline(
         total += duration
         scene_counts[scene_id] = scene_counts.get(scene_id, 0) + 1
         index += 1
-        if total >= target:
+        # Stop at the duration budget or the clip-count cap, whichever comes first.
+        if total >= target or (max_clips and len(selected) >= max_clips):
             break
 
     # "score_desc" keeps the strongest-first order from selection; the narrative

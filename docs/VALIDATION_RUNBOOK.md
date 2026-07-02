@@ -78,6 +78,20 @@ detection, assembly, and AI scoring durations.
       Flow C handoff criterion) and that the retime + reframe survive. Export EDL
       and confirm the **flatten warning** is surfaced (speed/transform dropped).
 
+## Flow G: Connect Your AI Via MCP Desktop Client
+
+1. Launch the packaged app and open a folder project with analyzed Candidate Clips.
+2. Open Settings -> Connect your AI.
+3. Click Connect for Claude Desktop or Codex.
+4. Confirm the app reports "Connected. Restart <client> to finish."
+5. Restart the selected client.
+6. Ask the client to list available AI Clip Assembler tools.
+7. Ask it to summarize the open project.
+8. Ask it to add the top Candidate Clip to the Timeline.
+9. Confirm the Timeline updates live in the app and undo works.
+10. Close the app and ask the client to summarize the project again.
+11. Confirm it returns "Open AI Clip Assembler and a project, then retry."
+
 ## Report Template
 
 Store the completed report at

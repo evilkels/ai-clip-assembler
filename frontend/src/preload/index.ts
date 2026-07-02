@@ -31,6 +31,28 @@ const bridge = {
   setWindowTitle: (projectName?: string) => ipcRenderer.invoke('window:set-title', projectName),
   openInDaVinci: (exportPath: string, sourceFolder?: string) =>
     ipcRenderer.invoke('davinci:open-handoff', exportPath, sourceFolder) as Promise<{ opened: boolean }>,
+  detectMcpClients: () =>
+    ipcRenderer.invoke('mcp:detect-clients') as Promise<
+      Array<{
+        id: 'claude_desktop' | 'codex';
+        name: string;
+        configPath: string;
+        installed: boolean;
+        connected: boolean;
+        needsRestart: boolean;
+      }>
+    >,
+  connectMcpClient: (clientId: 'claude_desktop' | 'codex') =>
+    ipcRenderer.invoke('mcp:connect-client', clientId) as Promise<{
+      id: 'claude_desktop' | 'codex';
+      name: string;
+      configPath: string;
+      installed: boolean;
+      connected: boolean;
+      needsRestart: boolean;
+      backupPath?: string;
+      snippet: string;
+    }>,
 };
 
 contextBridge.exposeInMainWorld('clipAssembler', bridge);

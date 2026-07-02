@@ -118,7 +118,8 @@ def test_create_project_writes_manifest_with_relative_source_video_filenames(tmp
     project = create_project(project_folder, now=fixed_now)
 
     assert project.name == "sunset-drone-footage"
-    assert project.harness == "pi_agent"
+    assert project.harness == "manual"
+    assert project.cloud_ai_consent is False
     assert project.created_at == "2026-05-30T19:00:00Z"
     assert [video.filename for video in project.source_videos] == [
         "DJI_0042.MP4",

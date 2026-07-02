@@ -72,7 +72,8 @@ def test_create_project_from_folder_registers_source_videos_without_copying(tmp_
     assert response.status_code == 200
     body = response.json()
     assert body["project"]["name"] == "sunset-drone-footage"
-    assert body["project"]["harness"] == "pi_agent"
+    assert body["project"]["harness"] == "manual"
+    assert body["project"]["cloud_ai_consent"] is False
     assert body["project"]["source_videos"][0]["filename"] == "DJI_0042.MP4"
     project = api.projects[body["project_id"]]
     assert project["project_folder"] == str(project_folder)
@@ -86,6 +87,53 @@ def test_create_project_from_folder_registers_source_videos_without_copying(tmp_
         }
     ]
     assert not (project_folder / "videos").exists()
+
+
+def test_update_cloud_ai_consent_persists_in_folder_project(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+
+    response = client.put(
+        f"/projects/{project_id}/cloud-ai-consent",
+        json={"consented": True},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["project"]["cloud_ai_consent"] is True
+    saved = json.loads((project_folder / "clipassembler" / "project.json").read_text(encoding="utf-8"))
+    assert saved["cloud_ai_consent"] is True
+
+    api.projects.clear()
+    reopened = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()
+    assert reopened["project"]["cloud_ai_consent"] is True
+
+
+def test_analyze_refuses_pi_agent_without_cloud_ai_consent(monkeypatch, tmp_path):
+    api.projects.clear()
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("pi harness must not run without cloud AI consent")
+
+    monkeypatch.setattr(api, "enhance_clips_with_pi_cli", fail_if_called)
+
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "pi_agent", "preferences": {}},
+    )
+
+    assert response.status_code == 403
+    assert "Cloud AI consent is required" in response.json()["detail"]
 
 
 def test_create_project_from_folder_opens_existing_manifest_without_rescan(tmp_path):
@@ -1288,6 +1336,7 @@ def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
         return enhanced, True
 
     monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+    api.projects[project_id]["cloud_ai_consent"] = True
 
     response = client.post(
         f"/projects/{project_id}/analyze",
@@ -1376,6 +1425,7 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
         return fallback, False
 
     monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+    api.projects[project_id]["cloud_ai_consent"] = True
 
     response = client.post(
         f"/projects/{project_id}/analyze",

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Body, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
@@ -40,6 +40,7 @@ from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (pos
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
+from .models import FrameScore
 from .motion_analysis import (
     FFmpegVidstabError,
     FFmpegVidstabUnavailableError,
@@ -60,8 +61,10 @@ from .project_store import (
     migrate_legacy_timeline,
     project_state_dir,
     read_analysis_results,
+    read_frame_scores,
     rescan_project,
     write_analysis_results,
+    write_frame_scores,
     write_timeline_document,
 )
 from .mcp_server import TimelineMCPServer
@@ -227,8 +230,10 @@ async def create_project_from_folder(request: ProjectFolderRequest):
     project_id = str(uuid.uuid4())
     videos = videos_from_manifest(folder_path, manifest)
     restored = read_analysis_results(folder_path)
+    frame_scores = read_frame_scores(folder_path)
     clips = restored["clips"] if restored else []
     timeline = restored.get("timeline") if restored else None
+    generation_stats = restored.get("generation_stats") if restored else None
     projects[project_id] = {
         "project_id": project_id,
         "project_folder": str(folder_path),
@@ -237,6 +242,8 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "clips": clips,
         "timeline": timeline,
         "harness_id": restored.get("harness_id") if restored else None,
+        "frame_scores": frame_scores,
+        "generation_stats": generation_stats,
     }
     _proposal_store.configure_project(project_id, folder_path)
     return {
@@ -246,6 +253,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "videos": videos,
         "clips": clips,
         "timeline": timeline,
+        "generation_stats": generation_stats,
     }
 
 
@@ -461,9 +469,10 @@ async def cancel_analysis(project_id: str):
 
 def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     pipeline_started = time.monotonic()
-    all_clips = []
     per_video_results = []
+    per_file_results = []
     timings = []
+    per_file_frames = {}
     preferences = preferences_from_request(request.preferences)
     sample_fps = sample_fps_from_request(request.preferences)
     cancellable_runner = _make_cancellable_runner(project_id)
@@ -548,19 +557,30 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             frame_scores = score_samples_rule_based(samples, parse_trf(transforms_path, fps=fps))
         else:
             frame_scores = score_samples_rule_based(samples)
+        scene_bounds = {
+            scene.scene_id: (scene.start_sec, scene.end_sec)
+            for scene in scenes
+        }
+        source_duration_sec = float(
+            (video.get("metadata") or {}).get("duration_sec") or 0.0
+        ) or None
         result = assemble_smooth_clips(
             file_id=video["file_id"],
             file_name=video["file_name"],
             frames=frame_scores,
             preferences=preferences,
-            scene_bounds={
-                scene.scene_id: (scene.start_sec, scene.end_sec)
-                for scene in scenes
-            },
-            source_duration_sec=float(
-                (video.get("metadata") or {}).get("duration_sec") or 0.0
-            ) or None,
+            scene_bounds=scene_bounds,
+            source_duration_sec=source_duration_sec,
         )
+        per_file_frames[video["file_id"]] = {
+            "frames": [frame.model_dump() for frame in frame_scores],
+            "scene_bounds": {
+                str(scene_id): [start, end]
+                for scene_id, (start, end) in scene_bounds.items()
+            },
+            "source_duration_sec": source_duration_sec,
+            "fps": float((video.get("metadata") or {}).get("fps") or 30.0),
+        }
         video_timing["assembly_sec"] = round(time.monotonic() - phase_started, 2)
         video_timing["ai_scoring_sec"] = 0.0
         logger.info(
@@ -623,55 +643,37 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             clip_dict["source_created_at"] = source_created_at
             clip_dict["source_duration_sec"] = source_duration_sec
             clips.append(clip_dict)
-        all_clips.extend(clips)
+        per_file_results.append({"file_id": video["file_id"], "clips": clips, "result": result})
         video_timing["video_total_sec"] = round(time.monotonic() - video_started, 2)
         timings.append(video_timing)
 
-    analyzed_file_ids = {video["file_id"] for video in videos_to_analyze}
-    all_clips.extend(
-        clip
-        for clip in projects[project_id].get("clips", [])
-        if clip.get("file_id") not in analyzed_file_ids
+    analyzed_file_ids = {result["file_id"] for result in per_file_results}
+    existing_frame_scores = projects[project_id].get("frame_scores") or {"per_file": {}}
+    merged_frame_scores = {
+        file_id: entry
+        for file_id, entry in existing_frame_scores.get("per_file", {}).items()
+        if file_id not in analyzed_file_ids
+    }
+    merged_frame_scores.update(per_file_frames)
+    projects[project_id]["frame_scores"] = {"per_file": merged_frame_scores}
+    if projects[project_id].get("project_folder"):
+        write_frame_scores(Path(projects[project_id]["project_folder"]), merged_frame_scores)
+    finalized = _finalize_clip_set(
+        project_id,
+        per_file_results,
+        harness_id=request.harness_id,
+        preserve_manual_timeline=True,
     )
-    # Backfill source metadata on merged-in clips from earlier runs so the per-file
-    # track and chronological sort behave consistently across the whole set.
-    enrich_clips_with_source_metadata({"clips": all_clips, "videos": projects[project_id]["videos"]})
-    ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
+    ranked_clips = finalized["clips"]
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
-    existing_timeline = projects[project_id].get("timeline")
-    existing_clips = projects[project_id].get("clips", [])
-    if isinstance(existing_timeline, dict) and existing_timeline.get("source") == "manual":
-        accepted_ids = {
-            entry["clip_id"]
-            for entry in existing_timeline.get("clips", [])
-            if isinstance(entry, dict) and entry.get("clip_id")
-        }
-        new_ids = {clip["clip_id"] for clip in ranked_clips}
-        ranked_clips.extend(
-            clip for clip in existing_clips
-            if clip.get("clip_id") in accepted_ids and clip.get("clip_id") not in new_ids
-        )
-        timeline = existing_timeline
-    else:
-        recommendation = recommend_assembly_profile(ranked_clips)
-        timeline = build_draft_timeline(
-            ranked_clips,
-            profile=recommendation["profile"],
-            target_duration_sec=recommendation["target_duration_sec"],
-        )
-
-    projects[project_id]["clips"] = ranked_clips
-    projects[project_id]["timeline"] = timeline
-    projects[project_id]["harness_id"] = request.harness_id
-    invalidate_timeline_controller(project_id)
-    persist_project_results(project_id)
     response = {
         "project_id": project_id,
         "harness_id": request.harness_id,
         "status": "complete",
         "clips": ranked_clips,
-        "sequence": projects[project_id]["timeline"],
-        "recommendation": recommend_assembly_profile(ranked_clips),
+        "sequence": finalized["timeline"],
+        "recommendation": finalized["recommendation"],
+        "generation_stats": finalized["generation_stats"],
         "timings": {
             "per_video": timings,
             "pipeline_total_sec": round(time.monotonic() - pipeline_started, 2),
@@ -708,6 +710,102 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         harness_metadata["local"] = False
         response["metadata"] = harness_metadata
     return response
+
+
+def _finalize_clip_set(
+    project_id: str,
+    per_file_results: list[dict],
+    *,
+    harness_id: str,
+    preserve_manual_timeline: bool,
+) -> dict:
+    analyzed_file_ids = {result["file_id"] for result in per_file_results}
+    all_clips = [
+        clip
+        for result in per_file_results
+        for clip in result["clips"]
+    ]
+    all_clips.extend(
+        clip
+        for clip in projects[project_id].get("clips", [])
+        if clip.get("file_id") not in analyzed_file_ids
+    )
+    # Backfill source metadata on merged-in clips from earlier runs so the per-file
+    # track and chronological sort behave consistently across the whole set.
+    enrich_clips_with_source_metadata({"clips": all_clips, "videos": projects[project_id]["videos"]})
+    ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
+    existing_timeline = projects[project_id].get("timeline")
+    existing_clips = projects[project_id].get("clips", [])
+    if preserve_manual_timeline and isinstance(existing_timeline, dict) and existing_timeline.get("source") == "manual":
+        accepted_ids = {
+            entry["clip_id"]
+            for entry in existing_timeline.get("clips", [])
+            if isinstance(entry, dict) and entry.get("clip_id")
+        }
+        new_ids = {clip["clip_id"] for clip in ranked_clips}
+        ranked_clips.extend(
+            clip for clip in existing_clips
+            if clip.get("clip_id") in accepted_ids and clip.get("clip_id") not in new_ids
+        )
+        timeline = existing_timeline
+    else:
+        recommendation = recommend_assembly_profile(ranked_clips)
+        timeline = build_draft_timeline(
+            ranked_clips,
+            profile=recommendation["profile"],
+            target_duration_sec=recommendation["target_duration_sec"],
+        )
+
+    recommendation = recommend_assembly_profile(ranked_clips)
+    projects[project_id]["clips"] = ranked_clips
+    projects[project_id]["timeline"] = timeline
+    projects[project_id]["harness_id"] = harness_id
+    generation_stats = aggregate_generation_stats(per_file_results)
+    projects[project_id]["generation_stats"] = generation_stats
+    invalidate_timeline_controller(project_id)
+    persist_project_results(project_id)
+    return {
+        "clips": ranked_clips,
+        "timeline": timeline,
+        "recommendation": recommendation,
+        "generation_stats": generation_stats,
+    }
+
+
+def aggregate_generation_stats(per_file_results: list[dict]) -> dict:
+    per_file = {}
+    totals = {
+        "candidates_generated": 0,
+        "candidates_kept": 0,
+        "scenes_total": 0,
+        "scenes_at_cap": 0,
+    }
+    effective_preferences = None
+    max_candidates_per_video = None
+    for result in per_file_results:
+        stats = (result.get("result").metadata or {}).get("generation_stats", {})
+        file_stats = {
+            "candidates_generated": int(stats.get("candidates_generated", 0)),
+            "candidates_kept": int(stats.get("candidates_kept", 0)),
+            "scenes_total": int(stats.get("scenes_total", 0)),
+            "scenes_at_cap": int(stats.get("scenes_at_cap", 0)),
+            "preferences": stats.get("preferences") or {},
+        }
+        per_file[result["file_id"]] = file_stats
+        for key in totals:
+            totals[key] += file_stats[key]
+        if effective_preferences is None:
+            effective_preferences = file_stats["preferences"]
+            max_candidates_per_video = effective_preferences.get("max_candidates_per_video")
+    return {
+        "per_file": per_file,
+        "totals": {
+            **totals,
+            "videos": len(per_file_results),
+            "max_candidates_per_video": max_candidates_per_video,
+        },
+        "preferences": effective_preferences or {},
+    }
 
 
 @app.put("/projects/{project_id}/timeline")
@@ -754,6 +852,63 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
     invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
     return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
+
+
+@app.post("/projects/{project_id}/clips/rederive")
+async def rederive_clips(project_id: str, preferences: dict = Body(default_factory=dict)):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    cached = projects[project_id].get("frame_scores")
+    if not cached or not isinstance(cached.get("per_file"), dict):
+        raise HTTPException(
+            status_code=422,
+            detail="Analyze once before regenerating clips; cached frame scores are not available",
+        )
+    assembly_preferences = preferences_from_request(preferences)
+    videos_by_id = {video["file_id"]: video for video in projects[project_id].get("videos", [])}
+    per_file_results = []
+    for file_id, entry in cached["per_file"].items():
+        video = videos_by_id.get(file_id)
+        if video is None:
+            continue
+        frames = [FrameScore.model_validate(frame) for frame in entry.get("frames", [])]
+        scene_bounds = {
+            int(scene_id): (float(bounds[0]), float(bounds[1]))
+            for scene_id, bounds in (entry.get("scene_bounds") or {}).items()
+            if isinstance(bounds, list) and len(bounds) == 2
+        }
+        result = assemble_smooth_clips(
+            file_id=file_id,
+            file_name=video["file_name"],
+            frames=frames,
+            preferences=assembly_preferences,
+            scene_bounds=scene_bounds,
+            source_duration_sec=entry.get("source_duration_sec"),
+        )
+        source_meta = video.get("metadata") or {}
+        clips = []
+        for clip in result.clips:
+            clip_dict = clip.model_dump()
+            clip_dict["source_created_at"] = source_meta.get("created_at")
+            clip_dict["source_duration_sec"] = source_meta.get("duration_sec")
+            clips.append(clip_dict)
+        per_file_results.append({"file_id": file_id, "clips": clips, "result": result})
+
+    finalized = _finalize_clip_set(
+        project_id,
+        per_file_results,
+        harness_id="manual",
+        preserve_manual_timeline=False,
+    )
+    return {
+        "project_id": project_id,
+        "harness_id": "manual",
+        "status": "complete",
+        "clips": finalized["clips"],
+        "sequence": finalized["timeline"],
+        "recommendation": finalized["recommendation"],
+        "generation_stats": finalized["generation_stats"],
+    }
 
 
 def enrich_clips_with_source_metadata(project: dict) -> list:
@@ -1506,6 +1661,7 @@ def persist_project_results(project_id: str) -> None:
             harness_id=project.get("harness_id") or "manual",
             clips=project.get("clips", []),
             timeline=project.get("timeline"),
+            generation_stats=project.get("generation_stats"),
         )
     except OSError as exc:
         logger.warning("Could not persist analysis results for %s: %s", project_id, exc)

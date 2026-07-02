@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { ResizeHandle } from '../components/ResizeHandle';
+import { ClipGenerationPanel } from '../components/ClipGenerationPanel';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
@@ -28,9 +29,11 @@ export function ReviewPage() {
     decisions,
     error,
     exclude,
+    generationStats,
     include,
     loading,
     projectId,
+    rederiveClips,
     smoothnessThreshold,
     setSmoothnessThreshold,
     timelineSnapshot,
@@ -106,7 +109,7 @@ export function ReviewPage() {
         </div>
         <div className="controls">
           <div className="control">
-            <label htmlFor="smoothness">Stability ≥</label>
+            <label htmlFor="smoothness">Display filter</label>
             <input
               id="smoothness"
               type="range"
@@ -122,7 +125,7 @@ export function ReviewPage() {
               max={10}
               step={0.5}
               value={smoothnessThreshold}
-              aria-label="Stability threshold value"
+              aria-label="Display filter threshold value"
               onChange={(event) => setSmoothnessThreshold(Number(event.target.value))}
             />
           </div>
@@ -138,6 +141,11 @@ export function ReviewPage() {
         </aside>
         <ResizeHandle ariaLabel="Resize the Ask the AI panel" onResize={resizeChat} />
         <main className="review-main">
+          <ClipGenerationPanel
+            stats={generationStats}
+            disabled={loading || !projectId}
+            onRegenerate={rederiveClips}
+          />
           <section className="version-zone" aria-label="Suggested cuts">
             <div className="version-zone-head">
               <div>
@@ -190,6 +198,7 @@ export function ReviewPage() {
             draftPositions={draftPositions}
             clipsByFile={clipsByFile}
             versionMembership={versionMembership}
+            generationStats={generationStats}
             loading={loading}
             error={error}
             smoothnessThreshold={smoothnessThreshold}

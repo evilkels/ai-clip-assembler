@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
-import type { ClipCandidate, ClipDecision } from '../types/clip';
+import type { ClipCandidate, ClipDecision, ClipGenerationStats } from '../types/clip';
 import { ClipCard } from './ClipCard';
 
 interface SourceClipsPanelProps {
@@ -11,6 +11,7 @@ interface SourceClipsPanelProps {
   draftPositions: Map<string, number>;
   clipsByFile: Map<string, ClipCandidate[]>;
   versionMembership: Map<string, string[]>;
+  generationStats: ClipGenerationStats | null;
   loading: boolean;
   error: string | null;
   smoothnessThreshold: number;
@@ -26,6 +27,7 @@ export function SourceClipsPanel({
   draftPositions,
   clipsByFile,
   versionMembership,
+  generationStats,
   loading,
   error,
   smoothnessThreshold,
@@ -33,16 +35,21 @@ export function SourceClipsPanel({
   onExclude,
 }: SourceClipsPanelProps) {
   const [open, setOpen] = useState(false);
+  const totals = generationStats?.totals;
 
   return (
     <details
       className="source-clips-panel"
       data-testid="source-clips-panel"
       onToggle={(event) => setOpen(event.currentTarget.open)}
-    >
+      >
       <summary>
-        <strong>All clips ({clips.length})</strong>
-        <span className="draft-summary">Add individual clips to your video</span>
+        <strong>All clips ({totalCount})</strong>
+        <span className="draft-summary">
+          {totals
+            ? `Generated ${totals.candidates_generated} → kept ${totals.candidates_kept} · scene cap on ${totals.scenes_at_cap}/${totals.scenes_total} scenes · video cap ${totals.max_candidates_per_video ?? '—'}`
+            : `${clips.length} shown · Add individual clips to your video`}
+        </span>
       </summary>
       {/* Closed details still mount children, so conditionally render to avoid N video streams. */}
       {open ? (
@@ -64,7 +71,7 @@ export function SourceClipsPanel({
             <div className="empty-state">{error}</div>
           ) : clips.length === 0 ? (
             <div className="empty-state">
-              No clips above stability {smoothnessThreshold}. Lower the threshold to see more.
+              No clips above display filter {smoothnessThreshold}. Lower the filter to see more.
             </div>
           ) : (
             <div className="review-grid">

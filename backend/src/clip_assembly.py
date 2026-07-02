@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import asdict
 from dataclasses import dataclass
 from statistics import median
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -242,6 +243,18 @@ def assemble_smooth_clips(
             clips.append(_rank_clips(fallback_clips)[0])
 
     selected = _bounded_scene_pool(clips, preferences)
+    kept_by_scene: Dict[int, int] = {}
+    generated_by_scene: Dict[int, int] = {}
+    for clip in clips:
+        generated_by_scene[clip.scene_id] = generated_by_scene.get(clip.scene_id, 0) + 1
+    for clip in selected:
+        kept_by_scene[clip.scene_id] = kept_by_scene.get(clip.scene_id, 0) + 1
+    scenes_at_cap = sum(
+        1
+        for scene_id, kept_count in kept_by_scene.items()
+        if kept_count >= preferences.max_clips_per_scene
+        and generated_by_scene.get(scene_id, 0) > kept_count
+    )
 
     return AssemblyResult(
         clips=selected,
@@ -249,5 +262,15 @@ def assemble_smooth_clips(
             total_duration_sec=round(sum(clip.duration_sec for clip in selected), 3),
             clips=[clip.clip_id for clip in selected],
         ),
-        metadata={"local": True, "model_used": "manual_rule_based"},
+        metadata={
+            "local": True,
+            "model_used": "manual_rule_based",
+            "generation_stats": {
+                "candidates_generated": len(clips),
+                "candidates_kept": len(selected),
+                "scenes_total": len(frames_by_scene),
+                "scenes_at_cap": scenes_at_cap,
+                "preferences": asdict(preferences),
+            },
+        },
     )

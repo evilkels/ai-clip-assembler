@@ -21,6 +21,8 @@ export interface ClipCandidate {
   scores: ClipScores;
   reason: string;
   suggested_speed?: number;
+  tags?: string[];
+  max_turn_rate_deg_per_sec?: number | null;
   thumbnail_url?: string;
   /** ISO 8601 capture time of the source file (for chronological sorting). */
   source_created_at?: string | null;
@@ -71,6 +73,40 @@ export interface AnalysisResult {
   clips: ClipCandidate[];
   sequence: DraftTimeline;
   recommendation: AssemblyRecommendation;
+  generation_stats?: ClipGenerationStats;
+}
+
+export interface ClipGenerationPreferences {
+  min_clip_duration_sec: number;
+  max_clip_duration_sec: number;
+  smoothness_threshold: number;
+  target_duration_sec: number;
+  max_turn_rate_deg_per_sec: number;
+  max_clips_per_scene: number;
+  max_candidates_per_video: number;
+}
+
+export type ClipGenerationPreferenceUpdate = Partial<ClipGenerationPreferences>;
+
+export interface ClipGenerationFileStats {
+  candidates_generated: number;
+  candidates_kept: number;
+  scenes_total: number;
+  scenes_at_cap: number;
+  preferences: Partial<ClipGenerationPreferences>;
+}
+
+export interface ClipGenerationStats {
+  per_file: Record<string, ClipGenerationFileStats>;
+  totals: {
+    candidates_generated: number;
+    candidates_kept: number;
+    scenes_total: number;
+    scenes_at_cap: number;
+    videos: number;
+    max_candidates_per_video?: number | null;
+  };
+  preferences: Partial<ClipGenerationPreferences>;
 }
 
 export type AssemblyProfile =

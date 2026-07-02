@@ -852,6 +852,63 @@ a {
   padding-top: 12px;
 }
 
+.clip-generation-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+
+.clip-generation-panel > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.clip-generation-body {
+  display: grid;
+  gap: 14px;
+  padding: 0 14px 14px;
+}
+
+.clip-generation-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.clip-generation-controls label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+}
+
+.clip-generation-controls input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--bg-1);
+}
+
+.clip-generation-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clip-generation-warning {
+  color: var(--yellow);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
 .source-clips-panel > summary {
   display: flex;
   align-items: center;
@@ -1519,6 +1576,13 @@ a {
   font-size: 12px;
   line-height: 1.45;
   min-height: 2.7em;
+}
+
+.clip-generation-why {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .clip-reason-label {

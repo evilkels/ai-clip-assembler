@@ -48,6 +48,15 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function generationWhy(clip: ClipCandidate): string {
+  const kind = clip.tags?.includes('fallback') ? 'fallback' : 'smooth';
+  const turn =
+    typeof clip.max_turn_rate_deg_per_sec === 'number'
+      ? `${clip.max_turn_rate_deg_per_sec.toFixed(1)}°/s turn`
+      : 'turn unavailable';
+  return `Scene ${clip.scene_id ?? '—'} · ${kind} · smooth ${clip.scores.smoothness.toFixed(1)} · ${turn}`;
+}
+
 /** A bar spanning the full source file with the clip region, sibling candidates
  *  and a live playhead marked on it. */
 function SourceTrack({
@@ -241,6 +250,7 @@ export function ClipCard({
             <ScoreChip label="contrast" value={clip.scores.contrast} />
           </div>
         </details>
+        <div className="clip-generation-why">{generationWhy(clip)}</div>
         {clip.reason && (
           <div className="clip-reason">
             <span className="clip-reason-label">Why</span> {clip.reason}

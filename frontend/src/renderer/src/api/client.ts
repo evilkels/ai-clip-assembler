@@ -10,6 +10,8 @@ import type {
   AnalysisStatus,
   AssemblyProfile,
   ClipCandidate,
+  ClipGenerationPreferenceUpdate,
+  ClipGenerationStats,
   DraftResult,
   ProjectManifest,
   RecentProject,
@@ -70,6 +72,7 @@ interface BackendClipSuggestion {
   sharpness_score?: number | null;
   exposure_score?: number | null;
   contrast_score?: number | null;
+  max_turn_rate_deg_per_sec?: number | null;
   visual_interest_score: number;
   overall_score: number;
   ai_reason: string;
@@ -98,6 +101,8 @@ export function mapBackendClip(c: BackendClipSuggestion): ClipCandidate {
     },
     reason: c.ai_reason,
     suggested_speed: c.suggested_speed,
+    tags: c.tags,
+    max_turn_rate_deg_per_sec: c.max_turn_rate_deg_per_sec ?? null,
     source_created_at: c.source_created_at ?? null,
     source_duration_sec: c.source_duration_sec ?? null,
   };
@@ -114,6 +119,7 @@ export interface FolderProjectResult {
   project_folder: string;
   project: ProjectManifest;
   videos: UploadedVideo[];
+  generation_stats?: ClipGenerationStats | null;
 }
 
 export async function createProjectFromFolder(folderPath: string): Promise<FolderProjectResult> {
@@ -255,6 +261,7 @@ export async function analyzeProject(
     clips: BackendClipSuggestion[];
     sequence: AnalysisResult['sequence'];
     recommendation: AnalysisResult['recommendation'];
+    generation_stats?: ClipGenerationStats;
   };
   return {
     project_id: raw.project_id,
@@ -263,6 +270,40 @@ export async function analyzeProject(
     clips: raw.clips.map(mapBackendClip),
     sequence: raw.sequence,
     recommendation: raw.recommendation,
+    generation_stats: raw.generation_stats,
+  };
+}
+
+export async function rederiveClips(
+  projectId: string,
+  preferences: ClipGenerationPreferenceUpdate,
+): Promise<AnalysisResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/clips/rederive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(preferences),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Clip regeneration failed: ${res.status}`);
+  }
+  const raw = (await res.json()) as {
+    project_id: string;
+    harness_id: string;
+    status: string;
+    clips: BackendClipSuggestion[];
+    sequence: AnalysisResult['sequence'];
+    recommendation: AnalysisResult['recommendation'];
+    generation_stats?: ClipGenerationStats;
+  };
+  return {
+    project_id: raw.project_id,
+    harness_id: raw.harness_id,
+    status: raw.status,
+    clips: raw.clips.map(mapBackendClip),
+    sequence: raw.sequence,
+    recommendation: raw.recommendation,
+    generation_stats: raw.generation_stats,
   };
 }
 

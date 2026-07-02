@@ -23,6 +23,7 @@ import {
   relocateRecentProject,
   removeRecentProject,
   regenerateDraft as requestDraft,
+  rederiveClips as requestClipRederive,
   rescanProject,
   subscribeTimelineEvents,
   TimelineRevisionConflictError,
@@ -38,6 +39,8 @@ import type {
   AssemblyRecommendation,
   ClipCandidate,
   ClipDecision,
+  ClipGenerationPreferenceUpdate,
+  ClipGenerationStats,
   RecentProject,
   Trim,
   UploadedVideo,
@@ -86,7 +89,9 @@ interface ReviewState {
   setAnalysisStatus: (status: AnalysisStatus) => void;
   applyAnalysisResult: (result: AnalysisResult) => void;
   recommendation: AssemblyRecommendation | null;
+  generationStats: ClipGenerationStats | null;
   regenerateDraft: (profile: AssemblyProfile, targetDurationSec: number) => Promise<void>;
+  rederiveClips: (preferences: ClipGenerationPreferenceUpdate) => Promise<void>;
   createUploadProject: () => Promise<void>;
   openProjectFolder: (folderPath: string) => Promise<void>;
   refreshRecentProjects: () => Promise<void>;
@@ -121,6 +126,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
   const [targetDuration, setTargetDuration] = useState(120);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
+  const [generationStats, setGenerationStats] = useState<ClipGenerationStats | null>(null);
 
   // The latest authoritative document, kept in a ref so operation handlers can
   // map a Candidate Clip to its Timeline Item without re-rendering churn.
@@ -251,6 +257,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setAnalysisStatus({ phase: 'idle' });
     setError(null);
     setRecommendation(null);
+    setGenerationStats(null);
     setProfile('cinematic_highlight');
     setTargetDuration(120);
   }, []);
@@ -289,6 +296,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setProjectFolder(result.project_folder);
         setUploadedVideos(result.videos);
         resetProjectSession();
+        setGenerationStats(result.generation_stats ?? null);
         setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
       } finally {
         setLoading(false);
@@ -338,6 +346,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       // the freshly built Timeline Document.
       setClips(result.clips);
       setRecommendation(result.recommendation);
+      setGenerationStats(result.generation_stats ?? null);
       setProfile(result.recommendation.profile);
       setTargetDuration(result.recommendation.target_duration_sec);
       void refreshTimelineDocument();
@@ -354,6 +363,25 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       await refreshTimelineDocument();
     },
     [projectId, refreshTimelineDocument],
+  );
+
+  const rederiveClips = useCallback(
+    async (preferences: ClipGenerationPreferenceUpdate) => {
+      if (!projectId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await requestClipRederive(projectId, preferences);
+        applyAnalysisResult(result);
+      } catch (reason: unknown) {
+        const message = reason instanceof Error ? reason.message : 'Unable to regenerate clips';
+        setError(message);
+        throw reason;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyAnalysisResult, projectId],
   );
 
   const include = useCallback(
@@ -519,7 +547,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setAnalysisStatus,
       applyAnalysisResult,
       recommendation,
+      generationStats,
       regenerateDraft,
+      rederiveClips,
       createUploadProject,
       openProjectFolder,
       refreshRecentProjects,
@@ -547,6 +577,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       smoothnessThreshold,
       profile,
       targetDuration,
+      generationStats,
       selectProfile,
       selectTargetDuration,
       include,
@@ -562,6 +593,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       applyAnalysisResult,
       recommendation,
       regenerateDraft,
+      rederiveClips,
       createUploadProject,
       openProjectFolder,
       refreshRecentProjects,

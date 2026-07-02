@@ -17,7 +17,9 @@ PROJECT_STATE_DIRNAME = "clipassembler"
 PROJECT_MANIFEST_FILENAME = "project.json"
 PROJECT_SCHEMA_VERSION = 1
 ANALYSIS_RESULTS_FILENAME = "results.json"
-ANALYSIS_RESULTS_SCHEMA_VERSION = 1
+ANALYSIS_RESULTS_SCHEMA_VERSION = 2
+FRAME_SCORES_FILENAME = "frame_scores.json"
+FRAME_SCORES_SCHEMA_VERSION = 1
 TIMELINE_DOCUMENT_FILENAME = "timeline.json"
 REVIEW_SESSION_FILENAME = "review-session.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
@@ -227,6 +229,7 @@ def write_analysis_results(
     harness_id: str,
     clips: List[dict],
     timeline: Optional[dict],
+    generation_stats: Optional[dict] = None,
     now: Callable[[], datetime] = datetime_now_utc,
 ) -> None:
     payload = {
@@ -235,6 +238,7 @@ def write_analysis_results(
         "analyzed_at": format_timestamp(now()),
         "clips": clips,
         "timeline": timeline,
+        "generation_stats": generation_stats,
     }
     path = analysis_results_path(project_folder)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -251,11 +255,42 @@ def read_analysis_results(project_folder: Path) -> Optional[dict]:
         return None
     if not isinstance(payload, dict):
         return None
-    if payload.get("schema_version") != ANALYSIS_RESULTS_SCHEMA_VERSION:
+    if payload.get("schema_version") not in (1, ANALYSIS_RESULTS_SCHEMA_VERSION):
         return None
     if not isinstance(payload.get("clips"), list):
         return None
     return payload
+
+
+def frame_scores_path(project_folder: Path) -> Path:
+    return project_state_dir(project_folder) / "analysis" / FRAME_SCORES_FILENAME
+
+
+def write_frame_scores(project_folder: Path, per_file: dict) -> None:
+    payload = {
+        "schema_version": FRAME_SCORES_SCHEMA_VERSION,
+        "per_file": per_file,
+    }
+    path = frame_scores_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def read_frame_scores(project_folder: Path) -> Optional[dict]:
+    path = frame_scores_path(project_folder)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("schema_version") != FRAME_SCORES_SCHEMA_VERSION:
+        return None
+    if not isinstance(payload.get("per_file"), dict):
+        return None
+    return {"per_file": payload["per_file"]}
 
 
 def review_session_path(project_folder: Path) -> Path:

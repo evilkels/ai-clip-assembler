@@ -1,7 +1,11 @@
 # Plan: Settings Page
 
-Status: draft, awaiting review
-Owner: TBD
+Status: DONE (2026-07-03) — shipped as the Settings & Diagnostics modal in
+`frontend/src/renderer/src/components/SettingsModal.tsx` (`8523ed9`) plus
+theme switching (`cd1ef24`). The shipped slice covers global runtime AI
+settings, theme preference, Connect your AI, and review-model diagnostics; the
+broader original inventory/per-project override model did not ship.
+Owner: Elvijs
 Depends on: `project-folder-model.md` (global vs per-project split, `project.json::settings_overrides`)
 Pairs with: `project-sidebar.md`, `ui-polish-modern-shell.md`
 
@@ -187,14 +191,14 @@ window.api.settings = {
 
 ## Acceptance
 
-- [ ] Opening Settings from sidebar shows global section.
-- [ ] When a project is open, Settings also shows per-project overrides for that project.
-- [ ] Changing a global value persists to `settings.json` and takes effect immediately for all projects without overrides.
-- [ ] Adding an override persists to `project.json` and takes effect for that project only.
-- [ ] Re-launch preserves all settings.
-- [ ] Diagnostics section accurately reflects ffmpeg/Pi/Ollama state and updates on the "Refresh" button.
-- [ ] Invalid ffmpeg path on save shows validation error; setting not saved.
-- [ ] Settings page passes react-doctor a11y rules (form labels associated, button types explicit).
+- [x] Opening Settings from sidebar shows a global settings section.
+- [ ] When a project is open, Settings also shows per-project overrides for that project. Not shipped.
+- [x] Changing a global runtime AI value persists to `.ai-clip-assembler/settings.json` and takes effect on the next request.
+- [ ] Adding an override persists to `project.json` and takes effect for that project only. Not shipped.
+- [x] Re-launch preserves saved runtime AI settings and theme preference.
+- [x] Diagnostics section reflects Pi review-model reachability and updates from the "Run check again" button.
+- [ ] Invalid ffmpeg path on save shows validation error; setting not saved. Superseded by the shipped scope: ffmpeg path editing did not ship.
+- [x] Settings page received the 2026-07-03 react-doctor mechanical a11y/markup pass in PR #35.
 
 ## Open Questions
 

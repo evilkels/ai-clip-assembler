@@ -13,9 +13,10 @@ File bugs with the template in [`QA.md`](QA.md).
 - Electron frontend creates/opens a **Project** from a footage folder; source
   videos stay in place and app state lives under `clipassembler/`.
 - FastAPI backend probes metadata, extracts frames, scores them, and assembles
-  rule-based smooth **Candidate Clips**. The default **AI harness is `pi_agent`**
-  (pi CLI → cloud model) which enriches scores with a visual-interest judgment;
-  it falls back to manual scoring on failure. `manual` is the no-AI mode.
+  rule-based smooth **Candidate Clips**. The default harness is `manual`, which
+  runs without AI. The optional `pi_agent` harness (pi CLI → cloud model)
+  enriches scores with a visual-interest judgment after per-project consent;
+  it falls back to manual scoring on failure.
   `local_qwen` is **postponed/disabled**; `claude_code`/`codex` are not enabled.
 - The timeline is a **backend-authoritative Timeline Document**, edited only
   through one reversible **operations core** with **undo/redo**. The Review

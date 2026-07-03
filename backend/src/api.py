@@ -63,6 +63,7 @@ from .project_store import (
     read_analysis_results,
     read_frame_scores,
     rescan_project,
+    write_project_manifest,
     write_analysis_results,
     write_frame_scores,
     write_timeline_document,
@@ -204,6 +205,10 @@ class ProjectFolderRequest(BaseModel):
     folder_path: str
 
 
+class CloudAiConsentRequest(BaseModel):
+    consented: bool
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "version": "0.1.0"}
@@ -218,6 +223,7 @@ async def create_project():
         "videos": [],
         "clips": [],
         "timeline": None,
+        "cloud_ai_consent": False,
     }
     _proposal_store.configure_project(project_id)
     return {"project_id": project_id}
@@ -255,6 +261,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "videos": videos,
         "clips": clips,
         "timeline": timeline,
+        "cloud_ai_consent": manifest.cloud_ai_consent,
         "harness_id": restored.get("harness_id") if restored else None,
         "frame_scores": frame_scores,
         "generation_stats": generation_stats,
@@ -268,6 +275,33 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "clips": clips,
         "timeline": timeline,
         "generation_stats": generation_stats,
+    }
+
+
+@app.put("/projects/{project_id}/cloud-ai-consent")
+async def update_cloud_ai_consent(project_id: str, request: CloudAiConsentRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+
+    manifest_payload = project.get("project")
+    if project.get("project_folder") and manifest_payload:
+        try:
+            manifest = create_or_open_folder_project(Path(project["project_folder"]))
+            updated = manifest.model_copy(update={"cloud_ai_consent": request.consented})
+            write_project_manifest(Path(project["project_folder"]), updated)
+        except ProjectStoreError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        project["project"] = updated.model_dump()
+
+    project["cloud_ai_consent"] = request.consented
+
+    return {
+        "project_id": project_id,
+        "cloud_ai_consent": request.consented,
+        "project": project.get("project"),
     }
 
 
@@ -416,6 +450,14 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
         raise HTTPException(status_code=404, detail="Project not found")
     if request.harness_id not in ("manual", "pi_agent"):
         raise HTTPException(status_code=400, detail="Only manual and pi_agent harnesses are available in the drone MVP")
+    if is_cloud_harness(request.harness_id) and not projects[project_id].get("cloud_ai_consent"):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Cloud AI consent is required before this harness can analyze footage. "
+                "Use the manual harness or opt in for this project."
+            ),
+        )
     current = projects[project_id].get("analysis_progress") or {}
     if current.get("phase") == "analyzing":
         raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
@@ -470,6 +512,10 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
 
 def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
     return analysis_service.selected_videos(projects[project_id], request)
+
+
+def is_cloud_harness(harness_id: str) -> bool:
+    return harness_id == "pi_agent"
 
 
 @app.post("/projects/{project_id}/analyze/cancel")
@@ -1015,7 +1061,12 @@ def _review_inputs(project_id: str) -> tuple[list, list, object]:
         if len(candidate_frames) >= 12:
             break
     agent = _review_agent
-    if projects[project_id].get("harness_id") != "pi_agent" and agent is default_review_agent:
+    project = projects[project_id]
+    default_agent_requires_consent = (
+        project.get("harness_id") != "pi_agent"
+        or not project.get("cloud_ai_consent")
+    )
+    if default_agent_requires_consent and agent is default_review_agent:
         def manual_review_agent(_context):
             return {
                 "message": "Manual analysis is ready. Creative versions remain deterministic and local.",

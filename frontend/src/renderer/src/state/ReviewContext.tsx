@@ -29,6 +29,7 @@ import {
   subscribeTimelineEvents,
   TimelineRevisionConflictError,
   undoTimeline,
+  updateCloudAiConsent,
   type TimelineDocument,
   type TimelineItem,
   type TimelineSnapshot,
@@ -51,6 +52,7 @@ interface ReviewState {
   projectId: string | null;
   projectName: string | null;
   projectFolder: string | null;
+  cloudAiConsent: boolean;
   recentProjects: RecentProject[];
   uploadedVideos: UploadedVideo[];
   analysisStatus: AnalysisStatus;
@@ -88,6 +90,7 @@ interface ReviewState {
   setProjectId: (id: string | null) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
   setAnalysisStatus: (status: AnalysisStatus) => void;
+  setCloudAiConsent: (consented: boolean) => Promise<void>;
   applyAnalysisResult: (result: AnalysisResult) => void;
   recommendation: AssemblyRecommendation | null;
   generationStats: ClipGenerationStats | null;
@@ -116,6 +119,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [projectFolder, setProjectFolder] = useState<string | null>(null);
+  const [cloudAiConsent, setCloudAiConsentState] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [uploadedVideos, setUploadedVideos] = useState<UploadedVideo[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({ phase: 'idle' });
@@ -293,6 +297,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setProjectId(project_id);
       setProjectName('Upload Project');
       setProjectFolder(null);
+      setCloudAiConsentState(false);
       setUploadedVideos([]);
       resetProjectSession();
     } finally {
@@ -308,6 +313,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setProjectId(result.project_id);
         setProjectName(result.project.name);
         setProjectFolder(result.project_folder);
+        setCloudAiConsentState(result.project.cloud_ai_consent);
         setUploadedVideos(result.videos);
         resetProjectSession();
         setGenerationStats(result.generation_stats ?? null);
@@ -334,6 +340,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       const result = await rescanProject(projectId);
       setProjectName(result.project.name);
       setProjectFolder(result.project_folder);
+      setCloudAiConsentState(result.project.cloud_ai_consent);
       setUploadedVideos(result.videos);
       resetProjectSession();
       setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
@@ -524,11 +531,21 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     reconcileTimelineSnapshot(await redoTimeline(projectId));
   }, [projectId, reconcileTimelineSnapshot]);
 
+  const setCloudAiConsent = useCallback(
+    async (consented: boolean) => {
+      if (!projectId) return;
+      const result = await updateCloudAiConsent(projectId, consented);
+      setCloudAiConsentState(result.cloud_ai_consent);
+    },
+    [projectId],
+  );
+
   const value = useMemo<ReviewState>(
     () => ({
       projectId,
       projectName,
       projectFolder,
+      cloudAiConsent,
       recentProjects,
       uploadedVideos,
       analysisStatus,
@@ -559,6 +576,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setProjectId,
       setUploadedVideos,
       setAnalysisStatus,
+      setCloudAiConsent,
       applyAnalysisResult,
       recommendation,
       generationStats,
@@ -577,6 +595,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       projectId,
       projectName,
       projectFolder,
+      cloudAiConsent,
       recentProjects,
       uploadedVideos,
       analysisStatus,
@@ -604,6 +623,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       applyTimelineOperation,
       undo,
       redo,
+      setCloudAiConsent,
       applyAnalysisResult,
       recommendation,
       regenerateDraft,

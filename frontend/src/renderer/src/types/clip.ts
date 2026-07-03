@@ -70,6 +70,7 @@ export interface ProjectManifest {
   name: string;
   created_at: string;
   harness: string;
+  cloud_ai_consent: boolean;
   source_videos: Array<{ filename: string; imported_at: string }>;
   settings_overrides: Record<string, unknown>;
 }

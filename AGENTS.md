@@ -21,7 +21,7 @@ Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for decisions. See 
 - **Name**: AI Clip Assembler
 - **Type**: Local-first desktop video editor (Electron + React frontend, FastAPI + Python backend)
 - **Purpose**: Auto-assemble clips from raw MP4 footage using modular AI harnesses
-- **Privacy**: Footage never leaves the machine. AI runs locally or via user-chosen provider.
+- **Privacy**: Local by default. Cloud AI is opt-in per project via user-chosen provider.
 - **Export**: FCPXML (Final Cut Pro), EDL (universal), Resolve XML
 
 ## Architecture Quick Ref

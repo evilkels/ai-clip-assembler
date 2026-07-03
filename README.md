@@ -29,16 +29,16 @@ The app is still early. Expect rough edges, macOS-first setup, and active change
 - Local FastAPI backend for video analysis and export.
 - Electron + React desktop app for import, review, timeline editing, and export.
 - FFmpeg/OpenCV/PySceneDetect pipeline for frame sampling, quality scoring, scene boundaries, and motion stability.
-- Pluggable AI harness system with a default `pi_agent` harness and a no-AI manual harness.
+- Pluggable harness system with a default no-AI `manual` harness and opt-in cloud AI harnesses.
 - Review board for accepting or rejecting candidate clips.
 - Backend-authoritative timeline with split, retrim, reorder, speed, transform, undo, and redo support.
 - Export to Final Cut Pro XML, DaVinci Resolve XML, and EDL.
 
 ## Privacy model
 
-Footage is local by default. Source videos are processed on your machine, project data is stored as files, and there is no database service.
+AI Clip Assembler is local by default. Source videos are processed on your machine, project data is stored as files, and there is no database service.
 
-Optional AI harnesses may call tools or providers you configure yourself. If you use a provider-backed harness, review that provider's data policy before sending frames or metadata through it. The manual harness runs without AI.
+Cloud AI is opt-in per project. Provider-backed harnesses may send sampled frames or clip metadata to tools or providers you configure yourself, and the backend refuses to run those harnesses until project consent is saved. If you use a provider-backed harness, review that provider's data policy before sending frames or metadata through it. The manual harness runs without AI.
 
 ## Tech stack
 
@@ -106,9 +106,9 @@ npm run dev:with-backend
 
 The backend runs on `http://127.0.0.1:8000`. The Electron app opens in development mode.
 
-## Optional AI harness setup
+## Optional cloud AI harness setup
 
-The active default AI harness is `pi_agent`, which drives the [`pi`](https://github.com/earendil-works/pi-mono) coding-agent CLI to score candidate clips.
+The default harness is `manual`, which runs without AI. The optional `pi_agent` harness drives the [`pi`](https://github.com/earendil-works/pi-mono) coding-agent CLI to score candidate clips with a configured provider. It requires explicit project consent before it can run.
 
 Install and authenticate it if you want AI-assisted visual-interest scoring:
 

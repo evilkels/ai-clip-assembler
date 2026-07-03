@@ -106,7 +106,7 @@
 ### 0. Pi Coding-Agent Harness (Default)
 
 **ID:** `pi_agent`
-**Status:** Active default AI harness.
+**Status:** Optional cloud-backed AI harness; requires per-project consent.
 **Input:** Sampled frame image paths per candidate clip.
 **Process:**
 1. For each rule-based candidate clip, sample up to 4 representative frames.
@@ -197,6 +197,7 @@ Configuration is via environment variables only (no config file):
 ### 4. Manual / Rule-Based Harness
 
 **ID:** `manual`
+**Status:** Default local harness.
 **Input:** OpenCV metrics only (no AI vision model)
 **Process:**
 1. Use vidstab motion scores

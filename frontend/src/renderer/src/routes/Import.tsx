@@ -31,7 +31,7 @@ function formatResolution(metadata: {
 
 const HARNESS_HINTS: Record<string, string> = {
   manual: 'rule-based, fast',
-  pi_agent: 'AI scoring, slower',
+  pi_agent: 'cloud AI, opt-in',
 };
 
 const STEP_LABELS: Record<string, string> = {
@@ -96,12 +96,14 @@ export function ImportPage() {
     projectId,
     projectName,
     projectFolder,
+    cloudAiConsent,
     uploadedVideos,
     clips,
     analysisStatus,
     createUploadProject,
     setUploadedVideos,
     setAnalysisStatus,
+    setCloudAiConsent,
     applyAnalysisResult,
     openProjectFolder,
     rescanOpenProject,
@@ -114,7 +116,7 @@ export function ImportPage() {
     { id: 'manual', name: 'Manual / Rule-based', type: 'rule', enabled: true },
     { id: 'pi_agent', name: 'Pi Agent', type: 'agent', enabled: true },
   ]);
-  const [harnessId, setHarnessId] = useState('pi_agent');
+  const [harnessId, setHarnessId] = useState('manual');
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
   const analyzedIds = useMemo(() => new Set(clips.map((clip) => clip.file_id)), [clips]);
   // Analyzed files default to unchecked so a rescan targets the new batch.
@@ -253,6 +255,19 @@ export function ImportPage() {
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
+      if (harnessId === 'pi_agent' && !cloudAiConsent) {
+        const consented = window.confirm(
+          [
+            'Pi Agent can send sampled frames or clip metadata to the cloud provider configured for the Pi CLI.',
+            'Consent is saved for this project. Continue with cloud AI for this project?',
+          ].join('\n\n'),
+        );
+        if (!consented) {
+          setAnalysisStatus({ phase: 'idle' });
+          return;
+        }
+        await setCloudAiConsent(true);
+      }
       const result = await analyzeProject(projectId, {
         harness_id: harnessId,
         file_ids: selectedIds,
@@ -270,7 +285,16 @@ export function ImportPage() {
       setProgress(null);
       setCancelling(false);
     }
-  }, [projectId, harnessId, selectedIds, selectedCount, setAnalysisStatus, applyAnalysisResult]);
+  }, [
+    projectId,
+    harnessId,
+    cloudAiConsent,
+    selectedIds,
+    selectedCount,
+    setAnalysisStatus,
+    setCloudAiConsent,
+    applyAnalysisResult,
+  ]);
 
   const handleAbort = useCallback(async () => {
     if (!projectId) return;

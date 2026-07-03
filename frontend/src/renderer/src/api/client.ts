@@ -135,6 +135,26 @@ export async function createProjectFromFolder(folderPath: string): Promise<Folde
   return res.json() as Promise<FolderProjectResult>;
 }
 
+export async function updateCloudAiConsent(
+  projectId: string,
+  consented: boolean,
+): Promise<{ project_id: string; cloud_ai_consent: boolean; project?: ProjectManifest }> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/cloud-ai-consent`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ consented }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Failed to update cloud AI consent: ${res.status}`);
+  }
+  return res.json() as Promise<{
+    project_id: string;
+    cloud_ai_consent: boolean;
+    project?: ProjectManifest;
+  }>;
+}
+
 export async function selectProjectFolder(): Promise<string | null> {
   return window.clipAssembler?.selectProjectFolder?.() ?? null;
 }
@@ -263,7 +283,7 @@ export async function analyzeProject(
   projectId: string,
   options: AnalyzeOptions = {},
 ): Promise<AnalysisResult> {
-  const harness_id = options.harness_id ?? 'pi_agent';
+  const harness_id = options.harness_id ?? 'manual';
   const preferences = options.preferences ?? {};
   const file_ids = options.file_ids ?? null;
   const res = await fetch(`${backendUrl()}/projects/${projectId}/analyze`, {

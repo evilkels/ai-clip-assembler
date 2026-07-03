@@ -105,8 +105,9 @@ order, and timings being exported.
 
 ## Choosing an AI harness
 
-The default is `pi_agent` (the `pi` coding agent). The `manual` rule-based
-harness needs no AI and selects clips purely on technical quality. The local
+The default is `manual`, which needs no AI and selects clips purely on
+technical quality. The optional `pi_agent` harness uses the `pi` coding agent
+and requires per-project cloud AI consent before it can run. The local
 Qwen/Ollama harness is currently **postponed**. See
 [HARNESS_SPEC.md](HARNESS_SPEC.md) and the README's *AI Harness* section for
 configuration.

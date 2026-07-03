@@ -23,7 +23,7 @@ FRAME_SCORES_SCHEMA_VERSION = 1
 TIMELINE_DOCUMENT_FILENAME = "timeline.json"
 REVIEW_SESSION_FILENAME = "review-session.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
-DEFAULT_HARNESS_ID = "pi_agent"
+DEFAULT_HARNESS_ID = "manual"
 UNSAFE_PROJECT_ROOTS = [
     Path("/System"),
     Path("/Applications"),
@@ -73,6 +73,7 @@ class ProjectManifest(BaseModel):
     name: str
     created_at: str
     harness: str = DEFAULT_HARNESS_ID
+    cloud_ai_consent: bool = False
     source_videos: List[ProjectSourceVideo]
     settings_overrides: dict = Field(default_factory=dict)
 

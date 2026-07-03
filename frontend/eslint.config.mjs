@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'out/**', 'playwright-report/**', 'test-results/**']
+    ignores: ['dist/**', 'out/**', 'playwright-report/**', 'test-results/**', '.tmp/**']
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

@@ -98,11 +98,11 @@ work while phase 1 trust issues are open.
 
 ### Phase 4 — Architecture debt (parallel track, keeps velocity up)
 
-- [x] **Task 7: Execute plan 010** — DONE in PR #35 (2026-07-03); the plans
+- [x] **Task 7: Execute plan 010** — DONE in PR #35 (2026-07-02); the plans
   README marks plan 010 done. Generate frontend types from backend
   models (kills contract drift). Already fully specified in
   `docs/plans/010-shared-frontend-backend-contract.md`.
-- [x] **Task 8: Execute plan 011** — slice 1 DONE in PR #35 (2026-07-03); the
+- [x] **Task 8: Execute plan 011** — slice 1 DONE in PR #35 (2026-07-02); the
   plans README marks plan 011 slice 1 done. Decompose `api.py`, slice 1.
   Characterization tests first, per the plan.
 

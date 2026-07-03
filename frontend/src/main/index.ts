@@ -2,15 +2,23 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electro
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
+import {
+  cleanupStaleBackend,
+  findFreePort,
+  waitForBackend,
+  waitForRuntimeDescriptorPort,
+} from './backendLifecycle';
 import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
+import { installSingleInstanceGuard } from './singleInstance';
 
 const isDev = !app.isPackaged;
 const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
 const runtimeFilePath = () => join(app.getPath('userData'), '.ai-clip-assembler', 'runtime.json');
 let backendProcess: ChildProcessWithoutNullStreams | undefined;
 let packagedBackendUrl: string | undefined;
+let stoppingBackend = false;
+let quitAfterBackendStops = false;
 
 interface RecentProject {
   folderPath: string;
@@ -153,36 +161,6 @@ function resolveOptionalAssetPath(filename: string): string | undefined {
   return existsSync(assetPath) ? assetPath : undefined;
 }
 
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) resolve(address.port);
-        else reject(new Error('Could not allocate a backend port'));
-      });
-    });
-  });
-}
-
-async function waitForBackend(backendUrl: string, timeoutMs = 15000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  let lastError: unknown;
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(`${backendUrl}/`, { cache: 'no-store' });
-      if (res.ok) return;
-      lastError = new Error(`Backend health check returned ${res.status}`);
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw lastError instanceof Error ? lastError : new Error('Backend health check timed out');
-}
-
 async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
   if (process.env.PI_BIN) return process.env.PI_BIN;
   if (process.platform !== 'darwin') return undefined;
@@ -222,38 +200,89 @@ async function startPackagedBackend(): Promise<void> {
     throw new Error(`Packaged backend not found at ${backendExecutable}`);
   }
 
-  const port = await findFreePort();
-  const backendUrl = `http://127.0.0.1:${port}`;
   const piBin = await resolvePiBinFromLoginShell();
   const extraPath = buildPackagedBackendPath(piBin);
-  backendProcess = spawn(backendExecutable, [], {
-    cwd: app.getPath('userData'),
-    env: {
-      ...process.env,
-      CLIP_ASSEMBLER_PORT: String(port),
-      CLIP_ASSEMBLER_RUNTIME_FILE: runtimeFile,
-      PATH: extraPath,
-      ...(piBin ? { PI_BIN: piBin } : {}),
-      PYTHONUNBUFFERED: '1',
-    },
-  });
 
-  backendProcess.stdout.on('data', (chunk) => console.log(`[backend] ${chunk.toString().trimEnd()}`));
-  backendProcess.stderr.on('data', (chunk) => console.error(`[backend] ${chunk.toString().trimEnd()}`));
-  backendProcess.once('exit', (code, signal) => {
-    if (code !== 0 && signal !== 'SIGTERM') {
-      console.error(`[backend] exited unexpectedly code=${code ?? 'null'} signal=${signal ?? 'null'}`);
+  const cleanup = await cleanupStaleBackend({ runtimeFile, backendExecutable });
+  if (cleanup.reason === 'still-running') {
+    throw new Error('A previous backend process could not be stopped. Quit it manually and restart AI Clip Assembler.');
+  }
+  if (cleanup.cleaned) {
+    console.log(`[backend] cleaned previous backend runtime (${cleanup.reason})`);
+  }
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const port = await findFreePort();
+    const backendUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(backendExecutable, [], {
+      cwd: app.getPath('userData'),
+      env: {
+        ...process.env,
+        CLIP_ASSEMBLER_PORT: String(port),
+        CLIP_ASSEMBLER_RUNTIME_FILE: runtimeFile,
+        PATH: extraPath,
+        ...(piBin ? { PI_BIN: piBin } : {}),
+        PYTHONUNBUFFERED: '1',
+      },
+    });
+    backendProcess = child;
+
+    child.stdout.on('data', (chunk) => console.log(`[backend] ${chunk.toString().trimEnd()}`));
+    child.stderr.on('data', (chunk) => console.error(`[backend] ${chunk.toString().trimEnd()}`));
+    child.once('exit', (code, signal) => {
+      if (backendProcess === child) backendProcess = undefined;
+      if (!stoppingBackend && code !== 0 && signal !== 'SIGTERM') {
+        console.error(`[backend] exited unexpectedly code=${code ?? 'null'} signal=${signal ?? 'null'}`);
+      }
+    });
+
+    try {
+      await Promise.race([
+        waitForBackend(backendUrl),
+        new Promise<never>((_resolve, reject) => {
+          child.once('exit', (code, signal) => {
+            reject(new Error(`Backend exited before startup code=${code ?? 'null'} signal=${signal ?? 'null'}`));
+          });
+        }),
+      ]);
+      await waitForRuntimeDescriptorPort(runtimeFile, port);
+      packagedBackendUrl = backendUrl;
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(`[backend] startup attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
+      await stopBackendProcess(child);
     }
-  });
+  }
 
-  await waitForBackend(backendUrl);
-  packagedBackendUrl = backendUrl;
+  throw lastError instanceof Error ? lastError : new Error('Backend failed to start');
 }
 
-function stopPackagedBackend(): void {
-  if (!backendProcess || backendProcess.killed) return;
-  backendProcess.kill();
+async function stopBackendProcess(child: ChildProcessWithoutNullStreams): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  stoppingBackend = true;
+  const exited = new Promise<void>((resolve) => {
+    child.once('exit', () => resolve());
+  });
+  child.kill('SIGTERM');
+  const terminated = await Promise.race([
+    exited.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2500)),
+  ]);
+  if (!terminated && child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGKILL');
+    await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, 1500))]);
+  }
+  if (backendProcess === child) backendProcess = undefined;
+  stoppingBackend = false;
+}
+
+async function stopPackagedBackend(): Promise<void> {
+  const child = backendProcess;
+  if (!child) return;
   backendProcess = undefined;
+  await stopBackendProcess(child);
 }
 
 function createWindow(): void {
@@ -303,28 +332,49 @@ function createWindow(): void {
   }
 }
 
-app.whenReady()
-  .then(async () => {
-    if (process.platform === 'darwin' && app.dock) {
-      const icon = resolveOptionalAssetPath('icon.png');
-      if (icon) app.dock.setIcon(icon);
-    }
-    await startPackagedBackend();
-    registerIpcHandlers();
-    createWindow();
+if (installSingleInstanceGuard(app, BrowserWindow)) {
+  app.whenReady()
+    .then(async () => {
+      if (process.platform === 'darwin' && app.dock) {
+        const icon = resolveOptionalAssetPath('icon.png');
+        if (icon) app.dock.setIcon(icon);
+      }
+      await startPackagedBackend();
+      registerIpcHandlers();
+      createWindow();
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      dialog.showErrorBox('AI Clip Assembler failed to start', message);
+      app.quit();
     });
-  })
-  .catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    dialog.showErrorBox('AI Clip Assembler failed to start', message);
-    app.quit();
+
+  app.on('before-quit', (event) => {
+    if (!backendProcess || quitAfterBackendStops) return;
+    event.preventDefault();
+    void stopPackagedBackend().finally(() => {
+      quitAfterBackendStops = true;
+      app.quit();
+    });
   });
 
-app.on('will-quit', stopPackagedBackend);
+  process.once('exit', () => {
+    if (backendProcess && backendProcess.exitCode === null && backendProcess.signalCode === null) {
+      backendProcess.kill('SIGTERM');
+    }
+  });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      void stopPackagedBackend().finally(() => process.exit(0));
+    });
+  }
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+}

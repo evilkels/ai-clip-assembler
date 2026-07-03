@@ -28,6 +28,7 @@
     "gen:types": "cd ../backend && PYTHONPATH=. .venv/bin/pydantic2ts --module src.models --output ../frontend/src/renderer/src/types/generated.ts --json2ts-cmd \"$(pwd)/../frontend/node_modules/.bin/json2ts\"",
     "check:types-fresh": "tmp=$(mktemp) && cd ../backend && PYTHONPATH=. .venv/bin/pydantic2ts --module src.models --output \"$tmp\" --json2ts-cmd \"$(pwd)/../frontend/node_modules/.bin/json2ts\" && diff -u ../frontend/src/renderer/src/types/generated.ts \"$tmp\" && rm \"$tmp\"",
     "typecheck": "npm run check:types-fresh && tsc --noEmit -p tsconfig.json",
+    "test:main": "tsc -p tsconfig.main-tests.json && node --test .tmp/main-tests/tests/main/*.test.js",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "postinstall": "electron-builder install-app-deps",

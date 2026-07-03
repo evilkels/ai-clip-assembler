@@ -283,6 +283,7 @@ export async function analyzeProject(
     sequence: AnalysisResult['sequence'];
     recommendation: AnalysisResult['recommendation'];
     generation_stats?: ClipGenerationStats;
+    notices?: AnalysisResult['notices'];
   };
   return {
     project_id: raw.project_id,
@@ -292,6 +293,7 @@ export async function analyzeProject(
     sequence: raw.sequence,
     recommendation: raw.recommendation,
     generation_stats: raw.generation_stats,
+    notices: raw.notices,
   };
 }
 

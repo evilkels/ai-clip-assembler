@@ -3,7 +3,9 @@ from pathlib import Path
 
 from src.motion_analysis import (
     FFmpegVidstabError,
+    FFmpegVidstabUnavailableError,
     build_vidstabdetect_command,
+    ffmpeg_supports_vidstab,
     fit_rotation_degrees,
     parse_trf,
     run_vidstabdetect,
@@ -76,7 +78,7 @@ def test_parse_trf_fits_rotation_into_da(tmp_path):
 
 def test_run_vidstabdetect_wraps_ffmpeg_failures(tmp_path):
     def failing_runner(*args, **kwargs):
-        raise subprocess.CalledProcessError(1, args[0], stderr="No such filter: vidstabdetect")
+        raise subprocess.CalledProcessError(1, args[0], stderr="Invalid data found when processing input")
 
     try:
         run_vidstabdetect(
@@ -88,3 +90,29 @@ def test_run_vidstabdetect_wraps_ffmpeg_failures(tmp_path):
         assert "vidstabdetect" in str(exc)
     else:
         raise AssertionError("Expected vidstabdetect ffmpeg failure to be wrapped")
+
+
+def test_run_vidstabdetect_treats_missing_filter_as_unavailable(tmp_path):
+    def failing_runner(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, args[0], stderr="No such filter: 'vidstabdetect'")
+
+    try:
+        run_vidstabdetect(
+            input_path=tmp_path / "clip.mp4",
+            transforms_path=tmp_path / "transforms.trf",
+            runner=failing_runner,
+        )
+    except FFmpegVidstabUnavailableError as exc:
+        assert "vidstabdetect" in str(exc)
+    else:
+        raise AssertionError("Expected missing vidstabdetect to be classified as unavailable")
+
+
+def test_ffmpeg_supports_vidstab_detects_missing_filter():
+    def runner(*args, **kwargs):
+        return subprocess.CompletedProcess(args[0], 0, stdout=" T.. scale\n", stderr="")
+
+    capability = ffmpeg_supports_vidstab(runner=runner)
+
+    assert capability.available is False
+    assert "vidstabdetect" in capability.reason

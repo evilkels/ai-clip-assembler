@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
-from typing import Callable, List, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 
 class FFmpegVidstabUnavailableError(RuntimeError):
@@ -25,6 +25,12 @@ VIDSTAB_ANALYSIS_WIDTH = 640
 
 
 @dataclass(frozen=True)
+class FFmpegVidstabCapability:
+    available: bool
+    reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class FrameTransform:
     t: float
     dx: float
@@ -39,6 +45,43 @@ LOCAL_MOTION_RE = re.compile(
     r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+"
     r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\)"
 )
+
+
+def ffmpeg_supports_vidstab(runner: Runner = subprocess.run) -> FFmpegVidstabCapability:
+    try:
+        result = runner(
+            ["ffmpeg", "-hide_banner", "-filters"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return FFmpegVidstabCapability(
+            available=False,
+            reason="ffmpeg was not found; motion-stability analysis will be skipped.",
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr or str(exc)
+        return FFmpegVidstabCapability(
+            available=False,
+            reason=f"ffmpeg filter detection failed; motion-stability analysis will be skipped: {detail}",
+        )
+    filters = f"{result.stdout}\n{result.stderr}"
+    if "vidstabdetect" not in filters:
+        return FFmpegVidstabCapability(
+            available=False,
+            reason="ffmpeg lacks vidstabdetect; motion-stability analysis will be skipped.",
+        )
+    return FFmpegVidstabCapability(available=True)
+
+
+def _is_missing_vidstab_error(detail: str) -> bool:
+    lowered = detail.lower()
+    return "vidstabdetect" in lowered and (
+        "no such filter" in lowered
+        or "filter not found" in lowered
+        or "not found" in lowered
+    )
 
 
 def fit_rotation_degrees(
@@ -138,5 +181,9 @@ def run_vidstabdetect(
         raise FFmpegVidstabUnavailableError("ffmpeg is required for vidstabdetect analysis") from exc
     except subprocess.CalledProcessError as exc:
         detail = exc.stderr or str(exc)
+        if _is_missing_vidstab_error(detail):
+            raise FFmpegVidstabUnavailableError(
+                "ffmpeg lacks vidstabdetect; motion-stability analysis will be skipped"
+            ) from exc
         raise FFmpegVidstabError(f"ffmpeg vidstabdetect failed for {input_path}: {detail}") from exc
     return transforms_path

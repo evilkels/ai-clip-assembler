@@ -5,7 +5,7 @@ import pytest
 
 from src import analysis_service
 from src.clip_assembly import AssemblyPreferences
-from src.frame_extraction import FFmpegError
+from src.frame_extraction import FFmpegError, FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
 from src.motion_analysis import FFmpegVidstabUnavailableError
 
@@ -303,11 +303,58 @@ def test_early_stage_ffmpeg_errors_map_to_typed_analysis_errors(tmp_path):
     with pytest.raises(analysis_service.AnalysisInputError):
         _run_service(project, _request(), tmp_path, extract_frames_fn=raise_ffmpeg)
 
+    def raise_ffmpeg_unavailable(**_kwargs):
+        raise FFmpegUnavailableError("ffmpeg missing")
+
+    with pytest.raises(analysis_service.AnalysisDependencyUnavailableError):
+        _run_service(project, _request(), tmp_path, extract_frames_fn=raise_ffmpeg_unavailable)
+
+
+def test_vidstab_unavailable_skips_motion_analysis_and_records_notice(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+    scored_samples = []
+    stale_transform = tmp_path / "analysis" / "motion" / "file-1.trf"
+    stale_transform.parent.mkdir(parents=True)
+    stale_transform.write_text("stale", encoding="utf-8")
+
+    def score_without_transforms(samples):
+        scored_samples.extend(samples)
+        return [_frame(0.0, smoothness=8.0)]
+
     def raise_vidstab_unavailable(**_kwargs):
         raise FFmpegVidstabUnavailableError("ffmpeg lacks vidstabdetect")
 
-    with pytest.raises(analysis_service.AnalysisDependencyUnavailableError):
-        _run_service(project, _request(), tmp_path, run_vidstabdetect_fn=raise_vidstab_unavailable)
+    result = _run_service(
+        project,
+        _request(),
+        tmp_path,
+        run_vidstabdetect_fn=raise_vidstab_unavailable,
+        parse_transforms_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("stale transform used")
+        ),
+        score_samples_fn=score_without_transforms,
+        assemble_clips_fn=lambda **_kwargs: AssemblyResult(
+            clips=[_clip("clip-a", 0.0, 10.0, 8.0)],
+            sequence=TimelineSequence(total_duration_sec=10.0, clips=["clip-a"]),
+            metadata={},
+        ),
+    )
+
+    assert scored_samples
+    assert not stale_transform.exists()
+    assert result.notices == [
+        {
+            "code": "motion_analysis_unavailable",
+            "level": "warning",
+            "message": "Motion-stability analysis was skipped because ffmpeg lacks vidstabdetect.",
+        }
+    ]
+    assert result.timings[0]["motion_analysis_skipped"] is True
 
 
 def test_late_stage_ffmpeg_errors_propagate_untranslated(tmp_path):

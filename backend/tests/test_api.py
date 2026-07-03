@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import quote
 
 import pytest
@@ -1820,6 +1821,46 @@ def test_analysis_status_complete_after_successful_analyze(monkeypatch, tmp_path
     ]:
         assert timing[key] >= 0
     assert timing["ai_scoring_sec"] == 0.0
+
+
+def test_analysis_response_and_status_include_motion_degradation_notice(monkeypatch, tmp_path):
+    client, project_id = _project_with_one_video(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        api,
+        "_motion_analysis_capability",
+        SimpleNamespace(available=False, reason="ffmpeg lacks vidstabdetect"),
+    )
+    monkeypatch.setattr(
+        api,
+        "run_vidstabdetect",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("should skip vidstab")),
+    )
+    monkeypatch.setattr(api, "detect_scenes", lambda video_path: [])
+    monkeypatch.setattr(api, "extract_frames", lambda **kwargs: [FrameSample(timestamp=0, frame_path="/tmp/0.jpg")])
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda samples: [scored_frame(0)])
+    monkeypatch.setattr(
+        api,
+        "assemble_smooth_clips",
+        lambda file_id, file_name, frames, preferences, **_kwargs: AssemblyResult(
+            clips=[], sequence=TimelineSequence(total_duration_sec=0, clips=[])
+        ),
+    )
+
+    analyze = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+    status = client.get(f"/projects/{project_id}/analyze/status")
+
+    assert analyze.status_code == 200
+    notice = {
+        "code": "motion_analysis_unavailable",
+        "level": "warning",
+        "message": "Motion-stability analysis was skipped because ffmpeg lacks vidstabdetect.",
+    }
+    assert analyze.json()["notices"] == [notice]
+    assert status.json()["notices"] == [notice]
+    assert status.json()["timings"]["per_video"][0]["motion_analysis_skipped"] is True
 
 
 def test_analysis_status_error_after_failed_analyze(monkeypatch, tmp_path):

@@ -10,6 +10,7 @@ import {
   waitForRuntimeDescriptorPort,
 } from './backendLifecycle';
 import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
+import { installSingleInstanceGuard } from './singleInstance';
 
 const isDev = !app.isPackaged;
 const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
@@ -331,47 +332,49 @@ function createWindow(): void {
   }
 }
 
-app.whenReady()
-  .then(async () => {
-    if (process.platform === 'darwin' && app.dock) {
-      const icon = resolveOptionalAssetPath('icon.png');
-      if (icon) app.dock.setIcon(icon);
-    }
-    await startPackagedBackend();
-    registerIpcHandlers();
-    createWindow();
+if (installSingleInstanceGuard(app, BrowserWindow)) {
+  app.whenReady()
+    .then(async () => {
+      if (process.platform === 'darwin' && app.dock) {
+        const icon = resolveOptionalAssetPath('icon.png');
+        if (icon) app.dock.setIcon(icon);
+      }
+      await startPackagedBackend();
+      registerIpcHandlers();
+      createWindow();
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      dialog.showErrorBox('AI Clip Assembler failed to start', message);
+      app.quit();
     });
-  })
-  .catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    dialog.showErrorBox('AI Clip Assembler failed to start', message);
-    app.quit();
+
+  app.on('before-quit', (event) => {
+    if (!backendProcess || quitAfterBackendStops) return;
+    event.preventDefault();
+    void stopPackagedBackend().finally(() => {
+      quitAfterBackendStops = true;
+      app.quit();
+    });
   });
 
-app.on('before-quit', (event) => {
-  if (!backendProcess || quitAfterBackendStops) return;
-  event.preventDefault();
-  void stopPackagedBackend().finally(() => {
-    quitAfterBackendStops = true;
-    app.quit();
+  process.once('exit', () => {
+    if (backendProcess && backendProcess.exitCode === null && backendProcess.signalCode === null) {
+      backendProcess.kill('SIGTERM');
+    }
   });
-});
 
-process.once('exit', () => {
-  if (backendProcess && backendProcess.exitCode === null && backendProcess.signalCode === null) {
-    backendProcess.kill('SIGTERM');
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      void stopPackagedBackend().finally(() => process.exit(0));
+    });
   }
-});
 
-for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(signal, () => {
-    void stopPackagedBackend().finally(() => process.exit(0));
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
   });
 }
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});

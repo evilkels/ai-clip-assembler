@@ -111,6 +111,15 @@ export function killPid(pid: number, signal: NodeJS.Signals): void {
   process.kill(pid, signal);
 }
 
+function isProcessNotFoundError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'ESRCH',
+  );
+}
+
 function processExists(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -151,13 +160,25 @@ export async function cleanupStaleBackend(options: CleanupOptions): Promise<Clea
   const wait = options.waitForExit ?? waitForProcessExit;
   const terminateTimeoutMs = options.terminateTimeoutMs ?? 2500;
   const killTimeoutMs = options.killTimeoutMs ?? 1500;
-  killer(descriptor.pid, 'SIGTERM');
+  try {
+    killer(descriptor.pid, 'SIGTERM');
+  } catch (error) {
+    if (!isProcessNotFoundError(error)) throw error;
+    await removeRuntimeDescriptor(options.runtimeFile);
+    return { cleaned: true, reason: 'not-running' };
+  }
   if (await wait(descriptor.pid, 'SIGTERM', terminateTimeoutMs)) {
     await removeRuntimeDescriptor(options.runtimeFile);
     return { cleaned: true, reason: 'terminated' };
   }
 
-  killer(descriptor.pid, 'SIGKILL');
+  try {
+    killer(descriptor.pid, 'SIGKILL');
+  } catch (error) {
+    if (!isProcessNotFoundError(error)) throw error;
+    await removeRuntimeDescriptor(options.runtimeFile);
+    return { cleaned: true, reason: 'not-running' };
+  }
   if (await wait(descriptor.pid, 'SIGKILL', killTimeoutMs)) {
     await removeRuntimeDescriptor(options.runtimeFile);
     return { cleaned: true, reason: 'killed' };

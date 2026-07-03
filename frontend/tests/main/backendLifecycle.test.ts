@@ -101,6 +101,72 @@ test('cleanupStaleBackend escalates when matching backend ignores SIGTERM', asyn
   }
 });
 
+test('cleanupStaleBackend treats a process that vanishes before SIGTERM as not running', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'clip-runtime-'));
+  const runtimeFile = join(dir, 'runtime.json');
+  try {
+    await writeFile(
+      runtimeFile,
+      JSON.stringify({ port: 8123, pid: 4321, active_project_id: null, updated_at: new Date().toISOString() }),
+      'utf-8',
+    );
+
+    const error = new Error('no such process') as NodeJS.ErrnoException;
+    error.code = 'ESRCH';
+
+    const result = await cleanupStaleBackend({
+      runtimeFile,
+      backendExecutable: '/app/backend/ai-clip-backend',
+      inspectProcessCommand: async () => '/app/backend/ai-clip-backend',
+      killPid: () => {
+        throw error;
+      },
+      waitForExit: async () => false,
+    });
+
+    assert.deepEqual(result, { cleaned: true, reason: 'not-running' });
+    assert.equal(await readRuntimeDescriptor(runtimeFile), undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('cleanupStaleBackend treats a process that vanishes before SIGKILL as stopped', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'clip-runtime-'));
+  const runtimeFile = join(dir, 'runtime.json');
+  const killed: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+  try {
+    await writeFile(
+      runtimeFile,
+      JSON.stringify({ port: 8123, pid: 4321, active_project_id: null, updated_at: new Date().toISOString() }),
+      'utf-8',
+    );
+
+    const error = new Error('no such process') as NodeJS.ErrnoException;
+    error.code = 'ESRCH';
+
+    const result = await cleanupStaleBackend({
+      runtimeFile,
+      backendExecutable: '/app/backend/ai-clip-backend',
+      inspectProcessCommand: async () => '/app/backend/ai-clip-backend',
+      killPid: (pid, signal) => {
+        killed.push({ pid, signal });
+        if (signal === 'SIGKILL') throw error;
+      },
+      waitForExit: async () => false,
+    });
+
+    assert.deepEqual(result, { cleaned: true, reason: 'not-running' });
+    assert.deepEqual(killed, [
+      { pid: 4321, signal: 'SIGTERM' },
+      { pid: 4321, signal: 'SIGKILL' },
+    ]);
+    assert.equal(await readRuntimeDescriptor(runtimeFile), undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('cleanupStaleBackend does not terminate a reused pid that is not the backend', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'clip-runtime-'));
   const runtimeFile = join(dir, 'runtime.json');

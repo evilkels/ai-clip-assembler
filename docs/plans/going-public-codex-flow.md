@@ -56,7 +56,8 @@ work while phase 1 trust issues are open.
 
 ### Phase 1 — Trust (do first, cheap, reputational insurance)
 
-- [ ] **Task 1: Privacy consent + honest labeling.** The README/AGENTS.md say
+- [x] **Task 1: Privacy consent + honest labeling.** DONE 2026-07-03 in PR
+  #37 (`72a195b`). The README/AGENTS.md say
   footage never leaves the machine, but the default `pi_agent` harness sends
   sampled frames to a cloud model. Add an explicit first-use consent prompt
   before any cloud-backed harness runs, default new projects to the manual
@@ -67,7 +68,9 @@ work while phase 1 trust issues are open.
 
 ### Phase 2 — Installability (the adoption blockers)
 
-- [ ] **Task 2: FFmpeg out-of-the-box.** Today a fresh install needs a 10–30
+- [ ] **Task 2: FFmpeg out-of-the-box.** Part (a) DONE 2026-07-03 in PR #36
+  (`f7f88eb`): graceful degradation when `vidstabdetect` is missing. Part (b)
+  remains open: bundle a static ffmpeg in the DMG. Today a fresh install needs a 10–30
   min source build of ffmpeg with libvidstab. Two-part fix: (a) graceful
   degradation — detect missing `vidstabdetect` at startup and skip motion
   stability with a visible notice instead of hard-failing
@@ -77,7 +80,8 @@ work while phase 1 trust issues are open.
 - [ ] **Task 3: Sign + notarize the DMG.** Apple developer account, signing
   identity, notarization in the build script. Without this Gatekeeper calls
   the app damaged. Mostly plumbing, not code.
-- [ ] **Task 4: Backend spawn hardening.** Orphaned uvicorn holding port 8000
+- [x] **Task 4: Backend spawn hardening.** DONE 2026-07-03 in PR #38
+  (`b625a82`). Orphaned uvicorn holding port 8000
   breaks the next launch. Add orphan cleanup + port-collision policy to the
   Electron backend spawn. (Recorded follow-up from plan 003.)
 
@@ -86,18 +90,20 @@ work while phase 1 trust issues are open.
 - [ ] **Task 5: README demo media.** Add screenshots + a short GIF of the
   review board and timeline. `docs/BRAND_MEDIA_PROMPTS.md` already has the
   asset direction. A video tool with no visuals is invisible.
-- [ ] **Task 6: Reconcile drifted plan statuses.** `project-sidebar` and
-  `settings-page` shipped but their plans read stale (see
-  `docs/plans/README.md` drift notes). Verify acceptance items, move to
-  `done/`. Ten minutes of Codex work; makes the repo read current to
-  visitors.
+- [x] **Task 6: Reconcile drifted plan statuses.** DONE 2026-07-03 on branch
+  `docs/reconcile-plan-statuses`; `settings-page` reconciled here, while
+  `project-sidebar` is intentionally left for the parallel session. The
+  `settings-page` plan moved to `done/` after checking the shipped slice
+  against its acceptance items.
 
 ### Phase 4 — Architecture debt (parallel track, keeps velocity up)
 
-- [ ] **Task 7: Execute plan 010** — generate frontend types from backend
+- [x] **Task 7: Execute plan 010** — DONE in PR #35 (2026-07-02); the plans
+  README marks plan 010 done. Generate frontend types from backend
   models (kills contract drift). Already fully specified in
   `docs/plans/010-shared-frontend-backend-contract.md`.
-- [ ] **Task 8: Execute plan 011** — decompose `api.py`, slice 1.
+- [x] **Task 8: Execute plan 011** — slice 1 DONE in PR #35 (2026-07-02); the
+  plans README marks plan 011 slice 1 done. Decompose `api.py`, slice 1.
   Characterization tests first, per the plan.
 
 ### Phase 5 — Launch + monetize (after 1–3 are done)

@@ -283,7 +283,6 @@ async def update_cloud_ai_consent(project_id: str, request: CloudAiConsentReques
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     project = projects[project_id]
-    project["cloud_ai_consent"] = request.consented
 
     manifest_payload = project.get("project")
     if project.get("project_folder") and manifest_payload:
@@ -291,11 +290,13 @@ async def update_cloud_ai_consent(project_id: str, request: CloudAiConsentReques
             manifest = create_or_open_folder_project(Path(project["project_folder"]))
             updated = manifest.model_copy(update={"cloud_ai_consent": request.consented})
             write_project_manifest(Path(project["project_folder"]), updated)
-            project["project"] = updated.model_dump()
         except ProjectStoreError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (FileNotFoundError, NotADirectoryError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        project["project"] = updated.model_dump()
+
+    project["cloud_ai_consent"] = request.consented
 
     return {
         "project_id": project_id,
@@ -1060,7 +1061,12 @@ def _review_inputs(project_id: str) -> tuple[list, list, object]:
         if len(candidate_frames) >= 12:
             break
     agent = _review_agent
-    if projects[project_id].get("harness_id") != "pi_agent" and agent is default_review_agent:
+    project = projects[project_id]
+    default_agent_requires_consent = (
+        project.get("harness_id") != "pi_agent"
+        or not project.get("cloud_ai_consent")
+    )
+    if default_agent_requires_consent and agent is default_review_agent:
         def manual_review_agent(_context):
             return {
                 "message": "Manual analysis is ready. Creative versions remain deterministic and local.",

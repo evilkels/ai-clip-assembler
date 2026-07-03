@@ -118,6 +118,32 @@ def test_update_cloud_ai_consent_persists_in_folder_project(tmp_path):
     assert reopened["project"]["cloud_ai_consent"] is True
 
 
+def test_update_cloud_ai_consent_keeps_memory_unchanged_when_persist_fails(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+
+    def fail_write(*_args, **_kwargs):
+        raise api.ProjectStoreError("manifest write failed")
+
+    monkeypatch.setattr(api, "write_project_manifest", fail_write)
+
+    response = client.put(
+        f"/projects/{project_id}/cloud-ai-consent",
+        json={"consented": True},
+    )
+
+    assert response.status_code == 400
+    assert api.projects[project_id]["cloud_ai_consent"] is False
+    assert api.projects[project_id]["project"]["cloud_ai_consent"] is False
+
+
 def test_analyze_refuses_pi_agent_without_cloud_ai_consent(monkeypatch, tmp_path):
     api.projects.clear()
     client, project_id, _source_video = create_folder_project_with_video(tmp_path)
@@ -2153,6 +2179,25 @@ def test_review_turn_proposes_then_accept_applies(monkeypatch, tmp_path):
     accepted = client.post(f"/projects/{project_id}/proposals/{proposal_id}/accept")
     assert accepted.status_code == 200
     assert [i["source_clip_id"] for i in accepted.json()["document"]["items"]] == ["clip-1"]
+
+
+def test_review_turn_uses_local_manual_agent_when_pi_project_lacks_cloud_consent(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["harness_id"] = "pi_agent"
+    api.projects[project_id]["cloud_ai_consent"] = False
+
+    def cloud_agent_must_not_run(_context):
+        raise AssertionError("default review agent must not run without cloud AI consent")
+
+    monkeypatch.setattr(api, "default_review_agent", cloud_agent_must_not_run)
+    monkeypatch.setattr(api, "_review_agent", cloud_agent_must_not_run)
+
+    turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
+
+    assert turn.status_code == 200
+    assert turn.json()["message"] == "Manual analysis is ready. Creative versions remain deterministic and local."
+    assert turn.json()["proposal"] is None
 
 
 def test_proposal_accept_is_atomic_and_rejects_stale_baseline(monkeypatch, tmp_path):

@@ -8,22 +8,34 @@ on:
 
 jobs:
   build-dmg:
-    name: Build DMG on macOS
-    runs-on: macos-latest
+    name: Build DMG on macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macos-15 runs on Apple Silicon; macos-15-intel is GitHub's
+          # x64 runner (macos-13 was retired in December 2025). Pinned to
+          # macOS 15 on both arches instead of macos-latest, which is
+          # migrating to macOS 26 as of June 2026.
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -34,6 +46,14 @@ jobs:
       - name: Build packaged backend
         working-directory: frontend
         run: npm run build:backend
+
+      # npm run build runs check:types-fresh, which regenerates TypeScript
+      # types from the backend Pydantic models via backend/.venv.
+      - name: Set up backend venv for type generation
+        working-directory: backend
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r requirements.txt
 
       - name: Build frontend bundle
         working-directory: frontend
@@ -49,9 +69,9 @@ jobs:
         run: npx electron-builder --mac dmg --publish never
 
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: ai-clip-assembler-dmg
+          name: ai-clip-assembler-dmg-${{ matrix.arch }}
           path: frontend/dist/*.dmg
           if-no-files-found: error
           retention-days: 14
@@ -64,14 +84,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download DMG artifact
-        uses: actions/download-artifact@v4
+      - name: Download DMG artifacts
+        uses: actions/download-artifact@v8
         with:
-          name: ai-clip-assembler-dmg
+          pattern: ai-clip-assembler-dmg-*
+          merge-multiple: true
           path: dist
 
       - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*.dmg
           generate_release_notes: true

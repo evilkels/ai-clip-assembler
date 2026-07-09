@@ -35,6 +35,9 @@ Two kinds of plans live side by side:
 | [010](010-shared-frontend-backend-contract.md) | Generate frontend domain types from backend models (kill contract drift) | P1 | M | — | DONE (2026-07-02) — generated `generated.ts` from backend Pydantic models; frontend clip/version/profile types now derive from it; freshness check wired into typecheck. |
 | [011](011-decompose-api-god-module.md) | Decompose `api.py` god-module — extract analysis pipeline into a service (slice 1) | P1 | L | — | DONE slice 1 of 4 (2026-07-02) — analysis pipeline extracted to `analysis_service.py`; remaining slices: timeline lifecycle service, review/proposal service, projects repository/write-policy. |
 | [012](012-adjustable-clip-generation.md) | Transparent, adjustable clip generation (persist frame scores → live re-derive) | P1 | M | — | DONE (2026-06-28) — frame-score sidecar, live rule-based re-derive, generation stats, GUI knobs, counts, and per-clip why shipped. |
+| [013](013-reliable-browser-e2e-signals.md) | Make browser E2E signals deterministic and meaningful | P1 | S | — | TODO |
+| [014](014-extract-timeline-lifecycle-service.md) | Extract Timeline lifecycle coordination from the API module | P1 | M | 011 slice 1 | TODO |
+| [015](015-record-core-architecture-decisions.md) | Record the core architecture decisions as ADRs | P2 | S | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

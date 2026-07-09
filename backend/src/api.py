@@ -70,7 +70,6 @@ from .project_store import (
 )
 from .mcp_server import TimelineMCPServer
 from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
-from .review_state import review_context_fingerprint, sequence_fingerprint
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
@@ -78,7 +77,7 @@ from .timeline_ops import (
     TimelineOpError,
     TimelineRevisionConflict,
 )
-from .timeline_service import TimelineEventBroker
+from .timeline_service import TimelineLifecycle
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes  # noqa: F401 - public test seam
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
@@ -121,13 +120,6 @@ PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 _active_project_id: Optional[str] = None
 _motion_analysis_capability = FFmpegVidstabCapability(available=True)
-
-# Backend-authoritative Timeline Document layer. One TimelineController per
-# project owns the document + undo history + write lock; the broker fans out
-# `timeline-changed` events to connected clients (GUI over SSE) so the GUI is a
-# thin live-syncing client of the document rather than the source of truth.
-_timeline_controllers: dict[str, TimelineController] = {}
-_timeline_broker = TimelineEventBroker()
 
 # In-app review agent (propose mode). The model call is injected so it is
 # testable/overridable; proposals are staged here and replayed through the
@@ -843,61 +835,39 @@ def _initial_timeline_document(project: dict, sources: dict[str, SourceClip]) ->
     return TimelineDocument()
 
 
-def _make_timeline_on_change(project_id: str):
-    publish = _timeline_broker.publisher(project_id)
+def _write_timeline_for_project(project: dict, document: TimelineDocument) -> None:
+    project["timeline_document"] = document.model_dump()
+    folder = project.get("project_folder")
+    if folder:
+        try:
+            write_timeline_document(Path(folder), document)
+        except OSError as exc:
+            project_id = project.get("project_id", "unknown")
+            logger.warning("Could not persist timeline document for %s: %s", project_id, exc)
 
-    async def on_change(document: TimelineDocument) -> None:
-        project = projects.get(project_id)
-        if project is not None:
-            project["timeline_document"] = document.model_dump()
-            folder = project.get("project_folder")
-            if folder:
-                try:
-                    write_timeline_document(Path(folder), document)
-                except OSError as exc:
-                    logger.warning("Could not persist timeline document for %s: %s", project_id, exc)
-        await publish(document)
 
-    return on_change
+_timeline_lifecycle = TimelineLifecycle(
+    project_lookup=projects.get,
+    source_builder=build_timeline_sources,
+    document_loader=_initial_timeline_document,
+    document_writer=_write_timeline_for_project,
+    candidate_lister=lambda project_id: get_mcp_server()._list_candidates(project_id),
+)
 
 
 def invalidate_timeline_controller(project_id: str) -> None:
-    """Drop the cached controller so the next access rebuilds the document from
-    a freshly written legacy timeline (analyze/draft/PUT). Keeps the
-    backend-authoritative document in sync with those paths until the GUI drives
-    everything through the operations core."""
-    _timeline_controllers.pop(project_id, None)
-    project = projects.get(project_id)
-    if project is not None:
-        project.pop("timeline_document", None)
+    """Drop the cached controller before rebuilding from the legacy document."""
+    _timeline_lifecycle.invalidate(project_id)
 
 
 def get_timeline_controller(project_id: str) -> TimelineController:
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    project = projects[project_id]
-    sources = build_timeline_sources(project)
-    controller = _timeline_controllers.get(project_id)
-    if controller is None:
-        controller = TimelineController(
-            _initial_timeline_document(project, sources),
-            sources,
-            on_change=_make_timeline_on_change(project_id),
-        )
-        _timeline_controllers[project_id] = controller
-    else:
-        controller.update_sources(sources)
-    return controller
+    return _timeline_lifecycle.get_controller(project_id)
 
 
 def _timeline_snapshot(project_id: str, document: TimelineDocument) -> dict:
-    candidates = get_mcp_server()._list_candidates(project_id)
-    return {
-        "project_id": project_id,
-        "document": document.model_dump(),
-        "sequence_fingerprint": sequence_fingerprint(document.items),
-        "review_context_fingerprint": review_context_fingerprint(document, candidates),
-    }
+    return _timeline_lifecycle.snapshot(project_id, document)
 
 
 def _revision_conflict_detail(
@@ -955,7 +925,7 @@ async def redo_timeline_op(project_id: str):
 async def timeline_events(project_id: str):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
-    queue = _timeline_broker.subscribe(project_id)
+    queue = _timeline_lifecycle.subscribe(project_id)
 
     async def event_stream():
         try:
@@ -964,7 +934,7 @@ async def timeline_events(project_id: str):
                 payload = await queue.get()
                 yield f"event: {payload.get('type', 'message')}\ndata: {json.dumps(payload)}\n\n"
         finally:
-            _timeline_broker.unsubscribe(project_id, queue)
+            _timeline_lifecycle.unsubscribe(project_id, queue)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

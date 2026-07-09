@@ -9,7 +9,7 @@ import pytest
 
 from src.models import TimelineDocument
 from src.timeline_ops import SourceClip, TimelineController
-from src.timeline_service import TimelineEventBroker
+from src.timeline_service import TimelineEventBroker, TimelineLifecycle
 
 
 def _sources():
@@ -59,3 +59,49 @@ async def test_operation_through_controller_emits_timeline_changed():
 
     event = queue.get_nowait()
     assert event["type"] == "timeline-changed"
+
+
+def _lifecycle(projects, writes=None):
+    return TimelineLifecycle(
+        project_lookup=projects.get,
+        source_builder=lambda _project: _sources(),
+        document_loader=lambda project, _sources: project["document"],
+        document_writer=(
+            (lambda _project, document: writes.append(document.model_dump()))
+            if writes is not None
+            else lambda _project, _document: None
+        ),
+        candidate_lister=lambda _project_id: [],
+    )
+
+
+@pytest.mark.asyncio
+async def test_service_controller_persists_before_publishing_change():
+    projects = {"p1": {"document": TimelineDocument()}}
+    writes = []
+    lifecycle = _lifecycle(projects, writes)
+    queue = lifecycle.subscribe("p1")
+
+    await lifecycle.get_controller("p1").apply("add_item", source_clip_id="clip-a")
+
+    assert writes[0]["items"][0]["source_clip_id"] == "clip-a"
+    event = queue.get_nowait()
+    assert event["type"] == "timeline-changed"
+    assert event["version"] == TimelineDocument().version
+
+
+def test_invalidate_rebuilds_only_the_requested_project_controller():
+    projects = {
+        "p1": {"document": TimelineDocument()},
+        "p2": {"document": TimelineDocument()},
+    }
+    lifecycle = _lifecycle(projects)
+    p1_controller = lifecycle.get_controller("p1")
+    p2_controller = lifecycle.get_controller("p2")
+    projects["p1"]["document"] = TimelineDocument(profile="reloaded")
+
+    lifecycle.invalidate("p1")
+
+    assert lifecycle.get_controller("p2") is p2_controller
+    assert lifecycle.get_controller("p1") is not p1_controller
+    assert lifecycle.get_controller("p1").document.profile == "reloaded"

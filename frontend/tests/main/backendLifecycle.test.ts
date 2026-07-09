@@ -5,9 +5,58 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cleanupStaleBackend,
+  preflightRuntimeTools,
   readRuntimeDescriptor,
   runtimeDescriptorMatchesBackend,
 } from '../../src/main/backendLifecycle.js';
+
+test('preflightRuntimeTools accepts executable bundled tools with vidstabdetect', async () => {
+  const status = await preflightRuntimeTools({
+    ffmpegPath: '/app/tools/ffmpeg',
+    ffprobePath: '/app/tools/ffprobe',
+    access: async () => undefined,
+    execFile: async () => ({ stdout: ' ... vidstabdetect ... ', stderr: '' }),
+  });
+
+  assert.deepEqual(status, {
+    ready: true,
+    ffmpegPath: '/app/tools/ffmpeg',
+    ffprobePath: '/app/tools/ffprobe',
+    toolDirectory: '/app/tools',
+  });
+});
+
+test('preflightRuntimeTools reports a missing ffmpeg executable', async () => {
+  const status = await preflightRuntimeTools({
+    ffmpegPath: '/app/tools/ffmpeg',
+    ffprobePath: '/app/tools/ffprobe',
+    access: async (path: string) => {
+      if (path.endsWith('ffmpeg')) throw new Error('missing');
+    },
+    execFile: async () => ({ stdout: '', stderr: '' }),
+  });
+
+  assert.deepEqual(status, {
+    ready: false,
+    reason: 'missing-ffmpeg',
+    detail: 'Bundled ffmpeg was not found or is not executable.',
+  });
+});
+
+test('preflightRuntimeTools reports a bundled ffmpeg without vidstabdetect', async () => {
+  const status = await preflightRuntimeTools({
+    ffmpegPath: '/app/tools/ffmpeg',
+    ffprobePath: '/app/tools/ffprobe',
+    access: async () => undefined,
+    execFile: async () => ({ stdout: 'Filters:\n', stderr: '' }),
+  });
+
+  assert.deepEqual(status, {
+    ready: false,
+    reason: 'missing-vidstabdetect',
+    detail: 'Bundled ffmpeg does not include the required vidstabdetect filter.',
+  });
+});
 
 test('readRuntimeDescriptor returns undefined for missing or invalid files', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'clip-runtime-'));

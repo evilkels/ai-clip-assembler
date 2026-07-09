@@ -46,6 +46,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 | Plan | Status |
 |------|--------|
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE (2026-07-02) — operating manual + ordered roadmap (trust → installability → presentability → arch debt → launch) for the public/monetized release, driven with Codex CLI. |
+| [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS (2026-07-10) — CI stages and preflights private FFmpeg/ffprobe plus their runtime-library closure; packaged startup now prefers the bundle. Remaining: diagnostics UI, GPL/source-compliance material, Intel CI evidence, signing/notarization, clean-machine DMG validation. |
+| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE (2026-07-10) — cover-aligned editorial landing refresh plus ordered public-launch backlog: direct DMG, proof demo, tester capture, installability, and an audience-specific launch loop. |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | The acceptance bar (Flows A–E). Partially automated; real-footage, performance, DaVinci, and signal QA remain — plan 001 operationalizes them. |
 | [project-folder-model](project-folder-model.md) | Implementation and automated QA complete; pending real-footage/manual app QA (plan 001's validation session). |
 | [project-sidebar](project-sidebar.md) | Partially implemented; auto-reopen persistence shipped (2026-07-09). Remaining deferred pending visual QA: `Cmd-B` collapse/resizable rail, context menus, and keyboard-navigation verification. |

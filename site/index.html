@@ -11,14 +11,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --navy: #0e1b2c;
-    --navy-soft: #16283f;
-    --paper: #fafaf8;
-    --ink: #1c2733;
-    --signal: #e5484d;
-    --slate: #64748b;
-    --tick: #d8dee6;
-    --tick-dark: #2b3c53;
+    --navy: #182330;
+    --navy-soft: #273544;
+    --paper: #f0f2f4;
+    --paper-bright: #fafbfc;
+    --ink: #17202c;
+    --signal: #ef5358;
+    --signal-dark: #d93f46;
+    --slate: #617080;
+    --tick: #d2d8de;
+    --tick-dark: #9da8b3;
     --mono: 'IBM Plex Mono', ui-monospace, monospace;
     --sans: 'Archivo', system-ui, sans-serif;
   }
@@ -43,29 +45,60 @@
 
   /* ---------- Hero ---------- */
   .hero {
-    background: var(--navy);
-    color: #eef3f9;
-    padding: 72px 24px 0;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 79% 27%, rgba(239, 83, 88, 0.16) 0 7px, transparent 8px),
+      radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.12) 0 6px, transparent 7px),
+      linear-gradient(135deg, #fafbfc 0%, #edf0f3 62%, #e4e8ec 100%);
+    color: var(--ink);
+    padding: 38px 24px 0;
+    border-bottom: 1px solid var(--tick);
   }
   .hero-inner {
-    max-width: 1080px;
+    position: relative;
+    z-index: 1;
+    max-width: 1240px;
     margin: 0 auto;
   }
+  .hero-network {
+    position: absolute;
+    z-index: 0;
+    width: min(740px, 62vw);
+    right: max(24px, calc((100vw - 1240px) / 2));
+    top: 10px;
+    height: 480px;
+    color: #526170;
+    opacity: 0.64;
+    pointer-events: none;
+  }
+  .hero-network line { stroke: currentColor; stroke-width: 1.1; }
+  .hero-network circle { fill: #536170; stroke: #edf0f3; stroke-width: 5; }
+  .hero-network circle.signal { fill: var(--signal); stroke: #ffd9da; }
   .hero-brand {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 64px;
+    margin-bottom: 40px;
   }
-  .hero-brand img { width: 36px; height: 36px; }
-  .hero-brand .tc { color: #9fb2c8; }
+  .hero-brand img { width: 38px; height: 38px; filter: drop-shadow(0 5px 7px rgba(23, 32, 44, 0.16)); }
+  .hero-brand .tc { color: var(--navy-soft); }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(220px, 3fr);
+    gap: 56px;
+    align-items: end;
+    padding-bottom: 68px;
+  }
+  .hero-copy { position: relative; z-index: 1; }
   .hero h1 {
     font-weight: 800;
     font-stretch: 87%;
     font-size: clamp(2.4rem, 6vw, 4.4rem);
     line-height: 1.02;
     letter-spacing: -0.02em;
-    max-width: 14ch;
+    max-width: 12ch;
   }
   .hero h1 em {
     font-style: normal;
@@ -75,18 +108,18 @@
     margin-top: 28px;
     max-width: 54ch;
     font-size: 1.1rem;
-    color: #b9c7d8;
+    color: var(--slate);
   }
   .hero-cta {
     display: flex;
     flex-wrap: wrap;
     gap: 14px;
-    margin: 36px 0 72px;
+    margin: 34px 0 18px;
   }
   .btn {
     display: inline-block;
     padding: 14px 26px;
-    border-radius: 8px;
+    border-radius: 5px;
     text-decoration: none;
     font-weight: 600;
     font-size: 1rem;
@@ -95,32 +128,42 @@
     outline: 3px solid var(--signal);
     outline-offset: 3px;
   }
-  .btn-primary { background: var(--signal); color: #fff; }
-  .btn-primary:hover { background: #d13438; }
-  .btn-ghost { border: 1px solid #3d5271; color: #dfe8f2; }
-  .btn-ghost:hover { border-color: #7f97b3; }
+  .btn-primary { background: var(--signal); color: #fff; box-shadow: 0 8px 18px -12px rgba(217, 63, 70, 0.85); }
+  .btn-primary:hover { background: var(--signal-dark); }
+  .btn-ghost { border: 1px solid #aab5bf; color: var(--navy); background: rgba(255, 255, 255, 0.45); }
+  .btn-ghost:hover { border-color: #687787; background: #fff; }
   .hero-note {
     font-family: var(--mono);
     font-size: 12.5px;
-    color: #7e93ac;
-    margin: -56px 0 72px;
+    color: var(--slate);
+    margin: 0;
   }
+  .hero-mark {
+    justify-self: end;
+    width: min(100%, 284px);
+    padding: 22px 0 18px 24px;
+    border-left: 1px solid rgba(83, 97, 112, 0.4);
+  }
+  .hero-mark img { width: 94px; margin-bottom: 18px; filter: drop-shadow(0 12px 13px rgba(23, 32, 44, 0.18)); }
+  .hero-mark p { color: var(--navy-soft); max-width: 18ch; font-weight: 600; font-size: 0.98rem; line-height: 1.35; }
+  .hero-mark .tc { color: var(--signal-dark); display: block; margin-bottom: 8px; }
 
   /* ---------- Ruler / playhead signature ---------- */
   .ruler {
     position: relative;
     height: 58px;
     overflow: hidden;
+    background-color: var(--paper-bright);
     background:
       repeating-linear-gradient(90deg,
-        var(--tick-dark) 0 1px, transparent 1px 12.5%);
-    border-top: 1px solid var(--tick-dark);
+        var(--tick) 0 1px, transparent 1px 12.5%);
+    border-top: 1px solid var(--tick);
   }
   .ruler .marks {
     display: flex;
     justify-content: space-between;
     padding: 8px 12px 0;
-    color: #6d84a0;
+    color: #82909c;
     font-family: var(--mono);
     font-size: 11.5px;
   }
@@ -152,13 +195,13 @@
 
   /* ---------- Workflow sections ---------- */
   .steps {
-    max-width: 1080px;
+    max-width: 1240px;
     margin: 0 auto;
     padding: 40px 24px 20px;
   }
   .steps-intro {
     max-width: 60ch;
-    margin: 48px auto 12px;
+    margin: 76px auto 16px;
     text-align: center;
   }
   .steps-intro h2 {
@@ -170,10 +213,10 @@
   .steps-intro p { color: var(--slate); margin-top: 12px; }
   .step {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 48px;
+    grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
+    gap: 72px;
     align-items: center;
-    padding: 72px 0;
+    padding: 88px 0;
     border-bottom: 1px solid var(--tick);
   }
   .step:last-child { border-bottom: none; }
@@ -197,11 +240,13 @@
     padding: 1px 5px;
   }
   .shot {
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid var(--tick);
-    box-shadow: 0 24px 48px -24px rgba(14, 27, 44, 0.35);
+    background: #fff;
+    box-shadow: 0 32px 70px -32px rgba(23, 32, 44, 0.35);
     overflow: hidden;
   }
+  .shot img { width: 100%; }
 
   /* ---------- Privacy band ---------- */
   .privacy {
@@ -210,7 +255,7 @@
     padding: 88px 24px;
   }
   .privacy-inner {
-    max-width: 1080px;
+    max-width: 1240px;
     margin: 0 auto;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -245,33 +290,95 @@
   footer .tc { color: var(--slate); }
   footer a { color: var(--ink); }
 
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #111a24;
+      --paper-bright: #17222f;
+      --ink: #f1f4f7;
+      --navy: #101a25;
+      --navy-soft: #c7d2dd;
+      --slate: #aebdcb;
+      --tick: #2b3a4a;
+      --tick-dark: #8291a0;
+    }
+    .hero {
+      background:
+        radial-gradient(circle at 79% 27%, rgba(239, 83, 88, 0.24) 0 7px, transparent 8px),
+        radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.18) 0 6px, transparent 7px),
+        linear-gradient(135deg, #172230 0%, #101923 62%, #0d151e 100%);
+    }
+    .hero-network { color: #8d9dab; opacity: 0.48; }
+    .hero-network circle { fill: #a0afbc; stroke: #15202c; }
+    .hero-network circle.signal { stroke: #43252a; }
+    .btn-ghost { color: var(--ink); border-color: #4b5e70; background: rgba(255, 255, 255, 0.04); }
+    .btn-ghost:hover { border-color: #93a5b6; background: rgba(255, 255, 255, 0.09); }
+    .hero-mark { border-color: rgba(174, 189, 203, 0.32); }
+    .hero-mark .tc { color: #ff8185; }
+    .shot { border-color: #415367; box-shadow: 0 32px 70px -32px rgba(0, 0, 0, 0.75); }
+    .step-copy .kbd { background: #22303e; border-color: #3c4d60; }
+    footer a { color: var(--ink); }
+  }
+
   @media (max-width: 800px) {
-    .step { grid-template-columns: 1fr; gap: 24px; padding: 56px 0; }
+    .hero { padding-top: 28px; }
+    .hero-network { width: 520px; right: -255px; top: 72px; opacity: 0.35; }
+    .hero-brand { margin-bottom: 36px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 28px; padding-bottom: 42px; }
+    .hero-mark { justify-self: start; width: auto; padding: 14px 0 0; border-left: 0; border-top: 1px solid rgba(83, 97, 112, 0.35); display: flex; align-items: center; gap: 14px; }
+    .hero-mark img { width: 54px; margin: 0; }
+    .hero-mark p { max-width: 24ch; }
+    .hero-mark .tc { margin-bottom: 3px; }
+    .step { grid-template-columns: 1fr; gap: 28px; padding: 64px 0; }
     .step:nth-child(even) .step-copy { order: 0; }
     .privacy-inner { grid-template-columns: 1fr; gap: 32px; }
-    .hero-note { margin-top: -60px; }
+    .steps-intro { margin-top: 58px; }
   }
 </style>
 </head>
 <body>
 
 <header class="hero">
+  <svg class="hero-network" viewBox="0 0 760 480" fill="none" aria-hidden="true">
+    <line x1="116" y1="116" x2="244" y2="76" /><line x1="116" y1="116" x2="194" y2="225" />
+    <line x1="244" y1="76" x2="342" y2="148" /><line x1="244" y1="76" x2="384" y2="42" />
+    <line x1="342" y1="148" x2="455" y2="96" /><line x1="342" y1="148" x2="418" y2="268" />
+    <line x1="455" y1="96" x2="592" y2="156" /><line x1="455" y1="96" x2="540" y2="34" />
+    <line x1="592" y1="156" x2="670" y2="86" /><line x1="592" y1="156" x2="618" y2="278" />
+    <line x1="194" y1="225" x2="306" y2="326" /><line x1="306" y1="326" x2="418" y2="268" />
+    <line x1="418" y1="268" x2="536" y2="370" /><line x1="536" y1="370" x2="618" y2="278" />
+    <circle cx="116" cy="116" r="10" /><circle class="signal" cx="244" cy="76" r="11" />
+    <circle cx="194" cy="225" r="10" /><circle cx="342" cy="148" r="10" /><circle cx="384" cy="42" r="10" />
+    <circle class="signal" cx="455" cy="96" r="11" /><circle cx="418" cy="268" r="10" /><circle cx="592" cy="156" r="10" />
+    <circle cx="670" cy="86" r="10" /><circle cx="306" cy="326" r="10" /><circle class="signal" cx="536" cy="370" r="11" />
+    <circle cx="618" cy="278" r="10" /><circle cx="540" cy="34" r="10" />
+  </svg>
   <div class="hero-inner">
     <div class="hero-brand">
       <img src="img/icon.png" alt="" width="36" height="36" />
       <span class="tc">AI Clip Assembler · macOS</span>
     </div>
-    <h1>Hours of drone footage. <em>One tight cut.</em></h1>
-    <p class="hero-sub">
-      AI Clip Assembler scores every moment of your footage — smoothness, sharpness,
-      exposure — right on your Mac, suggests the clips worth keeping, and hands you an
-      editable timeline for DaVinci Resolve or Final Cut Pro.
-    </p>
-    <div class="hero-cta">
-      <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
-      <a class="btn btn-ghost" href="https://github.com/evilkels/ai-clip-assembler">View on GitHub</a>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <h1>Hours of drone footage. <em>One tight cut.</em></h1>
+        <p class="hero-sub">
+          AI Clip Assembler analyses footage for smoothness, sharpness, and exposure
+          on your Mac, then hands you an editable timeline for DaVinci Resolve or
+          Final Cut Pro.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
+          <a class="btn btn-ghost" href="https://github.com/evilkels/ai-clip-assembler">View on GitHub</a>
+        </div>
+        <p class="hero-note">Apple Silicon &amp; Intel · free &amp; open source · footage never leaves your machine</p>
+      </div>
+      <aside class="hero-mark">
+        <img src="img/icon.png" alt="" width="94" height="94" />
+        <div>
+          <span class="tc">Local-first editor</span>
+          <p>Find the worthwhile moments. Keep the final call.</p>
+        </div>
+      </aside>
     </div>
-    <p class="hero-note">Apple Silicon &amp; Intel · free &amp; open source · footage never leaves your machine</p>
   </div>
   <div class="ruler" aria-hidden="true">
     <div class="marks">
@@ -305,11 +412,12 @@
     <section class="step">
       <div class="step-copy">
         <span class="tc"><span class="in">IN</span> 00:42 · Review</span>
-        <h3>Pick from ranked suggestions</h3>
+        <h3>Review clips. Build a montage.</h3>
         <p>
-          Candidates arrive scored and explained — or ask for a full suggested cut:
-          a punchy social edit, a cinematic highlight, a long scenic montage.
-          Include what you like, exclude the rest. You stay the editor.
+          Every candidate arrives with scores and a reason. Include the keepers,
+          exclude the rest, then ask the optional AI agent for editable versions:
+          a punchy social cut, cinematic highlight, or long scenic montage.
+          Compare the options, apply one to the Timeline, and keep the final call.
         </p>
       </div>
       <div class="shot"><img src="img/review.png" alt="Review screen with three suggested cuts ready to apply" loading="lazy" /></div>

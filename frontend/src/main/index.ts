@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import {
   cleanupStaleBackend,
   findFreePort,
+  preflightRuntimeTools,
   waitForBackend,
   waitForRuntimeDescriptorPort,
 } from './backendLifecycle';
@@ -220,7 +221,14 @@ async function startPackagedBackend(): Promise<void> {
   }
 
   const piBin = await resolvePiBinFromLoginShell();
-  const extraPath = buildPackagedBackendPath(piBin);
+  const runtimeTools = await preflightRuntimeTools({
+    ffmpegPath: join(process.resourcesPath, 'tools', 'ffmpeg'),
+    ffprobePath: join(process.resourcesPath, 'tools', 'ffprobe'),
+  });
+  if (!runtimeTools.ready) {
+    throw new Error(`Bundled video tools need repair. Reinstall AI Clip Assembler. (${runtimeTools.detail})`);
+  }
+  const extraPath = [runtimeTools.toolDirectory, buildPackagedBackendPath(piBin)].join(':');
 
   const cleanup = await cleanupStaleBackend({ runtimeFile, backendExecutable });
   if (cleanup.reason === 'still-running') {

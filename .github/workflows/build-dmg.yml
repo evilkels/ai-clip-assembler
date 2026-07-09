@@ -43,6 +43,18 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Install vetted FFmpeg runtime tools
+        run: |
+          brew tap homebrew-ffmpeg/ffmpeg
+          brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
+          ffmpeg -hide_banner -filters | grep vidstabdetect
+
+      - name: Stage self-contained FFmpeg runtime tools
+        working-directory: frontend
+        env:
+          CLIP_ASSEMBLER_FFMPEG_BIN: ${{ matrix.arch == 'arm64' && '/opt/homebrew/bin/ffmpeg' || '/usr/local/bin/ffmpeg' }}
+        run: npm run stage:runtime-tools
+
       - name: Build packaged backend
         working-directory: frontend
         run: npm run build:backend
@@ -57,6 +69,8 @@ jobs:
 
       - name: Build frontend bundle
         working-directory: frontend
+        env:
+          CLIP_ASSEMBLER_FFMPEG_BIN: ${{ matrix.arch == 'arm64' && '/opt/homebrew/bin/ffmpeg' || '/usr/local/bin/ffmpeg' }}
         run: npm run build
 
       - name: Package DMG with electron-builder

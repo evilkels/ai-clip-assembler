@@ -45,8 +45,14 @@ async function setupTimeline(page: Page, files: string[]) {
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles(files[0]);
   await expect(page.getByText(/Legacy upload project created/)).toBeVisible();
-  await fileInput.setInputFiles(files);
-  await expect(page.getByText(new RegExp(`${files.length} source videos? ready`))).toBeVisible();
+  for (const [index, file] of files.entries()) {
+    await fileInput.setInputFiles(file);
+    await expect(
+      page.getByText(
+        new RegExp(`${index + 1} source videos? ready`),
+      ),
+    ).toBeVisible();
+  }
 
   await page.getByLabel('Harness').selectOption('manual');
   await page.getByRole('button', { name: /Analyze/ }).click();
@@ -60,7 +66,9 @@ async function setupTimeline(page: Page, files: string[]) {
   // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
   const includeButton = page.getByRole('button', { name: 'Include', exact: true });
   for (let i = 0; i < 6 && (await includeButton.count()) > 0; i++) {
+    const before = await includeButton.count();
     await includeButton.first().click();
+    await expect.poll(() => includeButton.count()).toBeLessThan(before);
   }
 
   await page.goto('/#/timeline');
@@ -157,36 +165,49 @@ test('forward play is video-driven: monotonic advance, stable src, zero seeking 
   expect(seekCount, 'video must not be hard-seeked during steady forward play').toBe(0);
 });
 
+/** Find the index of the first Timeline Item whose visible file name differs
+ * from the first item's — i.e. the actual Source Video boundary — rather
+ * than assuming the boundary sits between item 0 and item 1. */
+async function findFileBoundary(page: Page): Promise<{ boundaryIndex: number; firstName: string; secondName: string }> {
+  const names = await page.locator('.tl-clip-name').allTextContents();
+  const firstName = names[0];
+  const boundaryIndex = names.findIndex((name) => name !== firstName);
+  expect(boundaryIndex, 'timeline must contain a Source Video transition').toBeGreaterThan(0);
+  return { boundaryIndex, firstName, secondName: names[boundaryIndex] };
+}
+
 test('playback crosses the clip boundary and continues into the next file', async ({ page }) => {
   const video = await setupTimeline(page, [fixtureA(), fixtureB()]);
 
-  const clip1Name = await page.getByTestId('timeline-preview-current-clip').textContent();
-  expect(clip1Name).toBeTruthy();
+  const { boundaryIndex, firstName, secondName } = await findFileBoundary(page);
 
-  // Scrub via the ruler to just before the end of clip 1.
-  const clip1Box = await page.locator('.tl-clip').first().boundingBox();
+  // Scrub via the ruler to just before the end of the Timeline Item
+  // immediately preceding the first file boundary.
+  const lastClipOfFirstFile = page.locator('.tl-clip').nth(boundaryIndex - 1);
+  const clipBox = await lastClipOfFirstFile.boundingBox();
   const rulerBox = await page.locator('.timeline-ruler').boundingBox();
-  expect(clip1Box).toBeTruthy();
+  expect(clipBox).toBeTruthy();
   expect(rulerBox).toBeTruthy();
   await page.mouse.click(
-    clip1Box!.x + clip1Box!.width - 15,
+    clipBox!.x + clipBox!.width - 15,
     rulerBox!.y + rulerBox!.height / 2,
   );
 
   await page.getByTestId('transport-play').click();
 
-  // Within a few seconds the engine must advance to clip 2 (different file
-  // name) and keep playing after the src swap.
+  // Within a few seconds the engine must advance past the boundary into the
+  // second Source Video's Timeline Item and keep playing after the src swap.
   await expect
     .poll(
       async () => {
         const name = await page.getByTestId('timeline-preview-current-clip').textContent();
         const paused = await video.evaluate((el) => (el as HTMLVideoElement).paused);
-        return name !== clip1Name && !paused;
+        return name === secondName && !paused;
       },
       { timeout: 10_000 },
     )
     .toBe(true);
+  expect(secondName).not.toBe(firstName);
 
   await page.getByTestId('transport-stop').click();
 });

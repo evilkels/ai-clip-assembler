@@ -6,7 +6,7 @@
 
 ## Status
 
-- **Status:** TODO
+- **Status:** IN PROGRESS (2026-07-09) — both spec rewrites landed (`844c029`: per-file upload waits, polled Include loop, real file-boundary detection, card-anchored A/C assertion); the full Playwright run against the built app has not been re-executed yet, so the plan stays open until that verification is green.
 - **Priority:** P1
 - **Effort:** S
 - **Risk:** LOW

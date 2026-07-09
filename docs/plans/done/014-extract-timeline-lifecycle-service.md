@@ -6,7 +6,7 @@
 
 ## Status
 
-- **Status:** TODO
+- **Status:** DONE (2026-07-09) — lifecycle coordination extracted to `timeline_service.py` (`1c88a22`, executed by Codex in a delegated worktree). Executor verification: focused tests 94 passed, service tests 6 passed, ruff clean, full suite 355 passed (4 skipped for missing OpenCV). Checkboxes below were not ticked by the executor; the report and diff are the record.
 - **Priority:** P1
 - **Effort:** M
 - **Risk:** MED

@@ -6,7 +6,7 @@
 
 ## Status
 
-- **Status:** TODO
+- **Status:** DONE (2026-07-09) — four ADRs + index shipped (`93b0d37`, executed by Claude Sonnet in a delegated worktree). All plan verifications ran green: four index links, no placeholders, every reference resolves, each ADR 219-231 words. Checkboxes below were not ticked by the executor; the commit is the record.
 - **Priority:** P2
 - **Effort:** S
 - **Risk:** LOW

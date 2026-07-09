@@ -45,6 +45,14 @@ jobs:
         working-directory: frontend
         run: npm run build:backend
 
+      # npm run build runs check:types-fresh, which regenerates TypeScript
+      # types from the backend Pydantic models via backend/.venv.
+      - name: Set up backend venv for type generation
+        working-directory: backend
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+
       - name: Build frontend bundle
         working-directory: frontend
         run: npm run build

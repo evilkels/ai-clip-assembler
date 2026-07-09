@@ -95,7 +95,8 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.video",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   }
 }

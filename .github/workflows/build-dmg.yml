@@ -8,8 +8,18 @@ on:
 
 jobs:
   build-dmg:
-    name: Build DMG on macOS
-    runs-on: macos-latest
+    name: Build DMG on macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macos-latest runs on Apple Silicon; macos-15-intel is GitHub's
+          # x64 runner (macos-13 was retired in December 2025).
+          - arch: arm64
+            runner: macos-latest
+          - arch: x64
+            runner: macos-15-intel
 
     steps:
       - name: Checkout repository
@@ -51,7 +61,7 @@ jobs:
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ai-clip-assembler-dmg
+          name: ai-clip-assembler-dmg-${{ matrix.arch }}
           path: frontend/dist/*.dmg
           if-no-files-found: error
           retention-days: 14
@@ -64,10 +74,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download DMG artifact
+      - name: Download DMG artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ai-clip-assembler-dmg
+          pattern: ai-clip-assembler-dmg-*
+          merge-multiple: true
           path: dist
 
       - name: Create or update GitHub Release

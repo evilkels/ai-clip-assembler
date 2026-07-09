@@ -261,8 +261,12 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await sourcePanelForState.locator('summary').first().click();
   const sourceCards = sourcePanelForState.locator('.clip-card');
   await expect(sourceCards.first()).toContainText(/Timeline #\d+/);
-  await expect(sourcePanelForState.getByText('Proposed in A/C')).toBeVisible();
   const timelineSourceCard = sourceCards.first();
+  // version-a and version-c both include the second Source Clip card, but
+  // version-b only includes the first — so this card is the one deterministically
+  // labeled "Proposed in A/C" (the first card is "Proposed in A/B/C").
+  const proposedInACCard = sourceCards.nth(1);
+  await expect(proposedInACCard.getByText('Proposed in A/C')).toBeVisible();
   await timelineSourceCard.getByRole('button', { name: 'Remove from working timeline' }).click();
   await expect(timelineSourceCard.getByRole('button', { name: 'Add to working timeline' })).toBeVisible();
   await timelineSourceCard.getByRole('button', { name: 'Add to working timeline' }).click();
@@ -278,7 +282,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(
     page.getByText('Your video or clip choices changed since these suggestions were made.'),
   ).toHaveCount(0);
-  await expect(sourcePanelForState.getByText('Proposed in A/C')).toBeVisible();
+  await expect(proposedInACCard.getByText('Proposed in A/C')).toBeVisible();
 
   await cards.first().getByTestId('version-card-surface').click();
   await expect(cards.first()).toHaveClass(/expanded/);

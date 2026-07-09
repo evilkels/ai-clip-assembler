@@ -1984,8 +1984,9 @@ def test_analysis_status_returns_404_for_unknown_project():
 
 def _seed_analyzed_project(monkeypatch, tmp_path, *, duration=10.0):
     """A folderless project with one source video and two candidate clips."""
+    for existing_project_id in list(api.projects):
+        api._timeline_lifecycle.invalidate(existing_project_id)
     api.projects.clear()
-    api._timeline_controllers.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
     client = TestClient(api.app)
     project_id = client.post("/projects").json()["project_id"]

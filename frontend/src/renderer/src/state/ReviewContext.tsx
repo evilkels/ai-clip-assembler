@@ -18,6 +18,7 @@ import {
   createProject,
   createProjectFromFolder,
   getClipsWithFallback,
+  getLastOpenedRecentProject,
   getTimelineDocument,
   listRecentProjects,
   redoTimeline,
@@ -140,6 +141,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   // The latest authoritative document, kept in a ref so operation handlers can
   // map a Candidate Clip to its Timeline Item without re-rendering churn.
   const documentRef = useRef<TimelineDocument | null>(null);
+  const didAutoOpenProject = useRef(false);
+  const openStartedRef = useRef(false);
 
   // Reconcile local review state from the authoritative Timeline Document. The
   // backend document is the source of truth; the GUI mirrors it.
@@ -291,6 +294,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   }, [refreshRecentProjects]);
 
   const createUploadProject = useCallback(async () => {
+    openStartedRef.current = true;
     setLoading(true);
     try {
       const { project_id } = await createProject();
@@ -307,6 +311,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const openProjectFolder = useCallback(
     async (folderPath: string) => {
+      // Any open (manual or auto) cancels the pending startup auto-open so a
+      // slow-resolving auto-open can't clobber a project the user just chose.
+      openStartedRef.current = true;
       setLoading(true);
       try {
         const result = await createProjectFromFolder(folderPath);
@@ -324,6 +331,17 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     },
     [resetProjectSession],
   );
+
+  useEffect(() => {
+    if (didAutoOpenProject.current) return;
+    didAutoOpenProject.current = true;
+
+    getLastOpenedRecentProject()
+      .then((project) =>
+        project && !openStartedRef.current ? openProjectFolder(project.folderPath) : undefined,
+      )
+      .catch(() => {});
+  }, [openProjectFolder]);
 
   const removeRecent = useCallback(async (folderPath: string) => {
     setRecentProjects(await removeRecentProject(folderPath));

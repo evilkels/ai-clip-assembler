@@ -1,6 +1,6 @@
 # Plan: Project Sidebar
 
-Status: partially implemented; remaining UX and persistence acceptance items are active
+Status: partially implemented; auto-reopen persistence shipped; remaining sidebar UX items deferred pending visual QA
 Owner: Elvijs / Codex
 Depends on: `project-folder-model.md` (project = folder, `recent.json` in app-data)
 Pairs with: `settings-page.md`, `ui-polish-modern-shell.md`
@@ -20,51 +20,52 @@ This is the **only entry point** to a project after launch. No project list live
 
 ## Data Source
 
-Single source of truth: `~/Library/Application Support/AIClipAssembler/recent.json` (defined in `project-folder-model.md`).
+Single source of truth: `~/Library/Application Support/AIClipAssembler/recent.json` (defined in `project-folder-model.md` and implemented in `frontend/src/main/index.ts`).
 
 ```json
-{
-  "schema_version": 1,
-  "open_project_path": "/Users/elvijs/Movies/sunset-drone-footage",
-  "recents": [
-    {
-      "path": "/Users/elvijs/Movies/sunset-drone-footage",
-      "last_opened_at": "2026-05-30T19:00:00Z",
-      "display_name_override": null
-    },
-    ...
-  ]
-}
+[
+  {
+    "folderPath": "/Users/elvijs/Movies/sunset-drone-footage",
+    "lastOpenedAt": "2026-05-30T19:00:00Z",
+    "name": "sunset-drone-footage"
+  }
+]
 ```
 
-The sidebar reads this file on app boot and on focus-regain. It writes when:
+The Electron main process owns recents through `recentProjectsPath`,
+`project:recent-list`, `project:recent-add`, `project:recent-remove`,
+`project:recent-relocate`, and `project:recent-last-opened` IPC handlers. The
+list is capped at 20 entries and sorted by `lastOpenedAt` via writes; auto-open
+checks the newest folder and skips relaunch reopen silently when that folder is
+missing.
+
+The sidebar reads this file on app boot. It writes when:
 - User creates a new project (prepend to recents).
 - User opens an existing project (move to top).
 - User removes a project from the list (delete entry).
 
-Display name is the folder basename unless `display_name_override` is set (future rename feature, out of scope for v1).
+Display name is the saved `name` from the project manifest, falling back to the
+folder basename.
 
 ## States
 
 | State | Trigger | UI |
 |---|---|---|
-| Empty | First launch, no recents | Centered prompt: "Create your first project" + folder-picker button. No sidebar items. |
+| Empty | First launch, no recents | Sidebar shows "No recent projects"; Open Folder remains available. |
 | Single project | One entry in recents | Show it, highlighted as open. |
 | Many projects | N entries in recents | List, most recent first, open one highlighted. |
 | Missing folder | recent path no longer exists | Show grayed-out, "Locate…" button beside it. |
-| Read-only folder | path exists but not writable | Show with warning icon, tooltip explains. |
 
 ## Interactions
 
 | Action | Trigger | Behavior |
 |---|---|---|
-| Open project | Click row | Load project, update `open_project_path`, navigate to Review Board. |
-| Create project | Top button | Native folder picker → calls backend `create_project(path)` → adds to recents → opens it. |
-| Open existing folder | "Open…" button at bottom | Native folder picker → if folder has `clipassembler/`, load; else offer to create. |
-| Remove from list | Right-click → "Remove from list" | Deletes from recents only. **Does not touch disk.** |
+| Open project | Click row | Load project through `ReviewContext.openProjectFolder`, add it to recents, and keep the current route. |
+| Open folder | Top button | Native folder picker → backend opens/creates folder project → adds to recents → opens it. |
+| Remove from list | Inline "Remove" button | Deletes from recents only. **Does not touch disk.** |
 | Locate missing | Click "Locate…" on missing entry | Folder picker scoped to find the moved folder; updates the entry's path. |
-| Rename (v2) | Right-click → "Rename" | Sets `display_name_override`. Folder on disk unchanged. Defer. |
-| Delete from disk (v2) | Right-click → "Delete project files…" with double confirm | Removes `clipassembler/` + `exports/`. **Never touches video files.** Defer. |
+| Rename (v2) | Future context menu → "Rename" | Sets a display-name override. Folder on disk unchanged. Defer. |
+| Delete from disk (v2) | Future context menu → "Delete project files…" with double confirm | Removes `clipassembler/` + `exports/`. **Never touches video files.** Defer. |
 
 ## Layout
 
@@ -72,7 +73,7 @@ Display name is the folder basename unless `display_name_override` is set (futur
 ┌─────────────────────────────┐
 │  AI Clip Assembler          │ <- titlebar (frameless, native traffic lights on macOS)
 ├──────────┬──────────────────┤
-│ + New    │                  │ <- sidebar header: create button
+│ Open     │                  │ <- sidebar header: folder picker button
 │          │                  │
 │ ● sunset │   Main area      │ <- open project (filled dot)
 │   forest │   (Review /      │
@@ -80,7 +81,6 @@ Display name is the folder basename unless `display_name_override` is set (futur
 │   ⚠ ski  │    Export)       │ <- missing (warning icon)
 │          │                  │
 │   ──────│                  │
-│   Open…  │                  │ <- "open existing folder" button at bottom
 │   Settings                   │ <- settings entry pinned at bottom
 └──────────┴──────────────────┘
 ```
@@ -93,31 +93,43 @@ Collapsible: hotkey `Cmd-B` toggles. Collapsed state shows icons only (rail-mode
 
 Per `ui-polish-modern-shell.md`:
 
-- shadcn/ui `Sidebar` primitive (it has one in 2025 — supports rail mode, persistence, keyboard nav out of the box).
-- lucide-react icons (`Plus`, `Folder`, `FolderOpen`, `Settings`, `AlertTriangle`).
-- Radix `ContextMenu` for right-click actions.
-- Radix `Tooltip` for missing-folder explanations.
+- Current shipped implementation: custom React sidebar in
+  `frontend/src/renderer/src/layouts/Sidebar.tsx`, with inline action buttons
+  for Locate/Remove and hand-authored SVG icons.
+- Deferred: resizable/collapsible rail, context menus, and keyboard-navigation
+  verification after visual QA.
 
 ## Frontend Wiring
 
-New: `frontend/src/renderer/src/state/ProjectsContext.tsx` — owns the recents list + open project. Loads from main process via IPC (`window.api.projects.listRecents()`, `window.api.projects.openProject(path)`, etc).
+Shipped implementation:
 
-New: `frontend/src/main/projects.ts` — reads/writes `recent.json`, talks to backend HTTP for `create_project` / project metadata.
+- `frontend/src/main/index.ts` reads/writes `recent.json` and exposes project
+  IPC. There is no separate `frontend/src/main/projects.ts`.
+- `frontend/src/preload/index.ts` exposes the IPC methods on
+  `window.clipAssembler`.
+- `frontend/src/renderer/src/api/client.ts` wraps the preload API and backend
+  HTTP API.
+- `frontend/src/renderer/src/state/ReviewContext.tsx` owns the open project,
+  recents, and the folder-open flow. On mount it asks main for
+  `project:recent-last-opened` and reuses `openProjectFolder`.
+- `frontend/src/renderer/src/layouts/Sidebar.tsx` renders the recents list and
+  calls the same `openProjectFolder` path for user-initiated opens.
 
-Existing routes (`Review.tsx`, `Import.tsx`, `Export.tsx`) consume the open project ID from `ProjectsContext`. If no project is open, redirect to a placeholder empty state.
+Existing routes (`Review.tsx`, `Import.tsx`, `Export.tsx`) consume the open
+project state from `ReviewContext`.
 
 ## IPC API
 
 Exposed via `preload`:
 
 ```ts
-window.api.projects = {
-  listRecents: () => Promise<RecentProject[]>,
-  openProject: (path: string) => Promise<Project>,
-  createProject: (path: string) => Promise<Project>,
-  removeFromRecents: (path: string) => Promise<void>,
-  relocateProject: (oldPath: string, newPath: string) => Promise<Project>,
-  pickFolder: () => Promise<string | null>,
+window.clipAssembler = {
+  selectProjectFolder: () => Promise<string | null>,
+  listRecentProjects: () => Promise<RecentProject[]>,
+  getLastOpenedRecentProject: () => Promise<RecentProject | null>,
+  addRecentProject: (folderPath: string, name?: string) => Promise<RecentProject[]>,
+  removeRecentProject: (folderPath: string) => Promise<RecentProject[]>,
+  relocateRecentProject: (folderPath: string) => Promise<RecentProject[]>,
 }
 ```
 
@@ -130,11 +142,11 @@ window.api.projects = {
 
 ## Acceptance
 
-- [ ] Cold launch with no recents → empty state with create button.
-- [ ] Create flow: pick folder → folder appears in sidebar, project opens, main area shows Review Board.
-- [ ] Re-launch the app → last-open project re-opens automatically, sidebar populated.
-- [ ] Move a project folder on disk → sidebar shows it as missing → Locate flow recovers it.
-- [ ] Right-click → Remove → entry disappears, folder on disk untouched.
+- [x] Cold launch with no recents → empty sidebar state with Open Folder button.
+- [x] Open Folder flow: pick folder → folder appears in sidebar and project opens.
+- [x] Re-launch the app → last-open project re-opens automatically, sidebar populated.
+- [x] Move a project folder on disk → sidebar shows it as missing → Locate flow recovers it.
+- [x] Inline Remove → entry disappears, folder on disk untouched.
 - [ ] `Cmd-B` toggles collapsed/expanded; preference persists.
 - [ ] Sidebar passes react-doctor a11y rules (keyboard nav, ARIA roles).
 
@@ -143,16 +155,19 @@ window.api.projects = {
 Implemented:
 
 - Persistent `recent.json` storage in the Electron main process.
-- Sidebar recent-project list, active project state, create/open folder action, missing-folder state, Locate, Remove, Rescan, and Delete Project Files.
+- Sidebar recent-project list, active project state, create/open folder action, missing-folder state, Locate, Remove, and Rescan.
 - Preload IPC methods and renderer API/client wiring for recent projects.
+- Automatically re-open the last-open project after relaunch, using the newest
+  recent folder and falling back silently when that folder no longer exists.
 
 Remaining:
 
-- Automatically re-open the last-open project after relaunch.
-- Navigate directly to the Review Board after create/open.
-- Resizable/collapsible rail mode with persisted width and `Cmd-B`.
-- Replace the current inline action buttons with the planned context-menu interaction.
+- `Cmd-B` collapsed/expanded rail and persisted resizable sidebar width.
+- Replace inline Locate/Remove buttons with the planned context-menu interaction.
 - Complete keyboard-navigation/a11y verification.
+
+These remaining items are deferred pending visual QA on the current Electron
+shell.
 
 ## Open Questions
 

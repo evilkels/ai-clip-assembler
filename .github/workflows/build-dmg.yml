@@ -14,26 +14,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macos-latest runs on Apple Silicon; macos-15-intel is GitHub's
-          # x64 runner (macos-13 was retired in December 2025).
+          # macos-15 runs on Apple Silicon; macos-15-intel is GitHub's
+          # x64 runner (macos-13 was retired in December 2025). Pinned to
+          # macOS 15 on both arches instead of macos-latest, which is
+          # migrating to macOS 26 as of June 2026.
           - arch: arm64
-            runner: macos-latest
+            runner: macos-15
           - arch: x64
             runner: macos-15-intel
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -67,7 +69,7 @@ jobs:
         run: npx electron-builder --mac dmg --publish never
 
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ai-clip-assembler-dmg-${{ matrix.arch }}
           path: frontend/dist/*.dmg
@@ -83,14 +85,14 @@ jobs:
       contents: write
     steps:
       - name: Download DMG artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: ai-clip-assembler-dmg-*
           merge-multiple: true
           path: dist
 
       - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*.dmg
           generate_release_notes: true

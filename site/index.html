@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Clip Assembler — hours of drone footage, one tight cut</title>
+<meta name="description" content="AI Clip Assembler scores your drone footage on your Mac, suggests the smoothest clips, and hands you an editable timeline for DaVinci Resolve or Final Cut Pro. Footage never leaves your machine." />
+<link rel="icon" href="img/icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --navy: #0e1b2c;
+    --navy-soft: #16283f;
+    --paper: #fafaf8;
+    --ink: #1c2733;
+    --signal: #e5484d;
+    --slate: #64748b;
+    --tick: #d8dee6;
+    --tick-dark: #2b3c53;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'Archivo', system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  a { color: inherit; }
+  img { max-width: 100%; display: block; }
+
+  .tc {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    background: var(--navy);
+    color: #eef3f9;
+    padding: 72px 24px 0;
+  }
+  .hero-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .hero-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 64px;
+  }
+  .hero-brand img { width: 36px; height: 36px; }
+  .hero-brand .tc { color: #9fb2c8; }
+  .hero h1 {
+    font-weight: 800;
+    font-stretch: 87%;
+    font-size: clamp(2.4rem, 6vw, 4.4rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    max-width: 14ch;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: var(--signal);
+  }
+  .hero-sub {
+    margin-top: 28px;
+    max-width: 54ch;
+    font-size: 1.1rem;
+    color: #b9c7d8;
+  }
+  .hero-cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 36px 0 72px;
+  }
+  .btn {
+    display: inline-block;
+    padding: 14px 26px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .btn:focus-visible, a:focus-visible {
+    outline: 3px solid var(--signal);
+    outline-offset: 3px;
+  }
+  .btn-primary { background: var(--signal); color: #fff; }
+  .btn-primary:hover { background: #d13438; }
+  .btn-ghost { border: 1px solid #3d5271; color: #dfe8f2; }
+  .btn-ghost:hover { border-color: #7f97b3; }
+  .hero-note {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: #7e93ac;
+    margin: -56px 0 72px;
+  }
+
+  /* ---------- Ruler / playhead signature ---------- */
+  .ruler {
+    position: relative;
+    height: 58px;
+    overflow: hidden;
+    background:
+      repeating-linear-gradient(90deg,
+        var(--tick-dark) 0 1px, transparent 1px 12.5%);
+    border-top: 1px solid var(--tick-dark);
+  }
+  .ruler .marks {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px 0;
+    color: #6d84a0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
+  .playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    background: var(--signal);
+    animation: scrub 24s linear infinite;
+  }
+  .playhead::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -5px;
+    border: 6px solid transparent;
+    border-top: 8px solid var(--signal);
+  }
+  @keyframes scrub {
+    from { transform: translateX(0); }
+    to   { transform: translateX(100vw); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .playhead { animation: none; left: 34%; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* ---------- Workflow sections ---------- */
+  .steps {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 24px 20px;
+  }
+  .steps-intro {
+    max-width: 60ch;
+    margin: 48px auto 12px;
+    text-align: center;
+  }
+  .steps-intro h2 {
+    font-weight: 800;
+    font-stretch: 90%;
+    font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+    letter-spacing: -0.01em;
+  }
+  .steps-intro p { color: var(--slate); margin-top: 12px; }
+  .step {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 48px;
+    align-items: center;
+    padding: 72px 0;
+    border-bottom: 1px solid var(--tick);
+  }
+  .step:last-child { border-bottom: none; }
+  .step:nth-child(even) .step-copy { order: 2; }
+  .step-copy .tc { color: var(--signal); }
+  .step-copy .tc .in { color: var(--slate); }
+  .step-copy h3 {
+    font-weight: 700;
+    font-stretch: 92%;
+    font-size: 1.7rem;
+    margin: 10px 0 12px;
+    letter-spacing: -0.01em;
+  }
+  .step-copy p { color: var(--slate); }
+  .step-copy .kbd {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    background: #eef1f5;
+    border: 1px solid var(--tick);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  .shot {
+    border-radius: 10px;
+    border: 1px solid var(--tick);
+    box-shadow: 0 24px 48px -24px rgba(14, 27, 44, 0.35);
+    overflow: hidden;
+  }
+
+  /* ---------- Privacy band ---------- */
+  .privacy {
+    background: var(--navy);
+    color: #eef3f9;
+    padding: 88px 24px;
+  }
+  .privacy-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 48px;
+  }
+  .privacy-inner > div:first-child { grid-column: 1 / -1; max-width: 46ch; }
+  .privacy h2 {
+    font-weight: 800;
+    font-stretch: 90%;
+    font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+    letter-spacing: -0.01em;
+  }
+  .privacy h2 em { font-style: normal; color: var(--signal); }
+  .privacy .lead { color: #b9c7d8; margin-top: 12px; }
+  .privacy h4 {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9fb2c8;
+    margin-bottom: 10px;
+  }
+  .privacy p { color: #b9c7d8; font-size: 0.98rem; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--slate);
+    font-size: 0.92rem;
+  }
+  footer .tc { color: var(--slate); }
+  footer a { color: var(--ink); }
+
+  @media (max-width: 800px) {
+    .step { grid-template-columns: 1fr; gap: 24px; padding: 56px 0; }
+    .step:nth-child(even) .step-copy { order: 0; }
+    .privacy-inner { grid-template-columns: 1fr; gap: 32px; }
+    .hero-note { margin-top: -60px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-brand">
+      <img src="img/icon.png" alt="" width="36" height="36" />
+      <span class="tc">AI Clip Assembler · macOS</span>
+    </div>
+    <h1>Hours of drone footage. <em>One tight cut.</em></h1>
+    <p class="hero-sub">
+      AI Clip Assembler scores every moment of your footage — smoothness, sharpness,
+      exposure — right on your Mac, suggests the clips worth keeping, and hands you an
+      editable timeline for DaVinci Resolve or Final Cut Pro.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
+      <a class="btn btn-ghost" href="https://github.com/evilkels/ai-clip-assembler">View on GitHub</a>
+    </div>
+    <p class="hero-note">Apple Silicon &amp; Intel · free &amp; open source · footage never leaves your machine</p>
+  </div>
+  <div class="ruler" aria-hidden="true">
+    <div class="marks">
+      <span>00:00</span><span>00:20</span><span>00:40</span><span>01:00</span>
+      <span>01:20</span><span>01:40</span><span>02:00</span><span>02:47</span>
+    </div>
+    <div class="playhead"></div>
+  </div>
+</header>
+
+<main>
+  <div class="steps-intro">
+    <h2>Four steps from SD card to sequence</h2>
+    <p>The workflow reads left to right, like your timeline will.</p>
+  </div>
+
+  <div class="steps">
+    <section class="step">
+      <div class="step-copy">
+        <span class="tc"><span class="in">IN</span> 00:00 · Import</span>
+        <h3>Drop in the raw files</h3>
+        <p>
+          Point it at a folder of MP4/MOV files. Each video is probed for duration,
+          frame rate, and codec, then analyzed for stable, interesting moments —
+          scene by scene, on your own hardware.
+        </p>
+      </div>
+      <div class="shot"><img src="img/import.png" alt="Import screen with three source videos analyzed" loading="lazy" /></div>
+    </section>
+
+    <section class="step">
+      <div class="step-copy">
+        <span class="tc"><span class="in">IN</span> 00:42 · Review</span>
+        <h3>Pick from ranked suggestions</h3>
+        <p>
+          Candidates arrive scored and explained — or ask for a full suggested cut:
+          a punchy social edit, a cinematic highlight, a long scenic montage.
+          Include what you like, exclude the rest. You stay the editor.
+        </p>
+      </div>
+      <div class="shot"><img src="img/review.png" alt="Review screen with three suggested cuts ready to apply" loading="lazy" /></div>
+    </section>
+
+    <section class="step">
+      <div class="step-copy">
+        <span class="tc"><span class="in">IN</span> 01:36 · Timeline</span>
+        <h3>Trim like you mean it</h3>
+        <p>
+          Reorder by dragging, trim from clip edges, scrub the ruler, and play it back
+          with <span class="kbd">J</span> <span class="kbd">K</span> <span class="kbd">L</span>
+          transport keys. Every edit — yours or the AI's — lands in one undo history.
+        </p>
+      </div>
+      <div class="shot"><img src="img/timeline.png" alt="Timeline screen with four clips and a playhead" loading="lazy" /></div>
+    </section>
+
+    <section class="step">
+      <div class="step-copy">
+        <span class="tc"><span class="in">IN</span> 02:47 · Export</span>
+        <h3>Hand off, don't lock in</h3>
+        <p>
+          Export a real, editable timeline — DaVinci Resolve XML, Final Cut Pro FCPXML,
+          or plain EDL — with media paths that survive moving the project folder.
+          Finish the cut in the editor you already trust.
+        </p>
+      </div>
+      <div class="shot"><img src="img/export.png" alt="Export screen with DaVinci Resolve, FCPXML, and EDL options" loading="lazy" /></div>
+    </section>
+  </div>
+
+  <section class="privacy">
+    <div class="privacy-inner">
+      <div>
+        <h2>Local-first, <em>by decision</em></h2>
+        <p class="lead">
+          Not a setting buried in preferences — an architecture decision, recorded
+          and enforced in the codebase.
+        </p>
+      </div>
+      <div>
+        <h4>Your footage stays</h4>
+        <p>
+          Analysis, scoring, and playback run entirely on your Mac. Cloud AI is
+          opt-in per project, with explicit consent before a single frame leaves —
+          or run the rule-based mode with no AI at all.
+        </p>
+      </div>
+      <div>
+        <h4>Bring your own AI</h4>
+        <p>
+          Already talk to Claude Desktop or Codex? Connect it in Settings and ask it
+          to review candidates or edit your timeline. Its edits appear live in the
+          app — and every one is undoable.
+        </p>
+      </div>
+      <div>
+        <h4>Open source</h4>
+        <p>
+          The whole app — backend, UI, and the architecture decisions behind it —
+          is on GitHub. Read the code that promises your footage never leaves.
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p class="tc">AI Clip Assembler</p>
+  <p style="margin-top:8px">
+    <a href="https://github.com/evilkels/ai-clip-assembler">GitHub</a> ·
+    <a href="https://github.com/evilkels/ai-clip-assembler/releases">Releases</a> ·
+    <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/USER_GUIDE.md">User guide</a>
+  </p>
+</footer>
+
+</body>
+</html>

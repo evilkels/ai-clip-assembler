@@ -223,37 +223,37 @@
   .steps {
     max-width: 1240px;
     margin: 0 auto;
-    padding: 40px 24px 20px;
+    padding: 28px 24px 8px;
   }
   .steps-intro {
-    max-width: 56ch;
-    margin: 76px auto 16px;
+    max-width: 52ch;
+    margin: 56px auto 8px;
     text-align: center;
   }
   .steps-intro h2 {
     font-weight: 800;
     font-stretch: 90%;
-    font-size: clamp(1.65rem, 3.6vw, 2.35rem);
-    line-height: 1.12;
+    font-size: clamp(1.55rem, 3vw, 2.15rem);
+    line-height: 1.08;
     letter-spacing: -0.02em;
-    max-width: 16ch;
+    max-width: 14ch;
     margin: 0 auto;
   }
   .steps-intro p {
     color: var(--slate);
-    margin-top: 14px;
-    font-size: 1.05rem;
+    margin-top: 12px;
+    font-size: 1rem;
     line-height: 1.55;
-    max-width: 36ch;
+    max-width: 34ch;
     margin-left: auto;
     margin-right: auto;
   }
   .step {
     display: grid;
     grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
-    gap: 72px;
+    gap: 64px;
     align-items: center;
-    padding: 88px 0;
+    padding: 72px 0;
     border-bottom: 1px solid var(--tick);
   }
   .step:last-child { border-bottom: none; }
@@ -289,7 +289,7 @@
   .privacy {
     background: var(--navy);
     color: #eef3f9;
-    padding: 88px 24px;
+    padding: 72px 24px;
   }
   .privacy-inner {
     max-width: 1240px;
@@ -321,7 +321,7 @@
   .closing {
     max-width: 1240px;
     margin: 0 auto;
-    padding: 88px 24px 72px;
+    padding: 72px 24px 56px;
     text-align: center;
   }
   .closing h2 {
@@ -409,29 +409,30 @@
     .steps {
       padding-left: clamp(18px, 6vw, 40px);
       padding-right: clamp(18px, 6vw, 40px);
-      padding-top: 26px;
+      padding-top: 18px;
     }
     .steps-intro {
-      margin-top: 46px;
+      margin-top: 34px;
       max-width: 100%;
     }
     .steps-intro h2 {
-      font-size: clamp(1.7rem, 7vw, 2.25rem);
-      line-height: 1.14;
-      max-width: 14ch;
+      font-size: clamp(1.5rem, 6.2vw, 2.05rem);
+      line-height: 1.06;
+      max-width: 13ch;
     }
     .steps-intro p {
-      font-size: 1rem;
+      font-size: 0.98rem;
       line-height: 1.5;
-      max-width: 30ch;
-      margin-top: 12px;
+      max-width: 32ch;
+      margin-top: 10px;
     }
-    .step { grid-template-columns: 1fr; gap: 24px; padding: 42px 0; }
+    .step { grid-template-columns: 1fr; gap: 20px; padding: 36px 0; }
     .step:nth-child(even) .step-copy { order: 0; }
     .step-copy h3 { font-size: 1.45rem; line-height: 1.12; }
     .step-copy p { line-height: 1.6; }
     .privacy-inner { grid-template-columns: 1fr; gap: 32px; }
-    .closing { padding: 56px 20px 48px; }
+    .privacy { padding: 64px 20px; }
+    .closing { padding: 48px 20px 36px; }
   }
 </style>
 </head>

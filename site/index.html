@@ -100,7 +100,7 @@
   }
   .hero h1 {
     font-weight: 800;
-    font-stretch: 90%;
+    font-stretch: 100%;
     font-size: clamp(2.35rem, 5.8vw, 4.3rem);
     line-height: 1.03;
     letter-spacing: -0.03em;
@@ -110,12 +110,16 @@
   .hero h1 em {
     font-style: normal;
     color: var(--signal);
+    display: block;
+    margin-top: 4px;
   }
   .hero-sub {
     margin: 18px auto 0;
-    max-width: 34ch;
-    font-size: 1.03rem;
-    color: var(--slate);
+    max-width: 52ch;
+    font-size: 1.125rem;
+    line-height: 1.55;
+    font-weight: 400;
+    color: var(--navy-soft);
   }
   .hero-cta {
     display: flex;
@@ -373,6 +377,13 @@
     .hero-mark img { width: 106px; }
     .hero-mark p { max-width: 28ch; }
     .hero-mark .tc { margin-bottom: 6px; }
+    .hero-mark p {
+      max-width: 36ch;
+    }
+    .hero-sub {
+      font-size: 1.05rem;
+      max-width: 36ch;
+    }
     .steps {
       padding-left: clamp(18px, 6vw, 40px);
       padding-right: clamp(18px, 6vw, 40px);
@@ -441,7 +452,7 @@
         <img src="img/icon.png" alt="" width="94" height="94" />
         <div>
           <span class="tc">Local-first editor</span>
-          <p>Find the worthwhile moments. Keep the final call.</p>
+          <p>Built for drone pilots who already edit.</p>
         </div>
       </aside>
     </div>

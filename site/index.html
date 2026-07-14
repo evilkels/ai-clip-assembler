@@ -53,7 +53,7 @@
       radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.12) 0 6px, transparent 7px),
       linear-gradient(135deg, #fafbfc 0%, #edf0f3 62%, #e4e8ec 100%);
     color: var(--ink);
-    padding: 38px 24px 0;
+    padding: 30px 24px 0;
     border-bottom: 1px solid var(--tick);
   }
   .hero-inner {
@@ -79,18 +79,16 @@
   .hero-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 28px;
     justify-content: center;
+    margin-bottom: 22px;
   }
-  .hero-brand img { width: 38px; height: 38px; filter: drop-shadow(0 5px 7px rgba(23, 32, 44, 0.16)); }
   .hero-brand .tc { color: var(--navy-soft); }
   .hero-grid {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 22px;
-    padding-bottom: 48px;
+    padding-bottom: 40px;
   }
   .hero-copy {
     position: relative;
@@ -126,7 +124,7 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 14px;
-    margin: 30px 0 16px;
+    margin: 28px 0 0;
   }
   .btn {
     display: inline-block;
@@ -148,7 +146,7 @@
     font-family: var(--mono);
     font-size: 12.5px;
     color: var(--slate);
-    margin: 0;
+    margin: 4px 0 0;
     text-align: center;
   }
   .hero-mark {
@@ -319,6 +317,30 @@
   }
   .privacy p { color: #b9c7d8; font-size: 0.98rem; }
 
+  /* ---------- Closing CTA ---------- */
+  .closing {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 88px 24px 72px;
+    text-align: center;
+  }
+  .closing h2 {
+    font-weight: 800;
+    font-stretch: 90%;
+    font-size: clamp(1.65rem, 3.6vw, 2.35rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    max-width: 20ch;
+    margin: 0 auto;
+  }
+  .closing p {
+    color: var(--slate);
+    margin: 12px auto 0;
+    max-width: 44ch;
+  }
+  .closing .hero-cta { margin: 28px 0 0; }
+  .closing .hero-note { margin-top: 18px; }
+
   /* ---------- Footer ---------- */
   footer {
     padding: 48px 24px;
@@ -364,10 +386,13 @@
   }
 
   @media (max-width: 800px) {
-    .hero { padding-top: 28px; }
+    .hero { padding-top: 20px; }
     .hero-network { width: 520px; right: -255px; top: 72px; opacity: 0.35; }
-    .hero-brand { margin-bottom: 24px; }
-    .hero-grid { gap: 18px; padding-bottom: 34px; }
+    .hero-brand { margin-bottom: 16px; }
+    .hero-grid { gap: 16px; padding-bottom: 28px; }
+    .hero-sub { margin-top: 12px; }
+    .hero-cta { margin-top: 20px; gap: 10px; }
+    .btn { padding: 14px 24px; }
     .hero-mark {
       text-align: center;
       width: min(100%, 420px);
@@ -375,11 +400,8 @@
       gap: 12px;
     }
     .hero-mark img { width: 106px; }
-    .hero-mark p { max-width: 28ch; }
     .hero-mark .tc { margin-bottom: 6px; }
-    .hero-mark p {
-      max-width: 36ch;
-    }
+    .hero-mark p { max-width: 36ch; }
     .hero-sub {
       font-size: 1.05rem;
       max-width: 36ch;
@@ -409,6 +431,7 @@
     .step-copy h3 { font-size: 1.45rem; line-height: 1.12; }
     .step-copy p { line-height: 1.6; }
     .privacy-inner { grid-template-columns: 1fr; gap: 32px; }
+    .closing { padding: 56px 20px 48px; }
   }
 </style>
 </head>
@@ -431,20 +454,18 @@
   </svg>
   <div class="hero-inner">
     <div class="hero-brand">
-      <img src="img/icon.png" alt="" width="36" height="36" />
       <span class="tc">AI Clip Assembler · macOS</span>
     </div>
     <div class="hero-grid">
       <div class="hero-copy">
         <h1>Turn 3 hours of drone footage <em>into the cut worth keeping.</em></h1>
         <p class="hero-sub">
-          Find the keepers before the cut.
+          Find the best clips before edit.
         </p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
-          <a class="btn btn-ghost" href="#how-it-works">Watch a 30s demo</a>
+          <a class="btn btn-ghost" href="#how-it-works">See how it works</a>
         </div>
-        <p class="hero-note">Apple Silicon &amp; Intel · free &amp; open source · footage never leaves your machine</p>
       </div>
       <aside class="hero-mark">
         <img src="img/icon.png" alt="" width="94" height="94" />
@@ -462,6 +483,7 @@
     </div>
     <div class="playhead"></div>
   </div>
+  <p class="hero-note">Apple Silicon &amp; Intel · free &amp; open source · footage never leaves your machine</p>
 </header>
 
 <main>
@@ -560,6 +582,16 @@
         </p>
       </div>
     </div>
+  </section>
+
+  <section class="closing">
+    <h2>Try it on your last flight</h2>
+    <p>Free and open source. Download the app, drop in a folder of clips, and see what it finds.</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
+      <a class="btn btn-ghost" href="https://github.com/evilkels/ai-clip-assembler">View on GitHub</a>
+    </div>
+    <p class="hero-note">Apple Silicon &amp; Intel · footage never leaves your machine</p>
   </section>
 </main>
 

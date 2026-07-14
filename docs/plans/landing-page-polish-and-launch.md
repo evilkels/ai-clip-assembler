@@ -1,6 +1,6 @@
 # Landing Page Polish and Launch Backlog
 
-Status: ACTIVE — the editorial visual refresh is being delivered now; the
+Status: ACTIVE — the editorial visual refresh shipped in v0.1.3; the
 remaining items are intentionally deferred launch work.
 
 ## Delivered in the editorial refresh

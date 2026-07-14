@@ -226,27 +226,59 @@
     padding: 28px 24px 8px;
   }
   .steps-intro {
-    max-width: 52ch;
-    margin: 56px auto 8px;
-    text-align: center;
+    max-width: 1240px;
+    margin: 24px auto 0;
+    padding: 72px 24px;
+    display: grid;
+    grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
+    gap: 72px;
+    align-items: center;
+    border-bottom: 1px solid var(--tick);
   }
+  .steps-intro > div { max-width: none; }
+  .steps-intro .tc {
+    display: block;
+    color: var(--signal);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .intro-panel {
+    justify-self: start;
+    width: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .intro-panel p {
+    margin: 0;
+    max-width: 100%;
+    color: var(--slate);
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+  .intro-panel p + p { margin-top: 8px; }
   .steps-intro h2 {
-    font-weight: 800;
-    font-stretch: 90%;
-    font-size: clamp(1.55rem, 3vw, 2.15rem);
-    line-height: 1.08;
-    letter-spacing: -0.02em;
-    max-width: 14ch;
-    margin: 0 auto;
+    font-weight: 700;
+    font-stretch: 92%;
+    font-size: 1.7rem;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    max-width: 18ch;
+    margin: 0;
   }
   .steps-intro p {
     color: var(--slate);
     margin-top: 12px;
-    font-size: 1rem;
+    font-size: 0.98rem;
     line-height: 1.55;
-    max-width: 34ch;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: 36ch;
+    margin-left: 0;
+    margin-right: 0;
   }
   .step {
     display: grid;
@@ -414,6 +446,17 @@
     .steps-intro {
       margin-top: 34px;
       max-width: 100%;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .steps-intro > div { max-width: 100%; }
+    .intro-panel {
+      justify-self: start;
+      width: 100%;
+      padding: 16px 18px;
+      margin-top: 4px;
     }
     .steps-intro h2 {
       font-size: clamp(1.5rem, 6.2vw, 2.05rem);
@@ -488,10 +531,19 @@
 
 <main>
   <div class="steps-intro" id="how-it-works">
-    <h2>What is AI Clip Assembler?</h2>
-    <p>
-      Drop in a folder of raw clips. AI Clip Assembler scores each one on sharpness, smoothness, and exposure — then hands you an editable timeline for Final Cut Pro or DaVinci Resolve.
-    </p>
+    <div>
+      <span class="tc">Overview</span>
+      <h2>What is AI Clip Assembler?</h2>
+      <p>
+        Drop in a folder of raw clips. AI Clip Assembler scores each one on sharpness, smoothness, and exposure — then hands you an editable timeline for Final Cut Pro or DaVinci Resolve.
+      </p>
+    </div>
+    <div class="intro-panel" aria-hidden="true">
+      <span class="tc">Flow</span>
+      <p>Import clips.</p>
+      <p>Score the keepers.</p>
+      <p>Export an editable timeline.</p>
+    </div>
   </div>
 
   <div class="steps">

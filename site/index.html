@@ -227,15 +227,10 @@
   }
   .steps-intro {
     max-width: 1240px;
-    margin: 24px auto 0;
-    padding: 72px 24px;
-    display: grid;
-    grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
-    gap: 72px;
-    align-items: center;
+    margin: 0 auto;
+    padding: 72px 24px 24px;
     border-bottom: 1px solid var(--tick);
   }
-  .steps-intro > div { max-width: none; }
   .steps-intro .tc {
     display: block;
     color: var(--signal);
@@ -245,23 +240,6 @@
     text-transform: uppercase;
     margin-bottom: 10px;
   }
-  .intro-panel {
-    justify-self: start;
-    width: auto;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-  .intro-panel p {
-    margin: 0;
-    max-width: 100%;
-    color: var(--slate);
-    font-size: 0.95rem;
-    line-height: 1.55;
-  }
-  .intro-panel p + p { margin-top: 8px; }
   .steps-intro h2 {
     font-weight: 700;
     font-stretch: 92%;
@@ -276,7 +254,7 @@
     margin-top: 12px;
     font-size: 0.98rem;
     line-height: 1.55;
-    max-width: 36ch;
+    max-width: 42ch;
     margin-left: 0;
     margin-right: 0;
   }
@@ -537,12 +515,6 @@
       <p>
         Drop in a folder of raw clips. AI Clip Assembler scores each one on sharpness, smoothness, and exposure — then hands you an editable timeline for Final Cut Pro or DaVinci Resolve.
       </p>
-    </div>
-    <div class="intro-panel" aria-hidden="true">
-      <span class="tc">Flow</span>
-      <p>Import clips.</p>
-      <p>Score the keepers.</p>
-      <p>Export an editable timeline.</p>
     </div>
   </div>
 

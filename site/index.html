@@ -224,17 +224,28 @@
     padding: 40px 24px 20px;
   }
   .steps-intro {
-    max-width: 60ch;
+    max-width: 56ch;
     margin: 76px auto 16px;
     text-align: center;
   }
   .steps-intro h2 {
     font-weight: 800;
     font-stretch: 90%;
-    font-size: clamp(1.6rem, 3.4vw, 2.3rem);
-    letter-spacing: -0.01em;
+    font-size: clamp(1.65rem, 3.6vw, 2.35rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    max-width: 16ch;
+    margin: 0 auto;
   }
-  .steps-intro p { color: var(--slate); margin-top: 12px; }
+  .steps-intro p {
+    color: var(--slate);
+    margin-top: 14px;
+    font-size: 1.05rem;
+    line-height: 1.55;
+    max-width: 36ch;
+    margin-left: auto;
+    margin-right: auto;
+  }
   .step {
     display: grid;
     grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
@@ -362,10 +373,31 @@
     .hero-mark img { width: 106px; }
     .hero-mark p { max-width: 28ch; }
     .hero-mark .tc { margin-bottom: 6px; }
-    .step { grid-template-columns: 1fr; gap: 28px; padding: 64px 0; }
+    .steps {
+      padding-left: clamp(18px, 6vw, 40px);
+      padding-right: clamp(18px, 6vw, 40px);
+      padding-top: 26px;
+    }
+    .steps-intro {
+      margin-top: 46px;
+      max-width: 100%;
+    }
+    .steps-intro h2 {
+      font-size: clamp(1.7rem, 7vw, 2.25rem);
+      line-height: 1.14;
+      max-width: 14ch;
+    }
+    .steps-intro p {
+      font-size: 1rem;
+      line-height: 1.5;
+      max-width: 30ch;
+      margin-top: 12px;
+    }
+    .step { grid-template-columns: 1fr; gap: 24px; padding: 42px 0; }
     .step:nth-child(even) .step-copy { order: 0; }
+    .step-copy h3 { font-size: 1.45rem; line-height: 1.12; }
+    .step-copy p { line-height: 1.6; }
     .privacy-inner { grid-template-columns: 1fr; gap: 32px; }
-    .steps-intro { margin-top: 58px; }
   }
 </style>
 </head>
@@ -425,8 +457,8 @@
 
 <main>
   <div class="steps-intro">
-    <h2>Four steps from SD card to sequence</h2>
-    <p>The workflow reads left to right, like your timeline will.</p>
+    <h2>From SD card to final cut in 4 steps.</h2>
+    <p>Same workflow you'd do by hand — just without the 3 hours of scrubbing first.</p>
   </div>
 
   <div class="steps">

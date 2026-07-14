@@ -1,7 +1,8 @@
-import { execFile } from 'node:child_process';
-import { readFile, unlink } from 'node:fs/promises';
+import { execFile as execFileCallback } from 'node:child_process';
+import { constants } from 'node:fs';
+import { access, readFile, unlink } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { basename, normalize } from 'node:path';
+import { basename, dirname, normalize } from 'node:path';
 
 export interface RuntimeDescriptor {
   port: number;
@@ -36,6 +37,68 @@ export interface CleanupOptions {
   waitForExit?: ExitWaiter;
   terminateTimeoutMs?: number;
   killTimeoutMs?: number;
+}
+
+export type RuntimeToolStatus =
+  | { ready: true; ffmpegPath: string; ffprobePath: string; toolDirectory: string }
+  | {
+    ready: false;
+    reason: 'missing-ffmpeg' | 'missing-ffprobe' | 'not-executable' | 'missing-vidstabdetect' | 'preflight-failed';
+    detail: string;
+  };
+
+export interface RuntimeToolPreflightOptions {
+  ffmpegPath: string;
+  ffprobePath: string;
+  access?: (path: string) => Promise<void>;
+  execFile?: (file: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
+}
+
+async function runRuntimeToolPreflightCommand(file: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFileCallback(file, args, { timeout: 5000 }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+export async function preflightRuntimeTools(options: RuntimeToolPreflightOptions): Promise<RuntimeToolStatus> {
+  const checkAccess = options.access ?? ((path: string) => access(path, constants.X_OK));
+  try {
+    await checkAccess(options.ffmpegPath);
+  } catch {
+    return { ready: false, reason: 'missing-ffmpeg', detail: 'Bundled ffmpeg was not found or is not executable.' };
+  }
+  try {
+    await checkAccess(options.ffprobePath);
+  } catch {
+    return { ready: false, reason: 'missing-ffprobe', detail: 'Bundled ffprobe was not found or is not executable.' };
+  }
+
+  try {
+    const run = options.execFile ?? runRuntimeToolPreflightCommand;
+    const output = await run(options.ffmpegPath, ['-hide_banner', '-filters']);
+    if (!`${output.stdout}\n${output.stderr}`.includes('vidstabdetect')) {
+      return {
+        ready: false,
+        reason: 'missing-vidstabdetect',
+        detail: 'Bundled ffmpeg does not include the required vidstabdetect filter.',
+      };
+    }
+  } catch {
+    return { ready: false, reason: 'preflight-failed', detail: 'Bundled ffmpeg could not complete its startup check.' };
+  }
+
+  return {
+    ready: true,
+    ffmpegPath: options.ffmpegPath,
+    ffprobePath: options.ffprobePath,
+    toolDirectory: dirname(options.ffmpegPath),
+  };
 }
 
 function isRuntimeDescriptor(value: unknown): value is RuntimeDescriptor {
@@ -88,7 +151,7 @@ export async function inspectProcessCommand(pid: number): Promise<string | undef
     : { file: 'ps', args: ['-p', String(pid), '-o', 'command='] };
 
   return new Promise((resolve) => {
-    execFile(command.file, command.args, { timeout: 3000 }, (error, stdout) => {
+    execFileCallback(command.file, command.args, { timeout: 3000 }, (error, stdout) => {
       if (error) {
         resolve(undefined);
         return;

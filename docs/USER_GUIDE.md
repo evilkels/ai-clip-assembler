@@ -112,6 +112,57 @@ Qwen/Ollama harness is currently **postponed**. See
 [HARNESS_SPEC.md](HARNESS_SPEC.md) and the README's *AI Harness* section for
 configuration.
 
+## Connect your AI (optional)
+
+If you already chat with an AI assistant on your Mac — **Claude Desktop** or
+**Codex** — you can connect it to AI Clip Assembler. Once connected, you can
+ask the assistant things like *"add the three smoothest clips to my timeline"*
+or *"trim the first clip to 4 seconds"*, and watch the edits appear live in the
+app. The assistant works on whatever project you have open.
+
+### How to connect
+
+1. In the app, open **Settings → Connect your AI**.
+2. You'll see a row for each supported assistant with its status:
+   **Connected**, **Detected** (installed but not connected yet), or
+   **Config not found** (the assistant isn't installed, or has never run).
+3. Click **Connect**. The app adds itself to that assistant's configuration —
+   it backs up the existing file first and shows you where the backup went.
+4. Restart the assistant. It won't see the new connection until you do — the
+   app reminds you with *"Connected. Restart … to finish."*
+
+If the automatic write fails (for example, a permissions issue), the panel
+shows the exact configuration snippet so you can paste it into the assistant's
+config file yourself.
+
+### What the assistant can do
+
+- **Look at your candidates:** list the suggested clips with their scores and
+  the reason each was picked, and view sampled frames from a clip.
+- **Edit your timeline:** include or exclude clips, reorder, trim, split,
+  change speed, and undo/redo — the same edits you make by hand.
+- **Not analyze footage:** connected assistants review and edit an already
+  analyzed project; they never run the scoring step.
+
+Every edit an assistant makes goes through the app's normal undo history, so
+anything it does can be reversed with **Undo**, exactly like your own edits.
+
+### Good to know
+
+- **The app must be open** with a project loaded. If it isn't, the assistant is
+  told *"Open AI Clip Assembler and a project, then retry"* instead of failing
+  silently.
+- **Your video files are never uploaded by the app.** Be aware, though, that
+  whatever the assistant reads — clip names, scores, and any frames it opens —
+  becomes part of your conversation with that assistant, and is handled under
+  that provider's privacy policy (the same trade-off as choosing a cloud AI
+  harness).
+- **Nothing else in your assistant's setup is touched.** Connecting only adds
+  one entry; other tools you've connected stay as they are.
+
+Developers and other MCP-capable clients (Claude Code, Cursor) can connect at a
+lower level — see [MCP_SERVER.md](MCP_SERVER.md).
+
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues (backend offline,

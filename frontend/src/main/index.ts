@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import {
   cleanupStaleBackend,
   findFreePort,
+  preflightRuntimeTools,
   waitForBackend,
   waitForRuntimeDescriptorPort,
 } from './backendLifecycle';
@@ -55,6 +56,23 @@ async function enrichRecentProjects(): Promise<RecentProject[]> {
   );
 }
 
+async function findLastOpenedRecentProject(): Promise<RecentProject | null> {
+  const projects = await readRecentProjects();
+  const [latestProject] = [...projects].sort(
+    (a, b) => Date.parse(b.lastOpenedAt) - Date.parse(a.lastOpenedAt),
+  );
+
+  if (!latestProject) return null;
+
+  try {
+    const folderStat = await stat(latestProject.folderPath);
+    return folderStat.isDirectory() ? { ...latestProject, missing: false } : null;
+  } catch {
+    // Missing recents are still shown in the sidebar, but never interrupt launch.
+    return null;
+  }
+}
+
 async function writeRecentProjects(projects: RecentProject[]): Promise<void> {
   await mkdir(app.getPath('userData'), { recursive: true });
   await writeFile(recentProjectsPath(), JSON.stringify(projects, null, 2) + '\n', 'utf-8');
@@ -74,6 +92,8 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('project:recent-list', async () => enrichRecentProjects());
+
+  ipcMain.handle('project:recent-last-opened', async () => findLastOpenedRecentProject());
 
   ipcMain.handle('project:recent-add', async (_event, folderPath: string, name?: string) => {
     if (typeof folderPath !== 'string' || folderPath.length === 0) return [];
@@ -201,7 +221,14 @@ async function startPackagedBackend(): Promise<void> {
   }
 
   const piBin = await resolvePiBinFromLoginShell();
-  const extraPath = buildPackagedBackendPath(piBin);
+  const runtimeTools = await preflightRuntimeTools({
+    ffmpegPath: join(process.resourcesPath, 'tools', 'ffmpeg'),
+    ffprobePath: join(process.resourcesPath, 'tools', 'ffprobe'),
+  });
+  if (!runtimeTools.ready) {
+    throw new Error(`Bundled video tools need repair. Reinstall AI Clip Assembler. (${runtimeTools.detail})`);
+  }
+  const extraPath = [runtimeTools.toolDirectory, buildPackagedBackendPath(piBin)].join(':');
 
   const cleanup = await cleanupStaleBackend({ runtimeFile, backendExecutable });
   if (cleanup.reason === 'still-running') {

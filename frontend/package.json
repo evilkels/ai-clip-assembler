@@ -19,6 +19,7 @@
     "build": "npm run typecheck && npm run stage:assets && electron-vite build && npm run copy:assets",
     "build:backend": "cd ../backend && python3 -m pip install -r requirements.txt pyinstaller && python3 -m PyInstaller --noconfirm packaging/backend.spec",
     "stage:assets": "node scripts/stage-assets.mjs",
+    "stage:runtime-tools": "node scripts/stage-runtime-tools.mjs",
     "copy:assets": "npm run stage:assets",
     "preview": "npm run stage:assets && electron-vite preview",
     "start": "npm run preview",
@@ -84,6 +85,13 @@
         ]
       },
       {
+        "from": "build/runtime-tools",
+        "to": "tools",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
         "from": "../backend/dist/ai-clip-backend",
         "to": "backend",
         "filter": [
@@ -95,7 +103,8 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.video",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   }
 }

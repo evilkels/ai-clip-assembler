@@ -9,7 +9,7 @@ run the test suites. Target platform is macOS.
 # Toolchain
 brew install python@3.11 node
 
-# FFmpeg with the vidstabdetect filter (required for motion analysis)
+# FFmpeg with the vidstabdetect filter (required for local development motion analysis)
 brew install ffmpeg
 ffmpeg -hide_banner -filters | grep vidstabdetect   # must print a line
 ```
@@ -26,6 +26,10 @@ brew tap homebrew-ffmpeg/ffmpeg
 brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
 ffmpeg -hide_banner -filters | grep vidstab   # must list vidstabdetect + vidstabtransform
 ```
+
+Release DMGs do not use this developer setup. CI stages a private FFmpeg runtime
+with `vidstabdetect` into each architecture-matched application bundle, then
+the Electron main process verifies it before starting the packaged backend.
 
 The tap builds from source; expect 10–30 minutes. `brew options
 homebrew-ffmpeg/ffmpeg/ffmpeg` lists further optional codecs.

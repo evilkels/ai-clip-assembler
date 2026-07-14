@@ -9,6 +9,10 @@ the GUI and an agent never drift, and every change lands in the **Undo History**
 > External agents **apply Operations directly** (you are driving them from the
 > CLI). The in-app review agent instead **proposes** edits you accept or reject.
 
+This page is the technical reference. If you just want to connect Claude
+Desktop or Codex from inside the app, see the
+[User Guide's "Connect your AI" section](USER_GUIDE.md#connect-your-ai-optional).
+
 ## Endpoint & port
 
 - **URL:** `http://127.0.0.1:8000/mcp` (the backend's own port — no separate

@@ -75,8 +75,12 @@ work while phase 1 trust issues are open.
   degradation — detect missing `vidstabdetect` at startup and skip motion
   stability with a visible notice instead of hard-failing
   (`backend/src/frame_extraction.py`, `backend/src/motion_analysis.py`);
-  (b) bundle a static ffmpeg in the DMG (follow-up from plan 003's packaging
-  work, PRs #31–#33). Ship (a) first — it makes every install work today.
+  (b) is IN PROGRESS (2026-07-10): CI installs the vetted Homebrew FFmpeg
+  build with `libvidstab`, stages its executable and dynamic-library closure
+  into the DMG, re-signs the staged Mach-O files, and preflights
+  `vidstabdetect` before packaged-backend startup. Remaining release gates are
+  license/source-compliance materials, Intel CI evidence, signing/notarization,
+  and a clean-machine DMG test. See `self-contained-runtime-tools.md`.
 - [ ] **Task 3: Sign + notarize the DMG.** Apple developer account, signing
   identity, notarization in the build script. Without this Gatekeeper calls
   the app damaged. Mostly plumbing, not code.

@@ -47,6 +47,12 @@ Cloud AI is opt-in per project. Provider-backed harnesses may send sampled frame
 - Data: project folders, JSON metadata, FFmpeg-derived media metadata
 - AI: modular harnesses for manual rules, local models, and user-chosen agent/provider workflows
 
+## Install the app
+
+Download the macOS DMG from [Releases](https://github.com/evilkels/ai-clip-assembler/releases), drag AI Clip Assembler into Applications, and open it. Release builds include the Python backend and a private FFmpeg runtime with motion-analysis support; no Python, Homebrew, or terminal setup is required.
+
+The instructions below are for contributors running the project from source.
+
 ## Getting started
 
 ### Prerequisites
@@ -74,7 +80,9 @@ brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libvidstab
 ffmpeg -hide_banner -filters | grep vidstab
 ```
 
-The source build can take 10-30 minutes.
+The source build can take 10-30 minutes. This is only required for local
+development: release DMGs bundle a verified FFmpeg runtime with
+`vidstabdetect`, so normal users do not install Python, Homebrew, or FFmpeg.
 
 ### Run the app
 

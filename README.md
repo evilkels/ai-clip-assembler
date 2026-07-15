@@ -2,9 +2,11 @@
 
 ![AI Clip Assembler cover banner](assets/cover-banner.png)
 
-AI Clip Assembler is a local-first desktop video editor for turning raw MP4 footage into a clean, editable timeline. Import a folder of clips, let the app detect and score useful moments, review the suggestions, adjust the timeline, and export to Final Cut Pro, DaVinci Resolve, or any editor that accepts EDL.
+[Website](https://evilkels.github.io/ai-clip-assembler/) · [Releases](https://github.com/evilkels/ai-clip-assembler/releases) · [User guide](docs/USER_GUIDE.md)
 
-The project is built for creators who come home with long drone, action-camera, travel, or event footage and need a fast first assembly without handing private source media to a cloud service.
+AI Clip Assembler is a free, local-first macOS app for turning raw drone, action-camera, or event footage into a clean, editable timeline. Import a folder of clips, let the app score and detect useful moments locally, review the suggestions, adjust the timeline, and export to Final Cut Pro, DaVinci Resolve, or any editor that accepts EDL.
+
+The project is built for creators who come home with hours of raw footage and need a fast first assembly. Analysis and scoring run locally by default; provider-backed AI harnesses are available but only run after you opt in per project.
 
 
 ## The problem
@@ -39,6 +41,8 @@ The app is still early. Expect rough edges, macOS-first setup, and active change
 AI Clip Assembler is local by default. Source videos are processed on your machine, project data is stored as files, and there is no database service.
 
 Cloud AI is opt-in per project. Provider-backed harnesses may send sampled frames or clip metadata to tools or providers you configure yourself, and the backend refuses to run those harnesses until project consent is saved. If you use a provider-backed harness, review that provider's data policy before sending frames or metadata through it. The manual harness runs without AI.
+
+Connecting an external AI assistant through MCP is a separate trust boundary. If you ask that assistant to inspect clip metadata or sampled frame paths, what it reads becomes part of that external provider interaction and is governed by the provider's privacy policy; the harness consent gate does not cover this MCP path.
 
 ## Tech stack
 

@@ -1,632 +1,1068 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Clip Assembler — hours of drone footage, one tight cut</title>
-<meta name="description" content="AI Clip Assembler scores your drone footage on your Mac, suggests the smoothest clips, and hands you an editable timeline for DaVinci Resolve or Final Cut Pro. Footage never leaves your machine." />
-<link rel="icon" href="img/icon.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    --navy: #182330;
-    --navy-soft: #273544;
-    --paper: #f0f2f4;
-    --paper-bright: #fafbfc;
-    --ink: #17202c;
-    --signal: #ef5358;
-    --signal-dark: #d93f46;
-    --slate: #617080;
-    --tick: #d2d8de;
-    --tick-dark: #9da8b3;
-    --mono: 'IBM Plex Mono', ui-monospace, monospace;
-    --sans: 'Archivo', system-ui, sans-serif;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    font-family: var(--sans);
-    background: var(--paper);
-    color: var(--ink);
-    font-size: 17px;
-    line-height: 1.6;
-  }
-  a { color: inherit; }
-  img { max-width: 100%; display: block; }
-
-  .tc {
-    font-family: var(--mono);
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  /* ---------- Hero ---------- */
-  .hero {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    background:
-      radial-gradient(circle at 79% 27%, rgba(239, 83, 88, 0.16) 0 7px, transparent 8px),
-      radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.12) 0 6px, transparent 7px),
-      linear-gradient(135deg, #fafbfc 0%, #edf0f3 62%, #e4e8ec 100%);
-    color: var(--ink);
-    padding: 30px 24px 0;
-    border-bottom: 1px solid var(--tick);
-  }
-  .hero-inner {
-    position: relative;
-    z-index: 1;
-    max-width: 1240px;
-    margin: 0 auto;
-  }
-  .hero-network {
-    position: absolute;
-    z-index: 0;
-    width: min(740px, 62vw);
-    right: max(24px, calc((100vw - 1240px) / 2));
-    top: 10px;
-    height: 480px;
-    color: #526170;
-    opacity: 0.64;
-    pointer-events: none;
-  }
-  .hero-network line { stroke: currentColor; stroke-width: 1.1; }
-  .hero-network circle { fill: #536170; stroke: #edf0f3; stroke-width: 5; }
-  .hero-network circle.signal { fill: var(--signal); stroke: #ffd9da; }
-  .hero-brand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 22px;
-  }
-  .hero-brand .tc { color: var(--navy-soft); }
-  .hero-grid {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 22px;
-    padding-bottom: 40px;
-  }
-  .hero-copy {
-    position: relative;
-    z-index: 1;
-    text-align: center;
-    max-width: 760px;
-  }
-  .hero h1 {
-    font-weight: 800;
-    font-stretch: 100%;
-    font-size: clamp(2.35rem, 5.8vw, 4.3rem);
-    line-height: 1.03;
-    letter-spacing: -0.03em;
-    max-width: 12ch;
-    margin: 0 auto;
-  }
-  .hero h1 em {
-    font-style: normal;
-    color: var(--signal);
-    display: block;
-    margin-top: 4px;
-  }
-  .hero-sub {
-    margin: 18px auto 0;
-    max-width: 52ch;
-    font-size: 1.125rem;
-    line-height: 1.55;
-    font-weight: 400;
-    color: var(--navy-soft);
-  }
-  .hero-cta {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 14px;
-    margin: 28px 0 0;
-  }
-  .btn {
-    display: inline-block;
-    padding: 16px 28px;
-    border-radius: 12px;
-    text-decoration: none;
-    font-weight: 700;
-    font-size: 1.02rem;
-  }
-  .btn:focus-visible, a:focus-visible {
-    outline: 3px solid var(--signal);
-    outline-offset: 3px;
-  }
-  .btn-primary { background: var(--signal); color: #fff; box-shadow: 0 8px 18px -12px rgba(217, 63, 70, 0.85); }
-  .btn-primary:hover { background: var(--signal-dark); }
-  .btn-ghost { border: 1px solid #aab5bf; color: var(--navy); background: rgba(255, 255, 255, 0.45); }
-  .btn-ghost:hover { border-color: #687787; background: #fff; }
-  .hero-note {
-    font-family: var(--mono);
-    font-size: 12.5px;
-    color: var(--slate);
-    margin: 4px 0 0;
-    text-align: center;
-  }
-  .hero-mark {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 14px;
-    width: min(100%, 420px);
-    padding: 20px 22px 18px;
-    border: 1px solid rgba(83, 97, 112, 0.28);
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.68);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 16px 28px -22px rgba(23, 32, 44, 0.34);
-  }
-  .hero-mark img {
-    width: 146px;
-    aspect-ratio: 1 / 1;
-    height: auto;
-    object-fit: cover;
-    border-radius: 18px;
-    filter: drop-shadow(0 12px 13px rgba(23, 32, 44, 0.18));
-  }
-  .hero-mark p { color: var(--navy-soft); max-width: 28ch; font-weight: 700; font-size: 1.04rem; line-height: 1.25; }
-  .hero-mark .tc { color: var(--signal-dark); display: block; margin-bottom: 10px; }
-
-  /* ---------- Ruler / playhead signature ---------- */
-  .ruler {
-    position: relative;
-    height: 58px;
-    overflow: hidden;
-    background-color: var(--paper-bright);
-    background:
-      repeating-linear-gradient(90deg,
-        var(--tick) 0 1px, transparent 1px 12.5%);
-    border-top: 1px solid var(--tick);
-  }
-  .ruler .marks {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 12px 0;
-    color: #82909c;
-    font-family: var(--mono);
-    font-size: 11.5px;
-  }
-  .playhead {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 2px;
-    background: var(--signal);
-    animation: scrub 24s linear infinite;
-  }
-  .playhead::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -5px;
-    border: 6px solid transparent;
-    border-top: 8px solid var(--signal);
-  }
-  @keyframes scrub {
-    from { transform: translateX(0); }
-    to   { transform: translateX(100vw); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .playhead { animation: none; left: 34%; }
-    html { scroll-behavior: auto; }
-  }
-
-  /* ---------- Workflow sections ---------- */
-  .steps {
-    max-width: 1240px;
-    margin: 0 auto;
-    padding: 28px 24px 8px;
-  }
-  .steps-intro {
-    max-width: 1240px;
-    margin: 0 auto;
-    padding: 72px 24px 24px;
-    border-bottom: 1px solid var(--tick);
-  }
-  .steps-intro .tc {
-    display: block;
-    color: var(--signal);
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-  .steps-intro h2 {
-    font-weight: 700;
-    font-stretch: 92%;
-    font-size: 1.7rem;
-    line-height: 1.12;
-    letter-spacing: -0.01em;
-    max-width: 18ch;
-    margin: 0;
-  }
-  .steps-intro p {
-    color: var(--slate);
-    margin-top: 12px;
-    font-size: 0.98rem;
-    line-height: 1.55;
-    max-width: 42ch;
-    margin-left: 0;
-    margin-right: 0;
-  }
-  .step {
-    display: grid;
-    grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
-    gap: 64px;
-    align-items: center;
-    padding: 72px 0;
-    border-bottom: 1px solid var(--tick);
-  }
-  .step:last-child { border-bottom: none; }
-  .step:nth-child(even) .step-copy { order: 2; }
-  .step-copy .tc { color: var(--signal); }
-  .step-copy .tc .in { color: var(--slate); }
-  .step-copy h3 {
-    font-weight: 700;
-    font-stretch: 92%;
-    font-size: 1.7rem;
-    margin: 10px 0 12px;
-    letter-spacing: -0.01em;
-  }
-  .step-copy p { color: var(--slate); }
-  .step-copy .kbd {
-    font-family: var(--mono);
-    font-size: 0.82em;
-    background: #eef1f5;
-    border: 1px solid var(--tick);
-    border-radius: 4px;
-    padding: 1px 5px;
-  }
-  .shot {
-    border-radius: 12px;
-    border: 1px solid var(--tick);
-    background: #fff;
-    box-shadow: 0 32px 70px -32px rgba(23, 32, 44, 0.35);
-    overflow: hidden;
-  }
-  .shot img { width: 100%; }
-
-  /* ---------- Privacy band ---------- */
-  .privacy {
-    background: var(--navy);
-    color: #eef3f9;
-    padding: 72px 24px;
-  }
-  .privacy-inner {
-    max-width: 1240px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 48px;
-  }
-  .privacy-inner > div:first-child { grid-column: 1 / -1; max-width: 46ch; }
-  .privacy h2 {
-    font-weight: 800;
-    font-stretch: 90%;
-    font-size: clamp(1.6rem, 3.4vw, 2.3rem);
-    letter-spacing: -0.01em;
-  }
-  .privacy h2 em { font-style: normal; color: var(--signal); }
-  .privacy .lead { color: #b9c7d8; margin-top: 12px; }
-  .privacy h4 {
-    font-family: var(--mono);
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #9fb2c8;
-    margin-bottom: 10px;
-  }
-  .privacy p { color: #b9c7d8; font-size: 0.98rem; }
-
-  /* ---------- Closing CTA ---------- */
-  .closing {
-    max-width: 1240px;
-    margin: 0 auto;
-    padding: 72px 24px 56px;
-    text-align: center;
-  }
-  .closing h2 {
-    font-weight: 800;
-    font-stretch: 90%;
-    font-size: clamp(1.65rem, 3.6vw, 2.35rem);
-    line-height: 1.12;
-    letter-spacing: -0.02em;
-    max-width: 20ch;
-    margin: 0 auto;
-  }
-  .closing p {
-    color: var(--slate);
-    margin: 12px auto 0;
-    max-width: 44ch;
-  }
-  .closing .hero-cta { margin: 28px 0 0; }
-  .closing .hero-note { margin-top: 18px; }
-
-  /* ---------- Footer ---------- */
-  footer {
-    padding: 48px 24px;
-    text-align: center;
-    color: var(--slate);
-    font-size: 0.92rem;
-  }
-  footer .tc { color: var(--slate); }
-  footer a { color: var(--ink); }
-
-  @media (prefers-color-scheme: dark) {
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Clip Assembler — Local-First Drone Video Culling for macOS</title>
+  <meta name="description"
+    content="Cull raw drone footage locally on your Mac, review scored clips, and export editable FCPXML, DaVinci Resolve XML, or EDL timelines. Free and open source." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="https://evilkels.github.io/ai-clip-assembler/" />
+  <link rel="icon" href="img/icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="AI Clip Assembler — Local-First Drone Video Culling for macOS" />
+  <meta property="og:description"
+    content="Cull raw drone footage locally on your Mac, review scored clips, and export editable FCPXML, DaVinci Resolve XML, or EDL timelines. Free and open source." />
+  <meta property="og:url" content="https://evilkels.github.io/ai-clip-assembler/" />
+  <meta property="og:image" content="https://evilkels.github.io/ai-clip-assembler/img/social-card.png" />
+  <meta property="og:image:width" content="1376" />
+  <meta property="og:image:height" content="768" />
+  <meta property="og:image:alt" content="AI Clip Assembler cover artwork showing the app's editorial branding" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AI Clip Assembler — Local-First Drone Video Culling for macOS" />
+  <meta name="twitter:description"
+    content="Cull raw drone footage locally on your Mac, review scored clips, and export editable FCPXML, DaVinci Resolve XML, or EDL timelines. Free and open source." />
+  <meta name="twitter:image" content="https://evilkels.github.io/ai-clip-assembler/img/social-card.png" />
+  <meta name="twitter:image:alt" content="AI Clip Assembler cover artwork showing the app's editorial branding" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://evilkels.github.io/ai-clip-assembler/#website",
+      "name": "AI Clip Assembler",
+      "url": "https://evilkels.github.io/ai-clip-assembler/"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://evilkels.github.io/ai-clip-assembler/#software",
+      "name": "AI Clip Assembler",
+      "url": "https://evilkels.github.io/ai-clip-assembler/",
+      "description": "Cull raw drone footage locally on your Mac, review scored clips, and export editable FCPXML, DaVinci Resolve XML, or EDL timelines.",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "macOS",
+      "offers": {
+        "@type": "Offer",
+        "price": 0
+      },
+      "downloadUrl": "https://github.com/evilkels/ai-clip-assembler/releases",
+      "license": "https://github.com/evilkels/ai-clip-assembler/blob/main/LICENSE",
+      "screenshot": "https://evilkels.github.io/ai-clip-assembler/img/review.png",
+      "featureList": "Local footage scoring, candidate clip review, timeline editing, FCPXML export, DaVinci Resolve XML export, EDL export",
+      "isAccessibleForFree": true
+    }
+  ]
+}
+</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap"
+    rel="stylesheet" />
+  <style>
     :root {
-      --paper: #111a24;
-      --paper-bright: #17222f;
-      --ink: #f1f4f7;
-      --navy: #101a25;
-      --navy-soft: #c7d2dd;
-      --slate: #aebdcb;
-      --tick: #2b3a4a;
-      --tick-dark: #8291a0;
+      --navy: #182330;
+      --navy-soft: #273544;
+      --paper: #f0f2f4;
+      --paper-bright: #fafbfc;
+      --ink: #17202c;
+      --signal: #ef5358;
+      --signal-dark: #d93f46;
+      --slate: #617080;
+      --tick: #d2d8de;
+      --tick-dark: #9da8b3;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Archivo', system-ui, sans-serif;
     }
-    .hero {
-      background:
-        radial-gradient(circle at 79% 27%, rgba(239, 83, 88, 0.24) 0 7px, transparent 8px),
-        radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.18) 0 6px, transparent 7px),
-        linear-gradient(135deg, #172230 0%, #101923 62%, #0d151e 100%);
-    }
-    .hero-network { color: #8d9dab; opacity: 0.48; }
-    .hero-network circle { fill: #a0afbc; stroke: #15202c; }
-    .hero-network circle.signal { stroke: #43252a; }
-    .btn-ghost { color: var(--ink); border-color: #4b5e70; background: rgba(255, 255, 255, 0.04); }
-    .btn-ghost:hover { border-color: #93a5b6; background: rgba(255, 255, 255, 0.09); }
-    .hero-mark {
-      border-color: rgba(174, 189, 203, 0.22);
-      background: rgba(12, 18, 26, 0.62);
-      box-shadow: 0 20px 38px -28px rgba(0, 0, 0, 0.8);
-    }
-    .hero-mark .tc { color: #ff8185; }
-    .hero-mark p { color: var(--ink); }
-    .shot { border-color: #415367; box-shadow: 0 32px 70px -32px rgba(0, 0, 0, 0.75); }
-    .step-copy .kbd { background: #22303e; border-color: #3c4d60; }
-    footer a { color: var(--ink); }
-  }
 
-  @media (max-width: 800px) {
-    .hero { padding-top: 20px; }
-    .hero-network { width: 520px; right: -255px; top: 72px; opacity: 0.35; }
-    .hero-brand { margin-bottom: 16px; }
-    .hero-grid { gap: 16px; padding-bottom: 28px; }
-    .hero-sub { margin-top: 12px; }
-    .hero-cta { margin-top: 20px; gap: 10px; }
-    .btn { padding: 14px 24px; }
-    .hero-mark {
-      text-align: center;
-      width: min(100%, 420px);
-      padding: 16px;
-      gap: 12px;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    .hero-mark img { width: 106px; }
-    .hero-mark .tc { margin-bottom: 6px; }
-    .hero-mark p { max-width: 36ch; }
-    .hero-sub {
-      font-size: 1.05rem;
-      max-width: 36ch;
+
+    html {
+      scroll-behavior: smooth;
     }
-    .steps {
-      padding-left: clamp(18px, 6vw, 40px);
-      padding-right: clamp(18px, 6vw, 40px);
-      padding-top: 0;
+
+    body {
+      font-family: var(--sans);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 17px;
+      line-height: 1.6;
     }
-    .steps-intro {
-      margin-top: 0;
+
+    a {
+      color: inherit;
+    }
+
+    img {
       max-width: 100%;
-      padding: 16px 20px 14px;
-      grid-template-columns: 1fr;
-      gap: 10px;
+      display: block;
+    }
+
+    .tc {
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- Hero ---------- */
+    .hero {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 79% 27%, rgba(239, 83, 88, 0.16) 0 7px, transparent 8px),
+        radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.12) 0 6px, transparent 7px),
+        linear-gradient(135deg, #fafbfc 0%, #edf0f3 62%, #e4e8ec 100%);
+      color: var(--ink);
+      padding: 30px 24px 0;
       border-bottom: 1px solid var(--tick);
     }
-    .steps-intro > div { max-width: 100%; }
-    .intro-panel {
-      justify-self: start;
-      width: 100%;
-      padding: 16px 18px;
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    .hero-network {
+      position: absolute;
+      z-index: 0;
+      width: min(740px, 62vw);
+      right: max(24px, calc((100vw - 1240px) / 2));
+      top: 10px;
+      height: 480px;
+      color: #526170;
+      opacity: 0.64;
+      pointer-events: none;
+    }
+
+    .hero-network line {
+      stroke: currentColor;
+      stroke-width: 1.1;
+    }
+
+    .hero-network circle {
+      fill: #536170;
+      stroke: #edf0f3;
+      stroke-width: 5;
+    }
+
+    .hero-network circle.signal {
+      fill: var(--signal);
+      stroke: #ffd9da;
+    }
+
+    .hero-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .hero-brand .tc {
+      color: var(--navy-soft);
+    }
+
+    .hero-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+      padding-bottom: 40px;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 760px;
+    }
+
+    .hero h1 {
+      font-weight: 800;
+      font-stretch: 100%;
+      font-size: clamp(2.35rem, 5.8vw, 4.3rem);
+      line-height: 1.03;
+      letter-spacing: -0.03em;
+      max-width: 12ch;
+      margin: 0 auto;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--signal);
+      display: block;
       margin-top: 4px;
     }
+
+    .hero-sub {
+      margin: 18px auto 0;
+      max-width: 52ch;
+      font-size: 1.125rem;
+      line-height: 1.55;
+      font-weight: 400;
+      color: var(--navy-soft);
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin: 28px 0 0;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 16px 28px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1.02rem;
+    }
+
+    .btn:focus-visible,
+    a:focus-visible {
+      outline: 3px solid var(--signal);
+      outline-offset: 3px;
+    }
+
+    .btn-primary {
+      background: var(--signal);
+      color: #fff;
+      box-shadow: 0 8px 18px -12px rgba(217, 63, 70, 0.85);
+    }
+
+    .btn-primary:hover {
+      background: var(--signal-dark);
+    }
+
+    .btn-ghost {
+      border: 1px solid #aab5bf;
+      color: var(--navy);
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .btn-ghost:hover {
+      border-color: #687787;
+      background: #fff;
+    }
+
+    .hero-note {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: var(--slate);
+      margin: 4px 0 0;
+      text-align: center;
+    }
+
+    .hero-mark {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+      width: min(100%, 420px);
+      padding: 20px 22px 18px;
+      border: 1px solid rgba(83, 97, 112, 0.28);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.68);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 16px 28px -22px rgba(23, 32, 44, 0.34);
+    }
+
+    .hero-mark img {
+      width: 146px;
+      aspect-ratio: 1 / 1;
+      height: auto;
+      object-fit: cover;
+      border-radius: 18px;
+      filter: drop-shadow(0 12px 13px rgba(23, 32, 44, 0.18));
+    }
+
+    .hero-mark p {
+      color: var(--navy-soft);
+      max-width: 28ch;
+      font-weight: 700;
+      font-size: 1.04rem;
+      line-height: 1.25;
+    }
+
+    .hero-mark .tc {
+      color: var(--signal-dark);
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    /* ---------- Ruler / playhead signature ---------- */
+    .ruler {
+      position: relative;
+      height: 58px;
+      overflow: hidden;
+      background-color: var(--paper-bright);
+      background:
+        repeating-linear-gradient(90deg,
+          var(--tick) 0 1px, transparent 1px 12.5%);
+      border-top: 1px solid var(--tick);
+    }
+
+    .ruler .marks {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px 0;
+      color: #82909c;
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+
+    .playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 2px;
+      background: var(--signal);
+      animation: scrub 24s linear infinite;
+    }
+
+    .playhead::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -5px;
+      border: 6px solid transparent;
+      border-top: 8px solid var(--signal);
+    }
+
+    @keyframes scrub {
+      from {
+        transform: translateX(0);
+      }
+
+      to {
+        transform: translateX(100vw);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .playhead {
+        animation: none;
+        left: 34%;
+      }
+
+      html {
+        scroll-behavior: auto;
+      }
+    }
+
+    /* ---------- Workflow sections ---------- */
+    .steps {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 28px 24px 8px;
+    }
+
+    .steps-intro {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 72px 24px 24px;
+      border-bottom: 1px solid var(--tick);
+    }
+
+    .steps-intro .tc {
+      display: block;
+      color: var(--signal);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
     .steps-intro h2 {
-      font-size: clamp(1.5rem, 6.2vw, 2.05rem);
-      line-height: 1.06;
-      max-width: 13ch;
+      font-weight: 700;
+      font-stretch: 92%;
+      font-size: 1.7rem;
+      line-height: 1.12;
+      letter-spacing: -0.01em;
+      max-width: 18ch;
+      margin: 0;
     }
+
     .steps-intro p {
+      color: var(--slate);
+      margin-top: 12px;
       font-size: 0.98rem;
-      line-height: 1.5;
-      max-width: 32ch;
-      margin-top: 10px;
+      line-height: 1.55;
+      max-width: 42ch;
+      margin-left: 0;
+      margin-right: 0;
     }
-    .step { grid-template-columns: 1fr; gap: 20px; padding: 36px 0; }
-    .step:nth-child(even) .step-copy { order: 0; }
-    .step-copy h3 { font-size: 1.45rem; line-height: 1.12; }
-    .step-copy p { line-height: 1.6; }
-    .privacy-inner { grid-template-columns: 1fr; gap: 32px; }
-    .privacy { padding: 64px 20px; }
-    .closing { padding: 48px 20px 36px; }
-  }
-</style>
+
+    .step {
+      display: grid;
+      grid-template-columns: minmax(250px, 4fr) minmax(0, 8fr);
+      gap: 64px;
+      align-items: center;
+      padding: 72px 0;
+      border-bottom: 1px solid var(--tick);
+    }
+
+    .step:last-child {
+      border-bottom: none;
+    }
+
+    .step:nth-child(even) .step-copy {
+      order: 2;
+    }
+
+    .step-copy .tc {
+      color: var(--signal);
+    }
+
+    .step-copy .tc .in {
+      color: var(--slate);
+    }
+
+    .step-copy h3 {
+      font-weight: 700;
+      font-stretch: 92%;
+      font-size: 1.7rem;
+      margin: 10px 0 12px;
+      letter-spacing: -0.01em;
+    }
+
+    .step-copy p {
+      color: var(--slate);
+    }
+
+    .step-copy .kbd {
+      font-family: var(--mono);
+      font-size: 0.82em;
+      background: #eef1f5;
+      border: 1px solid var(--tick);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    .shot {
+      border-radius: 12px;
+      border: 1px solid var(--tick);
+      background: #fff;
+      box-shadow: 0 32px 70px -32px rgba(23, 32, 44, 0.35);
+      overflow: hidden;
+    }
+
+    .shot img {
+      width: 100%;
+    }
+
+    /* ---------- Privacy band ---------- */
+    .privacy {
+      background: var(--navy);
+      color: #eef3f9;
+      padding: 72px 24px;
+    }
+
+    .privacy-inner {
+      max-width: 1240px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 48px;
+    }
+
+    .privacy-inner>div:first-child {
+      grid-column: 1 / -1;
+      max-width: 46ch;
+    }
+
+    .privacy h2 {
+      font-weight: 800;
+      font-stretch: 90%;
+      font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+      letter-spacing: -0.01em;
+    }
+
+    .privacy h2 em {
+      font-style: normal;
+      color: var(--signal);
+    }
+
+    .privacy .lead {
+      color: #b9c7d8;
+      margin-top: 12px;
+    }
+
+    .privacy h4 {
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #9fb2c8;
+      margin-bottom: 10px;
+    }
+
+    .privacy p {
+      color: #b9c7d8;
+      font-size: 0.98rem;
+    }
+
+    /* ---------- FAQ ---------- */
+    .faq {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      border-bottom: 1px solid var(--tick);
+    }
+
+    .faq>.tc {
+      color: var(--signal);
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .faq h2 {
+      font-weight: 700;
+      font-stretch: 92%;
+      font-size: 1.7rem;
+      letter-spacing: -0.01em;
+      margin: 0 0 32px;
+    }
+
+    .faq-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px 48px;
+    }
+
+    .faq-item h3 {
+      font-weight: 700;
+      font-stretch: 92%;
+      font-size: 1.05rem;
+      letter-spacing: -0.005em;
+      margin: 0 0 8px;
+    }
+
+    .faq-item p {
+      color: var(--slate);
+      font-size: 0.98rem;
+    }
+
+    /* ---------- Closing CTA ---------- */
+    .closing {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 72px 24px 56px;
+      text-align: center;
+    }
+
+    .closing h2 {
+      font-weight: 800;
+      font-stretch: 90%;
+      font-size: clamp(1.65rem, 3.6vw, 2.35rem);
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      max-width: 20ch;
+      margin: 0 auto;
+    }
+
+    .closing p {
+      color: var(--slate);
+      margin: 12px auto 0;
+      max-width: 44ch;
+    }
+
+    .closing .hero-cta {
+      margin: 28px 0 0;
+    }
+
+    .closing .hero-note {
+      margin-top: 18px;
+    }
+
+    /* ---------- Footer ---------- */
+    footer {
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--slate);
+      font-size: 0.92rem;
+    }
+
+    footer .tc {
+      color: var(--slate);
+    }
+
+    footer a {
+      color: var(--ink);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #111a24;
+        --paper-bright: #17222f;
+        --ink: #f1f4f7;
+        --navy: #101a25;
+        --navy-soft: #c7d2dd;
+        --slate: #aebdcb;
+        --tick: #2b3a4a;
+        --tick-dark: #8291a0;
+      }
+
+      .hero {
+        background:
+          radial-gradient(circle at 79% 27%, rgba(239, 83, 88, 0.24) 0 7px, transparent 8px),
+          radial-gradient(circle at 68% 73%, rgba(239, 83, 88, 0.18) 0 6px, transparent 7px),
+          linear-gradient(135deg, #172230 0%, #101923 62%, #0d151e 100%);
+      }
+
+      .hero-network {
+        color: #8d9dab;
+        opacity: 0.48;
+      }
+
+      .hero-network circle {
+        fill: #a0afbc;
+        stroke: #15202c;
+      }
+
+      .hero-network circle.signal {
+        stroke: #43252a;
+      }
+
+      .btn-ghost {
+        color: var(--ink);
+        border-color: #4b5e70;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .btn-ghost:hover {
+        border-color: #93a5b6;
+        background: rgba(255, 255, 255, 0.09);
+      }
+
+      .hero-mark {
+        border-color: rgba(174, 189, 203, 0.22);
+        background: rgba(12, 18, 26, 0.62);
+        box-shadow: 0 20px 38px -28px rgba(0, 0, 0, 0.8);
+      }
+
+      .hero-mark .tc {
+        color: #ff8185;
+      }
+
+      .hero-mark p {
+        color: var(--ink);
+      }
+
+      .shot {
+        border-color: #415367;
+        box-shadow: 0 32px 70px -32px rgba(0, 0, 0, 0.75);
+      }
+
+      .step-copy .kbd {
+        background: #22303e;
+        border-color: #3c4d60;
+      }
+
+      footer a {
+        color: var(--ink);
+      }
+    }
+
+    @media (max-width: 800px) {
+      .hero {
+        padding-top: 20px;
+      }
+
+      .hero-network {
+        width: 520px;
+        right: -255px;
+        top: 72px;
+        opacity: 0.35;
+      }
+
+      .hero-brand {
+        margin-bottom: 16px;
+      }
+
+      .hero-grid {
+        gap: 16px;
+        padding-bottom: 28px;
+      }
+
+      .hero-sub {
+        margin-top: 12px;
+      }
+
+      .hero-cta {
+        margin-top: 20px;
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 14px 24px;
+      }
+
+      .hero-mark {
+        text-align: center;
+        width: min(100%, 420px);
+        padding: 16px;
+        gap: 12px;
+      }
+
+      .hero-mark img {
+        width: 106px;
+      }
+
+      .hero-mark .tc {
+        margin-bottom: 6px;
+      }
+
+      .hero-mark p {
+        max-width: 36ch;
+      }
+
+      .hero-sub {
+        font-size: 1.05rem;
+        max-width: 36ch;
+      }
+
+      .steps {
+        padding-left: clamp(18px, 6vw, 40px);
+        padding-right: clamp(18px, 6vw, 40px);
+        padding-top: 0;
+      }
+
+      .steps-intro {
+        margin-top: 0;
+        max-width: 100%;
+        padding: 16px 20px 14px;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        border-bottom: 1px solid var(--tick);
+      }
+
+      .steps-intro>div {
+        max-width: 100%;
+      }
+
+      .intro-panel {
+        justify-self: start;
+        width: 100%;
+        padding: 16px 18px;
+        margin-top: 4px;
+      }
+
+      .steps-intro h2 {
+        font-size: clamp(1.5rem, 6.2vw, 2.05rem);
+        line-height: 1.06;
+        max-width: 13ch;
+      }
+
+      .steps-intro p {
+        font-size: 0.98rem;
+        line-height: 1.5;
+        max-width: 32ch;
+        margin-top: 10px;
+      }
+
+      .step {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 36px 0;
+      }
+
+      .step:nth-child(even) .step-copy {
+        order: 0;
+      }
+
+      .step-copy h3 {
+        font-size: 1.45rem;
+        line-height: 1.12;
+      }
+
+      .step-copy p {
+        line-height: 1.6;
+      }
+
+      .privacy-inner {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+
+      .privacy {
+        padding: 64px 20px;
+      }
+
+      .faq {
+        padding: 48px 20px;
+      }
+
+      .faq-list {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .closing {
+        padding: 48px 20px 36px;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<header class="hero">
-  <svg class="hero-network" viewBox="0 0 760 480" fill="none" aria-hidden="true">
-    <line x1="116" y1="116" x2="244" y2="76" /><line x1="116" y1="116" x2="194" y2="225" />
-    <line x1="244" y1="76" x2="342" y2="148" /><line x1="244" y1="76" x2="384" y2="42" />
-    <line x1="342" y1="148" x2="455" y2="96" /><line x1="342" y1="148" x2="418" y2="268" />
-    <line x1="455" y1="96" x2="592" y2="156" /><line x1="455" y1="96" x2="540" y2="34" />
-    <line x1="592" y1="156" x2="670" y2="86" /><line x1="592" y1="156" x2="618" y2="278" />
-    <line x1="194" y1="225" x2="306" y2="326" /><line x1="306" y1="326" x2="418" y2="268" />
-    <line x1="418" y1="268" x2="536" y2="370" /><line x1="536" y1="370" x2="618" y2="278" />
-    <circle cx="116" cy="116" r="10" /><circle class="signal" cx="244" cy="76" r="11" />
-    <circle cx="194" cy="225" r="10" /><circle cx="342" cy="148" r="10" /><circle cx="384" cy="42" r="10" />
-    <circle class="signal" cx="455" cy="96" r="11" /><circle cx="418" cy="268" r="10" /><circle cx="592" cy="156" r="10" />
-    <circle cx="670" cy="86" r="10" /><circle cx="306" cy="326" r="10" /><circle class="signal" cx="536" cy="370" r="11" />
-    <circle cx="618" cy="278" r="10" /><circle cx="540" cy="34" r="10" />
-  </svg>
-  <div class="hero-inner">
-    <div class="hero-brand">
-      <span class="tc">AI Clip Assembler · macOS</span>
-    </div>
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <h1>Turn 3 hours of drone footage <em>into the cut worth keeping.</em></h1>
-        <p class="hero-sub">
-          Find the best clips before edit.
-        </p>
-        <div class="hero-cta">
-          <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
-          <a class="btn btn-ghost" href="#how-it-works">See how it works</a>
-        </div>
+  <header class="hero">
+    <svg class="hero-network" viewBox="0 0 760 480" fill="none" aria-hidden="true">
+      <line x1="116" y1="116" x2="244" y2="76" />
+      <line x1="116" y1="116" x2="194" y2="225" />
+      <line x1="244" y1="76" x2="342" y2="148" />
+      <line x1="244" y1="76" x2="384" y2="42" />
+      <line x1="342" y1="148" x2="455" y2="96" />
+      <line x1="342" y1="148" x2="418" y2="268" />
+      <line x1="455" y1="96" x2="592" y2="156" />
+      <line x1="455" y1="96" x2="540" y2="34" />
+      <line x1="592" y1="156" x2="670" y2="86" />
+      <line x1="592" y1="156" x2="618" y2="278" />
+      <line x1="194" y1="225" x2="306" y2="326" />
+      <line x1="306" y1="326" x2="418" y2="268" />
+      <line x1="418" y1="268" x2="536" y2="370" />
+      <line x1="536" y1="370" x2="618" y2="278" />
+      <circle cx="116" cy="116" r="10" />
+      <circle class="signal" cx="244" cy="76" r="11" />
+      <circle cx="194" cy="225" r="10" />
+      <circle cx="342" cy="148" r="10" />
+      <circle cx="384" cy="42" r="10" />
+      <circle class="signal" cx="455" cy="96" r="11" />
+      <circle cx="418" cy="268" r="10" />
+      <circle cx="592" cy="156" r="10" />
+      <circle cx="670" cy="86" r="10" />
+      <circle cx="306" cy="326" r="10" />
+      <circle class="signal" cx="536" cy="370" r="11" />
+      <circle cx="618" cy="278" r="10" />
+      <circle cx="540" cy="34" r="10" />
+    </svg>
+    <div class="hero-inner">
+      <div class="hero-brand">
+        <span class="tc">AI Clip Assembler · macOS</span>
       </div>
-      <aside class="hero-mark">
-        <img src="img/icon.png" alt="" width="94" height="94" />
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1>Turn hours of drone footage <em>into a cut worth keeping.</em></h1>
+          <p class="hero-sub">
+            AI Clip Assembler is a free, local-first macOS app that scores raw footage
+            for sharpness, motion stability, and exposure, then exports an editable
+            FCPXML, DaVinci Resolve XML, or EDL timeline.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for
+              macOS</a>
+            <a class="btn btn-ghost" href="#how-it-works">See how it works</a>
+          </div>
+        </div>
+        <aside class="hero-mark">
+          <img src="img/icon.png" alt="" width="94" height="94" />
+          <div>
+            <span class="tc">Local-first editor</span>
+            <p>Built for drone pilots who already edit.</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <div class="ruler" aria-hidden="true">
+      <div class="marks">
+        <span>00:00</span><span>00:20</span><span>00:40</span><span>01:00</span>
+        <span>01:20</span><span>01:40</span><span>02:00</span><span>02:47</span>
+      </div>
+      <div class="playhead"></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="steps-intro" id="how-it-works">
+      <div>
+        <span class="tc">Overview</span>
+        <h2>What is AI Clip Assembler?</h2>
+        <p>
+          Drop in a folder of raw clips. AI Clip Assembler scores each one on sharpness, smoothness, and exposure — then
+          hands you an editable timeline for Final Cut Pro or DaVinci Resolve.
+        </p>
+      </div>
+    </div>
+
+    <div class="steps">
+      <section class="step">
+        <div class="step-copy">
+          <span class="tc"><span class="in">IN</span> 00:00 · Import</span>
+          <h3>Drop in the raw files</h3>
+          <p>
+            Point it at a folder of MP4/MOV files. Each video is probed for duration,
+            frame rate, and codec, then analyzed for stable, interesting moments —
+            scene by scene, on your own hardware.
+          </p>
+        </div>
+        <div class="shot"><img src="img/import.png" alt="Import screen with three source videos analyzed"
+            loading="lazy" /></div>
+      </section>
+
+      <section class="step">
+        <div class="step-copy">
+          <span class="tc"><span class="in">IN</span> 00:42 · Review</span>
+          <h3>Review clips. Build a montage.</h3>
+          <p>
+            Every candidate arrives with scores and a reason. Include the keepers,
+            exclude the rest, then ask the optional AI agent for editable versions:
+            a punchy social cut, cinematic highlight, or long scenic montage.
+            Compare the options, apply one to the Timeline, and keep the final call.
+          </p>
+        </div>
+        <div class="shot"><img src="img/review.png" alt="Review screen with three suggested cuts ready to apply"
+            loading="lazy" /></div>
+      </section>
+
+      <section class="step">
+        <div class="step-copy">
+          <span class="tc"><span class="in">IN</span> 01:36 · Timeline</span>
+          <h3>Trim like you mean it</h3>
+          <p>
+            Reorder by dragging, trim from clip edges, scrub the ruler, and play it back
+            with <span class="kbd">J</span> <span class="kbd">K</span> <span class="kbd">L</span>
+            transport keys. Every edit — yours or the AI's — lands in one undo history.
+          </p>
+        </div>
+        <div class="shot"><img src="img/timeline.png" alt="Timeline screen with four clips and a playhead"
+            loading="lazy" /></div>
+      </section>
+
+      <section class="step">
+        <div class="step-copy">
+          <span class="tc"><span class="in">IN</span> 02:47 · Export</span>
+          <h3>Hand off, don't lock in</h3>
+          <p>
+            Export a real, editable timeline — DaVinci Resolve XML, Final Cut Pro FCPXML,
+            or plain EDL — with media paths that survive moving the project folder.
+            Finish the cut in the editor you already trust.
+          </p>
+        </div>
+        <div class="shot"><img src="img/export.png" alt="Export screen with DaVinci Resolve, FCPXML, and EDL options"
+            loading="lazy" /></div>
+      </section>
+    </div>
+
+    <section class="privacy">
+      <div class="privacy-inner">
         <div>
-          <span class="tc">Local-first editor</span>
-          <p>Built for drone pilots who already edit.</p>
+          <h2>Local-first, <em>by decision</em></h2>
+          <p class="lead">
+            Not a setting buried in preferences — an architecture decision, recorded
+            and enforced in the codebase.
+          </p>
         </div>
-      </aside>
-    </div>
-  </div>
-  <div class="ruler" aria-hidden="true">
-    <div class="marks">
-      <span>00:00</span><span>00:20</span><span>00:40</span><span>01:00</span>
-      <span>01:20</span><span>01:40</span><span>02:00</span><span>02:47</span>
-    </div>
-    <div class="playhead"></div>
-  </div>
-</header>
-
-<main>
-  <div class="steps-intro" id="how-it-works">
-    <div>
-      <span class="tc">Overview</span>
-      <h2>What is AI Clip Assembler?</h2>
-      <p>
-        Drop in a folder of raw clips. AI Clip Assembler scores each one on sharpness, smoothness, and exposure — then hands you an editable timeline for Final Cut Pro or DaVinci Resolve.
-      </p>
-    </div>
-  </div>
-
-  <div class="steps">
-    <section class="step">
-      <div class="step-copy">
-        <span class="tc"><span class="in">IN</span> 00:00 · Import</span>
-        <h3>Drop in the raw files</h3>
-        <p>
-          Point it at a folder of MP4/MOV files. Each video is probed for duration,
-          frame rate, and codec, then analyzed for stable, interesting moments —
-          scene by scene, on your own hardware.
-        </p>
+        <div>
+          <h4>Your footage stays</h4>
+          <p>
+            Analysis, scoring, and playback run entirely on your Mac. Provider-backed
+            AI harnesses are opt-in per project, with explicit consent before they send
+            sampled frames or metadata — or use the rule-based mode with no AI at all.
+          </p>
+        </div>
+        <div>
+          <h4>Bring your own AI</h4>
+          <p>
+            Already talk to Claude Desktop or Codex? Connect it in Settings and ask it
+            to review candidates or edit your timeline. Its edits appear live in the
+            app — and every one is undoable. Anything the external assistant reads,
+            including frames you ask it to view, follows that provider's privacy policy.
+          </p>
+        </div>
+        <div>
+          <h4>Open source</h4>
+          <p>
+            The whole app — backend, UI, and the architecture decisions behind it —
+            is on GitHub. Read the code that enforces local defaults and
+            project-scoped consent for provider-backed harnesses.
+          </p>
+        </div>
       </div>
-      <div class="shot"><img src="img/import.png" alt="Import screen with three source videos analyzed" loading="lazy" /></div>
     </section>
 
-    <section class="step">
-      <div class="step-copy">
-        <span class="tc"><span class="in">IN</span> 00:42 · Review</span>
-        <h3>Review clips. Build a montage.</h3>
-        <p>
-          Every candidate arrives with scores and a reason. Include the keepers,
-          exclude the rest, then ask the optional AI agent for editable versions:
-          a punchy social cut, cinematic highlight, or long scenic montage.
-          Compare the options, apply one to the Timeline, and keep the final call.
-        </p>
+    <section class="faq" id="faq">
+      <span class="tc">FAQ</span>
+      <h2>Common questions</h2>
+      <div class="faq-list">
+        <div class="faq-item">
+          <h3>Does AI Clip Assembler upload my footage?</h3>
+          <p>
+            No, not by default. The Manual Harness — the default for every
+            project — scores footage locally with rule-based analysis and never
+            sends it anywhere. Provider-backed AI harnesses are optional: they
+            only run after you save explicit, per-project consent, and only
+            then send sampled frames or clip metadata to the provider you
+            configure. Separately, if you connect an external AI assistant and
+            ask it to inspect frames or metadata, that material is handled under
+            the external provider's privacy policy.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>Which video editors can use the exported timeline?</h3>
+          <p>
+            Final Cut Pro (FCPXML), DaVinci Resolve (Resolve XML), and any
+            editor that accepts EDL. FCPXML and Resolve XML preserve per-clip
+            Speed and Transform edits; EDL deliberately flattens Speed and
+            Transform and the export surfaces a warning so you know what to
+            reapply.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>Does it support Apple Silicon and Intel Macs?</h3>
+          <p>
+            Separate Apple Silicon and Intel DMGs are published. They bundle the
+            Python backend and a private FFmpeg runtime, so no separate Python,
+            Homebrew, or terminal setup is required. The current builds are
+            unsigned, so macOS may show a Gatekeeper warning on first launch;
+            clean-machine verification is still in progress.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>Is AI Clip Assembler free and open source?</h3>
+          <p>
+            Yes. AI Clip Assembler is free to download and released under the
+            MIT License, with the full backend, UI, and architecture decisions
+            on GitHub.
+          </p>
+        </div>
       </div>
-      <div class="shot"><img src="img/review.png" alt="Review screen with three suggested cuts ready to apply" loading="lazy" /></div>
     </section>
 
-    <section class="step">
-      <div class="step-copy">
-        <span class="tc"><span class="in">IN</span> 01:36 · Timeline</span>
-        <h3>Trim like you mean it</h3>
-        <p>
-          Reorder by dragging, trim from clip edges, scrub the ruler, and play it back
-          with <span class="kbd">J</span> <span class="kbd">K</span> <span class="kbd">L</span>
-          transport keys. Every edit — yours or the AI's — lands in one undo history.
-        </p>
+    <section class="closing">
+      <h2>Try it on your last flight</h2>
+      <p>Free and open source. Download the app, drop in a folder of clips, and see what it finds.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
+        <a class="btn btn-ghost" href="https://github.com/evilkels/ai-clip-assembler">View on GitHub</a>
       </div>
-      <div class="shot"><img src="img/timeline.png" alt="Timeline screen with four clips and a playhead" loading="lazy" /></div>
+      <p class="hero-note">Apple Silicon &amp; Intel · local by default · cloud AI is opt-in per project</p>
     </section>
+  </main>
 
-    <section class="step">
-      <div class="step-copy">
-        <span class="tc"><span class="in">IN</span> 02:47 · Export</span>
-        <h3>Hand off, don't lock in</h3>
-        <p>
-          Export a real, editable timeline — DaVinci Resolve XML, Final Cut Pro FCPXML,
-          or plain EDL — with media paths that survive moving the project folder.
-          Finish the cut in the editor you already trust.
-        </p>
-      </div>
-      <div class="shot"><img src="img/export.png" alt="Export screen with DaVinci Resolve, FCPXML, and EDL options" loading="lazy" /></div>
-    </section>
-  </div>
-
-  <section class="privacy">
-    <div class="privacy-inner">
-      <div>
-        <h2>Local-first, <em>by decision</em></h2>
-        <p class="lead">
-          Not a setting buried in preferences — an architecture decision, recorded
-          and enforced in the codebase.
-        </p>
-      </div>
-      <div>
-        <h4>Your footage stays</h4>
-        <p>
-          Analysis, scoring, and playback run entirely on your Mac. Cloud AI is
-          opt-in per project, with explicit consent before a single frame leaves —
-          or run the rule-based mode with no AI at all.
-        </p>
-      </div>
-      <div>
-        <h4>Bring your own AI</h4>
-        <p>
-          Already talk to Claude Desktop or Codex? Connect it in Settings and ask it
-          to review candidates or edit your timeline. Its edits appear live in the
-          app — and every one is undoable.
-        </p>
-      </div>
-      <div>
-        <h4>Open source</h4>
-        <p>
-          The whole app — backend, UI, and the architecture decisions behind it —
-          is on GitHub. Read the code that promises your footage never leaves.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section class="closing">
-    <h2>Try it on your last flight</h2>
-    <p>Free and open source. Download the app, drop in a folder of clips, and see what it finds.</p>
-    <div class="hero-cta">
-      <a class="btn btn-primary" href="https://github.com/evilkels/ai-clip-assembler/releases">Download for macOS</a>
-      <a class="btn btn-ghost" href="https://github.com/evilkels/ai-clip-assembler">View on GitHub</a>
-    </div>
-    <p class="hero-note">Apple Silicon &amp; Intel · footage never leaves your machine</p>
-  </section>
-</main>
-
-<footer>
-  <p class="tc">AI Clip Assembler</p>
-  <p style="margin-top:8px">
-    <a href="https://github.com/evilkels/ai-clip-assembler">GitHub</a> ·
-    <a href="https://github.com/evilkels/ai-clip-assembler/releases">Releases</a> ·
-    <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/USER_GUIDE.md">User guide</a>
-  </p>
-</footer>
+  <footer>
+    <p class="tc">AI Clip Assembler</p>
+    <p style="margin-top:8px">
+      <a href="https://github.com/evilkels/ai-clip-assembler">GitHub</a> ·
+      <a href="https://github.com/evilkels/ai-clip-assembler/releases">Releases</a> ·
+      <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/USER_GUIDE.md">User guide</a>
+    </p>
+  </footer>
 
 </body>
+
 </html>

@@ -322,7 +322,9 @@ export class ReviewModelAuthController {
         prompt: (prompt) => this.prompt(prompt, attempt),
         notify: (event) => this.notify(event, attempt),
       });
+      if (attempt.abortController.signal.aborted) throw new Error('Login cancelled');
       await attempt.browserOpen;
+      if (attempt.abortController.signal.aborted) throw new Error('Login cancelled');
       if (attempt.failure) throw new SafeAuthError(attempt.failure);
       return mapCredentialStatus(credential, pi, this.now());
     } catch (error) {

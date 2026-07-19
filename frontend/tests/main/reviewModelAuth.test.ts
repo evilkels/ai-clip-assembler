@@ -385,6 +385,31 @@ test('permits an immediate retry when cancelled preflight ignores abort', async 
   assert.equal((await staleAttempt).state, 'cancelled');
 });
 
+test('keeps a stale login result cancelled after a newer retry succeeds', async () => {
+  let resolveStaleLogin: ((value: Credential) => void) | undefined;
+  let loginCalls = 0;
+  const auth = controller({
+    runtimeFactory: async () => runtime(async () => {
+      loginCalls += 1;
+      if (loginCalls > 1) return SECRET_CREDENTIAL;
+      return new Promise<Credential>((resolve) => {
+        resolveStaleLogin = resolve;
+      });
+    }),
+  });
+
+  const staleAttempt = auth.signIn();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await auth.cancel()).state, 'cancelled');
+  assert.equal((await auth.signIn()).state, 'connected');
+
+  resolveStaleLogin?.(SECRET_CREDENTIAL);
+
+  assert.equal((await staleAttempt).state, 'cancelled');
+  assert.equal((await auth.signIn()).state, 'connected');
+  assert.equal(loginCalls, 3);
+});
+
 test('maps upstream failures containing fake tokens to a stable safe message', async () => {
   const logged: unknown[][] = [];
   const status = await controller({

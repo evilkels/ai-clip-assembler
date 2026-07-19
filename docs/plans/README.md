@@ -45,6 +45,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 | Plan | Status |
 |------|--------|
+| [review-model-sign-in](review-model-sign-in.md) | IN PROGRESS (2026-07-19) — secure Electron-main OpenAI Codex browser OAuth for the internal Pi review model, with token-free IPC, diagnostics rerun, compatibility handling, tests, and docs. |
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE (2026-07-02) — operating manual + ordered roadmap (trust → installability → presentability → arch debt → launch) for the public/monetized release, driven with Codex CLI. |
 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS (2026-07-10) — CI stages and preflights private FFmpeg/ffprobe plus their runtime-library closure; packaged startup now prefers the bundle. Remaining: diagnostics UI, GPL/source-compliance material, Intel CI evidence, signing/notarization, clean-machine DMG validation. |
 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE (2026-07-15) — separates coding-agent work from maintainer-owned demo capture, clean-machine proof, Search Console, editorial expertise, and human distribution; includes a 60-second demo brief. |

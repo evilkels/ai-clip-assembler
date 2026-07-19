@@ -21,6 +21,9 @@ import type {
 import { mockClips } from './mockClips';
 import type { ClipSuggestion } from '../types/generated';
 import type { VersionSet } from '../types/version';
+import type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
+
+export type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
 
 export type McpClientId = 'claude_desktop' | 'codex';
 
@@ -53,6 +56,9 @@ declare global {
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
       openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
+      getReviewModelAccountStatus?: () => Promise<ReviewModelAccountStatus>;
+      signInReviewModel?: () => Promise<ReviewModelAccountStatus>;
+      cancelReviewModelSignIn?: () => Promise<ReviewModelAccountStatus>;
       detectMcpClients?: () => Promise<McpClientStatus[]>;
       connectMcpClient?: (clientId: McpClientId) => Promise<McpConnectResult>;
     };
@@ -190,6 +196,29 @@ export async function setWindowTitle(projectName?: string): Promise<void> {
 export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
   const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
   return result?.opened ?? false;
+}
+
+const REVIEW_MODEL_DESKTOP_ERROR = 'Review model sign-in is only available in the desktop app';
+
+export async function getReviewModelAccountStatus(): Promise<ReviewModelAccountStatus> {
+  if (!window.clipAssembler?.getReviewModelAccountStatus) {
+    throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
+  }
+  return window.clipAssembler.getReviewModelAccountStatus();
+}
+
+export async function signInReviewModel(): Promise<ReviewModelAccountStatus> {
+  if (!window.clipAssembler?.signInReviewModel) {
+    throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
+  }
+  return window.clipAssembler.signInReviewModel();
+}
+
+export async function cancelReviewModelSignIn(): Promise<ReviewModelAccountStatus> {
+  if (!window.clipAssembler?.cancelReviewModelSignIn) {
+    throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
+  }
+  return window.clipAssembler.cancelReviewModelSignIn();
 }
 
 export async function detectMcpClients(): Promise<McpClientStatus[]> {

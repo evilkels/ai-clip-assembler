@@ -154,6 +154,47 @@ test('uses the supported Pi 0.80.10 runtime contract', async () => {
   assert.equal(status.state, 'connected');
 });
 
+test('forces embedded Pi OAuth to loopback only for the login lifetime', async () => {
+  const variable = 'PI_OAUTH_CALLBACK_HOST';
+  const previous = process.env[variable];
+  process.env[variable] = '0.0.0.0';
+  let releaseLogin: (() => void) | undefined;
+  let hostDuringLogin: string | undefined;
+
+  try {
+    const auth = controller({
+      runtimeFactory: undefined,
+      piSdkLoader: async () => ({
+        VERSION: '0.80.10',
+        ModelRuntime: {
+          create: async () => runtime(async () => {
+            hostDuringLogin = process.env[variable];
+            await new Promise<void>((resolve) => {
+              releaseLogin = resolve;
+            });
+            return SECRET_CREDENTIAL;
+          }),
+        },
+        readStoredCredential: () => undefined,
+      }),
+    });
+
+    const signIn = auth.signIn();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(hostDuringLogin, '127.0.0.1');
+    assert.equal(process.env[variable], '127.0.0.1');
+
+    releaseLogin?.();
+    assert.equal((await signIn).state, 'connected');
+    assert.equal(process.env[variable], '0.0.0.0');
+  } finally {
+    releaseLogin?.();
+    if (previous === undefined) delete process.env[variable];
+    else process.env[variable] = previous;
+  }
+});
+
 test('inspects SDK and CLI missing, old, and ready states without exposing command output', async () => {
   const incompatibleSdk = await inspectPiInstallation({
     sdkVersion: '0.80.9',

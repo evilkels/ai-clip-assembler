@@ -9,6 +9,8 @@ import {
 export const SUPPORTED_PI_SDK_VERSION = '0.80.10';
 export const MINIMUM_PI_CLI_VERSION = '0.73.1';
 const MAXIMUM_PI_CLI_VERSION_EXCLUSIVE = '1.0.0';
+const PI_OAUTH_CALLBACK_HOST = 'PI_OAUTH_CALLBACK_HOST';
+const LOOPBACK_CALLBACK_HOST = '127.0.0.1';
 
 const CANCELLED_DETAIL = 'Sign-in was cancelled.';
 const BROWSER_DETAIL = 'The OpenAI sign-in page could not be opened.';
@@ -65,9 +67,34 @@ async function loadPiSdk(): Promise<PiSdkSurface> {
   return import('@earendil-works/pi-coding-agent');
 }
 
+let callbackHostOverrideQueue: Promise<void> = Promise.resolve();
+
+async function withLoopbackCallbackHost<T>(operation: () => Promise<T>): Promise<T> {
+  const previousOverride = callbackHostOverrideQueue;
+  let releaseOverride: (() => void) | undefined;
+  callbackHostOverrideQueue = new Promise<void>((resolve) => {
+    releaseOverride = resolve;
+  });
+  await previousOverride;
+
+  const inheritedHost = process.env[PI_OAUTH_CALLBACK_HOST];
+  process.env[PI_OAUTH_CALLBACK_HOST] = LOOPBACK_CALLBACK_HOST;
+  try {
+    return await operation();
+  } finally {
+    if (inheritedHost === undefined) delete process.env[PI_OAUTH_CALLBACK_HOST];
+    else process.env[PI_OAUTH_CALLBACK_HOST] = inheritedHost;
+    releaseOverride?.();
+  }
+}
+
 async function createDefaultRuntime(loadSdk: PiSdkLoader): Promise<ReviewModelRuntime> {
   const { ModelRuntime } = await loadSdk();
-  return ModelRuntime.create({ allowModelNetwork: false });
+  const runtime = await ModelRuntime.create({ allowModelNetwork: false });
+  return {
+    login: (providerId, type, interaction) =>
+      withLoopbackCallbackHost(() => runtime.login(providerId, type, interaction)),
+  };
 }
 
 async function readDefaultCredential(loadSdk: PiSdkLoader): Promise<Credential | undefined> {

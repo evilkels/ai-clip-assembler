@@ -8,6 +8,7 @@ import {
 
 export const SUPPORTED_PI_SDK_VERSION = '0.80.10';
 export const MINIMUM_PI_CLI_VERSION = '0.73.1';
+const MAXIMUM_PI_CLI_VERSION_EXCLUSIVE = '1.0.0';
 
 const CANCELLED_DETAIL = 'Sign-in was cancelled.';
 const BROWSER_DETAIL = 'The OpenAI sign-in page could not be opened.';
@@ -139,6 +140,13 @@ export async function inspectPiInstallation(options: InspectPiOptions = {}): Pro
         detail: `Pi ${MINIMUM_PI_CLI_VERSION} or newer is required.`,
       };
     }
+    if (compareVersions(version, MAXIMUM_PI_CLI_VERSION_EXCLUSIVE) >= 0) {
+      return {
+        state: 'incompatible',
+        version,
+        detail: `Pi ${MINIMUM_PI_CLI_VERSION} or newer, but earlier than ${MAXIMUM_PI_CLI_VERSION_EXCLUSIVE}, is required.`,
+      };
+    }
     return { state: 'ready', version, detail: 'Pi is ready.' };
   } catch (error) {
     if (isMissingExecutable(error)) return { state: 'missing', detail: 'Pi is not installed.' };
@@ -219,7 +227,7 @@ export class ReviewModelAuthController {
     try {
       return await this.piInspector();
     } catch {
-      return { state: 'missing', detail: 'Pi could not be inspected.' };
+      return { state: 'incompatible', detail: 'Pi could not be inspected.' };
     }
   }
 
@@ -325,7 +333,11 @@ export class ReviewModelAuthController {
   }
 
   async cancel(): Promise<ReviewModelAccountStatus> {
-    this.activeAttempt?.abortController.abort();
+    const attempt = this.activeAttempt;
+    if (attempt) {
+      this.activeAttempt = undefined;
+      attempt.abortController.abort();
+    }
     return this.status('cancelled', CANCELLED_DETAIL, await this.getPiStatus());
   }
 }

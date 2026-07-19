@@ -109,6 +109,20 @@ test('reports missing and incompatible Pi installations separately', async () =>
   assert.equal(incompatible.pi.version, '0.72.0');
 });
 
+test('reports unexpected Pi inspection failures as incompatible, not missing', async () => {
+  const status = await controller({
+    piInspector: async () => {
+      throw new Error('unexpected SDK loader failure with fake-token');
+    },
+  }).getStatus();
+
+  assert.deepEqual(status.pi, {
+    state: 'incompatible',
+    detail: 'Pi could not be inspected.',
+  });
+  assert.doesNotMatch(JSON.stringify(status), /fake-token/);
+});
+
 test('uses the supported Pi 0.80.10 runtime contract', async () => {
   let interaction: AuthInteraction | undefined;
   let call: { provider: string; type: string } | undefined;
@@ -161,6 +175,14 @@ test('inspects SDK and CLI missing, old, and ready states without exposing comma
     sdkVersion: '0.80.10',
     execFile: async () => ({ stdout: 'pi 0.80.10', stderr: '' }),
   });
+  const latestCompatible = await inspectPiInstallation({
+    sdkVersion: '0.80.10',
+    execFile: async () => ({ stdout: 'pi 0.99.99', stderr: '' }),
+  });
+  const nextMajor = await inspectPiInstallation({
+    sdkVersion: '0.80.10',
+    execFile: async () => ({ stdout: 'pi 1.0.0', stderr: '' }),
+  });
 
   assert.equal(incompatibleSdk.state, 'incompatible');
   assert.equal(missing.state, 'missing');
@@ -170,7 +192,13 @@ test('inspects SDK and CLI missing, old, and ready states without exposing comma
     detail: 'Pi 0.73.1 or newer is required.',
   });
   assert.deepEqual(ready, { state: 'ready', version: '0.80.10', detail: 'Pi is ready.' });
-  assert.doesNotMatch(JSON.stringify([incompatibleSdk, missing, old, ready]), /fake-token/);
+  assert.deepEqual(latestCompatible, { state: 'ready', version: '0.99.99', detail: 'Pi is ready.' });
+  assert.deepEqual(nextMajor, {
+    state: 'incompatible',
+    version: '1.0.0',
+    detail: 'Pi 0.73.1 or newer, but earlier than 1.0.0, is required.',
+  });
+  assert.doesNotMatch(JSON.stringify([incompatibleSdk, missing, old, ready, latestCompatible, nextMajor]), /fake-token/);
 });
 
 test('treats a malformed oauth expiry as disconnected', async () => {
@@ -325,6 +353,36 @@ test('does not begin OAuth after cancellation while Pi inspection is pending', a
 
   assert.equal((await pending).state, 'cancelled');
   assert.equal(runtimeCalls, 0);
+});
+
+test('permits an immediate retry when cancelled preflight ignores abort', async () => {
+  let releaseOldInspection: ((value: PiInstallationStatus) => void) | undefined;
+  let inspectionCalls = 0;
+  let loginCalls = 0;
+  const auth = controller({
+    piInspector: () => {
+      inspectionCalls += 1;
+      if (inspectionCalls > 1) return Promise.resolve(READY_PI);
+      return new Promise<PiInstallationStatus>((resolve) => {
+        releaseOldInspection = resolve;
+      });
+    },
+    runtimeFactory: async () => runtime(async () => {
+      loginCalls += 1;
+      return SECRET_CREDENTIAL;
+    }),
+  });
+
+  const staleAttempt = auth.signIn();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await auth.cancel()).state, 'cancelled');
+
+  const retry = await auth.signIn();
+
+  assert.equal(retry.state, 'connected');
+  assert.equal(loginCalls, 1);
+  releaseOldInspection?.(READY_PI);
+  assert.equal((await staleAttempt).state, 'cancelled');
 });
 
 test('maps upstream failures containing fake tokens to a stable safe message', async () => {

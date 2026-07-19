@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** IN PROGRESS (2026-07-19)
+**Status:** DONE (2026-07-19) — automated verification is green; live OAuth and installed-package smoke tests remain manual QA.
+
+**Verification:** 359 backend tests, 30 main-process tests, 8 focused Connections E2E tests, backend/frontend lint, typecheck, production build, packaging-contract checks, Pi 0.80.10 API/dependency checks, and the production dependency audit pass. The remaining manual matrix is documented in `docs/MANUAL_QA_GUIDE.md` because it requires a real Plus/Pro account, external-browser interaction, and installed macOS artifacts.
 
 **Goal:** Let Editors authenticate the internal `pi_agent` review model with an OpenAI ChatGPT Plus/Pro subscription from Settings without exposing OAuth credentials outside Electron main.
 

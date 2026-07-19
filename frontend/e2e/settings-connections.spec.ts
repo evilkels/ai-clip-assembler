@@ -1,38 +1,28 @@
 import { expect, test, type Page } from '@playwright/test';
-
-type AccountState = 'connected' | 'expired' | 'disconnected' | 'waiting' | 'cancelled' | 'failed';
-type PiState = 'ready' | 'missing' | 'incompatible';
-
-interface AccountStatus {
-  provider: 'openai-codex';
-  state: AccountState;
-  detail: string;
-  expiresAt?: number;
-  pi: { state: PiState; version?: string; detail: string };
-}
+import type { ReviewModelAccountStatus } from '../src/shared/reviewModelAuth';
 
 const READY_PI = { state: 'ready' as const, version: '0.80.10', detail: 'Pi is ready.' };
 
 function status(
-  state: AccountState,
+  state: ReviewModelAccountStatus['state'],
   detail: string,
-  pi: AccountStatus['pi'] = READY_PI,
-): AccountStatus {
+  pi: ReviewModelAccountStatus['pi'] = READY_PI,
+): ReviewModelAccountStatus {
   return { provider: 'openai-codex', state, detail, pi };
 }
 
 async function installDesktopBridge(
   page: Page,
   options: {
-    initial: AccountStatus;
-    signIn?: AccountStatus;
-    cancel?: AccountStatus;
+    initial: ReviewModelAccountStatus;
+    signIn?: ReviewModelAccountStatus;
+    cancel?: ReviewModelAccountStatus;
     deferSignIn?: boolean;
   },
 ) {
   await page.addInitScript((config) => {
     let current = config.initial;
-    let completeSignIn: ((value: AccountStatus) => void) | undefined;
+    let completeSignIn: ((value: ReviewModelAccountStatus) => void) | undefined;
     const clients = [
       {
         id: 'claude_desktop' as const,
@@ -60,7 +50,7 @@ async function installDesktopBridge(
           completeSignIn?.(next);
           completeSignIn = undefined;
         },
-        setStatus(next: AccountStatus) {
+        setStatus(next: ReviewModelAccountStatus) {
           current = next;
         },
       },
@@ -70,7 +60,7 @@ async function installDesktopBridge(
         getReviewModelAccountStatus: async () => current,
         signInReviewModel: async () => {
           if (config.deferSignIn) {
-            return new Promise<AccountStatus>((resolve) => {
+            return new Promise<ReviewModelAccountStatus>((resolve) => {
               completeSignIn = resolve;
             });
           }
@@ -115,10 +105,11 @@ function diagnostics(reachable: boolean) {
   };
 }
 
-test('shows disconnected and starts browser sign-in', async ({ page }) => {
+test('cancels an in-flight sign-in and ignores its stale completion', async ({ page }) => {
   await installDesktopBridge(page, {
     initial: status('disconnected', 'Sign in with ChatGPT to use the review model.'),
-    signIn: status('cancelled', 'Sign-in was cancelled.'),
+    signIn: status('connected', 'Connected to ChatGPT.'),
+    cancel: status('cancelled', 'Sign-in was cancelled.'),
     deferSignIn: true,
   });
   await openConnections(page);
@@ -127,7 +118,17 @@ test('shows disconnected and starts browser sign-in', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
   await expect(page.getByText('Waiting', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
+
+  await page.evaluate(async () => {
+    (window as Window & { __reviewModelTest: { completeSignIn(): void } }).__reviewModelTest.completeSignIn();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+
+  await expect(reviewModelAccount(page).getByText('Cancelled', { exact: true })).toBeVisible();
+  await expect(reviewModelAccount(page).getByText('Connected', { exact: true })).toHaveCount(0);
 });
 
 test('shows waiting with a Cancel action and then cancelled', async ({ page }) => {
@@ -173,6 +174,24 @@ test('reruns diagnostics after sign-in and shows connected', async ({ page }) =>
   await expect.poll(() => diagnosticRequests).toBe(2);
   await expect(reviewModelAccount(page).getByText('Connected', { exact: true })).toBeVisible();
   await expect(page.getByText('Configured model is reachable.')).toBeVisible();
+});
+
+test('keeps the account connected and announces unreachable diagnostics', async ({ page }) => {
+  await page.route('**/diagnostics', async (route) => {
+    await route.fulfill({ json: diagnostics(false) });
+  });
+  await installDesktopBridge(page, {
+    initial: status('disconnected', 'Sign in with ChatGPT to use the review model.'),
+    signIn: status('connected', 'Connected to ChatGPT.'),
+  });
+  await openConnections(page);
+
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+
+  await expect(reviewModelAccount(page).getByText('Connected', { exact: true })).toBeVisible();
+  await expect(reviewModelAccount(page).getByRole('alert')).toContainText(
+    'Account is connected, but the configured model is not reachable.',
+  );
 });
 
 test('shows expired with Reconnect', async ({ page }) => {
@@ -228,7 +247,7 @@ test('explains missing and incompatible Pi installations', async ({ page }) => {
 
   await page.getByRole('tab', { name: 'Settings' }).click();
   await page.evaluate((next) => {
-    (window as Window & { __reviewModelTest: { setStatus(value: AccountStatus): void } }).__reviewModelTest.setStatus(next);
+    (window as Window & { __reviewModelTest: { setStatus(value: ReviewModelAccountStatus): void } }).__reviewModelTest.setStatus(next);
   }, incompatible);
   await page.getByRole('tab', { name: 'Connections' }).click();
 

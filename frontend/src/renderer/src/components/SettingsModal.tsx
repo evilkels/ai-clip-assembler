@@ -233,6 +233,7 @@ function ReviewModelAccountSection() {
     setDiagnosticState(null);
     if (account.state !== 'waiting') {
       setAccount({ ...account, state: 'waiting', detail: 'Waiting for OpenAI sign-in.' });
+      setActionPending(false);
     }
 
     try {
@@ -294,7 +295,9 @@ function ReviewModelAccountSection() {
         {diagnosticState === 'checking' && <p className="settings-muted">Checking configured model…</p>}
         {diagnosticState === 'reachable' && <p className="settings-saved">Configured model is reachable.</p>}
         {diagnosticState === 'unreachable' && (
-          <p className="settings-error">Account is connected, but the configured model is not reachable.</p>
+          <p className="settings-error" role="alert">
+            Account is connected, but the configured model is not reachable.
+          </p>
         )}
       </div>
     </section>

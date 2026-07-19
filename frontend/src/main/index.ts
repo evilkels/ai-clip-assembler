@@ -19,6 +19,10 @@ import {
   waitForRuntimeDescriptorPort,
 } from './backendLifecycle';
 import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
+import {
+  PI_BIN_RESOLUTION_MARKER,
+  resolvePiExecutableFromShellOutput,
+} from './piExecutable';
 import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
 import { installSingleInstanceGuard } from './singleInstance';
 
@@ -216,17 +220,13 @@ async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
   if (process.platform !== 'darwin') return undefined;
 
   return new Promise((resolve) => {
-    execFile('/bin/zsh', ['-lc', 'command -v pi'], { timeout: 5000 }, (error, stdout) => {
+    const command = `printf '\\n${PI_BIN_RESOLUTION_MARKER}%s\\n' "$(whence -p pi 2>/dev/null)"`;
+    execFile('/bin/zsh', ['-lc', command], { timeout: 5000 }, (error, stdout) => {
       if (error) {
         resolve(undefined);
         return;
       }
-
-      const piBin = stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .find(Boolean);
-      resolve(piBin);
+      void resolvePiExecutableFromShellOutput(stdout).then(resolve);
     });
   });
 }

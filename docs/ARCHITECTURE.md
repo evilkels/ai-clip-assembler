@@ -55,6 +55,33 @@ AI Clip Assembler is a local-first desktop application built on Electron (fronte
 - Custom timeline component (based on Remotion editor patterns)
 - IPC to FastAPI backend via HTTP (localhost)
 
+#### Review model authentication boundary
+
+Review model sign-in is a privileged Electron-main workflow, separate from the
+renderer-to-FastAPI application API:
+
+```text
+Connections UI (token-free status/actions)
+  → sandboxed preload (three no-argument IPC methods)
+  → Electron main ReviewModelAuthController
+  → system browser + OpenAI OAuth callback on 127.0.0.1:1455
+  → Pi AuthStorage at ~/.pi/agent/auth.json
+```
+
+The renderer receives only a sanitized account/Pi readiness DTO. It never
+receives authorization URLs, codes, access tokens, refresh tokens, or auth-file
+contents. Electron main validates the IPC sender, allows only the fixed
+`openai-codex` provider, opens only the expected HTTPS authorization host, and
+cancels an active login during app shutdown. The embedded Pi SDK and spawned Pi
+CLI intentionally share the same credential file and resolved executable
+readiness, while backend cloud-AI consent remains scoped to each Project.
+
+This is not the **Connect your AI** MCP boundary. An external MCP client such as
+Claude Desktop or Codex starts the packaged stdio bridge, which forwards tool
+requests to the active local FastAPI backend and its backend-authoritative
+Timeline operations. MCP client configuration does not authenticate the in-app
+Review model account, and Review model OAuth does not connect an MCP client.
+
 ### Backend (FastAPI + Python)
 
 **Responsibilities:**

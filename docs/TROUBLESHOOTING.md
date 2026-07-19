@@ -45,23 +45,48 @@ Then restart the backend.
 The uploaded file isn't a valid/probeable video, or `ffprobe` isn't on `PATH`.
 Confirm `which ffprobe` resolves and that the file plays in a normal player.
 
-## pi harness: "No API key found for <provider>"
+## Review model account and pi harness
 
-The `pi` CLI has no credential for the configured provider. Fix one of:
+Open **Settings → Connections** first. The **Review model account** state and
+the Pi installation detail are deliberately separate:
 
-- Authenticate interactively: `pi /login` and select your provider.
-- Set the provider env var before launching the backend (e.g.
-  `export OPENCODE_API_KEY=...` for the opencode provider), then restart.
-- Point `PI_PROVIDER` / `PI_MODEL` at a provider you *are* logged into
-  (defaults: `openai-codex` / `gpt-5.4-mini`).
+- **Pi is not installed:** install `@earendil-works/pi-coding-agent`, confirm
+  `pi --version` resolves, then restart the app. Signing in does not install the
+  CLI; analysis and diagnostics still invoke that executable.
+- **Pi is incompatible:** install a CLI version from 0.73.1 (inclusive) to 1.0.0
+  (exclusive). The app's Pi SDK packages are pinned to exactly 0.80.10.
+- **Expired or revoked:** choose **Reconnect**. If the provider revoked the
+  refresh token, complete the browser flow again.
+- **Cancelled:** choose **Reconnect** when ready. Cancelling or closing the app
+  must leave the existing credential unchanged.
+- **Callback port occupied:** another process is using `127.0.0.1:1455`. Quit
+  that process or its other Pi login, then retry. Do not disable callback-state
+  validation or forward this port to another machine.
+- **Browser did not return:** finish in the same browser profile that opened,
+  allow the localhost redirect, and retry. A different default browser or a
+  privacy extension can interrupt the return to port 1455.
+- **Offline, proxy, or provider denial:** restore network/proxy access and verify
+  the ChatGPT account is eligible, then retry. The UI reports a sanitized error;
+  terminal `pi /login` is an advanced fallback for isolating provider issues.
+- **Auth storage corrupt or unreadable:** Pi uses `~/.pi/agent/auth.json`. Check
+  that the directory belongs to your user and the file is readable/writable.
+  Back up the file privately before repair; do not let the app overwrite invalid
+  JSON. Preserve entries for unrelated providers.
+- **Connected, but configured model is not reachable:** authentication exists,
+  but the configured provider/model diagnostic failed. Verify Pi is available,
+  network access works, and the provider/model in Settings is valid. The account
+  remains Connected; a consented `pi_agent` run may still fall back to Manual
+  Harness results if the provider call fails.
 
-Note: `pi` keeps its own credentials in `~/.pi/agent/auth.json`, **separate**
-from the standalone `opencode` CLI's store. Logging into `opencode` does not log
-`pi` in.
+For `No API key found for <provider>`, reconnect `openai-codex`, select a
+provider for which Pi already has credentials, or set that provider's supported
+environment variable before launching the backend. The standalone `opencode`
+CLI has a different credential store; logging into it does not log Pi in.
 
-If the harness can't reach the model, analysis falls back to the rule-based
-result and the response metadata includes a `warning`; you still get clips, just
-without AI visual-interest scores.
+Never paste or attach `auth.json`, an OAuth authorization/callback URL, an
+authorization code, or access/refresh tokens to a bug report. Include only the
+sanitized account state, Pi version, configured provider/model names, and the
+safe error text shown by the app.
 
 ## "Only manual and pi_agent harnesses are available"
 

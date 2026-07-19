@@ -16,6 +16,16 @@ for (const file of requiredFiles) {
 }
 
 const packageJson = JSON.parse(readFileSync(join(frontendDir, 'package.json'), 'utf-8'));
+const requiredPiDependencies = [
+  '@earendil-works/pi-ai',
+  '@earendil-works/pi-coding-agent',
+];
+for (const packageName of requiredPiDependencies) {
+  if (packageJson.dependencies?.[packageName] !== '0.80.10') {
+    throw new Error(`frontend/package.json must pin ${packageName} to exactly 0.80.10`);
+  }
+}
+
 const resources = packageJson.build?.extraResources ?? [];
 const hasBackendResource = resources.some(
   (resource) => resource.from === '../backend/dist/ai-clip-backend' && resource.to === 'backend',
@@ -45,6 +55,17 @@ for (const snippet of [
 const preloadSource = readFileSync(join(frontendDir, 'src', 'preload', 'index.ts'), 'utf-8');
 if (!preloadSource.includes('clip-assembler-backend-url')) {
   throw new Error('preload must read the packaged backend URL from BrowserWindow additionalArguments');
+}
+
+const mainBundlePath = join(frontendDir, 'out', 'main', 'index.js');
+if (!existsSync(mainBundlePath)) {
+  throw new Error('Missing built Electron main bundle: out/main/index.js');
+}
+const mainBundle = readFileSync(mainBundlePath, 'utf-8');
+for (const marker of ['@earendil-works/pi-coding-agent', 'ReviewModelAuthController']) {
+  if (!mainBundle.includes(marker)) {
+    throw new Error(`Built Electron main bundle is missing review-model auth marker: ${marker}`);
+  }
 }
 
 const rendererHtml = readFileSync(join(frontendDir, 'src', 'renderer', 'index.html'), 'utf-8');

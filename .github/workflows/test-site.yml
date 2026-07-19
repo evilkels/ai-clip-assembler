@@ -1,0 +1,26 @@
+name: Test static site
+
+on:
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'scripts/tests/site_contract.py'
+      - 'scripts/tests/test_site_contract.py'
+      - 'README.md'
+      - '.github/workflows/test-site.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/tests/site_contract.py'
+      - 'scripts/tests/test_site_contract.py'
+      - 'README.md'
+      - '.github/workflows/test-site.yml'
+
+jobs:
+  test-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify static site contract
+        run: python3 scripts/tests/test_site_contract.py -v

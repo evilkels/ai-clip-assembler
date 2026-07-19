@@ -21,6 +21,7 @@ Top-level guides:
 - [USER_GUIDE.md](USER_GUIDE.md) — end-user guide
 - [MANUAL_QA_GUIDE.md](MANUAL_QA_GUIDE.md) — launch + smoke test
 - [QA.md](QA.md) — per-feature acceptance tests
+- [DEMO_RECORDING_GUIDE.md](DEMO_RECORDING_GUIDE.md) — pre-demo production guide: shot list, capture setup, script, asset naming, FFmpeg commands, agent handoff
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common failures and fixes
 - [LOCAL_QWEN_SETUP.md](LOCAL_QWEN_SETUP.md) — local model setup (postponed harness)
 - [BRAND_MEDIA_PROMPTS.md](BRAND_MEDIA_PROMPTS.md) — logo, README hero, and project media prompt ideas

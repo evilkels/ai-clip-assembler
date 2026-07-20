@@ -444,7 +444,7 @@ def test_analyze_folder_project_persists_and_reloads_frame_scores(monkeypatch, t
     )
 
     assert response.status_code == 200
-    assert response.json()["generation_stats"]["totals"]["candidates_kept"] == 4
+    assert response.json()["generation_stats"]["totals"]["candidates_kept"] == 1
     scores_path = project_folder / "clipassembler" / "analysis" / "frame_scores.json"
     assert scores_path.exists()
     cached = json.loads(scores_path.read_text(encoding="utf-8"))
@@ -458,7 +458,7 @@ def test_analyze_folder_project_persists_and_reloads_frame_scores(monkeypatch, t
 
     frame_scores = api.projects[reopened["project_id"]]["frame_scores"]
     assert frame_scores["per_file"]["DJI_0042.MP4"]["frames"][0]["timestamp"] == 0
-    assert api.projects[reopened["project_id"]]["generation_stats"]["totals"]["candidates_kept"] == 4
+    assert api.projects[reopened["project_id"]]["generation_stats"]["totals"]["candidates_kept"] == 1
 
 
 def test_rederive_clips_reuses_cached_frame_scores_and_changes_generation_stats(monkeypatch, tmp_path):
@@ -499,7 +499,7 @@ def test_rederive_clips_reuses_cached_frame_scores_and_changes_generation_stats(
     )
 
     assert changed.status_code == 200
-    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 3
+    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 1
 
 
 def test_rederive_clips_returns_422_without_cached_frame_scores(tmp_path):

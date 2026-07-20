@@ -83,8 +83,8 @@ def test_assemble_smooth_clips_respects_duration_and_thresholds():
         ),
     )
 
-    assert [clip.duration_sec for clip in result.clips] == [5, 5]
-    assert result.sequence.total_duration_sec == 10
+    assert [clip.duration_sec for clip in result.clips] == [5]
+    assert result.sequence.total_duration_sec == 5
 
 
 def test_clip_ids_are_stable_for_the_same_source_range():
@@ -173,7 +173,7 @@ def test_assembly_caps_clips_per_scene():
         ),
     )
 
-    assert len(result.clips) == 2
+    assert len(result.clips) == 1
 
 
 def test_candidate_pool_keeps_each_scene_and_counts_sample_interval_at_boundary():
@@ -226,6 +226,25 @@ def test_candidate_pool_keeps_one_honestly_scored_fallback_for_weak_scene():
     assert result.clips[0].scene_id == 4
     assert result.clips[0].smoothness_score == 3.0
     assert "fallback" in result.clips[0].tags
+
+
+def test_one_best_window_per_run_no_overlaps():
+    # A single smooth run 0..10s must yield exactly ONE candidate, not the
+    # O(n^2) family of overlapping windows.
+    frames = [frame(second, 9.0, scene_id=0, turn_rate=1.0) for second in range(11)]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "DJI.MP4",
+        frames,
+        AssemblyPreferences(min_clip_duration_sec=3.0, max_clip_duration_sec=10.0),
+        source_duration_sec=10.0,
+    )
+
+    assert len(result.clips) == 1
+    only = result.clips[0]
+    assert only.scene_id == 0
+    assert (only.end_sec - only.start_sec) >= 3.0
 
 
 def test_candidate_pool_skips_scene_shorter_than_minimum_duration():

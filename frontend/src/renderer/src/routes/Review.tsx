@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { ResizeHandle } from '../components/ResizeHandle';
-import { ClipGenerationPanel } from '../components/ClipGenerationPanel';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
@@ -200,10 +200,9 @@ export function ReviewPage() {
             onInclude={include}
             onExclude={exclude}
           />
-          <ClipGenerationPanel
-            stats={generationStats}
-            disabled={loading || !projectId}
-          />
+          <Link className="draft-summary" to="/import">
+            Adjust clip settings
+          </Link>
         </main>
       </div>
       {versionToApply && timelineSnapshot ? (

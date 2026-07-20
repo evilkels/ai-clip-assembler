@@ -292,6 +292,9 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   expect(analyzeRequests).toHaveLength(1);
 
   await page.goto('/#/review');
+  const adjustClipSettings = page.getByRole('link', { name: 'Adjust clip settings' });
+  await expect(adjustClipSettings).toHaveAttribute('href', '#/import');
+  await expect(page.locator('.review-main .clip-generation-panel')).toHaveCount(0);
   const gallery = page.getByTestId('version-gallery');
   await expect(gallery).toBeVisible();
   const cards = gallery.getByTestId('version-card');

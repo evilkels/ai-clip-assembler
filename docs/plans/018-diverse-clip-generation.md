@@ -31,6 +31,9 @@ exist, "Analyze" re-derives instantly with no FFmpeg.
 `onnxruntime` + a bundled CLIP image-encoder ONNX model (new, Phase B); React 19
 + TypeScript + Vite (Electron renderer), plain CSS + design tokens.
 
+**Status:** IN PROGRESS (2026-07-20) — Phase A and Phase E complete. Phases
+B–D remain; Phase B is the next dependency.
+
 ## Global Constraints
 
 - **Local-first**: no network calls; embeddings run on-device. Copied from
@@ -121,7 +124,7 @@ keeps its existing "one clip per uncovered scene" behavior.
   — returns the window maximizing `weighted_overall(window.frames)`, tie-broken
   by longer duration; `None` for empty input.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # backend/tests/test_clip_assembly.py
 from src.clip_assembly import assemble_smooth_clips, AssemblyPreferences
@@ -152,12 +155,12 @@ def test_one_best_window_per_run_no_overlaps():
     assert (only.end_sec - only.start_sec) >= 3.0
 ```
 
-- [ ] **Step 2: Run it, verify it fails**
+- [x] **Step 2: Run it, verify it fails**
 
 Run: `cd backend && source .venv/bin/activate && python -m pytest tests/test_clip_assembly.py::test_one_best_window_per_run_no_overlaps -v`
 Expected: FAIL — currently multiple overlapping clips are returned.
 
-- [ ] **Step 3: Add `best_window` and use it in the run loop**
+- [x] **Step 3: Add `best_window` and use it in the run loop**
 ```python
 # clip_assembly.py — add near candidate_windows
 def best_window(windows: List[CandidateWindow]) -> Optional[CandidateWindow]:
@@ -184,13 +187,13 @@ Then in `assemble_smooth_clips` replace the per-window append loop
             clips.append(make_clip(file_id, file_name, chosen))
 ```
 
-- [ ] **Step 4: Run the test, verify it passes**
+- [x] **Step 4: Run the test, verify it passes**
 
 Run: `python -m pytest tests/test_clip_assembly.py -v`
 Expected: PASS. (Update any pre-existing `test_clip_assembly.py` assertions that
 counted overlapping windows — they should now expect one-per-run.)
 
-- [ ] **Step 5: Run the full backend gate**
+- [x] **Step 5: Run the full backend gate**
 
 Run: `python -m pytest -q && .venv/bin/ruff check src tests`
 Expected: green. `_bounded_scene_pool` still enforces `max_clips_per_scene`
@@ -198,7 +201,7 @@ across runs within a scene; `generation_stats.candidates_generated` will drop
 sharply (one per run) — update `test_api.py` generation-stats expectations if
 they hard-code the old large count.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 ```bash
 git add backend/src/clip_assembly.py backend/tests/test_clip_assembly.py backend/tests/test_api.py
 git commit -m "feat(assembly): emit one best fragment per smooth run"
@@ -671,14 +674,14 @@ instantly (no FFmpeg).
 - Consumes: existing `rederiveClips`/`analyzeProject` client fns.
 - Produces: Import owns generation preferences; Review no longer hosts them.
 
-- [ ] **Step 1:** move panel usage to `Import.tsx`; relabel fields (e.g. "Shortest
+- [x] **Step 1:** move panel usage to `Import.tsx`; relabel fields (e.g. "Shortest
   clip (s)", "Longest clip (s)", "How steady (0–10)", "Max camera turn (°/s)",
   "Max clips per scene", "Max clips per video") with one-line help each.
-- [ ] **Step 2:** wire Analyze to re-derive from cache when `frame_scores` exist;
+- [x] **Step 2:** wire Analyze to re-derive from cache when `frame_scores` exist;
   full analyze only when absent/footage changed.
-- [ ] **Step 3:** remove the panel from `Review.tsx`; add the link.
-- [ ] **Step 4:** `npx tsc --noEmit` + eslint clean; manual smoke in the running app.
-- [ ] **Step 5: Commit** — `git commit -am "feat(import): move clip-generation controls under Analyze"`
+- [x] **Step 3:** remove the panel from `Review.tsx`; add the link.
+- [x] **Step 4:** `npx tsc --noEmit` + eslint clean; focused Playwright smoke green.
+- [x] **Step 5: Commit** — landed as scoped commits `2f48e2f` and `b0c46dc`.
 
 ---
 

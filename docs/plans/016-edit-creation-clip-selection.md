@@ -12,7 +12,7 @@
 
 ## Status
 
-- **Status**: STEP 1 DONE (shipped this session), STEPS 2–4 TODO
+- **Status**: STEPS 1–2 DONE; STEP 3 SUPERSEDED by plan 018; STEP 4 TODO
 - **Priority**: P1 (directly breaks the core "create an edit" flow)
 - **Effort**: M
 - **Risk**: LOW (Step 1, done), MEDIUM (Step 2 — touches candidate generation
@@ -96,7 +96,13 @@ New tests in `tests/test_assembly_profiles.py`:
   the *edit* the user complained about without disturbing candidate identity
   (`clip_id`s), the Review UI, or persistence.
 
-### Step 2 — De-overlap candidate generation at the source (TODO)
+### Step 2 — De-overlap candidate generation at the source (DONE via plan 018)
+
+Plan 018 Phase A replaced the proposed tolerance/NMS approach with a simpler
+deterministic invariant: keep the single best window per smooth run. It landed
+in `edd4f16` with stable uuid5 identities; the full backend gate passed (364
+tests + ruff). This removes the overlapping family at its source and applies to
+cached re-derive without FFmpeg.
 
 The 24 source clips still contain overlapping near-duplicates (Step 1 only
 hides them from the *edit*). Reduce duplication where candidates are created so
@@ -119,7 +125,13 @@ Review and re-derive show distinct footage too.
 - **STOP** if de-overlap would re-run any ffmpeg step (it must operate on cached
   frame scores only — see plan 012's frame-score sidecar).
 
-### Step 3 — Surface & control it in Review (TODO)
+### Step 3 — Surface & control it in Review (SUPERSEDED by plan 018)
+
+The shipped one-best-window invariant has no overlap tolerance to expose. Plan
+018 Phase E moved the remaining generation controls to Import (`2f48e2f`,
+`b0c46dc`), while existing generation stats continue to report generated and
+kept counts. Do not add a redundant overlap knob unless a future validated use
+case reopens this decision.
 
 1. In the Clip Generation panel (plan 012, Step 5) add the overlap-tolerance
    control alongside the existing generation knobs, wired to `rederiveClips`.

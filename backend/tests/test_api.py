@@ -2182,6 +2182,26 @@ def test_review_turn_proposes_then_accept_applies(monkeypatch, tmp_path):
     assert [i["source_clip_id"] for i in accepted.json()["document"]["items"]] == ["clip-1"]
 
 
+def test_excluded_clips_are_hidden_from_the_review_agent(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    seen_candidate_ids: list[str] = []
+
+    def capture_agent(context):
+        seen_candidate_ids.extend(c["clip_id"] for c in context["candidates"])
+        return {"message": "ok", "operations": [], "versions": []}
+
+    monkeypatch.setattr(api, "_review_agent", capture_agent)
+
+    # Exclude clip-2 on the review board, then run a turn.
+    _op(client, project_id, "exclude", clip_id="clip-2")
+    turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "propose a cut"})
+
+    assert turn.status_code == 200
+    assert "clip-1" in seen_candidate_ids
+    assert "clip-2" not in seen_candidate_ids
+
+
 def test_review_turn_uses_local_manual_agent_when_pi_project_lacks_cloud_consent(monkeypatch, tmp_path):
     client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
     api._proposal_store = api.ProposalStore()

@@ -44,16 +44,20 @@ export function SourceClipsPanel({
       onToggle={(event) => setOpen(event.currentTarget.open)}
       >
       <summary>
-        <strong>All clips ({totalCount})</strong>
+        <strong>{open ? 'Hide' : 'Browse'} your clips ({totalCount})</strong>
         <span className="draft-summary">
           {totals
             ? `Generated ${totals.candidates_generated} → kept ${totals.candidates_kept} · scene cap on ${totals.scenes_at_cap}/${totals.scenes_total} scenes · video cap ${totals.max_candidates_per_video ?? '—'}`
-            : `${clips.length} shown · Add individual clips to your video`}
+            : `${clips.length} shown · click to preview and pick clips`}
         </span>
       </summary>
       {/* Closed details still mount children, so conditionally render to avoid N video streams. */}
       {open ? (
         <div className="source-clips-content">
+          <p className="review-pipeline-helper">
+            Every usable clip found in your footage. Preview each one and “Add to working timeline”
+            to build your own edit. Removing a clip also keeps it out of the AI’s suggested cuts.
+          </p>
           {totalCount > 0 ? (
             <details className="score-legend">
               <summary>How clips are scored</summary>

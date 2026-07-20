@@ -141,11 +141,6 @@ export function ReviewPage() {
         </aside>
         <ResizeHandle ariaLabel="Resize the Ask the AI panel" onResize={resizeChat} />
         <main className="review-main">
-          <ClipGenerationPanel
-            stats={generationStats}
-            disabled={loading || !projectId}
-            onRegenerate={rederiveClips}
-          />
           <section className="version-zone" aria-label="Suggested cuts">
             <div className="version-zone-head">
               <div>
@@ -156,7 +151,8 @@ export function ReviewPage() {
               </span>
             </div>
             <p className="review-pipeline-helper">
-              These are previews. Editing individual clips changes your video, not these suggestions.
+              Complete edits the AI assembles from your clips. Preview one and apply it to your
+              timeline — or build your own below by adding individual clips.
             </p>
             {versionSetIsStale ? (
               <output className="version-stale-banner">
@@ -204,6 +200,11 @@ export function ReviewPage() {
             smoothnessThreshold={smoothnessThreshold}
             onInclude={include}
             onExclude={exclude}
+          />
+          <ClipGenerationPanel
+            stats={generationStats}
+            disabled={loading || !projectId}
+            onRegenerate={rederiveClips}
           />
         </main>
       </div>

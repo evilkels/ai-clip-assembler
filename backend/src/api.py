@@ -1008,8 +1008,17 @@ class ReviewTurnRequest(BaseModel):
     client_message_id: Optional[uuid.UUID] = None
 
 
-def _review_inputs(project_id: str) -> tuple[list, list, object]:
-    candidates = get_mcp_server()._list_candidates(project_id)
+def _review_inputs(
+    project_id: str, excluded_clip_ids: frozenset = frozenset()
+) -> tuple[list, list, object]:
+    # Clips the user explicitly excluded on the review board are dropped from the
+    # pool entirely, so the agent cannot propose them in a Version (and neither
+    # can the deterministic fallback). Included/pending clips stay.
+    candidates = [
+        candidate
+        for candidate in get_mcp_server()._list_candidates(project_id)
+        if candidate.get("clip_id") not in excluded_clip_ids
+    ]
     candidate_frames = []
     for candidate in candidates:
         paths = mcp_frame_paths(project_id, candidate.get("clip_id"))
@@ -1052,7 +1061,12 @@ async def _run_review_turn(
     project_id: str, user_message: str, client_message_id: Optional[str] = None
 ) -> dict:
     controller = get_timeline_controller(project_id)
-    candidates, candidate_frames, agent = _review_inputs(project_id)
+    excluded_clip_ids = frozenset(
+        clip_id
+        for clip_id, decision in controller.document.decisions.items()
+        if decision == "excluded"
+    )
+    candidates, candidate_frames, agent = _review_inputs(project_id, excluded_clip_ids)
     return await run_review_turn(
         project_id,
         user_message=user_message,

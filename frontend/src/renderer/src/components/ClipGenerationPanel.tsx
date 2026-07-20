@@ -68,10 +68,17 @@ export function ClipGenerationPanel({ stats, disabled = false, onRegenerate }: P
   return (
     <details className="clip-generation-panel">
       <summary>
-        <strong>Clip generation</strong>
-        <span className="draft-summary">Adjust source clip creation without rerunning FFmpeg</span>
+        <strong>Advanced: how clips are found</strong>
+        <span className="draft-summary">
+          Change what counts as a usable clip, then re-scan — no re-import needed
+        </span>
       </summary>
       <div className="clip-generation-body">
+        <p className="clip-generation-intro">
+          These control how your footage is cut into the clips above — clip length limits, how
+          steady a shot must be, and how many clips to keep per scene and per video. The defaults
+          suit most drone footage; adjust only if you want more, fewer, or longer clips.
+        </p>
         <div className="clip-generation-controls">
           <label>
             Min duration

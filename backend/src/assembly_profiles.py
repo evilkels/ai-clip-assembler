@@ -104,9 +104,17 @@ def build_draft_timeline(
     max_clips = int(defaults.get("max_clips", 0))
     speed_policy = str(defaults.get("speed_policy", "none"))
     ordering = str(defaults.get("ordering", "chronological"))
+    # The profile's shortest intended cut. We never emit a clip below this,
+    # so the budget remainder can't truncate the final clip into an unusable
+    # sliver (e.g. a 1s tail just to hit target_duration_sec).
+    min_clip_sec = min(clip_lengths) if clip_lengths else 1.0
     selected = []
     total = 0.0
     scene_counts: dict = {}
+    # Source ranges already claimed per file, so we never stack overlapping
+    # windows of the same footage (candidate generation emits many overlapping
+    # windows over a single smooth run; without this they read as duplicates).
+    claimed_spans: dict = {}
     index = 0
     for clip in sorted(clips, key=lambda item: float(item.get("overall_score", 0)), reverse=True):
         if max_clips and len(selected) >= max_clips:
@@ -114,14 +122,28 @@ def build_draft_timeline(
         scene_id = clip.get("scene_id", 0)
         if scene_counts.get(scene_id, 0) >= max_per_scene:
             continue
-        available = max(0.0, float(clip["end_sec"]) - float(clip["start_sec"]))
-        duration = min(available, float(clip_lengths[index % len(clip_lengths)]), target - total)
+        start = float(clip["start_sec"])
+        end = float(clip["end_sec"])
+        file_id = clip.get("file_id")
+        spans = claimed_spans.setdefault(file_id, [])
+        if any(start < span_end and end > span_start for span_start, span_end in spans):
+            # Overlaps footage already used from this file — replaying it would
+            # look like a duplicate cut, so skip.
+            continue
+        remaining = target - total
+        # Once the budget can't hold the profile's shortest intended cut, stop
+        # rather than appending a truncated sliver. (First clip is exempt so a
+        # tiny target still yields one clip instead of an empty timeline.)
+        if selected and remaining < min_clip_sec:
+            break
+        available = max(0.0, end - start)
+        duration = min(available, float(clip_lengths[index % len(clip_lengths)]), remaining)
         if duration <= 0:
             continue
         selected.append(
             {
                 **clip,
-                "end_sec": round(float(clip["start_sec"]) + duration, 3),
+                "end_sec": round(start + duration, 3),
                 "duration_sec": round(duration, 3),
                 "suggested_speed": speed_for_clip(clip, speed_policy),
                 "included": True,
@@ -129,6 +151,7 @@ def build_draft_timeline(
         )
         total += duration
         scene_counts[scene_id] = scene_counts.get(scene_id, 0) + 1
+        spans.append((start, end))
         index += 1
         # Stop at the duration budget or the clip-count cap, whichever comes first.
         if total >= target or (max_clips and len(selected) >= max_clips):

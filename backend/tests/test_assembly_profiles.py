@@ -103,3 +103,45 @@ def test_short_social_never_applies_slowmo():
     draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
 
     assert draft["clips"][0]["suggested_speed"] == 1.0
+
+
+def test_draft_skips_overlapping_windows_from_same_footage():
+    # Candidate generation emits many overlapping windows over one smooth run;
+    # only non-overlapping selections should survive so the edit has no dupes.
+    clips = [
+        clip("w-a", 10, 17, score=9.9, scene_id=0),
+        clip("w-b", 10, 14, score=9.8, scene_id=0),  # overlaps w-a
+        clip("w-c", 12, 18, score=9.7, scene_id=0),  # overlaps w-a
+        clip("later", 40, 50, score=9.0, scene_id=0),  # distinct footage
+    ]
+
+    draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=60)
+    kept = [entry["clip_id"] for entry in draft["clips"]]
+
+    assert kept == ["w-a", "later"]
+
+
+def test_draft_skips_overlap_per_file_not_across_files():
+    # Identical ranges in different source files are distinct footage, not dupes.
+    clips = [
+        clip("f1", 10, 17, score=9.9, file_name="A.MP4"),
+        clip("f2", 10, 17, score=9.8, file_name="B.MP4"),
+    ]
+    clips[0]["file_id"] = "file-A"
+    clips[1]["file_id"] = "file-B"
+
+    draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=60)
+
+    assert {entry["clip_id"] for entry in draft["clips"]} == {"f1", "f2"}
+
+
+def test_draft_does_not_emit_sliver_tail_to_hit_target():
+    # Six distinct 30s clips, target lands mid-clip. The final clip must not be
+    # truncated below the profile's shortest cut (cinematic min = 7s).
+    clips = [clip(f"s{i}", i * 100, i * 100 + 30, score=9.5 - i / 10, scene_id=i) for i in range(6)]
+
+    draft = build_draft_timeline(clips, profile="cinematic_highlight", target_duration_sec=50)
+    durations = [entry["duration_sec"] for entry in draft["clips"]]
+
+    assert min(durations) >= 7.0
+    assert draft["total_duration_sec"] <= 50

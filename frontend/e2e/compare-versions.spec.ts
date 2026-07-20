@@ -64,8 +64,20 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   };
   const reviewRequestIds: string[] = [];
   const reviewAttempts = new Map<string, number>();
+  const analyzeRequests: Array<Record<string, unknown>> = [];
+  const rederiveRequests: Array<Record<string, unknown>> = [];
   let currentVersionSet: Record<string, unknown> | null = null;
   let projectApiBase = '';
+
+  page.on('request', (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (/\/projects\/[^/]+\/analyze$/.test(pathname)) {
+      analyzeRequests.push(request.postDataJSON() as Record<string, unknown>);
+    }
+    if (/\/projects\/[^/]+\/clips\/rederive$/.test(pathname)) {
+      rederiveRequests.push(request.postDataJSON() as Record<string, unknown>);
+    }
+  });
 
   const ensureVersionSet = async (sessionUrl: string) => {
     if (currentVersionSet) return;
@@ -231,10 +243,53 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await fileInput.setInputFiles(ensureFixtureVideo());
   await expect(page.getByText(/1 source video ready/)).toBeVisible();
   await page.getByLabel('Harness').selectOption('manual');
+  const generationPanel = page.locator('.analysis-controls + .clip-generation-panel');
+  await expect(generationPanel).toBeVisible();
+  await generationPanel.locator('summary').click();
+  const generationLabels = [
+    'Shortest clip (s)',
+    'Longest clip (s)',
+    'How steady (0–10)',
+    'Max camera turn (°/s)',
+    'Max clips per scene',
+    'Max clips per video',
+  ];
+  for (const label of generationLabels) {
+    await expect(generationPanel.getByLabel(label, { exact: true })).toBeVisible();
+  }
+  await expect(generationPanel.locator('.clip-generation-help')).toHaveCount(6);
+  await generationPanel.getByLabel('Shortest clip (s)', { exact: true }).fill('4');
   await page.getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({
     timeout: 180_000,
   });
+  expect(analyzeRequests).toHaveLength(1);
+  expect(analyzeRequests[0].preferences).toMatchObject({ min_clip_duration_sec: 4 });
+
+  await page.getByRole('link', { name: 'Import' }).click();
+  await expect(page.getByText('0 of 1 selected')).toBeVisible();
+  const regenerateButton = page.getByRole('button', { name: 'Regenerate clips' });
+  await expect(regenerateButton).toBeEnabled();
+  const cachedGenerationPanel = page.locator('.analysis-controls + .clip-generation-panel');
+  if ((await cachedGenerationPanel.getAttribute('open')) === null) {
+    await cachedGenerationPanel.locator('summary').click();
+  }
+  await cachedGenerationPanel.getByLabel('Max clips per video', { exact: true }).fill('12');
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('resets manual');
+    await dialog.accept();
+  });
+  const rederiveResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/clips/rederive') &&
+      response.request().method() === 'POST' &&
+      response.ok(),
+  );
+  await regenerateButton.click();
+  await rederiveResponse;
+  expect(rederiveRequests).toHaveLength(1);
+  expect(rederiveRequests[0]).toMatchObject({ max_candidates_per_video: 12 });
+  expect(analyzeRequests).toHaveLength(1);
 
   await page.goto('/#/review');
   const gallery = page.getByTestId('version-gallery');
@@ -248,9 +303,8 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   }
   await expect(page.getByText('Ask the AI', { exact: true })).toBeVisible();
   await expect(page.getByText('Suggested cuts', { exact: true })).toBeVisible();
-  await expect(page.getByRole('strong').filter({ hasText: /^All clips \(\d+\)$/ })).toBeVisible();
   await expect(
-    page.getByText('These are previews. Editing individual clips changes your video, not these suggestions.'),
+    page.getByRole('strong').filter({ hasText: /^Browse your clips \(\d+\)$/ }),
   ).toBeVisible();
   await expect(cards.nth(0)).toContainText('Current suggestion');
   await expect(cards.nth(2)).toContainText('Unavailable');
@@ -259,14 +313,15 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
 
   const sourcePanelForState = page.getByTestId('source-clips-panel');
   await sourcePanelForState.locator('summary').first().click();
+  await expect(
+    sourcePanelForState.getByText(/Every usable clip found in your footage/),
+  ).toBeVisible();
   const sourceCards = sourcePanelForState.locator('.clip-card');
   await expect(sourceCards.first()).toContainText(/Timeline #\d+/);
   const timelineSourceCard = sourceCards.first();
-  // version-a and version-c both include the second Source Clip card, but
-  // version-b only includes the first — so this card is the one deterministically
-  // labeled "Proposed in A/C" (the first card is "Proposed in A/B/C").
-  const proposedInACCard = sourceCards.nth(1);
-  await expect(proposedInACCard.getByText('Proposed in A/C')).toBeVisible();
+  // The Phase A fixture now yields one best Candidate Clip, reused by all three Versions.
+  const proposedInAllCard = sourceCards.first();
+  await expect(proposedInAllCard.getByText('Proposed in A/B/C')).toBeVisible();
   await timelineSourceCard.getByRole('button', { name: 'Remove from working timeline' }).click();
   await expect(timelineSourceCard.getByRole('button', { name: 'Add to working timeline' })).toBeVisible();
   await timelineSourceCard.getByRole('button', { name: 'Add to working timeline' }).click();
@@ -282,7 +337,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(
     page.getByText('Your video or clip choices changed since these suggestions were made.'),
   ).toHaveCount(0);
-  await expect(proposedInACCard.getByText('Proposed in A/C')).toBeVisible();
+  await expect(proposedInAllCard.getByText('Proposed in A/B/C')).toBeVisible();
 
   await cards.first().getByTestId('version-card-surface').click();
   await expect(cards.first()).toHaveClass(/expanded/);
@@ -452,5 +507,5 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   // The adopted cut lands on the Working Timeline; verify it on the Timeline page
   // (the Review page no longer embeds a duplicate timeline strip).
   await page.getByRole('link', { name: 'Timeline' }).click();
-  await expect(page.locator('.tl-clip')).toHaveCount(4, { timeout: 10_000 });
+  await expect(page.locator('.tl-clip')).toHaveCount(1, { timeout: 10_000 });
 });

@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ClipGenerationPanel,
+  preferencesFromGenerationStats,
+} from '../components/ClipGenerationPanel';
 import { useReview } from '../state/ReviewContext';
 import {
   analyzeProject,
@@ -12,6 +16,7 @@ import {
   type HarnessInfo,
 } from '../api/client';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
+import type { ClipGenerationPreferences } from '../types/clip';
 
 type SortKey = 'size' | 'date' | 'analyzed';
 
@@ -99,12 +104,14 @@ export function ImportPage() {
     cloudAiConsent,
     uploadedVideos,
     clips,
+    generationStats,
     analysisStatus,
     createUploadProject,
     setUploadedVideos,
     setAnalysisStatus,
     setCloudAiConsent,
     applyAnalysisResult,
+    rederiveClips,
     openProjectFolder,
     rescanOpenProject,
   } = useReview();
@@ -117,11 +124,14 @@ export function ImportPage() {
     { id: 'pi_agent', name: 'Pi Agent', type: 'agent', enabled: true },
   ]);
   const [harnessId, setHarnessId] = useState('manual');
+  const [generationPreferences, setGenerationPreferences] =
+    useState<ClipGenerationPreferences>(() => preferencesFromGenerationStats(generationStats));
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
   const analyzedIds = useMemo(() => new Set(clips.map((clip) => clip.file_id)), [clips]);
   // Analyzed files default to unchecked so a rescan targets the new batch.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; fileName: string } | null>(null);
   const [sort, setSort] = useState<{ key: SortKey | null; dir: 'asc' | 'desc' }>({
     key: null,
@@ -164,6 +174,10 @@ export function ImportPage() {
     }
     setDeselected(next);
   }, [projectId, uploadedVideos, analyzedIds]);
+
+  useEffect(() => {
+    setGenerationPreferences(preferencesFromGenerationStats(generationStats));
+  }, [projectId, generationStats]);
 
   useEffect(() => {
     if (!preview) return;
@@ -250,7 +264,29 @@ export function ImportPage() {
   );
 
   const handleAnalyze = useCallback(async () => {
-    if (!projectId || selectedCount === 0) return;
+    if (!projectId) return;
+    const hasCachedFrameScores = generationStats !== null;
+    const shouldRederive = selectedCount === 0 && hasCachedFrameScores;
+    if (selectedCount === 0 && !shouldRederive) return;
+    if (shouldRederive) {
+      const confirmed = window.confirm(
+        'Regenerating clips resets manual include/exclude choices, order, trims, and the working timeline.',
+      );
+      if (!confirmed) return;
+      setRegenerating(true);
+      try {
+        await rederiveClips(generationPreferences);
+        setAnalysisStatus({ phase: 'complete' });
+      } catch (err) {
+        setAnalysisStatus({
+          phase: 'error',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        setRegenerating(false);
+      }
+      return;
+    }
     setCancelling(false);
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
@@ -271,6 +307,7 @@ export function ImportPage() {
       const result = await analyzeProject(projectId, {
         harness_id: harnessId,
         file_ids: selectedIds,
+        preferences: generationPreferences,
       });
       applyAnalysisResult(result);
       setAnalysisStatus({ phase: 'complete', notices: result.notices });
@@ -291,9 +328,12 @@ export function ImportPage() {
     cloudAiConsent,
     selectedIds,
     selectedCount,
+    generationStats,
+    generationPreferences,
     setAnalysisStatus,
     setCloudAiConsent,
     applyAnalysisResult,
+    rederiveClips,
   ]);
 
   const handleAbort = useCallback(async () => {
@@ -607,14 +647,22 @@ export function ImportPage() {
         )}
 
         {hasVideos && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="analysis-controls" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button type="button"
               className="btn primary"
               onClick={handleAnalyze}
-              disabled={isAnalyzing || selectedCount === 0}
+              disabled={
+                isAnalyzing ||
+                regenerating ||
+                (selectedCount === 0 && generationStats === null)
+              }
             >
               {isAnalyzing
                 ? 'Analyzing…'
+                : regenerating
+                  ? 'Regenerating clips…'
+                : selectedCount === 0 && generationStats
+                  ? 'Regenerate clips'
                 : selectedCount === 0
                   ? 'Select videos to analyze'
                   : selectedCount === uploadedVideos.length
@@ -650,6 +698,15 @@ export function ImportPage() {
               </select>
             </label>
           </div>
+        )}
+
+        {hasVideos && (
+          <ClipGenerationPanel
+            stats={generationStats}
+            preferences={generationPreferences}
+            onPreferencesChange={setGenerationPreferences}
+            disabled={isAnalyzing || regenerating}
+          />
         )}
 
         {isAnalyzing && (

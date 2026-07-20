@@ -279,7 +279,7 @@ export async function cancelAnalysis(projectId: string): Promise<{ status: strin
 
 export interface AnalyzeOptions {
   harness_id?: string;
-  preferences?: Record<string, unknown>;
+  preferences?: ClipGenerationPreferenceUpdate;
   /** When provided, only these source file_ids are analyzed. */
   file_ids?: string[];
 }

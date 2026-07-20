@@ -33,7 +33,6 @@ export function ReviewPage() {
     include,
     loading,
     projectId,
-    rederiveClips,
     smoothnessThreshold,
     setSmoothnessThreshold,
     timelineSnapshot,
@@ -204,7 +203,6 @@ export function ReviewPage() {
           <ClipGenerationPanel
             stats={generationStats}
             disabled={loading || !projectId}
-            onRegenerate={rederiveClips}
           />
         </main>
       </div>

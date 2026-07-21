@@ -1,149 +1,50 @@
 # React Doctor Triage
 
-Status: partially implemented; state refactors and current warnings remain active
+Status: partially implemented; state refactors and current warnings remain active.
 
-Reconcile note (2026-07-21): this plan's historical score/count snapshots are
-not a safe execution baseline. The latest recorded mechanical pass reduced the
-then-current findings from 47 to 33 on local react-doctor 0.2.14. Re-run the
-installed tool and refresh file/line evidence before selecting another batch.
+**Goal:** Work through `react-doctor` findings on `frontend/` in safe, ordered batches (mechanical first, judgment-call refactors last).
 
-Source: `npx react-doctor@latest --verbose` on `frontend/` (v0.2.14).
-Score: **88 / 100**, 40 issues across 19 rules.
-Snapshot at `/tmp/claude-501/react-doctor-209912ac-9bb7-427d-8b5b-844077d758cc`.
+Reconcile note (2026-07-21): historical score/count snapshots below are not a
+safe execution baseline. The last recorded mechanical pass reduced findings
+from 47 to 33 on local react-doctor 0.2.14. Re-run the installed tool and
+refresh file/line evidence before selecting another batch.
 
-Current note (2026-06-10): the original snapshot is historical. A post-merge
-`react-doctor --staged` run scored 90/100 with four warnings in the incoming
-React files, while `--verbose --diff` still reports broader pre-existing and
-active findings. Re-run before selecting the next batch; do not use the
-original counts as the current backlog.
+**History:** score bounced between snapshots (88/100 → 90/100 staged →
+44/100 after the codebase grew with the agent-operable-timeline UI) — treat
+none of these counts as current. Batch 1 quick wins (`button-has-type` on 14
+buttons, one em-dash fix) took issue count 75→60, build green, no behavior
+change. Skipped as stale: `js-tosorted-immutable` (needs tsconfig `lib` bump
+to es2023); `async-defer-await`/`no-initialize-state` in `App.tsx` (refactored
+since, findings gone). Remaining findings are dominated by judgment-call
+refactors (`no-giant-component`, `no-derived-state`, `prefer-use`, a11y).
 
-**Re-baseline (2026-06-19):** `npx react-doctor .` now scores **44 / 100
-Critical** (the codebase grew with the agent-operable timeline UI).
-**Batch 1 quick-wins applied this session:** `button-has-type` (14 buttons
-across Timeline/ClipCard/Import/Review) and one `design-no-em-dash-in-jsx-text`
-in Review's score legend — issue count **75 → 60**, `npm run build` green, no
-behavior change. Skipped/stale: `js-tosorted-immutable` (needs a tsconfig `lib`
-bump to es2023 — out of scope for a quick win); `async-defer-await` +
-`no-initialize-state` in `App.tsx` (the file was refactored since the snapshot;
-findings gone). The remaining 44/100 is dominated by **Batch 2/3 judgment-call
-refactors** (`no-giant-component`, `no-derived-state`, `prefer-use`, a11y
-interactions) — left for a deliberate pass, not blind edits.
+Each finding has a fix recipe at
+`https://www.react.doctor/prompts/rules/<rule>.md`. Re-run
+`cd frontend && npm run doctor -- --verbose --diff` after each batch.
 
-## How To Use This Doc
+Side effects of installing react-doctor: a git pre-commit hook now runs
+doctor on every commit (remove if unwanted); 3 npm vulnerabilities landed in
+new transitive deps; doctor flags itself as an unused dev dependency until a
+script/hook uses it.
 
-Each finding has a **canonical fix recipe** at `https://www.react.doctor/prompts/rules/<rule>.md` — fetch and follow it before editing. Re-run `npm run doctor -- --verbose --diff` after each batch.
+## Batches (roughly in PR order)
 
-Status legend: ✅ quick win · 🛠 refactor · 🤔 needs judgment · 🧹 false-positive
+1. **Quick wins** (mechanical, ~20 lines, near-zero risk).
+2. **Accessibility** — labels/roles on Review/Import controls; the clickable
+   `<div>` at Import.tsx:84 collapses 3 findings if changed to a `<button>`.
+3. **List keys** — Import.tsx:119, use a stable id, not array index.
+4. **State refactors** (behavior-affecting, own PRs) — `prefer-useReducer` +
+   `no-cascading-set-state` in `ReviewContext.tsx`/`Timeline.tsx`; split
+   `Timeline.tsx` (391 lines) while there. Do *after* the project-folder-model
+   backend work, since it changes the data shape.
+5. **React 19 migration** — `useContext`→`use()` only if committing to React
+   19+; audit `forwardRef` too.
+6. **Style/judgment, skip unless wanted** — 11px text in Review/Export matches
+   FCP/Resolve/Premiere secondary-metadata sizing; suppress rather than
+   upsize. `async-await-in-loop` in Import.tsx may be a false positive if
+   imports must be sequential.
+7. **False positive** — `deslop/unused-dev-dependency` on react-doctor
+   itself; resolves once a script/hook uses it.
 
-## Side Effects Of Installing react-doctor (flag for awareness)
-
-1. **Git pre-commit hook installed** at `.git/hooks/pre-commit`. It will run doctor on every commit — could block your flow. Inspect or remove if unwanted.
-2. **3 npm vulnerabilities** in new transitive deps (1 moderate, 2 high). Run `npm audit` to inspect.
-3. Doctor now flags itself as `deslop/unused-dev-dependency` until something uses it. Drops score 89 → 88. Resolves automatically once a script or hook is wired up (the hook already does).
-
----
-
-## Batch 1 — Quick Wins (mechanical, behavior-preserving) ✅
-
-Recommended first PR. ~20 lines of changes total, near-zero risk.
-
-| Rule | Count | Files | Fix |
-|---|---|---|---|
-| `button-has-type` | 15 | ClipCard.tsx, Review.tsx, Import.tsx, Export.tsx, Timeline.tsx | Add `type="button"` to every `<button>` not inside a `<form>`'s submit position. |
-| `js-tosorted-immutable` | 1 | Review.tsx:7 | `[...arr].sort()` → `arr.toSorted()`. |
-| `async-defer-await` | 1 | App.tsx:18 | Move the synchronous early-return guard above the `await`. |
-| `no-initialize-state` | 1 | App.tsx:23 | Pass the initial value directly to `useState()` instead of setting it from a mount-only effect. |
-| `design-no-em-dash-in-jsx-text` | 1 | Review.tsx:140 | Replace `—` with `,` `:` `;` or `()` in visible UI copy. |
-
-**Total: 19 findings in one PR, all mechanical.**
-
----
-
-## Batch 2 — Accessibility ✅ (mostly mechanical, one judgment call)
-
-Recommended second PR. Important for a desktop app you want to feel professional.
-
-| Rule | Count | Files | Notes |
-|---|---|---|---|
-| `control-has-associated-label` | 4 | Review.tsx:34, 48, 122; Import.tsx:96 | Add visible text or `aria-label`. |
-| `label-has-associated-control` | 1 | Review.tsx:33 | Add `htmlFor` or nest the input inside the `<label>`. |
-| `click-events-have-key-events` | 1 | Import.tsx:84 | Pair `onClick` with `onKeyDown`. |
-| `no-static-element-interactions` | 1 | Import.tsx:84 | Same element as above — change `<div onClick>` to `<button>`, or add `role="button"` + `tabIndex={0}`. Prefer the semantic element. |
-
-Import.tsx:84 is one clickable `div`; fixing it as a `<button>` collapses three findings.
-
----
-
-## Batch 3 — List Keys ✅
-
-Recommended third PR. Likely bug-fixing, not just lint.
-
-| Rule | Count | Files | Notes |
-|---|---|---|---|
-| `no-array-index-key` | 1 | Import.tsx:119 | Same line as below. |
-| `no-array-index-as-key` | 1 | Import.tsx:119 | Use a stable id from the imported video (path, hash, filename). One change, two findings gone. |
-
----
-
-## Batch 4 — State Refactors 🛠
-
-These are larger and behavior-affecting. Each gets its own PR.
-
-| Rule | Where | Why it matters |
-|---|---|---|
-| `prefer-useReducer` | `state/ReviewContext.tsx:47` (10 useState calls), `components/Timeline.tsx:47` | Both are central to the Review flow. Consolidating reduces re-render fanout and makes the project-folder-model migration cleaner. |
-| `no-cascading-set-state` | `state/ReviewContext.tsx:85`, `components/Timeline.tsx:102` | 6 `setState` calls inside a single `useEffect` → likely redundant renders, possible stale-state bugs. Same components as `prefer-useReducer` — address together. |
-| `rerender-state-only-in-handlers` | `components/Timeline.tsx:53` | `direction` is `useState` but never read in render → `useRef`. Trivial once you're in this file. |
-| `no-giant-component` | `components/Timeline.tsx` (391 lines) | Split during the same Timeline pass. |
-
-**Suggested grouping:** one PR for `ReviewContext.tsx`, one PR for `Timeline.tsx`. Both should land *after* the project-folder-model backend work, because the data shape feeding these components will change.
-
----
-
-## Batch 5 — React 19 Migration 🤔
-
-| Rule | Where | Decision needed |
-|---|---|---|
-| `no-react19-deprecated-apis` | `state/ReviewContext.tsx:4` | Replace `useContext(X)` with `use(X)` from React 19. Only do this if you're committing to React 19+; check current React version in `frontend/package.json` first. If you upgrade, audit for `forwardRef` usage too. |
-
----
-
-## Batch 6 — Style / Judgment 🤔
-
-Skip unless you want them — these are subjective.
-
-| Rule | Where | Verdict |
-|---|---|---|
-| `no-tiny-text` (11px) | Review.tsx:29, Export.tsx:182 | Honest call: 11px is fine for secondary metadata in a video editor (FCP, Resolve, Premiere all use 10-11px chrome). I'd suppress these two rather than upsize. |
-| `no-inline-exhaustive-style` | Export.tsx:176 | Worth extracting to a CSS module if you're already touching Export. Otherwise low priority. |
-| `async-await-in-loop` | Import.tsx:40 | Check whether the operations are truly independent. If imports must be sequential (e.g. backend rate limits), this is a false positive — suppress with a comment explaining why. |
-
----
-
-## Batch 7 — False Positive 🧹
-
-| Rule | Where | Action |
-|---|---|---|
-| `deslop/unused-dev-dependency` | `package.json` (react-doctor itself) | Disappears once the pre-commit hook or `npm run doctor` is considered "use". Ignore. |
-
----
-
-## Suggested PR Order
-
-1. **PR 1** — Batch 1 (quick wins, 19 findings)
-2. **PR 2** — Batch 2 + 3 (a11y + keys, 8 findings, one shared fix)
-3. *Wait for project-folder-model backend (phases 1-3 in the other plan)*
-4. **PR 3** — Batch 4a: ReviewContext refactor
-5. **PR 4** — Batch 4b: Timeline split + state refactor
-6. **PR 5** — Batch 5 if upgrading to React 19
-7. Decide on Batch 6 case by case
-
-After PR 2, expected score: ~96 / 100. After PR 4, the remaining issues should be judgment calls only.
-
-## Re-Run Command
-
-```bash
-cd frontend && npm run doctor -- --verbose --diff
-```
-
-The `--diff` form scopes to changed files, which is what the pre-commit hook runs.
+After batches 2+3, expected score ~96/100; after batch 4, remaining should
+be judgment calls only.

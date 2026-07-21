@@ -31,8 +31,9 @@ exist, "Analyze" re-derives instantly with no FFmpeg.
 `onnxruntime` + a bundled CLIP image-encoder ONNX model (new, Phase B); React 19
 + TypeScript + Vite (Electron renderer), plain CSS + design tokens.
 
-**Status:** IN PROGRESS (2026-07-21) — Phases A, B, C and E complete. Phase D
-(library grouping UI) is the only phase remaining.
+**Status:** CODE COMPLETE (2026-07-21) — all five phases A–E landed on
+`feature/diverse-clip-generation`. One non-code task remains before the feature
+does anything for a user: export and bundle the SigLIP ONNX model (see below).
 
 The Task B3 model decision is settled: **SigLIP base-patch16-224** vision tower
 (Apache-2.0 for both code and weights) instead of OpenAI CLIP — MobileCLIP and

@@ -881,6 +881,15 @@ a {
   font-size: var(--text-xs);
 }
 
+.format-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
 .version-stale-banner {
   display: flex;
   align-items: center;
@@ -1623,6 +1632,26 @@ a {
   border-radius: 999px;
   border: 1px solid;
   white-space: nowrap;
+}
+
+.clip-look-group-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.clip-look-group-badge:hover {
+  background: var(--bg-3);
+}
+
+.clip-look-group-badge[aria-expanded='true'] {
+  background: var(--accent-dim);
 }
 
 .clip-body {

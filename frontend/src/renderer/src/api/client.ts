@@ -13,6 +13,7 @@ import type {
   ClipGenerationPreferenceUpdate,
   ClipGenerationStats,
   DraftResult,
+  FormatName,
   ProjectManifest,
   RecentProject,
   UploadedVideo,
@@ -686,13 +687,16 @@ export async function rejectProposal(projectId: string, proposalId: string): Pro
 
 export async function regenerateDraft(
   projectId: string,
-  profile: AssemblyProfile,
-  targetDurationSec: number,
+  params: { format: FormatName } | { profile: AssemblyProfile; targetDurationSec: number },
 ): Promise<DraftResult> {
+  const body =
+    'format' in params
+      ? { format: params.format }
+      : { profile: params.profile, target_duration_sec: params.targetDurationSec };
   const res = await fetch(`${backendUrl()}/projects/${projectId}/draft`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ profile, target_duration_sec: targetDurationSec }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));

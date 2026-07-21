@@ -650,14 +650,42 @@ def test_short_format_never_slowmos():
 - Consumes: `ClipCandidate.look_group` (from regenerated `generated.ts`);
   `format` on the draft/recommendation payloads.
 
-- [ ] **Step 1:** `npm run gen:types`; verify `look_group` in `generated.ts`.
-- [ ] **Step 2 (test-first, RTL):** add a `SourceClipsPanel` test asserting two
-  clips with the same `look_group` render under one group header with the
-  higher-scored as the lead. (Follow existing frontend test patterns under
-  `frontend/tests/` / `frontend/e2e/`.)
-- [ ] **Step 3:** implement grouping + format switcher.
-- [ ] **Step 4:** `npx tsc --noEmit -p tsconfig.json && npx eslint . --max-warnings=0 --ignore-pattern src/renderer/src/types/generated.ts`.
-- [ ] **Step 5: Commit** — `git commit -am "feat(review): group clips by look and add a format switcher"`
+- [x] **Step 1:** `npm run gen:types`; verify `look_group` in `generated.ts`.
+- [x] **Step 2 (deliberately skipped, maintainer decision 2026-07-21):** this
+  step originally called for an RTL `SourceClipsPanel` test. This repo has no
+  component-test framework — only Playwright e2e (`frontend/e2e/`) and
+  `node --test` for the Electron main process, neither of which can render a
+  React component in isolation. Adding vitest/jest/@testing-library/jsdom
+  solely for one test was judged out of scope for this phase; the maintainer
+  ruled to skip the automated component test and implement against the
+  tsc/eslint gate instead, compensating with careful manual reasoning through
+  both the grouped and all-unique states (see Step 3 below for what was
+  verified).
+- [x] **Step 3:** implemented grouping + format switcher.
+  - `SourceClipsPanel.tsx` groups the (already score-sorted) clip list by
+    `look_group` via `groupByLook`; the first clip seen per group is the lead
+    (highest-scored), the rest become `siblings` and only render when the
+    lead's "N similar looks" badge is expanded (`ClipCard.tsx`). Clips with no
+    `look_group`, or the sole member of one, render as a plain single-card
+    "group" with `similarLookCount=0`, so no badge, wrapper, or chrome is added
+    — the grid stays a flat list of `ClipCard`s exactly as before, since group
+    members are pushed as siblings into the same flat array rather than a
+    nested wrapper. Verified by inspecting `groupByLook` against both an
+    all-null-`look_group` clip array (today's real degraded case, since the
+    ONNX model isn't bundled) and a synthetic array with two clips sharing a
+    `look_group`.
+  - `Review.tsx` adds a Short/Medium/Long `<fieldset>` switcher on "Suggested
+    cuts" that calls `regenerateDraft({ format })`, which now accepts either
+    `{ format }` or `{ profile, targetDurationSec }` and posts `{ format }` to
+    `POST /projects/{id}/draft`; the backend's returned timeline is picked up
+    through the existing `refreshTimelineDocument`/timeline-snapshot
+    reconciliation path (no parallel rendering path added).
+  - `format` was added by hand to `AssemblyRecommendation`/`DraftResult` in
+    `types/clip.ts` since it is a plain dict key in the backend
+    (`analysis_service.py`/`api.py`), not a pydantic field, so `gen:types`
+    cannot produce it.
+- [x] **Step 4:** `npx tsc --noEmit -p tsconfig.json && npx eslint . --max-warnings=0 --ignore-pattern src/renderer/src/types/generated.ts` — both clean.
+- [x] **Step 5: Commit** — landed as `feat(review): group clips by look and add a format switcher`.
 
 ---
 

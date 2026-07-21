@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src import api
+from src.embeddings import FakeEmbeddingProvider
 from src.frame_extraction import FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 from src.review_state import sequence_fingerprint
@@ -509,6 +510,80 @@ def test_rederive_clips_returns_422_without_cached_frame_scores(tmp_path):
 
     assert response.status_code == 422
     assert "Analyze once" in response.json()["detail"]
+
+
+def test_rederive_clips_reuses_persisted_embeddings_without_reembedding(monkeypatch, tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+
+    frame_path = tmp_path / "frame.jpg"
+    frame_path.write_bytes(b"a-frame-worth-of-bytes")
+    frames = [
+        FrameScore(
+            timestamp=float(second),
+            frame_path=str(frame_path),
+            motion_stability=8.0,
+            smoothness_score=8.0,
+            sharpness_score=8.0,
+            exposure_score=8.0,
+            contrast_score=8.0,
+            visual_interest_score=0.0,
+            overall_score=8.0,
+            blur_score=8.0,
+            brightness=0.8,
+            contrast=0.8,
+            scene_id=1,
+            is_keyframe=True,
+            turn_rate_deg_per_sec=0.0,
+        )
+        for second in range(8)
+    ]
+    scenes = [api.SceneBoundary(scene_id=1, start_sec=0.0, end_sec=8.0)]
+    stub_expensive_analysis(monkeypatch, frames, scenes)
+
+    embed_calls = []
+    real_embed_images = FakeEmbeddingProvider.embed_images
+
+    def counting_embed_images(self, paths):
+        embed_calls.append(list(paths))
+        return real_embed_images(self, paths)
+
+    monkeypatch.setattr(FakeEmbeddingProvider, "embed_images", counting_embed_images)
+    monkeypatch.setattr(api, "default_embedding_provider", lambda: FakeEmbeddingProvider(dim=4))
+
+    prefs = {
+        "min_clip_duration_sec": 2,
+        "max_clip_duration_sec": 3,
+        "max_clips_per_scene": 1,
+        "max_candidates_per_video": 10,
+    }
+    analyzed = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": prefs},
+    )
+
+    assert analyzed.status_code == 200
+    analyzed_clips = analyzed.json()["clips"]
+    assert len(analyzed_clips) == 1
+    assert isinstance(analyzed_clips[0]["look_group"], int)
+    calls_after_analyze = len(embed_calls)
+    assert calls_after_analyze > 0
+
+    rederived = client.post(f"/projects/{project_id}/clips/rederive", json=prefs)
+
+    assert rederived.status_code == 200
+    rederived_clips = rederived.json()["clips"]
+    assert rederived_clips[0]["look_group"] == analyzed_clips[0]["look_group"]
+    # No re-embedding: rederive must reuse the persisted vector, not call the
+    # embedding provider again (no FFmpeg, no re-embedding invariant).
+    assert len(embed_calls) == calls_after_analyze
 
 
 def test_reopen_folder_project_restores_edited_timeline(monkeypatch, tmp_path):

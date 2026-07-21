@@ -29,6 +29,7 @@ load_dotenv()
 from . import analysis_service
 from .assembly_profiles import AssemblyProfile, build_draft_timeline
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .embeddings import default_embedding_provider
 from .export_engine import (
     choose_timeline_fps,
     edl_flatten_warnings,
@@ -551,6 +552,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             parse_transforms_fn=parse_trf,
             motion_analysis_enabled=_motion_analysis_capability.available,
             motion_analysis_unavailable_reason=_motion_analysis_capability.reason,
+            embedding_provider_fn=default_embedding_provider,
         )
     except analysis_service.AnalysisDependencyUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

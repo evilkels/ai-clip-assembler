@@ -6,6 +6,8 @@ from typing import Any, Callable, Optional
 
 from .assembly_profiles import build_draft_timeline, recommend_assembly_profile
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .clip_diversity import assign_look_groups
+from .embeddings import EmbeddingProvider, default_embedding_provider, embed_candidate
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
 from .models import FrameSample
 from .motion_analysis import (
@@ -51,6 +53,43 @@ def _append_notice_once(notices: list[dict], notice: dict) -> None:
         notices.append(dict(notice))
 
 
+def _embed_candidates(
+    embedding_provider: Optional[EmbeddingProvider],
+    clips: list,
+    frame_scores: list,
+    *,
+    file_name: str,
+) -> dict:
+    """Embed each Candidate Clip from its already-sampled frame JPEGs.
+
+    Returns ``{clip_id: embedding}`` for clips whose frames produced a usable
+    vector. Empty when there's no provider, or when embedding raises for any
+    reason: a provider/session error must degrade to unique look groups, not
+    fail analysis.
+    """
+    if embedding_provider is None:
+        return {}
+    embeddings: dict = {}
+    try:
+        for clip in clips:
+            frame_paths = [
+                frame.frame_path
+                for frame in frame_scores
+                if clip.start_sec <= frame.timestamp <= clip.end_sec
+            ]
+            vector = embed_candidate(embedding_provider, frame_paths)
+            if vector is not None:
+                embeddings[clip.clip_id] = vector
+    except Exception as exc:
+        logger.warning(
+            "Embedding failed for %s, degrading to unique look groups: %s",
+            file_name,
+            exc,
+        )
+        return {}
+    return embeddings
+
+
 def selected_videos(project: dict, request: Any) -> list[dict]:
     """Source Videos to analyze: the requested subset, or all when unfiltered."""
     videos = project["videos"]
@@ -82,6 +121,7 @@ def run_analysis_pipeline(
     parse_transforms_fn: Callable = parse_trf,
     motion_analysis_enabled: bool = True,
     motion_analysis_unavailable_reason: Optional[str] = None,
+    embedding_provider_fn: Callable[[], Optional[EmbeddingProvider]] = default_embedding_provider,
 ) -> AnalysisPipelineResult:
     pipeline_started = time.monotonic()
     per_video_results = []
@@ -90,6 +130,11 @@ def run_analysis_pipeline(
     per_file_frames = {}
     notices = []
     score_samples = score_samples_fn or score_samples_rule_based
+    try:
+        embedding_provider = embedding_provider_fn()
+    except Exception as exc:
+        logger.warning("Embedding provider unavailable, degrading to unique look groups: %s", exc)
+        embedding_provider = None
     videos_to_analyze = selected_videos(project, request)
     total_videos = len(videos_to_analyze)
     for index, video in enumerate(videos_to_analyze, start=1):
@@ -212,6 +257,12 @@ def run_analysis_pipeline(
             scene_bounds=scene_bounds,
             source_duration_sec=source_duration_sec,
         )
+        clip_embeddings = _embed_candidates(
+            embedding_provider,
+            result.clips,
+            frame_scores,
+            file_name=video["file_name"],
+        )
         per_file_frames[video["file_id"]] = {
             "frames": [frame.model_dump() for frame in frame_scores],
             "scene_bounds": {
@@ -220,6 +271,7 @@ def run_analysis_pipeline(
             },
             "source_duration_sec": source_duration_sec,
             "fps": float((video.get("metadata") or {}).get("fps") or 30.0),
+            "embeddings": clip_embeddings,
         }
         video_timing["assembly_sec"] = round(time.monotonic() - phase_started, 2)
         video_timing["ai_scoring_sec"] = 0.0
@@ -334,6 +386,25 @@ def aggregate_generation_stats(per_file_results: list[dict]) -> dict:
     }
 
 
+def _assign_look_groups(clips: list[dict], project: dict) -> None:
+    """Attach each clip's persisted embedding (if any), cluster into Look
+    Groups, then drop the transient "embedding" key from the clip dicts.
+
+    Reuses embeddings already persisted in ``project["frame_scores"]``
+    (Task B4) — never re-embeds and never needs FFmpeg, so this is safe to
+    call from a cached re-derive as well as a fresh analysis.
+    """
+    frame_scores_by_file = (project.get("frame_scores") or {}).get("per_file", {})
+    for clip in clips:
+        entry = frame_scores_by_file.get(clip.get("file_id")) or {}
+        embedding = (entry.get("embeddings") or {}).get(clip.get("clip_id"))
+        if embedding is not None:
+            clip["embedding"] = embedding
+    assign_look_groups(clips)
+    for clip in clips:
+        clip.pop("embedding", None)
+
+
 def finalize_clip_set(
     project: dict,
     per_file_results: list[dict],
@@ -349,6 +420,7 @@ def finalize_clip_set(
         if clip.get("file_id") not in analyzed_file_ids
     )
     enrich_clips({"clips": all_clips, "videos": project["videos"]})
+    _assign_look_groups(all_clips, project)
     ranked_clips = sorted(all_clips, key=lambda clip: clip["overall_score"], reverse=True)
     existing_timeline = project.get("timeline")
     existing_clips = project.get("clips", [])

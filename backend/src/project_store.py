@@ -19,7 +19,9 @@ PROJECT_SCHEMA_VERSION = 1
 ANALYSIS_RESULTS_FILENAME = "results.json"
 ANALYSIS_RESULTS_SCHEMA_VERSION = 2
 FRAME_SCORES_FILENAME = "frame_scores.json"
-FRAME_SCORES_SCHEMA_VERSION = 1
+# v2 adds a per-file "embeddings": {clip_id: [floats]} map (Plan 018 Task B4).
+# v1 sidecars remain readable; they simply carry no embeddings.
+FRAME_SCORES_SCHEMA_VERSION = 2
 TIMELINE_DOCUMENT_FILENAME = "timeline.json"
 REVIEW_SESSION_FILENAME = "review-session.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
@@ -287,7 +289,7 @@ def read_frame_scores(project_folder: Path) -> Optional[dict]:
         return None
     if not isinstance(payload, dict):
         return None
-    if payload.get("schema_version") != FRAME_SCORES_SCHEMA_VERSION:
+    if payload.get("schema_version") not in (1, FRAME_SCORES_SCHEMA_VERSION):
         return None
     if not isinstance(payload.get("per_file"), dict):
         return None

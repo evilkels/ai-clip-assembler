@@ -5,6 +5,7 @@ import pytest
 
 from src.models import Proposal, ReviewMessage, ReviewSession, Transform, TimelineDocument, TimelineItem
 from src.project_store import (
+    FRAME_SCORES_SCHEMA_VERSION,
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
     ProjectFolderNotWritableError,
@@ -12,6 +13,7 @@ from src.project_store import (
     create_or_open_project,
     create_project,
     delete_project_files,
+    frame_scores_path,
     load_timeline_document,
     migrate_legacy_timeline,
     open_project,
@@ -92,6 +94,72 @@ def test_frame_scores_round_trip_as_schema_versioned_sidecar(tmp_path):
     write_frame_scores(project_folder, per_file)
 
     assert read_frame_scores(project_folder) == {"per_file": per_file}
+
+
+def test_frame_scores_schema_version_is_bumped_to_v2():
+    assert FRAME_SCORES_SCHEMA_VERSION == 2
+
+
+def test_frame_scores_v2_round_trip_persists_per_clip_embeddings(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    per_file = {
+        "DJI_0042.MP4": {
+            "frames": [
+                {
+                    "timestamp": 1.0,
+                    "frame_path": "/tmp/frame.jpg",
+                    "motion_stability": 8.0,
+                    "smoothness_score": 8.0,
+                    "sharpness_score": 7.0,
+                    "exposure_score": 6.0,
+                    "contrast_score": 5.0,
+                    "visual_interest_score": 0.0,
+                    "overall_score": 7.0,
+                    "blur_score": 7.0,
+                    "brightness": 0.6,
+                    "contrast": 0.5,
+                    "scene_id": 2,
+                    "is_keyframe": True,
+                    "turn_rate_deg_per_sec": 3.0,
+                }
+            ],
+            "scene_bounds": {"2": [0.0, 5.0]},
+            "source_duration_sec": 5.0,
+            "fps": 29.97,
+            "embeddings": {"clip-abc": [0.1, 0.2, 0.3]},
+        }
+    }
+
+    write_frame_scores(project_folder, per_file)
+
+    payload = json.loads(frame_scores_path(project_folder).read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 2
+    assert read_frame_scores(project_folder) == {"per_file": per_file}
+
+
+def test_read_frame_scores_accepts_legacy_v1_sidecar_with_no_embeddings(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    legacy_per_file = {
+        "DJI_0042.MP4": {
+            "frames": [],
+            "scene_bounds": {"2": [0.0, 5.0]},
+            "source_duration_sec": 5.0,
+            "fps": 29.97,
+        }
+    }
+    path = frame_scores_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"schema_version": 1, "per_file": legacy_per_file}),
+        encoding="utf-8",
+    )
+
+    result = read_frame_scores(project_folder)
+
+    assert result == {"per_file": legacy_per_file}
+    assert "embeddings" not in result["per_file"]["DJI_0042.MP4"]
 
 
 def test_read_review_session_tolerates_missing_and_corrupt_files(tmp_path):

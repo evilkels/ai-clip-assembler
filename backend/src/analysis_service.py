@@ -67,10 +67,11 @@ def _embed_candidates(
 ) -> dict:
     """Embed each Candidate Clip from its already-sampled frame JPEGs.
 
-    Returns ``{clip_id: embedding}`` for clips whose frames produced a usable
-    vector. Empty when there's no provider, or when embedding raises for any
-    reason: a provider/session error must degrade to unique look groups, not
-    fail analysis.
+    Returns a cache entry per clip with its source time region and vector.
+    Region metadata lets cached re-derives reuse an embedding when preference
+    changes alter the generated clip id but preserve most of the footage span.
+    Empty when there's no provider, or when embedding raises for any reason: a
+    provider/session error must degrade to unique look groups, not fail analysis.
     """
     if embedding_provider is None:
         return {}
@@ -84,7 +85,11 @@ def _embed_candidates(
             ]
             vector = embed_candidate(embedding_provider, frame_paths)
             if vector is not None:
-                embeddings[clip.clip_id] = vector
+                embeddings[clip.clip_id] = {
+                    "start_sec": clip.start_sec,
+                    "end_sec": clip.end_sec,
+                    "vector": vector,
+                }
     except Exception as exc:
         logger.warning(
             "Embedding failed for %s, degrading to unique look groups: %s",
@@ -391,6 +396,39 @@ def aggregate_generation_stats(per_file_results: list[dict]) -> dict:
     }
 
 
+def _cached_embedding_for_clip(clip: dict, cached: dict) -> Optional[list]:
+    exact = cached.get(clip.get("clip_id"))
+    if isinstance(exact, list):
+        # Schema v2 stored vectors directly under the generated clip id.
+        return exact
+    if isinstance(exact, dict) and isinstance(exact.get("vector"), list):
+        return exact["vector"]
+
+    clip_start = float(clip.get("start_sec", 0.0))
+    clip_end = float(clip.get("end_sec", clip_start))
+    clip_duration = clip_end - clip_start
+    if clip_duration <= 0:
+        return None
+
+    best_match = None
+    best_overlap = 0.0
+    for entry in cached.values():
+        if not isinstance(entry, dict) or not isinstance(entry.get("vector"), list):
+            continue
+        try:
+            cached_start = float(entry["start_sec"])
+            cached_end = float(entry["end_sec"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        intersection = max(0.0, min(clip_end, cached_end) - max(clip_start, cached_start))
+        union = max(clip_end, cached_end) - min(clip_start, cached_start)
+        overlap = intersection / union if union > 0 else 0.0
+        if overlap >= 0.5 and overlap > best_overlap:
+            best_match = entry["vector"]
+            best_overlap = overlap
+    return best_match
+
+
 def _assign_look_groups(clips: list[dict], project: dict) -> None:
     """Attach each clip's persisted embedding (if any), cluster into Look
     Groups, then drop the transient "embedding" key from the clip dicts.
@@ -402,7 +440,7 @@ def _assign_look_groups(clips: list[dict], project: dict) -> None:
     frame_scores_by_file = (project.get("frame_scores") or {}).get("per_file", {})
     for clip in clips:
         entry = frame_scores_by_file.get(clip.get("file_id")) or {}
-        embedding = (entry.get("embeddings") or {}).get(clip.get("clip_id"))
+        embedding = _cached_embedding_for_clip(clip, entry.get("embeddings") or {})
         if embedding is not None:
             clip["embedding"] = embedding
     assign_look_groups(clips)

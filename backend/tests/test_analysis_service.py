@@ -473,6 +473,11 @@ def test_run_analysis_pipeline_computes_embeddings_and_assigns_look_groups(tmp_p
         "clip-b",
         "clip-c",
     }
+    assert result.per_file_frames["file-1"]["embeddings"]["clip-a"] == {
+        "start_sec": 0.0,
+        "end_sec": 5.0,
+        "vector": result.per_file_frames["file-1"]["embeddings"]["clip-a"]["vector"],
+    }
 
     project["frame_scores"] = {"per_file": result.per_file_frames}
     finalized = analysis_service.finalize_clip_set(
@@ -489,6 +494,53 @@ def test_run_analysis_pipeline_computes_embeddings_and_assigns_look_groups(tmp_p
     assert clips_by_id["clip-a"]["look_group"] == clips_by_id["clip-b"]["look_group"]
     # clip-c's frame is visually distinct -> a different look group.
     assert clips_by_id["clip-c"]["look_group"] != clips_by_id["clip-a"]["look_group"]
+
+
+def test_finalize_clip_set_reuses_embeddings_for_overlapping_rederived_regions(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+        "frame_scores": {
+            "per_file": {
+                "file-1": {
+                    "embeddings": {
+                        "old-a": {
+                            "start_sec": 0.0,
+                            "end_sec": 5.0,
+                            "vector": [1.0, 0.0],
+                        },
+                        "old-b": {
+                            "start_sec": 30.0,
+                            "end_sec": 35.0,
+                            "vector": [1.0, 0.0],
+                        },
+                    }
+                }
+            }
+        },
+    }
+    per_file_results = [
+        {
+            "file_id": "file-1",
+            "clips": [
+                _clip("new-a", 0.0, 6.0, 9.0).model_dump(),
+                _clip("new-b", 29.0, 35.0, 8.0).model_dump(),
+            ],
+            "result": SimpleNamespace(metadata={}),
+        }
+    ]
+
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    clips_by_id = {clip["clip_id"]: clip for clip in finalized["clips"]}
+    assert clips_by_id["new-a"]["look_group"] == clips_by_id["new-b"]["look_group"]
 
 
 def test_run_analysis_pipeline_degrades_to_unique_look_groups_without_a_provider(tmp_path):

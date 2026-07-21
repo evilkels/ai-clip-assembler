@@ -96,11 +96,11 @@ def test_frame_scores_round_trip_as_schema_versioned_sidecar(tmp_path):
     assert read_frame_scores(project_folder) == {"per_file": per_file}
 
 
-def test_frame_scores_schema_version_is_bumped_to_v2():
-    assert FRAME_SCORES_SCHEMA_VERSION == 2
+def test_frame_scores_schema_version_is_bumped_to_v3():
+    assert FRAME_SCORES_SCHEMA_VERSION == 3
 
 
-def test_frame_scores_v2_round_trip_persists_per_clip_embeddings(tmp_path):
+def test_frame_scores_v3_round_trip_persists_region_embeddings(tmp_path):
     project_folder = tmp_path / "footage"
     project_folder.mkdir()
     per_file = {
@@ -127,14 +127,20 @@ def test_frame_scores_v2_round_trip_persists_per_clip_embeddings(tmp_path):
             "scene_bounds": {"2": [0.0, 5.0]},
             "source_duration_sec": 5.0,
             "fps": 29.97,
-            "embeddings": {"clip-abc": [0.1, 0.2, 0.3]},
+            "embeddings": {
+                "clip-abc": {
+                    "start_sec": 0.0,
+                    "end_sec": 5.0,
+                    "vector": [0.1, 0.2, 0.3],
+                }
+            },
         }
     }
 
     write_frame_scores(project_folder, per_file)
 
     payload = json.loads(frame_scores_path(project_folder).read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert read_frame_scores(project_folder) == {"per_file": per_file}
 
 
@@ -160,6 +166,28 @@ def test_read_frame_scores_accepts_legacy_v1_sidecar_with_no_embeddings(tmp_path
 
     assert result == {"per_file": legacy_per_file}
     assert "embeddings" not in result["per_file"]["DJI_0042.MP4"]
+
+
+def test_read_frame_scores_accepts_legacy_v2_clip_id_embeddings(tmp_path):
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    legacy_per_file = {
+        "DJI_0042.MP4": {
+            "frames": [],
+            "scene_bounds": {},
+            "source_duration_sec": 5.0,
+            "fps": 29.97,
+            "embeddings": {"clip-abc": [0.1, 0.2, 0.3]},
+        }
+    }
+    path = frame_scores_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"schema_version": 2, "per_file": legacy_per_file}),
+        encoding="utf-8",
+    )
+
+    assert read_frame_scores(project_folder) == {"per_file": legacy_per_file}
 
 
 def test_read_review_session_tolerates_missing_and_corrupt_files(tmp_path):

@@ -27,7 +27,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from . import analysis_service
-from .assembly_profiles import AssemblyProfile, build_draft_timeline
+from .assembly_profiles import FORMATS, AssemblyProfile, FormatName, build_draft_timeline
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .embeddings import default_embedding_provider
 from .export_engine import (
@@ -190,7 +190,11 @@ class TimelineUpdateRequest(BaseModel):
 
 
 class DraftRequest(BaseModel):
-    profile: AssemblyProfile
+    # Either `format` (Short/Medium/Long) or `profile` must be given; `format`
+    # takes precedence when both are present. `profile`/`target_duration_sec`
+    # remain for back-compat with callers predating the format registry.
+    format: Optional[FormatName] = None
+    profile: Optional[AssemblyProfile] = None
     target_duration_sec: Optional[float] = None
 
 
@@ -690,15 +694,33 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
     project = projects[project_id]
     if not project.get("clips"):
         raise HTTPException(status_code=400, detail="No analyzed clips available")
+    if request.format is not None:
+        format_info = FORMATS[request.format]
+        profile = format_info["profile"]
+        target_duration_sec = (
+            request.target_duration_sec
+            if request.target_duration_sec is not None
+            else format_info["target_duration_sec"]
+        )
+    elif request.profile is not None:
+        profile = request.profile
+        target_duration_sec = request.target_duration_sec
+    else:
+        raise HTTPException(status_code=422, detail="Either format or profile must be provided")
     timeline = build_draft_timeline(
         project["clips"],
-        profile=request.profile,
-        target_duration_sec=request.target_duration_sec,
+        profile=profile,
+        target_duration_sec=target_duration_sec,
     )
     project["timeline"] = timeline
     invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
-    return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
+    return {
+        "project_id": project_id,
+        "profile": profile,
+        "format": request.format,
+        "timeline": timeline,
+    }
 
 
 @app.post("/projects/{project_id}/clips/rederive")

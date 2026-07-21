@@ -1046,6 +1046,7 @@ def test_analyze_manual_harness_extracts_scores_and_stores_clips(monkeypatch, tm
     assert body["status"] == "complete"
     assert body["clips"][0]["clip_id"] == "clip-1"
     assert api.projects[project_id]["clips"][0]["clip_id"] == "clip-1"
+    assert body["recommendation"]["format"] == "short"
 
 
 def test_analyze_runs_motion_and_scene_detection_before_scoring(monkeypatch, tmp_path):
@@ -1627,6 +1628,80 @@ def test_regenerate_draft_uses_requested_profile(monkeypatch, tmp_path):
     body = response.json()
     assert body["profile"] == "short_social"
     assert body["timeline"]["clips"][0]["duration_sec"] == 7
+
+
+def test_regenerate_draft_accepts_a_format(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 20.0,
+            "duration_sec": 20.0,
+            "overall_score": 9,
+        }
+    ]
+
+    response = client.post(f"/projects/{project_id}/draft", json={"format": "short"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile"] == "short_social"
+    assert body["format"] == "short"
+    assert body["timeline"]["profile"] == "short_social"
+    assert body["timeline"]["total_duration_sec"] <= 60
+
+
+def test_regenerate_draft_rejects_unknown_format(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 20.0,
+            "duration_sec": 20.0,
+            "overall_score": 9,
+        }
+    ]
+
+    response = client.post(f"/projects/{project_id}/draft", json={"format": "giant"})
+
+    assert response.status_code == 422
+    # Framework-level validation error (same shape as an invalid `profile`),
+    # not a silent fallback to a default format.
+    assert response.json()["detail"][0]["loc"][-1] == "format"
+
+
+def test_regenerate_draft_requires_format_or_profile(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 20.0,
+            "duration_sec": 20.0,
+            "overall_score": 9,
+        }
+    ]
+
+    response = client.post(f"/projects/{project_id}/draft", json={})
+
+    assert response.status_code == 422
 
 
 def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):

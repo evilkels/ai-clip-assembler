@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from .assembly_profiles import build_draft_timeline, recommend_assembly_profile
+from .assembly_profiles import (
+    FORMATS,
+    build_draft_timeline,
+    recommend_assembly_profile,
+    recommend_format,
+)
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .clip_diversity import assign_look_groups
 from .embeddings import EmbeddingProvider, default_embedding_provider, embed_candidate
@@ -442,14 +447,17 @@ def finalize_clip_set(
         )
         timeline = existing_timeline
     else:
-        recommendation = recommend_assembly_profile(ranked_clips)
+        # Build only the recommended format's draft on analyze; the others are
+        # built on demand via POST /projects/{id}/draft.
+        recommended_format = FORMATS[recommend_format(ranked_clips)]
         timeline = build_draft_timeline(
             ranked_clips,
-            profile=recommendation["profile"],
-            target_duration_sec=recommendation["target_duration_sec"],
+            profile=recommended_format["profile"],
+            target_duration_sec=recommended_format["target_duration_sec"],
         )
 
     recommendation = recommend_assembly_profile(ranked_clips)
+    recommendation["format"] = recommend_format(ranked_clips)
     generation_stats = aggregate_generation_stats(per_file_results)
     # A partial run (explicit file_ids) keeps clips from the other files, so
     # carry their previous per-file stats forward instead of dropping them.

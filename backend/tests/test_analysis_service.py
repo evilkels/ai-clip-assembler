@@ -407,6 +407,9 @@ def test_finalize_clip_set_recommendation_boundaries():
     assert short["recommendation"]["profile"] == "short_social"
     assert cinematic["recommendation"]["profile"] == "cinematic_highlight"
     assert long["recommendation"]["profile"] == "long_scenic"
+    assert short["recommendation"]["format"] == "short"
+    assert cinematic["recommendation"]["format"] == "medium"
+    assert long["recommendation"]["format"] == "long"
 
 
 def _frame_at(timestamp: float, frame_path: str, *, smoothness: float = 8.0) -> FrameScore:

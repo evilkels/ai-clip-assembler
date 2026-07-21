@@ -19,7 +19,10 @@ PROJECT_SCHEMA_VERSION = 1
 ANALYSIS_RESULTS_FILENAME = "results.json"
 ANALYSIS_RESULTS_SCHEMA_VERSION = 2
 FRAME_SCORES_FILENAME = "frame_scores.json"
-FRAME_SCORES_SCHEMA_VERSION = 1
+# v3 stores each cached embedding with its source time region so a re-derived
+# Candidate Clip can reuse it even when changed bounds produce a new clip id.
+# v1 and v2 sidecars remain readable; v2 vectors still match exact clip ids.
+FRAME_SCORES_SCHEMA_VERSION = 3
 TIMELINE_DOCUMENT_FILENAME = "timeline.json"
 REVIEW_SESSION_FILENAME = "review-session.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
@@ -287,7 +290,7 @@ def read_frame_scores(project_folder: Path) -> Optional[dict]:
         return None
     if not isinstance(payload, dict):
         return None
-    if payload.get("schema_version") != FRAME_SCORES_SCHEMA_VERSION:
+    if payload.get("schema_version") not in (1, 2, FRAME_SCORES_SCHEMA_VERSION):
         return None
     if not isinstance(payload.get("per_file"), dict):
         return None

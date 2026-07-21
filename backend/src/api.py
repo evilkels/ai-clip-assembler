@@ -27,8 +27,9 @@ from pydantic import BaseModel
 load_dotenv()
 
 from . import analysis_service
-from .assembly_profiles import AssemblyProfile, build_draft_timeline
+from .assembly_profiles import FORMATS, AssemblyProfile, FormatName, build_draft_timeline
 from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from .embeddings import default_embedding_provider
 from .export_engine import (
     choose_timeline_fps,
     edl_flatten_warnings,
@@ -189,7 +190,11 @@ class TimelineUpdateRequest(BaseModel):
 
 
 class DraftRequest(BaseModel):
-    profile: AssemblyProfile
+    # Either `format` (Short/Medium/Long) or `profile` must be given; `format`
+    # takes precedence when both are present. `profile`/`target_duration_sec`
+    # remain for back-compat with callers predating the format registry.
+    format: Optional[FormatName] = None
+    profile: Optional[AssemblyProfile] = None
     target_duration_sec: Optional[float] = None
 
 
@@ -551,6 +556,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             parse_transforms_fn=parse_trf,
             motion_analysis_enabled=_motion_analysis_capability.available,
             motion_analysis_unavailable_reason=_motion_analysis_capability.reason,
+            embedding_provider_fn=default_embedding_provider,
         )
     except analysis_service.AnalysisDependencyUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -688,15 +694,33 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
     project = projects[project_id]
     if not project.get("clips"):
         raise HTTPException(status_code=400, detail="No analyzed clips available")
+    if request.format is not None:
+        format_info = FORMATS[request.format]
+        profile = format_info["profile"]
+        target_duration_sec = (
+            request.target_duration_sec
+            if request.target_duration_sec is not None
+            else format_info["target_duration_sec"]
+        )
+    elif request.profile is not None:
+        profile = request.profile
+        target_duration_sec = request.target_duration_sec
+    else:
+        raise HTTPException(status_code=422, detail="Either format or profile must be provided")
     timeline = build_draft_timeline(
         project["clips"],
-        profile=request.profile,
-        target_duration_sec=request.target_duration_sec,
+        profile=profile,
+        target_duration_sec=target_duration_sec,
     )
     project["timeline"] = timeline
     invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
-    return {"project_id": project_id, "profile": request.profile, "timeline": timeline}
+    return {
+        "project_id": project_id,
+        "profile": profile,
+        "format": request.format,
+        "timeline": timeline,
+    }
 
 
 @app.post("/projects/{project_id}/clips/rederive")
@@ -1008,8 +1032,17 @@ class ReviewTurnRequest(BaseModel):
     client_message_id: Optional[uuid.UUID] = None
 
 
-def _review_inputs(project_id: str) -> tuple[list, list, object]:
-    candidates = get_mcp_server()._list_candidates(project_id)
+def _review_inputs(
+    project_id: str, excluded_clip_ids: frozenset = frozenset()
+) -> tuple[list, list, object]:
+    # Clips the user explicitly excluded on the review board are dropped from the
+    # pool entirely, so the agent cannot propose them in a Version (and neither
+    # can the deterministic fallback). Included/pending clips stay.
+    candidates = [
+        candidate
+        for candidate in get_mcp_server()._list_candidates(project_id)
+        if candidate.get("clip_id") not in excluded_clip_ids
+    ]
     candidate_frames = []
     for candidate in candidates:
         paths = mcp_frame_paths(project_id, candidate.get("clip_id"))
@@ -1052,7 +1085,12 @@ async def _run_review_turn(
     project_id: str, user_message: str, client_message_id: Optional[str] = None
 ) -> dict:
     controller = get_timeline_controller(project_id)
-    candidates, candidate_frames, agent = _review_inputs(project_id)
+    excluded_clip_ids = frozenset(
+        clip_id
+        for clip_id, decision in controller.document.decisions.items()
+        if decision == "excluded"
+    )
+    candidates, candidate_frames, agent = _review_inputs(project_id, excluded_clip_ids)
     return await run_review_turn(
         project_id,
         user_message=user_message,

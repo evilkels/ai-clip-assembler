@@ -30,6 +30,7 @@
 | Term | Definition | Aliases to avoid |
 | --- | --- | --- |
 | **Candidate Clip** | A proposed time range from a source video that may be worth keeping. | Suggested clip, AI clip, segment |
+| **Look Group** | A set of Candidate Clips judged visually near-identical by embedding similarity. The library surfaces the highest-scored clip per Look Group; edits use at most one clip per Look Group. | Duplicate group, similarity cluster |
 | **Accepted Clip** | A candidate clip the editor has chosen to keep for export. | Included clip, selected clip |
 | **Rejected Clip** | A candidate clip the editor has chosen not to use. | Excluded clip, hidden clip |
 | **Clip Reason** | A short explanation of why a candidate clip was suggested or ranked; currently serialized as `ai_reason` in the harness/API contract. | AI reason, rationale |

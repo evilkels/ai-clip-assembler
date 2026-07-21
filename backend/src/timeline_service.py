@@ -109,6 +109,10 @@ class TimelineLifecycle:
         if project is not None:
             project.pop("timeline_document", None)
 
+    def reset(self) -> None:
+        """Drop all cached controllers (used by test/QA teardown)."""
+        self._controllers.clear()
+
     def snapshot(self, project_id: str, document: TimelineDocument) -> dict:
         candidates = self._candidate_lister(project_id)
         return {

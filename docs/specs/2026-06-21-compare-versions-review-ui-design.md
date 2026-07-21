@@ -18,17 +18,11 @@ Roadmap).
 
 ### Origin
 
-Two annotations on a Review screenshot (2026-06-21):
-
-1. Over the timeline editor / clip area: *"not well structured … I don't like
-   field boxes and random cards. I want well displayed videos so I can better
-   see what agent suggests are good parts."*
-2. Over the chat: *"I like this chat component but it would be nicer if agent
-   would be like a video editor creative agent."*
-
-Plus a functional gap the user hit: a 50s source yields only **one** suggested
-clip instead of several 3–10s options (root-caused in §"The candidate-pool
-gap").
+Two annotations on a Review screenshot (2026-06-21): the timeline/clip area
+felt unstructured ("random cards"; wanted well-displayed videos instead), and
+the chat felt like it should read as a video-editor creative agent, not a
+generic form. Plus a functional gap the user hit: a 50s source yields only
+**one** suggested clip instead of several 3–10s options (root-caused below).
 
 ## Decisions locked during brainstorm
 
@@ -61,180 +55,95 @@ fold, clipped by `.page`, with no scroll and no collapse. The new 3-zone shell
 puts every zone inside a managed scroll/collapse region, fixing this
 structurally.
 
-## The candidate-pool gap (point 2 — context, not in this slice)
+## The candidate-pool gap (context, not in this slice)
 
-Why a 50s file yields ~one clip:
+Why a 50s file yields ~one clip: `scene_detection.py` (PySceneDetect
+`ContentDetector`) fires on hard visual cuts, and continuous drone footage has
+none, so the whole file is one scene. `clip_assembly.py::assemble_smooth_clips`
+then dedupes into a final cut (`max_clips_per_scene = 2`, non-overlap rule
+deletes neighbours), netting ~1 clip. The new flow needs the opposite — a rich
+pool of overlapping 3–10s candidate segments. This is a backend sub-project
+(Roadmap SP-A) and a real prerequisite for versions on *real* footage, but it
+does **not** block this slice: the mock fabricates its own item ranges.
 
-- `scene_detection.py` uses PySceneDetect `ContentDetector`, which fires on hard
-  visual cuts. Continuous drone footage has none → the whole file is **one
-  scene** (shared `scene_id`).
-- `clip_assembly.py::assemble_smooth_clips` then **dedupes into a final cut**:
-  `max_clips_per_scene = 2` caps the file; it greedily takes the single
-  highest-scoring/longest window, then the **non-overlap rule deletes its
-  neighbours**, and stops at `target_duration_sec`. Net: ~1 clip.
+## Version data contract (the seam)
 
-The new flow needs the opposite — a **rich pool of overlapping 3–10s candidate
-segments**. This is a backend sub-project (Roadmap SP-A) and a real prerequisite
-for versions on *real* footage, but it does **not** block this slice: the mock
-fabricates its own item ranges (see §4).
+The mock emits this shape; the real agent implements the **same** shape later,
+so swapping the producer is a one-line change
+(`frontend/src/renderer/src/types/version.ts`): a `Version` has `version_id`,
+`title`, `vibe`, `rationale`, `profile` (`AssemblyProfile`),
+`total_duration_sec`, and `items: VersionItem[]`; a `VersionItem` has
+`source_clip_id`, `file_id`, `file_name`, `start_sec`, `end_sec`, `speed`, and
+`transform: {scale, x, y}`. `VersionItem` mirrors the backend `TimelineItem`
+**minus `item_id`** (versions aren't live yet) **plus** `file_id`/`file_name`
+(so the player can resolve media without a separate lookup). When the real
+agent lands, this type is mirrored in `backend/src/models.py`.
 
-## Scope of this sub-project
+## Layout / information architecture
 
-**In:** new layout shell; `Version` data contract; `VersionGallery` /
-`VersionCard` / `VersionPlayer`; `WorkingTimelineStrip` (read-mostly); mock
-`proposeVersions`; adopt via `replace_timeline`; relocate the chat; demote
-ClipCards.
+One scroll-managed shell replaced the stacked `Review.tsx` body: header (title
++ smoothness filter), a left chat spine, a side-by-side version compare
+gallery (click-to-expand focus player) with a collapsible "Source clips" panel
+below it, and a full-width collapsible working-timeline filmstrip at the
+bottom. All zones live inside managed scroll/collapse regions (fixes the
+scroll/hide bug); collapse state is local UI state.
 
-**Out (separate sub-projects; dependencies noted in Roadmap):** richer candidate
-pool; real creative agent (voice + powers); drag-handle visual editing.
+## Components
 
-## Section 1 — Version data contract (the seam)
+`VersionPlayer` is the sequence player: plays a version's `items` in order
+(load media, seek to `start_sec`, play to `end_sec` at `playbackRate = speed`,
+apply `transform.scale`, auto-advance to the next item), with compact (card)
+and focus (expanded) presentations. `VersionCard` wraps it with poster/preview,
+title, vibe, `total_duration_sec`, rationale, and a **Use this version** button;
+click body → expand to focus. `VersionGallery` is the side-by-side row plus the
+expand-to-focus state machine (one focused version at a time). `WorkingTimelineStrip`
+is a read-mostly filmstrip of the adopted timeline items, with minimal
+reorder/remove buttons in this slice — full drag-handle editing is Roadmap SP-C.
 
-The mock emits this shape now; the real agent implements the **same** shape
-later, so swapping the producer is a one-line change. New file
-`frontend/src/renderer/src/types/version.ts`:
+## The mock agent
 
-```ts
-interface VersionItem {
-  source_clip_id: string;          // references a Candidate Clip
-  file_id: string;                 // for media URL + sequence playback
-  file_name: string;
-  start_sec: number;               // in/out within the source video
-  end_sec: number;
-  speed: number;                   // 1 = normal; playbackRate
-  transform: { scale: number; x: number; y: number }; // digital zoom/pan
-}
+`proposeVersions(clips: ClipCandidate[]): Version[]` builds **2–4** versions
+from the project's **real** candidate clips by slicing sub-ranges and varying
+order/speed/total duration, with titles/vibes/rationale drawn from the profile
+set. Because it fabricates its own `VersionItem` ranges, it is **not** blocked
+by the sparse candidate pool, and it satisfies the signature the real agent
+will implement later.
 
-interface Version {
-  version_id: string;
-  title: string;                   // e.g. "Punchy Social Cut"
-  vibe: string;                    // short mood/pacing phrase
-  rationale: string;               // 1–2 sentence creative "why"
-  profile: AssemblyProfile;        // reuse existing union
-  total_duration_sec: number;      // sum of effective item durations
-  items: VersionItem[];            // ordered build-recipe
-}
-```
-
-`VersionItem` mirrors the backend `TimelineItem` **minus `item_id`** (versions
-aren't live yet) **plus** `file_id`/`file_name` (so the player can resolve media
-without a separate lookup). When the real agent lands, this type is mirrored in
-`backend/src/models.py`.
-
-## Section 2 — Layout / information architecture
-
-One scroll-managed shell replacing the current stacked `Review.tsx` body:
-
-```
-┌ page-header (title · smoothness filter) ───────────────────────────┐
-├ Agent chat   │  Version compare gallery                            ┤
-│ (left spine, │  ┌ V1 ┐ ┌ V2 ┐ ┌ V3 ┐   ← side-by-side, playable    │
-│  collapsible)│  └────┘ └────┘ └────┘   click → expands to focus    │
-│              │  ▸ Source clips (collapsible: old ClipCard grid)    │
-├──────────────┴─────────────────────────────────────────────────────┤
-│ ▾ Working timeline (full-width collapsible filmstrip)              │
-└────────────────────────────────────────────────────────────────────┘
-```
-
-Mapping every existing `Review.tsx` section to its new home:
-
-| Today | New home |
-| --- | --- |
-| `ReviewChatPanel` | Left spine (relocated, restyled; behaviour unchanged this slice) |
-| `review-grid` of `ClipCard`s | Collapsible **Source clips** panel (secondary) |
-| `draft-setup` (profile/target/regenerate) | Folds into gallery header ("ask the agent for cuts") |
-| `accepted-strip` + `TimelineEditor` | **WorkingTimelineStrip** (filmstrip; numeric fields hidden) |
-| score legend | Moves into Source clips panel |
-
-All zones live inside managed scroll/collapse regions (fixes the scroll/hide
-bug). Collapse state is local UI state.
-
-## Section 3 — Components (new)
-
-- **`VersionPlayer`** — sequence player. Plays a version's `items` in order:
-  load `item[i]` media (`buildVideoMediaUrl(projectId, file_id)`), seek to
-  `start_sec`, play to `end_sec` at `playbackRate = speed`, apply
-  `transform.scale` as a CSS transform, then **auto-advance** to `item[i+1]`
-  (swap `src` + seek). Optional whole-sequence loop. Two presentations: compact
-  (card) and focus (expanded). Reuses `ClipPreview` patterns; factor the
-  per-item seek/clamp into a shared hook if it reduces duplication.
-- **`VersionCard`** — poster/preview (compact `VersionPlayer`), title, vibe,
-  `total_duration_sec`, rationale, **Use this version** button; click body →
-  expand to focus.
-- **`VersionGallery`** — the side-by-side row + the expand-to-focus state
-  machine (one focused version at a time; others stay as a strip).
-- **`WorkingTimelineStrip`** — read-mostly filmstrip of the adopted timeline
-  items (thumbnail + duration + order). Keep the existing minimal reorder/remove
-  buttons in this slice; full drag-handle editing is Roadmap SP-C.
-
-## Section 4 — The mock agent
-
-`proposeVersions(clips: ClipCandidate[]): Version[]` (frontend, e.g.
-`state/mockVersions.ts`). Builds **2–4** versions from the project's **real**
-candidate clips by slicing sub-ranges and varying order / speed / total
-duration, with titles/vibes/rationale drawn from the profile set (e.g. a punchy
-`short_social`, a slow `long_scenic`). Because it **fabricates its own
-`VersionItem` ranges** from available source files, it is **not** blocked by the
-sparse candidate pool. It satisfies the exact signature the real agent will
-implement, so the later swap is local.
-
-## Section 5 — Adopt ("Use this version")
+## Adopt ("Use this version")
 
 New backend operation **`replace_timeline(items)`** in `timeline_ops.py`:
 atomically replaces the timeline document's items with the given `VersionItem`
 specs in **one undoable snapshot**, emits `timeline-changed` over SSE, and lands
-in undo history (reuse the existing `controller.apply` snapshot path). The
-frontend button calls
-`applyTimelineOperation('replace_timeline', { items })`.
+in undo history (reuses the existing controller snapshot path).
 
 *Rejected alternative:* sequencing existing `remove_item` + `add_item` + `set_*`
 ops client-side — messy undo granularity (N snapshots) and requires
-round-tripping freshly created `item_id`s before `set_bounds`/`set_speed`/
-`set_transform`. `replace_timeline` is the only backend touch in this slice;
-small and well-scoped.
+round-tripping freshly created `item_id`s. `replace_timeline` is the only
+backend touch in this slice.
 
-## Section 6 — Data flow
+## Data flow
 
 `proposeVersions(clips)` → `VersionGallery` renders cards → `VersionPlayer`
-plays real media sequences → **Use this version** →
-`replace_timeline(items)` → SSE reconcile in `ReviewContext` →
-`WorkingTimelineStrip` reflects the adopted timeline. The chat stays in
-propose-mode (the real `ReviewChatPanel`, just relocated) — unchanged this slice.
+plays real media sequences → **Use this version** → `replace_timeline(items)`
+→ SSE reconcile in `ReviewContext` → `WorkingTimelineStrip` reflects the
+adopted timeline. The chat stays in propose-mode (relocated, unchanged this
+slice).
 
-## Section 7 — Testing
-
-- **Unit:** `proposeVersions` (returns 2–4 versions; item bounds within source
-  durations; `total_duration_sec` consistent; deterministic given fixed input).
-  `VersionPlayer` advance logic (mocked video element clock). `replace_timeline`
-  (pytest alongside `timeline_ops` tests: clears + rebuilds; single undoable
-  snapshot; emits change).
-- **Component / e2e (Playwright, matching existing patterns):** gallery renders
-  N cards; click expands to focus; **Use this version** updates the working
-  strip.
-- **Regression:** timeline strip and chat are both reachable/collapsible (guards
-  the scroll/hide fix).
-
-## Section 8 — Roadmap (deferred dependencies)
+## Roadmap (deferred dependencies)
 
 - **SP-A — Richer candidate pool (backend).** Emit an overlapping 3–10s
-  candidate pool (relax `max_clips_per_scene` / non-overlap for the *pool*;
-  optionally sub-segment long single scenes). Prerequisite for versions on real
-  footage. Addresses the user's point 2 directly.
+  candidate pool; prerequisite for versions on real footage.
 - **SP-B — Real creative agent (voice + powers).** Implement a
-  `proposeVersions`-equivalent in `review_agent.py` with a creative voice and the
-  power to propose scenarios/versions with rationale; replace raw-UUID proposal
-  text with plain language.
+  `proposeVersions`-equivalent in `review_agent.py`.
 - **SP-C — Drag-handle visual editing.** Replace the hidden numeric controls in
-  `WorkingTimelineStrip` with drag trim handles, visual speed, and a zoom/reframe
-  box, wired to existing `set_bounds`/`set_speed`/`set_transform`.
+  `WorkingTimelineStrip` with drag trim handles, visual speed, and a
+  zoom/reframe box.
 
 ## Risks / open implementation details
 
 - **Src-swap flash** between items of different source files: mitigate by
-  preloading the next item or double-buffering two `<video>` elements. Player
-  internal detail.
-- **Mock variety with very few clips:** acceptable; it fabricates sub-ranges.
+  preloading the next item or double-buffering two `<video>` elements.
 - **`replace_timeline` vs live-sync/undo:** must go through the existing
-  controller snapshot path so undo/redo and SSE stay consistent (memory note:
-  "additive live-sync only" — replace is a new, deliberate exception handled in
-  one snapshot).
+  controller snapshot path so undo/redo and SSE stay consistent (additive
+  live-sync is otherwise the rule; replace is a deliberate, one-snapshot
+  exception).

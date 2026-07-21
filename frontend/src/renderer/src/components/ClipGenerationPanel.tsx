@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  ClipGenerationPreferenceUpdate,
-  ClipGenerationPreferences,
-  ClipGenerationStats,
-} from '../types/clip';
+import type { ClipGenerationPreferences, ClipGenerationStats } from '../types/clip';
 
 const DEFAULT_PREFERENCES: ClipGenerationPreferences = {
   min_clip_duration_sec: 3,
@@ -17,8 +13,9 @@ const DEFAULT_PREFERENCES: ClipGenerationPreferences = {
 
 interface Props {
   stats: ClipGenerationStats | null;
+  preferences?: ClipGenerationPreferences;
+  onPreferencesChange?: (preferences: ClipGenerationPreferences) => void;
   disabled?: boolean;
-  onRegenerate: (preferences: ClipGenerationPreferenceUpdate) => Promise<void>;
 }
 
 function preferenceValue(
@@ -29,127 +26,142 @@ function preferenceValue(
   return typeof value === 'number' ? value : DEFAULT_PREFERENCES[key];
 }
 
-export function ClipGenerationPanel({ stats, disabled = false, onRegenerate }: Props) {
+export function preferencesFromGenerationStats(
+  stats: ClipGenerationStats | null,
+): ClipGenerationPreferences {
+  return {
+    min_clip_duration_sec: preferenceValue(stats, 'min_clip_duration_sec'),
+    max_clip_duration_sec: preferenceValue(stats, 'max_clip_duration_sec'),
+    smoothness_threshold: preferenceValue(stats, 'smoothness_threshold'),
+    target_duration_sec: preferenceValue(stats, 'target_duration_sec'),
+    max_turn_rate_deg_per_sec: preferenceValue(stats, 'max_turn_rate_deg_per_sec'),
+    max_clips_per_scene: preferenceValue(stats, 'max_clips_per_scene'),
+    max_candidates_per_video: preferenceValue(stats, 'max_candidates_per_video'),
+  };
+}
+
+export function ClipGenerationPanel({
+  stats,
+  preferences,
+  onPreferencesChange,
+  disabled = false,
+}: Props) {
   const effective = useMemo<ClipGenerationPreferences>(
-    () => ({
-      min_clip_duration_sec: preferenceValue(stats, 'min_clip_duration_sec'),
-      max_clip_duration_sec: preferenceValue(stats, 'max_clip_duration_sec'),
-      smoothness_threshold: preferenceValue(stats, 'smoothness_threshold'),
-      target_duration_sec: preferenceValue(stats, 'target_duration_sec'),
-      max_turn_rate_deg_per_sec: preferenceValue(stats, 'max_turn_rate_deg_per_sec'),
-      max_clips_per_scene: preferenceValue(stats, 'max_clips_per_scene'),
-      max_candidates_per_video: preferenceValue(stats, 'max_candidates_per_video'),
-    }),
+    () => preferencesFromGenerationStats(stats),
     [stats],
   );
   const [draft, setDraft] = useState<ClipGenerationPreferences>(effective);
-  const [busy, setBusy] = useState(false);
-  const invalidDurationRange = draft.max_clip_duration_sec < draft.min_clip_duration_sec;
+  const current = preferences ?? draft;
+  const invalidDurationRange = current.max_clip_duration_sec < current.min_clip_duration_sec;
 
   useEffect(() => setDraft(effective), [effective]);
 
   const update = (key: keyof ClipGenerationPreferences, value: number) => {
-    setDraft((current) => ({ ...current, [key]: value }));
-  };
-
-  const regenerate = async () => {
-    const confirmed = window.confirm(
-      'Regenerating clips resets manual include/exclude choices, order, trims, and the working timeline.',
-    );
-    if (!confirmed) return;
-    setBusy(true);
-    try {
-      await onRegenerate(draft);
-    } finally {
-      setBusy(false);
-    }
+    const next = { ...current, [key]: value };
+    if (onPreferencesChange) onPreferencesChange(next);
+    else setDraft(next);
   };
 
   return (
     <details className="clip-generation-panel">
       <summary>
-        <strong>Clip generation</strong>
-        <span className="draft-summary">Adjust source clip creation without rerunning FFmpeg</span>
+        <strong>Advanced: how clips are found</strong>
+        <span className="draft-summary">
+          Change what counts as a usable clip, then re-scan — no re-import needed
+        </span>
       </summary>
       <div className="clip-generation-body">
+        <p className="clip-generation-intro">
+          These control how your footage is cut into the clips above — clip length limits, how
+          steady a shot must be, and how many clips to keep per scene and per video. The defaults
+          suit most drone footage; adjust only if you want more, fewer, or longer clips.
+        </p>
         <div className="clip-generation-controls">
           <label>
-            Min duration
+            Shortest clip (s)
+            <span className="clip-generation-help">Discard usable moments shorter than this.</span>
             <input
+              aria-label="Shortest clip (s)"
               type="number"
               min={0.5}
               step={0.5}
-              value={draft.min_clip_duration_sec}
+              disabled={disabled}
+              value={current.min_clip_duration_sec}
               onChange={(event) => update('min_clip_duration_sec', Number(event.target.value))}
             />
           </label>
           <label>
-            Max duration
+            Longest clip (s)
+            <span className="clip-generation-help">Split longer usable moments into shorter clips.</span>
             <input
+              aria-label="Longest clip (s)"
               type="number"
               min={1}
               step={0.5}
-              value={draft.max_clip_duration_sec}
+              disabled={disabled}
+              value={current.max_clip_duration_sec}
               onChange={(event) => update('max_clip_duration_sec', Number(event.target.value))}
             />
           </label>
           <label>
-            Smoothness used to generate clips
+            How steady (0–10)
+            <span className="clip-generation-help">Keep footage at or above this Smoothness Score.</span>
             <input
+              aria-label="How steady (0–10)"
               type="number"
               min={0}
               max={10}
               step={0.5}
-              value={draft.smoothness_threshold}
+              disabled={disabled}
+              value={current.smoothness_threshold}
               onChange={(event) => update('smoothness_threshold', Number(event.target.value))}
             />
           </label>
           <label>
-            Max turn rate
+            Max camera turn (°/s)
+            <span className="clip-generation-help">Reject moments where the camera turns faster.</span>
             <input
+              aria-label="Max camera turn (°/s)"
               type="number"
               min={0}
               step={1}
-              value={draft.max_turn_rate_deg_per_sec}
+              disabled={disabled}
+              value={current.max_turn_rate_deg_per_sec}
               onChange={(event) => update('max_turn_rate_deg_per_sec', Number(event.target.value))}
             />
           </label>
           <label>
-            Clips per scene
+            Max clips per scene
+            <span className="clip-generation-help">Limit how many Candidate Clips one Scene can keep.</span>
             <input
+              aria-label="Max clips per scene"
               type="number"
               min={1}
               step={1}
-              value={draft.max_clips_per_scene}
+              disabled={disabled}
+              value={current.max_clips_per_scene}
               onChange={(event) => update('max_clips_per_scene', Number(event.target.value))}
             />
           </label>
           <label>
-            Clips per video
+            Max clips per video
+            <span className="clip-generation-help">Limit how many Candidate Clips one Source Video can keep.</span>
             <input
+              aria-label="Max clips per video"
               type="number"
               min={1}
               step={1}
-              value={draft.max_candidates_per_video}
+              disabled={disabled}
+              value={current.max_candidates_per_video}
               onChange={(event) => update('max_candidates_per_video', Number(event.target.value))}
             />
           </label>
         </div>
-        <div className="clip-generation-footer">
+        {invalidDurationRange ? (
           <span className="clip-generation-warning">
-            {invalidDurationRange
-              ? 'Max duration must be at least the min duration.'
-              : 'Regenerating resets manual decisions and the working timeline.'}
+            Longest clip must be at least the shortest clip.
           </span>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => void regenerate()}
-            disabled={disabled || busy || invalidDurationRange}
-          >
-            {busy ? 'Regenerating…' : 'Regenerate clips'}
-          </button>
-        </div>
+        ) : null}
       </div>
     </details>
   );

@@ -881,6 +881,15 @@ a {
   font-size: var(--text-xs);
 }
 
+.format-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
 .version-stale-banner {
   display: flex;
   align-items: center;
@@ -894,8 +903,18 @@ a {
 }
 
 .source-clips-panel {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  padding: 4px 4px 4px;
+}
+
+.clip-generation-intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  max-width: 62ch;
 }
 
 .clip-generation-panel {
@@ -932,6 +951,12 @@ a {
   font-size: var(--text-xs);
 }
 
+.clip-generation-help {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .clip-generation-controls input {
   width: 100%;
   min-width: 0;
@@ -959,6 +984,7 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 12px 14px;
   cursor: pointer;
   list-style-position: inside;
 }
@@ -970,7 +996,8 @@ a {
 .source-clips-content {
   display: grid;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 4px;
+  padding: 0 14px 14px;
 }
 
 .draft-setup {
@@ -1605,6 +1632,26 @@ a {
   border-radius: 999px;
   border: 1px solid;
   white-space: nowrap;
+}
+
+.clip-look-group-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.clip-look-group-badge:hover {
+  background: var(--bg-3);
+}
+
+.clip-look-group-badge[aria-expanded='true'] {
+  background: var(--accent-dim);
 }
 
 .clip-body {

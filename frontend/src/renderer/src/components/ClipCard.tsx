@@ -23,6 +23,12 @@ interface Props {
   fileClipIndex?: number;
   /** Total candidates from the same source file. */
   fileClipCount?: number;
+  /** Other candidates sharing this clip's look group (visually similar shots),
+   *  hidden by default and revealed via the toggle below. Undefined/0 when
+   *  the clip has no look group or is the only member of one. */
+  similarLookCount?: number;
+  similarLooksExpanded?: boolean;
+  onToggleSimilarLooks?: () => void;
   onToggleInclude: () => void;
 }
 
@@ -59,6 +65,9 @@ export function ClipCard({
   siblingRanges = EMPTY_RANGES,
   fileClipIndex,
   fileClipCount,
+  similarLookCount = 0,
+  similarLooksExpanded = false,
+  onToggleSimilarLooks,
   onToggleInclude,
 }: Props) {
   const cls = ['clip-card', decision === 'included' ? 'included' : decision === 'excluded' ? 'excluded' : ''].join(' ');
@@ -161,6 +170,16 @@ export function ClipCard({
             <span className="clip-file-group" style={{ borderColor: accent, color: accent }}>
               {fileClipIndex} of {fileClipCount} from this file
             </span>
+          )}
+          {similarLookCount > 0 && (
+            <button
+              type="button"
+              className="clip-look-group-badge"
+              onClick={onToggleSimilarLooks}
+              aria-expanded={similarLooksExpanded}
+            >
+              {similarLooksExpanded ? 'Hide similar' : `${similarLookCount} similar look${similarLookCount === 1 ? '' : 's'}`}
+            </button>
           )}
         </div>
         <div className="clip-meta">

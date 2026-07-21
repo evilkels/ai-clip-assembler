@@ -1,193 +1,109 @@
 # User Guide
 
-AI Clip Assembler turns raw drone/action footage into a tight 1–3 minute cut.
-You import MP4/MOV files, the app suggests the smoothest, most interesting
-clips, you pick the keepers, fine-tune the sequence on a timeline, and export to
-Final Cut Pro (FCPXML) or any NLE (EDL).
+AI Clip Assembler turns raw drone/action footage into a tight 1–3 minute
+cut. Import MP4/MOV files, review suggested clips, refine the Timeline, and
+export to Final Cut Pro (FCPXML), DaVinci Resolve, or any EDL-reading editor.
 
-The default `manual` harness processes Source Videos and Frame Samples locally
-without AI. The optional `pi_agent` harness runs the
-[`pi`](https://github.com/earendil-works/pi-mono) CLI locally, but sends selected
-Frame Samples to the configured cloud provider for Visual Interest scoring only
-after you grant explicit consent for that project.
+The default `manual` harness stays local. Optional `pi_agent` sends selected
+Frame Samples to its configured cloud provider for visual scoring only after
+per-project consent; source videos stay on your machine.
 
-> Screenshots referenced below live in `docs/images/`. Drop a GIF/PNG in that
-> folder and update the caption when capturing a fresh build.
+> Screenshots live in `docs/images/`; update them when capturing a fresh build.
 
 ## Before you start
 
 - macOS (Apple Silicon or Intel).
-- The backend running on `http://127.0.0.1:8000` and the desktop app open. See
-  [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) to launch both.
-- The status bar at the bottom of the window shows **Online · v…** when the
-  backend is reachable. If it shows **Offline**, the app falls back to a small
-  set of mock clips so you can still explore the UI.
+- Run the backend on `http://127.0.0.1:8000` and open the desktop app; see
+  [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md).
+- **Online · v…** means the backend is reachable. **Offline** uses mock clips.
 
 ## The workflow
 
-The app has four tabs, used left to right: **Import → Review → Timeline →
-Export**.
+Four tabs, used left to right: **Import → Review → Timeline → Export**.
 
 ### 1. Import
 
 ![Import screen](images/import.png)
 
-1. Open the **Import** tab.
-2. Click the drop zone and select one or more `.mp4` / `.mov` files. Each file
-   is uploaded to the local backend and probed for duration, FPS, resolution,
-   and codec — shown in the **Uploaded videos** table.
-3. Click **Analyze**. The backend extracts frames, measures motion stability and
-   image quality, detects scenes, assembles candidate clips, and (with the
-   `pi_agent` harness) scores each clip's visual interest.
-4. When it finishes you'll see *"Analysis complete. Head to Review."*
+1. Drop `.mp4`/`.mov` files. The local backend probes duration, FPS,
+   resolution, and codec.
+2. Click **Analyze**. The backend samples frames, measures technical quality,
+   detects scenes, builds candidates, and optionally adds Pi visual scoring.
+3. Continue when *“Analysis complete. Head to Review.”* appears.
 
-Analysis time scales with footage length and the AI harness (the `pi` harness
-makes one model call per candidate clip, ~10–15s each).
+Analysis time scales with footage and harness; Pi makes a model call per clip.
 
 ### 2. Review
 
 ![Review screen](images/review.png)
 
-Candidates are ranked by overall score and shown as cards with per-metric chips
-(smoothness, sharpness, exposure, contrast, overall) and the AI's reason.
-
-- Drag the **Smoothness ≥** slider to hide shaky candidates.
-- Click **Include** to add a clip to your sequence, **Exclude** to drop it.
-- Included clips appear in the **Accepted order** strip at the top, where you
-  can do quick reordering and numeric trims.
+Candidates show metric chips and reasons. Adjust generation on Import; on
+Review, filter by smoothness, browse Look Groups, choose Short/Medium/Long,
+include/exclude clips, and reorder accepted clips. Excluded clips never enter
+AI proposals.
 
 ### 3. Timeline
 
 ![Timeline screen](images/timeline.png)
 
-The **Timeline** tab is where you assemble the final cut. Each accepted clip is
-a block whose width reflects its (trimmed) duration.
-
-- **Reorder:** drag a clip block left/right; a green indicator shows where it
-  will drop.
-- **Trim:** drag the light handle on either edge of a block to adjust its
-  start/end. Trims are clamped to the clip's original bounds.
-- **Scrub:** click the time ruler (or anywhere on the track) to move the red
-  playhead. The toolbar shows the current time / total and the clip under the
-  playhead.
-- **Zoom:** use the − / + buttons or the slider to change pixels-per-second for
-  precise editing.
-
-Keyboard shortcuts (when the Timeline tab is focused):
+Reorder blocks, drag edges to trim, click to scrub, and zoom. Shortcuts:
 
 | Key | Action |
 |-----|--------|
-| `L` / `K` / `J` | Play forward / stop / play reverse |
-| `Space` | Toggle play / pause |
+| `L` / `K` / `J` | Forward / stop / reverse |
+| `Space` | Play / pause |
 | `←` / `→` | Move playhead ∓1s |
 | `↑` / `↓` | Select previous / next clip |
-| `Shift`+`←` / `→` | Move the selected clip earlier / later |
-| `⌫` / `Delete` | Remove the selected clip from the sequence |
+| `Shift`+`←`/`→` | Move selected clip |
+| `⌫` / `Delete` | Remove selected clip |
 | `+` / `−` | Zoom in / out |
 
 ### 4. Export
 
 ![Export screen](images/export.png)
 
-1. Open the **Export** tab. It shows the accepted clip count and total duration.
-2. Click **Export for DaVinci Resolve**, **Export FCPXML**, or **Export EDL**.
-   The app first syncs your timeline order and trims to the backend, then
-   writes the file.
-3. The resulting file path is shown with a **Copy** button. Import that file
-   into DaVinci Resolve (`exports/davinci/timeline.xml`), Final Cut Pro
-   (FCPXML), or any editor that reads EDL (Premiere, etc.).
-
-For folder projects, exports are written inside the project folder
-(`exports/davinci/`, `exports/fcp/`, `exports/edl/`) with media paths relative
-to the export file, so the whole folder can be moved or copied to another
-drive and the timeline still resolves without relink prompts.
-
-Use the **Review export payload** disclosure to inspect the exact clip list,
-order, and timings being exported.
+Choose Resolve XML, FCPXML, or EDL. Folder-project exports live under
+`exports/{davinci,fcp,edl}` with relative media paths. Use **Review export
+payload** to inspect order and timings before importing into your NLE.
 
 ## Choosing an AI harness
 
-The default is `manual`, which needs no AI and selects clips purely on
-technical quality. The optional `pi_agent` harness uses the `pi` coding agent
-and requires per-project cloud AI consent before it can run. The local
-Qwen/Ollama harness is currently **postponed**. See
-[HARNESS_SPEC.md](HARNESS_SPEC.md) and the README's *AI Harness* section for
-configuration.
+`manual` is local/default. `pi_agent` requires a configured provider and
+per-project cloud consent. Local Qwen/Ollama is postponed. See
+[HARNESS_SPEC.md](HARNESS_SPEC.md).
 
 ## Review model account (optional)
 
-The `openai-codex` provider can use your ChatGPT subscription through Pi:
+To use an OpenAI ChatGPT subscription through Pi:
 
-1. Install a compatible `pi` CLI. In **Settings → Connections**, the Review
-   model account card shows Pi as ready, missing, or incompatible.
-2. Choose **Sign in**. AI Clip Assembler opens the OpenAI page in your system
-   browser; return to the app after the browser confirms completion.
-3. Confirm the card says **Connected** and the configured-model diagnostic is
-   reachable. Use **Reconnect** after expiry or revocation, and **Cancel** to
-   stop a waiting browser flow.
+1. Install a compatible Pi CLI. Open **Settings → Connections**; the Review
+   model card reports ready, missing, or incompatible.
+2. Choose **Sign in**, complete OpenAI authentication in the system browser,
+   and return when the card says **Connected**. Use **Reconnect** after expiry
+   and **Cancel** to stop a waiting flow.
 
-Pi stores the shared credential in `~/.pi/agent/auth.json`. The renderer never
-receives its tokens. Signing in only configures the Review model account: it
-does not install the Pi CLI, select a harness, upload footage, or grant the
-per-project cloud AI consent required before `pi_agent` analysis.
-
-This account is separate from the MCP connection controls below. Review model
-sign-in lets the in-app harness call its provider; **Connect your AI** lets an
-external desktop assistant inspect candidates and edit an already analyzed
-Timeline.
+Pi owns `~/.pi/agent/auth.json`; tokens never enter the renderer. Signing in
+does not install Pi, select a harness, upload footage, or grant project consent.
 
 ## Connect your AI (optional)
 
-If you already chat with an AI assistant on your Mac — **Claude Desktop** or
-**Codex** — you can connect it to AI Clip Assembler. Once connected, you can
-ask the assistant things like *"add the three smoothest clips to my timeline"*
-or *"trim the first clip to 4 seconds"*, and watch the edits appear live in the
-app. The assistant works on whatever project you have open.
+Claude Desktop or Codex can inspect candidates and edit the already-analyzed
+project currently open in the app. This MCP connection is separate from the
+in-app Review model account.
 
-### How to connect
+In **Settings → Connections → Connect your AI**, each assistant reports
+**Connected**, **Detected**, or **Config not found**. Click **Connect**; the app
+backs up and updates its configuration, then asks you to restart the assistant.
+If automatic setup fails, paste the displayed snippet manually.
 
-1. In the app, open **Settings → Connections**, then find **Connect your AI**.
-2. You'll see a row for each supported assistant with its status:
-   **Connected**, **Detected** (installed but not connected yet), or
-   **Config not found** (the assistant isn't installed, or has never run).
-3. Click **Connect**. The app adds itself to that assistant's configuration —
-   it backs up the existing file first and shows you where the backup went.
-4. Restart the assistant. It won't see the new connection until you do — the
-   app reminds you with *"Connected. Restart … to finish."*
-
-If the automatic write fails (for example, a permissions issue), the panel
-shows the exact configuration snippet so you can paste it into the assistant's
-config file yourself.
-
-### What the assistant can do
-
-- **Look at your candidates:** list the suggested clips with their scores and
-  the reason each was picked, and view sampled frames from a clip.
-- **Edit your timeline:** include or exclude clips, reorder, trim, split,
-  change speed, and undo/redo — the same edits you make by hand.
-- **Not analyze footage:** connected assistants review and edit an already
-  analyzed project; they never run the scoring step.
-
-Every edit an assistant makes goes through the app's normal undo history, so
-anything it does can be reversed with **Undo**, exactly like your own edits.
-
-### Good to know
-
-- **The app must be open** with a project loaded. If it isn't, the assistant is
-  told *"Open AI Clip Assembler and a project, then retry"* instead of failing
-  silently.
-- **Your video files are never uploaded by the app.** Be aware, though, that
-  whatever the assistant reads — clip names, scores, and any frames it opens —
-  becomes part of your conversation with that assistant, and is handled under
-  that provider's privacy policy (the same trade-off as choosing a cloud AI
-  harness).
-- **Nothing else in your assistant's setup is touched.** Connecting only adds
-  one entry; other tools you've connected stay as they are.
-
-Developers and other MCP-capable clients (Claude Code, Cursor) can connect at a
-lower level — see [MCP_SERVER.md](MCP_SERVER.md).
+Connected assistants can view candidates/frames and include, exclude, reorder,
+trim, split, change speed, and undo/redo. They cannot trigger analysis. The app
+must be open with a project loaded. Anything the assistant reads enters its
+conversation under that provider's privacy policy; source video is not uploaded
+by the app. See [MCP_SERVER.md](MCP_SERVER.md) for lower-level clients.
 
 ## Troubleshooting
 
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues (backend offline,
-missing `vidstabdetect` filter, pi authentication, etc.).
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for backend, FFmpeg, Pi sign-in,
+OAuth callback, diagnostic, and export problems. Never share Pi auth contents,
+OAuth URLs/codes, or tokens in logs or bug reports.

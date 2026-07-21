@@ -2,191 +2,111 @@
 
 ## Overview
 
-AI Clip Assembler is a local-first desktop video editor that uses AI to automatically identify, extract, and assemble the best segments from raw MP4 footage into polished 1-3 minute videos. Users maintain full control through an intuitive GUI with adjustable cuts and direct export to professional editing software.
+AI Clip Assembler is a local-first desktop video editor that uses AI to
+automatically identify, extract, and assemble the best segments from raw MP4
+footage into polished 1-3 minute videos. Users keep full control through a
+GUI with adjustable cuts and export to professional editing software.
 
 ## Problem Statement
 
-Content creators capture hours of raw footage but struggle to:
-- Identify smooth, stable segments among shaky footage
-- Manually scrub through 10-30 minute clips to find good moments
-- Assemble clips into coherent sequences efficiently
-- Do all of this without uploading private footage to cloud services
+Content creators capture hours of raw footage but struggle to identify
+smooth, stable segments among shaky footage; manually scrub long clips for
+good moments; and assemble clips into coherent sequences efficiently — all
+without uploading private footage to cloud services.
 
 ## Solution
 
-A desktop Electron app that:
-1. Ingests multiple MP4 files locally (no cloud upload)
-2. Analyzes footage for motion stability, visual interest, and technical quality
-3. Suggests optimal clip segments with AI-generated scores
-4. Presents clips in an interactive timeline for review and adjustment
-5. Exports assembled timelines to Final Cut Pro (FCPXML) or DaVinci Resolve (EDL)
+A desktop Electron app that: ingests multiple MP4 files locally (no cloud
+upload); analyzes footage for motion stability, visual interest, and
+technical quality; suggests optimal clip segments with AI-generated scores;
+presents clips in an interactive timeline for review and adjustment; and
+exports assembled timelines to Final Cut Pro (FCPXML) or DaVinci Resolve
+(EDL).
 
 ## Target Users
 
-- Travel vloggers with hours of raw footage
-- Drone operators learning cinematography
-- Event videographers needing quick assembly
-- Action camera users (GoPro, Insta360) with shaky footage
+Travel vloggers, drone operators, event videographers, and action-camera
+(GoPro/Insta360) users with hours of raw or shaky footage.
 
 ## Core Features
 
 ### MVP (Phase 1)
 
-#### 1. Video Ingestion
-- **Drop zone**: Drag-and-drop multiple MP4 files
-- **Metadata extraction**: Duration, resolution, FPS, codec via FFmpeg
-- **Frame extraction**: Sample frames every 1-2 seconds for analysis
-- **Progress tracking**: Show analysis progress per video
-
-#### 2. Motion & Quality Analysis
-- **Stability scoring**: FFmpeg vidstabdetect for motion analysis
-- **Blur detection**: OpenCV Laplacian variance for sharpness
-- **Brightness/contrast**: Technical quality metrics
-- **Scene detection**: PySceneDetect for shot boundaries
-
-#### 3. AI Clip Suggestion (Local Harness - Default)
-- **Vision model**: Qwen2.5-VL via Ollama/MLX
-- **Frame scoring**: Smoothness (0-10), visual interest (0-10)
-- **Clip extraction**: Identify continuous high-scoring segments
-- **Reasoning**: AI explains why each clip was selected
-
-#### 4. Timeline GUI
-- **Clip cards**: Visual thumbnails with AI scores overlaid
-- **Drag-and-drop**: Reorder clips in sequence
-- **Trim handles**: Adjust start/end points with precision
-- **Preview**: Play individual clips or full sequence
-- **Score filtering**: Hide clips below threshold
-
-#### 5. Export
-- **FCPXML**: Final Cut Pro timeline import
-- **EDL**: Universal edit decision list
-- **Clip-only**: Export individual clips without assembly
+1. **Video Ingestion** — drag-and-drop multiple MP4s; metadata (duration,
+   resolution, FPS, codec) via FFmpeg; frame sampling every 1-2s; per-video
+   analysis progress.
+2. **Motion & Quality Analysis** — FFmpeg vidstabdetect for stability,
+   OpenCV Laplacian variance for blur, brightness/contrast metrics,
+   PySceneDetect for shot boundaries.
+3. **Clip Suggestion** — the default local rule-based harness scores
+   smoothness and technical quality, identifies continuous high-scoring
+   segments, and explains each selection; opt-in AI adds visual-interest scoring.
+4. **Timeline GUI** — clip cards with AI scores, drag-and-drop reordering,
+   trim handles, clip/sequence preview, score-threshold filtering.
+5. **Export** — FCPXML, EDL, or individual clips without assembly.
 
 ### Phase 2 (Post-MVP)
 
-#### Modular AI Harnesses
-- Claude Code harness for complex editorial decisions
-- Codex harness for structured output
-- Pi Agent harness for conversational explanations
-- Manual/rule-based harness (no AI)
-
-#### Advanced Features
-- Speed ramping (auto-slowmo for key moments)
-- Music beat sync
-- Transition suggestions
-- Multi-track timeline (B-roll support)
-- Project save/load
+Modular AI harnesses (Claude Code, Codex, Pi Agent, manual/rule-based); speed
+ramping, music beat sync, transition suggestions, multi-track timeline
+(B-roll), project save/load.
 
 ## User Stories
 
-### Story 1: Quick Assembly
-> As a travel vlogger, I want to drop my 5 hours of raw footage into the app and get a 2-minute highlight reel suggestion that I can fine-tune and export to Final Cut Pro.
+**Quick Assembly** — drop 5 hours of footage, get a 2-3 minute highlight
+suggestion, fine-tune, export to FCPXML. Acceptance: handles 10+ files at
+once, analyzes 1hr of footage in <10 min, produces valid FCPXML.
 
-**Acceptance Criteria:**
-- App processes 10+ MP4 files simultaneously
-- Analysis completes in under 10 minutes for 1 hour of footage
-- Suggested clips total 2-3 minutes
-- User can adjust cuts and reorder in timeline
-- Export produces valid FCPXML
+**Shaky Footage Filtering** — AI excludes shaky segments automatically.
+Acceptance: stability score on every clip, filter by smoothness > 7/10,
+shaky segments flagged, optional auto-exclude.
 
-### Story 2: Shaky Footage Filtering
-> As a drone beginner, I want the AI to automatically exclude shaky segments so I only see smooth, professional-looking clips.
-
-**Acceptance Criteria:**
-- Stability score visible on every clip
-- Filter to show only clips with smoothness > 7/10
-- Shaky segments highlighted in red
-- Option to auto-exclude clips below threshold
-
-### Story 3: Manual Override
-> As a professional editor, I want to see AI suggestions but have full manual control over final cut points and sequence.
-
-**Acceptance Criteria:**
-- All AI suggestions are editable
-- Keyboard shortcuts for trimming (J/K/L, arrow keys)
-- Manual clip creation from raw footage
-- AI can be disabled entirely
+**Manual Override** — professional editor sees AI suggestions but keeps full
+manual control. Acceptance: all suggestions editable, J/K/L + arrow-key
+shortcuts, manual clip creation, AI can be disabled entirely.
 
 ## Technical Requirements
 
-### Performance
-- Process 1 hour of 4K/60fps footage in < 10 minutes (M3 Mac)
-- Timeline UI remains responsive during background analysis
-- Frame extraction: 2-4 frames per second of video
-
-### Compatibility
-- **macOS**: Primary target (Apple Silicon optimized)
-- **Windows**: Secondary (future release)
-- **Linux**: Community support
-- **Input formats**: MP4 (H.264/H.265), MOV
-- **Output formats**: FCPXML, EDL
-
-### Local-First Requirements
-- No footage uploaded to any server
-- AI inference runs on-device (Ollama/MLX)
-- Optional cloud AI with explicit user consent
-- All project data stored locally
+- **Performance**: process 1hr of 4K/60fps footage in <10 min (M3 Mac);
+  timeline UI stays responsive during background analysis.
+- **Compatibility**: macOS primary (Apple Silicon), Windows/Linux
+  secondary/community; MP4 (H.264/H.265) and MOV input; FCPXML/EDL output.
+- **Local-first (hard constraint)**: no footage uploaded to any server; AI
+  inference runs on-device (Ollama/MLX) by default; any cloud AI is optional
+  and requires explicit user consent; all project data stored locally.
 
 ## UI/UX Requirements
 
-### Layout
-```
-┌─────────────────────────────────────────────┐
-│  Toolbar (Import | Harness | Export | Settings)
-├──────────┬──────────────────────────────────┤
-│          │                                  │
-│  Video   │      Timeline                    │
-│  List    │      (clip cards with scores)    │
-│          │                                  │
-├──────────┤                                  │
-│  Clip    ├──────────────────────────────────┤
-│  Details │      Preview Player              │
-│  (scores,│      (with trim handles)         │
-│  reason) │                                  │
-└──────────┴──────────────────────────────────┘
-```
-
-### Interaction Design
-- **Dark mode default** (video editing standard)
-- **Thumbnail scrubbing**: Hover over clip to scrub through frames
-- **Score visualization**: Color-coded chips (green = good, red = shaky)
-- **Keyboard shortcuts**: J/K/L playback, I/O in/out points, arrow nudge
-- **Zoom**: Timeline zoom for precise trimming
+Four-pane layout: toolbar (Import | Harness | Export | Settings), video
+list, timeline (clip cards with scores), and preview player with trim
+handles. Dark mode default; thumbnail scrubbing on hover; color-coded score
+chips; J/K/L + I/O keyboard shortcuts; timeline zoom.
 
 ## Success Metrics
 
-### User Adoption
-- Time to first export: < 15 minutes for new user
-- User retention: 3+ exports in first week
-- NPS score: > 50
-
-### Technical
-- Analysis accuracy: > 80% of user-kept clips had AI score > 7/10
-- Export success rate: > 95% valid FCPXML/EDL
-- Crash rate: < 1% of sessions
+- Time to first export < 15 min for a new user; 3+ exports in first week;
+  NPS > 50.
+- AI accuracy: > 80% of user-kept clips scored > 7/10; export success rate
+  > 95%; crash rate < 1% of sessions.
 
 ## Risks & Mitigations
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Timeline UI complexity | High | Start with simple linear timeline, no multi-track |
-| Local AI too slow | High | Use frame sampling (not every frame), allow cloud fallback |
+| Local AI too slow | High | Frame sampling (not every frame), allow cloud fallback |
 | FCPXML format changes | Medium | Target FCPXML v1.10 (stable), validate with tests |
-| User expects full editor | Medium | Clear positioning: assembly tool, not replacement for FCP/Resolve |
+| User expects full editor | Medium | Clear positioning: assembly tool, not a replacement for FCP/Resolve |
 
 ## Out of Scope (for MVP)
 
-- Multi-track timeline
-- Color grading
-- Audio mixing
-- Effects/transitions
-- Cloud collaboration
-- Mobile app
-- Video stabilization (detection only, not correction)
+Multi-track timeline, color grading, audio mixing, effects/transitions,
+cloud collaboration, mobile app, and video stabilization correction
+(detection only).
 
 ## Open Questions
 
 1. Should we include audio transcription for spoken-content filtering?
-2. What's the minimum viable timeline component — can we use an existing library?
+2. What's the minimum viable timeline component — existing library or custom?
 3. Should clips be rendered as proxy files for timeline preview?
 4. How do we handle different frame rates in the same project?

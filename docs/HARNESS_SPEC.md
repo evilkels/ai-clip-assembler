@@ -9,89 +9,23 @@
 
 ## Input Format
 
-```json
-{
-  "project_id": "uuid",
-  "harness_id": "local_qwen",
-  "videos": [
-    {
-      "file_id": "uuid",
-      "file_path": "/Users/ernesto/Videos/DJI_001.MP4",
-      "file_name": "DJI_001.MP4",
-      "duration_sec": 1847.3,
-      "fps": 60,
-      "resolution": [3840, 2160],
-      "codec": "h264",
-      "frames": [
-        {
-          "timestamp": 45.2,
-          "frame_path": "/tmp/frames/DJI_001_045200.jpg",
-          "motion_stability": 8.5,
-          "blur_score": 7.2,
-          "brightness": 0.78,
-          "contrast": 0.65,
-          "scene_id": 3,
-          "is_keyframe": true
-        }
-      ],
-      "scenes": [
-        {"scene_id": 3, "start": 42.0, "end": 68.5}
-      ],
-      "audio_transcript": [
-        {"start": 45.2, "end": 48.1, "text": "look at this amazing view"}
-      ]
-    }
-  ],
-  "preferences": {
-    "target_duration_sec": 120,
-    "min_clip_duration_sec": 3,
-    "max_clip_duration_sec": 15,
-    "pacing": "fast",
-    "focus": "smooth_motion",
-    "music_bpm": null
-  },
-  "context": {
-    "previous_suggestions": [],
-    "user_feedback": "more drone shots, less walking"
-  }
-}
-```
+Harness input is a JSON payload keyed by `project_id` and `harness_id`, carrying
+per-video metadata (`file_id`, `file_path`, `duration_sec`, `fps`, `resolution`,
+`codec`), a `frames` array (timestamp, frame path, motion/blur/brightness/contrast
+scores, scene id, keyframe flag), detected `scenes`, and an optional
+`audio_transcript`. A `preferences` block carries editing targets (target/min/max
+clip duration, pacing, focus, music BPM) and a `context` block carries prior
+suggestions and free-text user feedback.
 
 ## Output Format
 
-```json
-{
-  "harness_id": "local_qwen",
-  "harness_version": "1.0.0",
-  "processing_time_sec": 45.2,
-  "clips": [
-    {
-      "clip_id": "uuid",
-      "file_id": "uuid",
-      "file_name": "DJI_001.MP4",
-      "start_sec": 45.2,
-      "end_sec": 52.8,
-      "duration_sec": 7.6,
-      "smoothness_score": 8.5,
-      "visual_interest_score": 7.2,
-      "overall_score": 7.8,
-      "ai_reason": "smooth drone pan over water, golden hour lighting, no shake detected",
-      "suggested_speed": 1.0,
-      "suggested_transition": "crossfade",
-      "tags": ["drone", "water", "golden_hour", "smooth"]
-    }
-  ],
-  "sequence": {
-    "total_duration_sec": 118.4,
-    "clips": ["clip_id_1", "clip_id_2", "clip_id_3"]
-  },
-  "metadata": {
-    "model_used": "qwen3-vl-8b",
-    "tokens_used": 15234,
-    "local": true
-  }
-}
-```
+Harness output returns `harness_id`, `harness_version`, `processing_time_sec`,
+and a `clips` array. Each clip carries `clip_id`, `file_id`, `file_name`,
+`start_sec`/`end_sec`/`duration_sec`, `smoothness_score`, `visual_interest_score`,
+`overall_score`, a human-readable `ai_reason`, `suggested_speed`,
+`suggested_transition`, and `tags`. A `sequence` block lists the assembled clip
+order and total duration; a `metadata` block records which model was used, token
+usage, and whether processing was local.
 
 ## Score Definitions
 
@@ -103,17 +37,19 @@
 
 ## Harness Implementations
 
-### 0. Pi Coding-Agent Harness (Default)
+### 0. Pi Coding-Agent Harness (Optional)
 
 **ID:** `pi_agent`
 **Status:** Optional cloud-backed AI harness; requires per-project consent.
 **Input:** Sampled frame image paths per candidate clip.
-**Process:**
-1. For each rule-based candidate clip, sample up to 4 representative frames.
-2. Spawn the `pi` CLI in non-interactive print mode (`pi --provider <p> --model <m> --print --mode text --no-session`).
-3. `pi` reads the frame images with its built-in `read` tool and returns a JSON object scoring smoothness and visual interest.
-4. Blend the score (70 % original technical + 30 % visual interest) and re-rank clips.
-5. Fall back to the rule-based result if the CLI is unavailable or every clip fails to score.
+
+Rule-based candidate clips are sampled (up to 4 representative frames each) and
+scored by spawning the `pi` CLI in non-interactive print mode
+(`pi --provider <p> --model <m> --print --mode text --no-session`), which reads
+the frames via its built-in `read` tool and returns a JSON score for smoothness
+and visual interest. The harness blends that score (70% original technical +
+30% visual interest) and re-ranks clips, falling back to the rule-based result
+if the CLI is unavailable or every clip fails to score.
 
 Still-frame enhancement judges semantic Visual Interest only. The response keeps
 a neutral `smoothness` compatibility field, but the application ignores it;
@@ -149,86 +85,41 @@ does not replace the backend's required per-project cloud AI consent check.
 > `backend/src/local_qwen_harness.py` is retained for future re-enablement but is
 > not a selectable harness in `/analyze`.
 
-**ID:** `local_qwen`
-**Input:** Frame images + OpenCV metrics
-**Process:**
-1. Send batch of frames to local Qwen3-VL via Ollama/MLX
-2. Prompt: "Score this video frame for smoothness and visual interest. Is there camera shake?"
-3. Parse structured JSON response
-4. Aggregate scores across frames
-
-**Config:**
-Configuration is via environment variables only (no config file):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
-| `OLLAMA_MODEL` | `qwen3-vl:8b` | Model tag to use |
-| `OLLAMA_TEMPERATURE` | `0.2` | Model sampling temperature (fixed at 0.2 by default for deterministic scoring) |
+**ID:** `local_qwen`. Sends batches of frames plus OpenCV metrics to a local
+Qwen3-VL model via Ollama/MLX, prompting it to score smoothness and visual
+interest and flag camera shake, then aggregates scores across frames.
+Configuration is via environment variables only: `OLLAMA_URL` (default
+`http://localhost:11434`), `OLLAMA_MODEL` (default `qwen3-vl:8b`), and
+`OLLAMA_TEMPERATURE` (default `0.2`, fixed for deterministic scoring).
 
 ### 2. Claude Code Harness
 
-**ID:** `claude_code`
-**Input:** Frame paths + analysis metadata
-**Process:**
-1. Spawn Claude Code subprocess with analysis script
-2. Script reads frames, calls Claude API for scoring
-3. Returns structured JSON
-
-**Config:**
-```json
-{
-  "api_key": "sk-ant-...",
-  "model": "claude-opus-4-6",
-  "max_frames": 50
-}
-```
+**ID:** `claude_code`. Spawns a Claude Code subprocess with an analysis script
+that reads frames and calls the Claude API for scoring, returning structured
+JSON. Config: `api_key`, `model`, `max_frames`.
 
 ### 3. Codex Harness
 
-**ID:** `codex`
-**Input:** Frame paths + analysis metadata
-**Process:**
-1. Spawn Codex CLI subprocess
-2. Script generates analysis, calls OpenAI API
-3. Returns structured JSON
-
-**Config:**
-```json
-{
-  "api_key": "sk-...",
-  "model": "gpt-5.3-codex",
-  "max_frames": 50
-}
-```
+**ID:** `codex`. Spawns the Codex CLI, which generates analysis via the OpenAI
+API and returns structured JSON. Config: `api_key`, `model`, `max_frames`.
 
 ### 4. Manual / Rule-Based Harness
 
 **ID:** `manual`
 **Status:** Default local harness.
-**Input:** OpenCV metrics only (no AI vision model)
-**Process:**
-1. Use vidstab motion scores
-2. Use blur/brightness/contrast thresholds
-3. Discover a bounded Candidate Clip pool across eligible detected Scenes
-4. Keep one honestly scored fallback when a Scene has no threshold-passing range
-5. Leave non-overlap, target duration, and scene-density constraints to draft selection
-6. No semantic understanding
+
+Uses OpenCV/vidstab motion scores and blur/brightness/contrast thresholds only
+— no semantic understanding. It discovers a bounded Candidate Clip pool across
+eligible detected Scenes, keeps one honestly scored fallback when a Scene has no
+threshold-passing range, and leaves non-overlap, target duration, and
+scene-density constraints to draft selection.
 
 Candidate discovery uses Frame Sample intervals when a range ends at a quality
 boundary, so three one-second samples cover approximately three seconds rather
 than being measured only from first timestamp to last timestamp. The default
 pool is capped at 12 Candidate Clips per Source Video before Pi enhancement.
 
-**Config:**
-```json
-{
-  "min_smoothness": 7.0,
-  "min_brightness": 0.3,
-  "max_blur": 100.0,
-  "scene_min_duration": 2.0
-}
-```
+Config: `min_smoothness`, `min_brightness`, `max_blur`, `scene_min_duration`.
 
 ## Harness Registration
 
@@ -241,11 +132,8 @@ section above for details.
 
 ## Error Handling
 
-If a harness fails:
-1. Log error with context
-2. Return partial results if available
-3. Fall back to `manual` harness
-4. Notify user in UI
+If a harness fails: log the error with context, return partial results if
+available, fall back to the `manual` harness, and notify the user in the UI.
 
 ## Versioning
 

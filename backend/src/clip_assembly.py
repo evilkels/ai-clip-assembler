@@ -74,6 +74,17 @@ def candidate_windows(
     return windows
 
 
+def best_window(windows: List[CandidateWindow]) -> Optional[CandidateWindow]:
+    """The single strongest window for a run: highest weighted overall score,
+    ties broken by the longer (more usable) span."""
+    if not windows:
+        return None
+    return max(
+        windows,
+        key=lambda w: (weighted_overall(w.frames), w.end_sec - w.start_sec),
+    )
+
+
 def candidate_runs(
     frames: List[FrameScore],
     threshold: float,
@@ -206,13 +217,15 @@ def assemble_smooth_clips(
         scene_end = bounds.get(run[0].scene_id, (0.0, source_duration_sec or float("inf")))[1]
         if source_duration_sec is not None:
             scene_end = min(scene_end, source_duration_sec)
-        for window in candidate_windows(
+        windows = candidate_windows(
             run,
             preferences.min_clip_duration_sec,
             preferences.max_clip_duration_sec,
             scene_end_sec=scene_end if scene_end != float("inf") else None,
-        ):
-            clips.append(make_clip(file_id, file_name, window))
+        )
+        chosen = best_window(windows)
+        if chosen is not None:
+            clips.append(make_clip(file_id, file_name, chosen))
 
     scenes_with_candidates = {clip.scene_id for clip in clips}
     frames_by_scene: Dict[int, List[FrameScore]] = {}

@@ -36,6 +36,7 @@ export interface ClipSuggestion {
   tags?: string[];
   source_created_at?: string | null;
   source_duration_sec?: number | null;
+  look_group?: number | null;
 }
 export interface TimelineSequence {
   total_duration_sec: number;

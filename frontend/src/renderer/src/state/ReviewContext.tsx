@@ -44,6 +44,7 @@ import type {
   ClipDecision,
   ClipGenerationPreferenceUpdate,
   ClipGenerationStats,
+  FormatName,
   RecentProject,
   Trim,
   UploadedVideo,
@@ -95,7 +96,10 @@ interface ReviewState {
   applyAnalysisResult: (result: AnalysisResult) => void;
   recommendation: AssemblyRecommendation | null;
   generationStats: ClipGenerationStats | null;
-  regenerateDraft: (profile: AssemblyProfile, targetDurationSec: number) => Promise<void>;
+  draftFormat: FormatName | null;
+  regenerateDraft: (
+    params: { format: FormatName } | { profile: AssemblyProfile; targetDurationSec: number },
+  ) => Promise<void>;
   rederiveClips: (preferences: ClipGenerationPreferenceUpdate) => Promise<void>;
   createUploadProject: () => Promise<void>;
   openProjectFolder: (folderPath: string) => Promise<void>;
@@ -137,6 +141,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [targetDuration, setTargetDuration] = useState(120);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
   const [generationStats, setGenerationStats] = useState<ClipGenerationStats | null>(null);
+  const [draftFormat, setDraftFormat] = useState<FormatName | null>(null);
 
   // The latest authoritative document, kept in a ref so operation handlers can
   // map a Candidate Clip to its Timeline Item without re-rendering churn.
@@ -281,6 +286,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setGenerationStats(null);
     setProfile('cinematic_highlight');
     setTargetDuration(120);
+    setDraftFormat(null);
   }, []);
 
   const refreshRecentProjects = useCallback(async () => {
@@ -388,17 +394,26 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setGenerationStats(result.generation_stats ?? null);
       setProfile(result.recommendation.profile);
       setTargetDuration(result.recommendation.target_duration_sec);
+      setDraftFormat(result.recommendation.format ?? null);
       void refreshTimelineDocument();
     },
     [refreshTimelineDocument, setClips],
   );
 
   const regenerateDraft = useCallback(
-    async (nextProfile: AssemblyProfile, targetDurationSec: number) => {
+    async (
+      params: { format: FormatName } | { profile: AssemblyProfile; targetDurationSec: number },
+    ) => {
       if (!projectId) return;
-      await requestDraft(projectId, nextProfile, targetDurationSec);
-      setProfile(nextProfile);
-      setTargetDuration(targetDurationSec);
+      const result = await requestDraft(projectId, params);
+      if ('format' in params) {
+        setDraftFormat(params.format);
+        setProfile(result.profile);
+      } else {
+        setProfile(params.profile);
+        setTargetDuration(params.targetDurationSec);
+        setDraftFormat(null);
+      }
       await refreshTimelineDocument();
     },
     [projectId, refreshTimelineDocument],
@@ -598,6 +613,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       applyAnalysisResult,
       recommendation,
       generationStats,
+      draftFormat,
       regenerateDraft,
       rederiveClips,
       createUploadProject,
@@ -644,6 +660,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setCloudAiConsent,
       applyAnalysisResult,
       recommendation,
+      draftFormat,
       regenerateDraft,
       rederiveClips,
       createUploadProject,

@@ -1,7 +1,6 @@
 # Developer Setup
 
-How to set up a local development environment, run both halves of the app, and
-run the test suites. Target platform is macOS.
+Set up local development, run both app halves, and test on the macOS target.
 
 ## Prerequisites
 
@@ -34,27 +33,21 @@ the Electron main process verifies it before starting the packaged backend.
 The tap builds from source; expect 10–30 minutes. `brew options
 homebrew-ffmpeg/ffmpeg/ffmpeg` lists further optional codecs.
 
-The AI harness uses the [`pi`](https://github.com/earendil-works/pi-mono) CLI.
-The desktop authentication integration pins both `@earendil-works/pi-ai` and
-`@earendil-works/pi-coding-agent` to exactly `0.80.10`; keep those production
-dependency versions in lockstep. Install a compatible CLI (0.73.1 or newer,
-but earlier than 1.0.0):
+The AI harness uses [`pi`](https://github.com/earendil-works/pi-mono). Desktop
+auth pins `pi-ai` and `pi-coding-agent` together at `0.80.10`; install CLI
+`>=0.73.1 <1.0.0`:
 
 ```bash
 npm install -g @earendil-works/pi-coding-agent   # provides the `pi` binary
 pi --version
 ```
 
-For normal development, launch Electron and use **Settings → Connections →
-Review model account → Sign in**. Electron main opens the system browser and
-owns the callback listener on `127.0.0.1:1455`; credentials are stored through
-Pi in `~/.pi/agent/auth.json`. Running `pi /login` in a terminal is an advanced
-fallback for debugging the same shared Pi credential store, not a separate app
-account.
+Normally use **Settings → Connections → Review model account → Sign in**.
+Electron main owns the browser callback on `127.0.0.1:1455`; Pi stores credentials
+in `~/.pi/agent/auth.json`. `pi /login` is an advanced fallback using that store.
 
-Never use a real `auth.json` as a test fixture, print it, copy it into the repo,
-or commit it. Main-process auth tests must use the in-memory/fake credential
-store and synthetic token values already used by the test suite.
+Never print, copy, commit, or fixture a real auth file. Tests use fake storage
+and synthetic tokens.
 
 ## Backend (FastAPI)
 
@@ -118,9 +111,8 @@ npm run test:main   # Electron main-process unit tests
 npm run build       # electron-vite production build
 ```
 
-Renderer behavior is covered by focused Playwright specs; Electron main-process
-logic uses Node's test runner through `npm run test:main`. Run both the relevant
-focused test and `typecheck` + `build` for frontend changes.
+Renderer behavior uses focused Playwright specs; Electron main uses Node tests.
+Run the relevant test plus `typecheck` and `build` for frontend changes.
 
 ## Project layout
 
@@ -152,8 +144,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and
 (input/output JSON, registration, fallback behavior). Domain language and agent
 conventions live in [agents/domain.md](agents/domain.md) and `AGENTS.md`.
 
-Workflow conventions: GitHub Issues track work (labels per
-[agents/triage-labels.md](agents/triage-labels.md)); changes land via PRs against
-`main`; all plans live under `docs/plans/` (index and statuses in
-`docs/plans/README.md`), and completed ones move to `docs/plans/done/`. See
-`docs/README.md` for the full docs layout.
+Workflow: GitHub Issues track work (labels in
+[agents/triage-labels.md](agents/triage-labels.md)); PRs target `main`; plans live
+under `docs/plans/`, completed ones move to `docs/plans/done/`, and
+`docs/README.md` maps the documentation.

@@ -5,6 +5,7 @@ import pytest
 
 from src import analysis_service
 from src.clip_assembly import AssemblyPreferences
+from src.embeddings import FakeEmbeddingProvider
 from src.frame_extraction import FFmpegError, FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
 from src.motion_analysis import FFmpegVidstabUnavailableError
@@ -406,3 +407,209 @@ def test_finalize_clip_set_recommendation_boundaries():
     assert short["recommendation"]["profile"] == "short_social"
     assert cinematic["recommendation"]["profile"] == "cinematic_highlight"
     assert long["recommendation"]["profile"] == "long_scenic"
+    assert short["recommendation"]["format"] == "short"
+    assert cinematic["recommendation"]["format"] == "medium"
+    assert long["recommendation"]["format"] == "long"
+
+
+def _frame_at(timestamp: float, frame_path: str, *, smoothness: float = 8.0) -> FrameScore:
+    return FrameScore(
+        timestamp=timestamp,
+        frame_path=frame_path,
+        motion_stability=smoothness,
+        smoothness_score=smoothness,
+        sharpness_score=8.0,
+        exposure_score=8.0,
+        contrast_score=8.0,
+        visual_interest_score=0.0,
+        overall_score=smoothness,
+        blur_score=8.0,
+        brightness=0.8,
+        contrast=0.8,
+        scene_id=1,
+        is_keyframe=True,
+        turn_rate_deg_per_sec=2.0,
+    )
+
+
+def test_run_analysis_pipeline_computes_embeddings_and_assigns_look_groups(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+    frame_a = tmp_path / "frame_a.jpg"
+    frame_a.write_bytes(b"identical-frame-bytes")
+    frame_b = tmp_path / "frame_b.jpg"
+    frame_b.write_bytes(b"identical-frame-bytes")
+    frame_c = tmp_path / "frame_c.jpg"
+    frame_c.write_bytes(b"a-visually-distinct-frame")
+    frames = [
+        _frame_at(0.0, str(frame_a)),
+        _frame_at(30.0, str(frame_b)),
+        _frame_at(60.0, str(frame_c)),
+    ]
+
+    result = _run_service(
+        project,
+        _request(),
+        tmp_path,
+        score_samples_fn=lambda _samples: frames,
+        assemble_clips_fn=lambda **_kwargs: AssemblyResult(
+            clips=[
+                _clip("clip-a", 0.0, 5.0, 9.0),
+                _clip("clip-b", 30.0, 35.0, 8.0),
+                _clip("clip-c", 60.0, 65.0, 7.0),
+            ],
+            sequence=TimelineSequence(total_duration_sec=65.0, clips=["clip-a", "clip-b", "clip-c"]),
+            metadata={},
+        ),
+        embedding_provider_fn=lambda: FakeEmbeddingProvider(dim=8),
+    )
+
+    assert result.per_file_frames["file-1"]["embeddings"].keys() == {
+        "clip-a",
+        "clip-b",
+        "clip-c",
+    }
+    assert result.per_file_frames["file-1"]["embeddings"]["clip-a"] == {
+        "start_sec": 0.0,
+        "end_sec": 5.0,
+        "vector": result.per_file_frames["file-1"]["embeddings"]["clip-a"]["vector"],
+    }
+
+    project["frame_scores"] = {"per_file": result.per_file_frames}
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        result.per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    clips_by_id = {clip["clip_id"]: clip for clip in finalized["clips"]}
+    assert all(isinstance(clip["look_group"], int) for clip in clips_by_id.values())
+    assert "embedding" not in clips_by_id["clip-a"]
+    # clip-a and clip-b were sampled from byte-identical frames -> same look.
+    assert clips_by_id["clip-a"]["look_group"] == clips_by_id["clip-b"]["look_group"]
+    # clip-c's frame is visually distinct -> a different look group.
+    assert clips_by_id["clip-c"]["look_group"] != clips_by_id["clip-a"]["look_group"]
+
+
+def test_finalize_clip_set_reuses_embeddings_for_overlapping_rederived_regions(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+        "frame_scores": {
+            "per_file": {
+                "file-1": {
+                    "embeddings": {
+                        "old-a": {
+                            "start_sec": 0.0,
+                            "end_sec": 5.0,
+                            "vector": [1.0, 0.0],
+                        },
+                        "old-b": {
+                            "start_sec": 30.0,
+                            "end_sec": 35.0,
+                            "vector": [1.0, 0.0],
+                        },
+                    }
+                }
+            }
+        },
+    }
+    per_file_results = [
+        {
+            "file_id": "file-1",
+            "clips": [
+                _clip("new-a", 0.0, 6.0, 9.0).model_dump(),
+                _clip("new-b", 29.0, 35.0, 8.0).model_dump(),
+            ],
+            "result": SimpleNamespace(metadata={}),
+        }
+    ]
+
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    clips_by_id = {clip["clip_id"]: clip for clip in finalized["clips"]}
+    assert clips_by_id["new-a"]["look_group"] == clips_by_id["new-b"]["look_group"]
+
+
+def test_run_analysis_pipeline_degrades_to_unique_look_groups_without_a_provider(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+    frame_a = tmp_path / "frame_a.jpg"
+    frame_a.write_bytes(b"identical-frame-bytes")
+    frame_b = tmp_path / "frame_b.jpg"
+    frame_b.write_bytes(b"identical-frame-bytes")
+    frames = [_frame_at(0.0, str(frame_a)), _frame_at(30.0, str(frame_b))]
+
+    result = _run_service(
+        project,
+        _request(),
+        tmp_path,
+        score_samples_fn=lambda _samples: frames,
+        assemble_clips_fn=lambda **_kwargs: AssemblyResult(
+            clips=[_clip("clip-a", 0.0, 5.0, 9.0), _clip("clip-b", 30.0, 35.0, 8.0)],
+            sequence=TimelineSequence(total_duration_sec=35.0, clips=["clip-a", "clip-b"]),
+            metadata={},
+        ),
+        embedding_provider_fn=lambda: None,
+    )
+
+    assert result.per_file_frames["file-1"]["embeddings"] == {}
+
+    project["frame_scores"] = {"per_file": result.per_file_frames}
+    finalized = analysis_service.finalize_clip_set(
+        project,
+        result.per_file_results,
+        preserve_manual_timeline=True,
+        enrich_clips=lambda data: data["clips"],
+    )
+
+    clips_by_id = {clip["clip_id"]: clip for clip in finalized["clips"]}
+    assert clips_by_id["clip-a"]["look_group"] != clips_by_id["clip-b"]["look_group"]
+
+
+def test_run_analysis_pipeline_survives_embedding_provider_errors(tmp_path):
+    project = {
+        "project_id": "project-1",
+        "videos": [_source_video(tmp_path)],
+        "clips": [],
+        "timeline": None,
+    }
+    frame_a = tmp_path / "frame_a.jpg"
+    frame_a.write_bytes(b"frame-bytes")
+    frames = [_frame_at(0.0, str(frame_a))]
+
+    class ExplodingProvider:
+        def embed_images(self, paths):
+            raise RuntimeError("session crashed")
+
+    result = _run_service(
+        project,
+        _request(),
+        tmp_path,
+        score_samples_fn=lambda _samples: frames,
+        assemble_clips_fn=lambda **_kwargs: AssemblyResult(
+            clips=[_clip("clip-a", 0.0, 5.0, 9.0)],
+            sequence=TimelineSequence(total_duration_sec=5.0, clips=["clip-a"]),
+            metadata={},
+        ),
+        embedding_provider_fn=lambda: ExplodingProvider(),
+    )
+
+    assert result.per_file_frames["file-1"]["embeddings"] == {}
+    assert len(result.per_file_results[0]["clips"]) == 1

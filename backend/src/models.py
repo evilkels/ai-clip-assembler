@@ -73,6 +73,10 @@ class ClipSuggestion(BaseModel):
     # explicit rather than bolted on after model_dump().
     source_created_at: Optional[str] = None
     source_duration_sec: Optional[float] = None
+    # Set of Candidate Clips judged visually near-identical by embedding
+    # similarity (see clip_diversity.assign_look_groups). None when no
+    # embedding model was available for this clip (degrades to "unique look").
+    look_group: Optional[int] = None
 
 
 class TimelineSequence(BaseModel):

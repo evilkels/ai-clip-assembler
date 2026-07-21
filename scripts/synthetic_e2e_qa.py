@@ -291,7 +291,7 @@ def main() -> int:
 
     print("\nFlow: close and reopen the project")
     api.projects.clear()
-    api._timeline_controllers.clear()
+    api._timeline_lifecycle.reset()
     reopened = client.post("/projects/from-folder", json={"folder_path": str(folder)})
     check("reopen succeeds", reopened.status_code == 200)
     restored_clips = reopened.json().get("clips", [])

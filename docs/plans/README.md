@@ -32,10 +32,10 @@ Two kinds of plans live side by side:
 | [007](done/007-creative-visual-review-agent.md) | Make the In-App Review Agent a visual creative curator | P1 | L | 005, 006 | DONE (2026-06-21) — bounded visual context + persisted validated creative Versions |
 | [008](done/008-chat-bubbles-and-interactions.md) | Present review chat as an accessible conversation | P2 | S | 006 | DONE (2026-06-21) — persistent accessible bubbles + interaction feedback |
 | [009](done/009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, and the Working Timeline | P1 | L | 005–008 | DONE (2026-06-28) — Tasks 1–5 merged to `main`; 319 backend tests + ruff + typecheck + build + `compare-versions.spec.ts` green at `f469e43`. Task 6 ceremony (full Playwright, synthetic_e2e, react-doctor, independent review) not re-run — non-blocking. |
-| [010](010-shared-frontend-backend-contract.md) | Generate frontend domain types from backend models (kill contract drift) | P1 | M | — | DONE (2026-07-02) — generated `generated.ts` from backend Pydantic models; frontend clip/version/profile types now derive from it; freshness check wired into typecheck. |
-| [011](011-decompose-api-god-module.md) | Decompose `api.py` god-module — extract analysis pipeline into a service (slice 1) | P1 | L | — | DONE slice 1 of 4 (2026-07-02) — analysis pipeline extracted to `analysis_service.py`; remaining slices: timeline lifecycle service, review/proposal service, projects repository/write-policy. |
-| [012](012-adjustable-clip-generation.md) | Transparent, adjustable clip generation (persist frame scores → live re-derive) | P1 | M | — | DONE (2026-06-28) — frame-score sidecar, live rule-based re-derive, generation stats, GUI knobs, counts, and per-clip why shipped. |
-| [013](013-reliable-browser-e2e-signals.md) | Make browser E2E signals deterministic and meaningful | P1 | S | — | IN PROGRESS (2026-07-09) — spec rewrites landed (`844c029`: per-file upload waits, polled Include loop, real file-boundary detection); full Playwright run against the built app still pending, so red/green verification remains open. |
+| [010](done/010-shared-frontend-backend-contract.md) | Generate frontend domain types from backend models (kill contract drift) | P1 | M | — | DONE (2026-07-02; re-verified 2026-07-21 at `9a6d56a`) — generated types are fresh; typecheck and lint green. |
+| [011](done/011-decompose-api-god-module.md) | Decompose `api.py` god-module — extract analysis pipeline into a service (slice 1) | P1 | L | — | DONE (2026-07-02; re-verified 2026-07-21) — slice 1 archived; slice 2 completed as Plan 014. Review/proposal service and projects repository/write-policy remain future slices. |
+| [012](done/012-adjustable-clip-generation.md) | Transparent, adjustable clip generation (persist frame scores → live re-derive) | P1 | M | — | DONE (2026-06-28; re-verified 2026-07-21) — frame-score sidecar, cached re-derive, stats, controls, counts, and per-clip why remain covered. |
+| [013](done/013-reliable-browser-e2e-signals.md) | Make browser E2E signals deterministic and meaningful | P1 | S | — | DONE (2026-07-21 at `9a6d56a`) — full Playwright suite 9 passed and typecheck green. |
 | [014](done/014-extract-timeline-lifecycle-service.md) | Extract Timeline lifecycle coordination from the API module | P1 | M | 011 slice 1 | DONE (2026-07-09) — lifecycle coordination extracted to `timeline_service.py` (`1c88a22`); executor verification green (focused 94 + service 6 tests, ruff, full suite 355 passed / 4 skipped for missing OpenCV). Slice 2 of plan 011's decomposition. |
 | [015](done/015-record-core-architecture-decisions.md) | Record the core architecture decisions as ADRs | P2 | S | — | DONE (2026-07-09) — ADRs 0001-0004 + index shipped (`93b0d37`); all plan verifications green (links, word budgets, no placeholders). |
 | [016](016-edit-creation-clip-selection.md) | Fix edit creation — no duplicate clips, no unusable slivers, agent-influenced selection | P1 | M | 005, 012, agent-operable-timeline | STEPS 1–2 DONE (2026-07-20) — draft-time overlap/sliver guard plus source-level one-best-window generation (`edd4f16`). Step 3's overlap knob was superseded by plan 018's deterministic invariant and controls-on-Import flow. Step 4 (agent-influenced selection) remains TODO. |
@@ -66,6 +66,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Completed (`done/`)
 
+- [013-reliable-browser-e2e-signals](done/013-reliable-browser-e2e-signals.md) — 2026-07-21; deterministic upload waits, card-scoped labels, and rendered Source Video boundary detection; full Playwright suite 9 passed.
+- [012-adjustable-clip-generation](done/012-adjustable-clip-generation.md) — 2026-06-28; persisted frame scores, cached clip re-derive, generation statistics, controls, and per-clip explanations; re-verified 2026-07-21.
+- [011-decompose-api-god-module](done/011-decompose-api-god-module.md) — 2026-07-02; analysis pipeline extracted into `analysis_service.py`; later timeline slice recorded as Plan 014.
+- [010-shared-frontend-backend-contract](done/010-shared-frontend-backend-contract.md) — 2026-07-02; generated frontend types and freshness enforcement; re-verified 2026-07-21.
 - [014-extract-timeline-lifecycle-service](done/014-extract-timeline-lifecycle-service.md) — 2026-07-09; Timeline lifecycle coordination extracted from `api.py` into `timeline_service.py` (plan 011 slice 2).
 - [015-record-core-architecture-decisions](done/015-record-core-architecture-decisions.md) — 2026-07-09; ADRs 0001-0004 (local-first consent, backend-authoritative Timeline Document, folder persistence, editable export/EDL degradation) plus index.
 - [connect-your-ai-mcp](done/connect-your-ai-mcp.md) — 2026-07-02; runtime descriptor, stdio bridge, desktop-client auto-config, Settings "Connect your AI" panel, and docs. Live desktop-client smoke (Flow G) remains a human step.
@@ -85,6 +89,15 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - [004-timeline-sequence-playback](done/004-timeline-sequence-playback.md) — 2026-06-11
 - [2026-06-10-review-timeline-video-preview-playwright](done/2026-06-10-review-timeline-video-preview-playwright.md)
 - [2026-05-12-backend-timeline-workflow](done/2026-05-12-backend-timeline-workflow.md)
+
+## Reconcile log
+
+- **2026-07-21 (`9a6d56a`)** — archived verified Plans 010–013. Gates:
+  backend 364 passed + ruff clean; Electron main 12 passed; generated types
+  fresh; frontend typecheck + lint clean; Playwright 9 passed; static-site
+  contract 6 passed. No BLOCKED plans. Runtime-tools Tasks 1/3 are partially
+  delivered, but compliance material, diagnostics, Intel evidence, signing,
+  notarization, and clean-machine validation remain open.
 
 ## Dependency notes
 

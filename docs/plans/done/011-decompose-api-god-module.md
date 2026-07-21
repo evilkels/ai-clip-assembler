@@ -13,7 +13,11 @@
 
 ## Status
 
-- **Status**: DONE — slice 1 of 4 (2026-07-02). Analysis pipeline extracted to `analysis_service.py`; `enrich_clips_with_source_metadata` stayed in `api.py` (shared with `GET /clips`, per STOP guidance). Remaining slices: timeline lifecycle service, review/proposal service, projects repository/write-policy.
+- **Status**: DONE — this plan's slice 1 scope completed 2026-07-02 and was
+  re-verified 2026-07-21 at `9a6d56a`. Analysis lives in
+  `analysis_service.py`; timeline lifecycle later completed as Plan 014.
+  Review/proposal extraction and a projects repository/write-policy remain
+  separate future slices, not unfinished work in this archived plan.
 - **Priority**: P1
 - **Effort**: L (do it in slices; this plan is **slice 1 only**)
 - **Risk**: HIGH (api.py is the central coordination point; every route and most tests touch it)
@@ -166,13 +170,13 @@ test in `test_api.py` imported a now-moved private helper, repoint it.
 ## Done criteria
 
 ALL must hold:
-- [ ] `backend/src/analysis_service.py` exists; contains no `from fastapi`/`@app` references (`grep -nE "fastapi|@app" backend/src/analysis_service.py` → no matches).
-- [ ] `run_analysis_pipeline` no longer has a body in `api.py` (it calls the service).
-- [ ] `cd backend && PYTHONPATH=. .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py -q` → ≥ 321 + the new tests, all pass.
-- [ ] `cd backend && .venv/bin/ruff check src tests` → `All checks passed!`
-- [ ] `/analyze` route signature and response unchanged (diff `api.py` route decorator + return).
-- [ ] No out-of-scope files modified (`git status`).
-- [ ] `docs/plans/README.md` row for 011 updated; note "slice 1 of N" and the remaining slices.
+- [x] `backend/src/analysis_service.py` exists and has no FastAPI route coupling.
+- [x] `api.py` delegates analysis orchestration to the service.
+- [x] Backend tests pass (364 passed on 2026-07-21).
+- [x] Backend ruff gate passes.
+- [x] `/analyze` retained its HTTP contract at delivery.
+- [x] Delivery stayed within the planned source scope plus plan bookkeeping.
+- [x] `docs/plans/README.md` records the completed slice and later follow-ups.
 
 ## STOP conditions
 
@@ -190,8 +194,9 @@ Stop and report (do not improvise) if:
 
 ## Maintenance notes
 
-- This is **slice 1**. Remaining slices (separate future plans, do NOT bundle):
-  (2) timeline-controller lifecycle → `timeline_service.py`;
+- This plan was **slice 1**. Slice 2, timeline-controller lifecycle →
+  `timeline_service.py`, completed as Plan 014. Remaining work must use
+  separate future plans (do NOT bundle it back into this archive):
   (3) review/proposal routes → `review_service.py`;
   (4) wrap the `projects` global in a repository with typed accessors once the
   services exist (the find ARCH-04/05 — write-policy + crash-safety between

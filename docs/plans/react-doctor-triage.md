@@ -2,6 +2,11 @@
 
 Status: partially implemented; state refactors and current warnings remain active
 
+Reconcile note (2026-07-21): this plan's historical score/count snapshots are
+not a safe execution baseline. The latest recorded mechanical pass reduced the
+then-current findings from 47 to 33 on local react-doctor 0.2.14. Re-run the
+installed tool and refresh file/line evidence before selecting another batch.
+
 Source: `npx react-doctor@latest --verbose` on `frontend/` (v0.2.14).
 Score: **88 / 100**, 40 issues across 19 rules.
 Snapshot at `/tmp/claude-501/react-doctor-209912ac-9bb7-427d-8b5b-844077d758cc`.

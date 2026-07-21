@@ -13,7 +13,10 @@
 
 ## Status
 
-- **Status**: TODO
+- **Status**: DONE (2026-06-28; re-verified 2026-07-21 at `9a6d56a`) — frame
+  scores persist, cached clip re-derive and generation statistics are covered
+  by backend tests, and the controls remain wired through the current Import
+  flow established by Plan 018 Phase E.
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MEDIUM (touches the analysis pipeline tail + Review wiring; clips feed the Review agent and Timeline)

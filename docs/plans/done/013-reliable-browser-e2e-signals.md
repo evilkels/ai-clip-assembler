@@ -6,7 +6,9 @@
 
 ## Status
 
-- **Status:** IN PROGRESS (2026-07-09) — both spec rewrites landed (`844c029`: per-file upload waits, polled Include loop, real file-boundary detection, card-anchored A/C assertion); the full Playwright run against the built app has not been re-executed yet, so the plan stays open until that verification is green.
+- **Status:** DONE (2026-07-21) — the spec rewrites landed in `844c029`, and
+  reconciliation at `9a6d56a` ran the complete built-app Playwright gate:
+  9 passed, including cross-file playback. Typecheck also passed.
 - **Priority:** P1
 - **Effort:** S
 - **Risk:** LOW
@@ -46,44 +48,44 @@ The browser suite currently reports product failures for assertions that do not 
 
 ### Step 1: Characterize the current failures
 
-- [ ] Run both focused commands above and retain the failure messages in the PR description.
-- [ ] Confirm the version-test failure is Playwright strict mode and the playback-test timeline contains more than one `seq-fixture-a.mp4` Timeline Item before its first `seq-fixture-b.mp4` item.
+- [x] Both focused failures were characterized before the rewrite.
+- [x] The strict-locator and positional file-boundary assumptions were confirmed.
 
 **Verify:** both commands fail for those exact reasons before any edit.
 
 ### Step 2: Make the version-label assertion card-scoped
 
-- [ ] Replace the ambiguous assertion at line 264 with an assertion scoped to a single known Source Clip card:
+- [x] Replace the ambiguous assertion with an assertion scoped to a single known Source Clip card:
 
 ```ts
 await expect(timelineSourceCard.getByText('Proposed in A/C')).toBeVisible();
 ```
 
-- [ ] Do not use `.first()` on the panel-wide locator: that would hide an incorrect label placement.
+- [x] Do not use `.first()` on the panel-wide locator: that would hide an incorrect label placement.
 
 **Verify:** `cd frontend && npx playwright test e2e/compare-versions.spec.ts --reporter=line` exits 0.
 
 ### Step 3: Make cross-file playback select an actual file boundary
 
-- [ ] In `setupTimeline`, return enough information for callers to identify the first timeline card whose visible filename differs from the first card, or add a focused helper in `timeline-playback.spec.ts` that finds it after setup.
-- [ ] Replace the assumption that `.tl-clip.first()` transitions directly to another file. Scrub to the end of the Timeline Item immediately before the first differently named Timeline Item, capture both names, and assert that playback changes to that known second name while `video.paused === false`.
-- [ ] Keep the assertion event-driven with `expect.poll`; do not add an arbitrary wait.
+- [x] Timeline setup identifies the first rendered Source Video boundary.
+- [x] Cross-file playback targets the Timeline Item immediately before that boundary and asserts the known second filename while playback continues.
+- [x] The assertion remains event-driven with `expect.poll`; no arbitrary wait was added.
 
 **Verify:** `cd frontend && npx playwright test e2e/timeline-playback.spec.ts --reporter=line` exits 0 twice consecutively.
 
 ### Step 4: Run release-relevant frontend checks
 
-- [ ] Run the full browser suite and typecheck.
-- [ ] Report the green commands and commit SHA to the controller; the controller updates `docs/plans/README.md` after merge so parallel plan branches do not conflict.
+- [x] Run the full browser suite and typecheck.
+- [x] Record the green commands and reconciliation SHA in the plans index.
 
 **Verify:** `cd frontend && npm run test:e2e && npm run typecheck` exits 0.
 
 ## Done criteria
 
-- [ ] Both original failures are replaced by assertions of the intended UI contract.
-- [ ] `npm run test:e2e` reports 9 passed.
-- [ ] `npm run typecheck` exits 0.
-- [ ] No production files changed.
+- [x] Both original failures are replaced by assertions of the intended UI contract.
+- [x] `npm run test:e2e` reports 9 passed (2026-07-21).
+- [x] `npm run typecheck` exits 0 (2026-07-21).
+- [x] The implementation changed only the two in-scope E2E specs.
 
 ## STOP conditions
 

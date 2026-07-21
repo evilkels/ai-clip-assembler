@@ -13,7 +13,9 @@
 
 ## Status
 
-- **Status**: TODO
+- **Status**: DONE (2026-07-02; re-verified 2026-07-21 at `9a6d56a`) — generated
+  Pydantic-derived frontend types are committed, the freshness check is wired
+  into `typecheck`, and the backend/frontend verification gates remain green.
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED (touches the type definitions every screen consumes; behaviour must not change)
@@ -188,15 +190,15 @@ Run the whole gate set (see Done criteria).
 
 ALL must hold:
 
-- [ ] `frontend/src/renderer/src/types/generated.ts` exists and is committed.
-- [ ] `cd frontend && npm run gen:types && git diff --exit-code -- frontend/src/renderer/src/types/generated.ts` exits 0 (idempotent).
-- [ ] `cd frontend && npm run typecheck` exits 0.
-- [ ] `cd frontend && npm run lint:frontend` exits 0.
-- [ ] `cd frontend && npm run build` exits 0.
-- [ ] `cd backend && .venv/bin/python -m pytest --ignore=tests/test_codex_cli_harness.py -q` → still `321 passed` (or more).
-- [ ] `grep -n "short_social" frontend/src/renderer/src/types/clip.ts` shows no standalone hand-written union.
-- [ ] No files outside the in-scope list modified (`git status`).
-- [ ] `docs/plans/README.md` row for 010 updated.
+- [x] `frontend/src/renderer/src/types/generated.ts` exists and is committed.
+- [x] The generated-type freshness check exits 0 (idempotent).
+- [x] `cd frontend && npm run typecheck` exits 0.
+- [x] `cd frontend && npm run lint:frontend` exits 0.
+- [x] `cd frontend && npm run build` exited 0 at delivery.
+- [x] Backend tests remain green (364 passed on 2026-07-21).
+- [x] The frontend assembly profile derives from the generated backend type.
+- [x] Delivery stayed within the planned source scope plus plan bookkeeping.
+- [x] `docs/plans/README.md` row for 010 updated.
 
 ## STOP conditions
 

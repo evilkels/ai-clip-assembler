@@ -14,6 +14,11 @@
 implemented and locally verified on Apple Silicon. Release diagnostics,
 compliance material, Intel CI evidence, and clean-machine DMG validation remain.
 
+**Reconciled 2026-07-21:** Task 1 and the executable parts of Task 3 are
+implemented and test-green. Task 2 is only partial: CI stages the binary pair
+and dynamic-library closure, but the required committed compliance materials
+and staging tests do not exist yet. Task 4 has not started.
+
 ## Global Constraints
 
 - macOS only: ship separate Apple Silicon and Intel artifacts; never run a mismatched binary.
@@ -39,11 +44,11 @@ export type RuntimeToolStatus =
   | { ready: false; reason: 'missing-ffmpeg' | 'missing-ffprobe' | 'not-executable' | 'missing-vidstabdetect' | 'preflight-failed'; detail: string };
 ```
 
-- [ ] Write three failing tests: valid executable pair plus `vidstabdetect` returns ready; missing `ffmpeg` returns `missing-ffmpeg`; output without `vidstabdetect` returns `missing-vidstabdetect`.
-- [ ] Run `cd frontend && npm run test:main`; expect an import failure for `preflightRuntimeTools`.
-- [ ] Implement exported `preflightRuntimeTools(options)` in `backendLifecycle.ts`. Use `access(path, constants.X_OK)` for both executable paths, then `execFile(ffmpegPath, ['-hide_banner', '-filters'], { timeout: 5000 })`; inspect combined stdout/stderr for the literal `vidstabdetect`. Expected damage states return `RuntimeToolStatus`, never throw.
-- [ ] Run `cd frontend && npm run test:main && npm run typecheck`; expect both commands to exit 0.
-- [ ] Commit with `git commit -m "feat: preflight packaged runtime tools"`.
+- [x] Tests cover a valid executable pair, missing `ffmpeg`, and missing `vidstabdetect`.
+- [x] The tests were introduced before the implementation in the delivery workflow.
+- [x] `preflightRuntimeTools(options)` returns structured expected damage states.
+- [x] `npm run test:main && npm run typecheck` exits 0 (re-verified 2026-07-21).
+- [x] The preflight implementation is committed.
 
 ### Task 2: Stage verified architecture-specific FFmpeg tools and compliance material
 
@@ -62,9 +67,12 @@ export type RuntimeToolStatus =
 
 - [ ] Document the required binaries, source revisions, checksum format, configure line, and release compliance check in `resources/runtime-tools/README.md`. The staging script must reject placeholder compliance documents.
 - [ ] Write a fixture test/dry run: with executable `ffmpeg` and `ffprobe`, assert the staged output includes both tools and all license files; with missing `ffprobe`, assert non-zero exit and a clear error.
-- [ ] Implement `stage-runtime-tools.mjs` with `CLIP_ASSEMBLER_FFMPEG_BIN` as its CI input and `build/runtime-tools` as its output. Copy `ffmpeg`, `ffprobe`, and their recursive Homebrew dynamic-library closure; rewrite install names to private `@loader_path` paths; reject a staged `ffmpeg` whose filters lack `vidstabdetect`.
-- [ ] Add `stage:runtime-tools` and run it before `electron-vite build` and `electron-builder`, but never from `npm run dev`.
-- [ ] Run the fixture test and `cd frontend && npm run stage:runtime-tools`; expect the staged tool and license tree. Commit with `git commit -m "build: stage bundled ffmpeg runtime tools"`.
+- [~] `stage-runtime-tools.mjs` accepts `CLIP_ASSEMBLER_FFMPEG_BIN`, copies the
+  binary pair and recursive Homebrew dylib closure, rewrites install names, and
+  rejects FFmpeg without `vidstabdetect`; license copying/rejection remains.
+- [~] `stage:runtime-tools` exists and CI runs it before packaging; the generic
+  local `build`/`dist` scripts do not yet enforce staging.
+- [ ] Add and run the missing fixture/compliance-tree test, then record both-architecture evidence.
 
 ### Task 3: Package and prefer the private tools at application startup
 
@@ -78,8 +86,8 @@ export type RuntimeToolStatus =
 **Produces:** backend `PATH` starting with `dirname(ffmpegPath)` only after a ready preflight.
 
 - [ ] Write failing tests for packaged paths resolving to `join(resourcesPath, 'tools', 'ffmpeg')` and `ffprobe`, and for the private tools directory being the first `PATH` entry.
-- [ ] Add electron-builder `extraResources`: `{ "from": "build/runtime-tools", "to": "tools", "filter": ["**/*"] }`.
-- [ ] In `startPackagedBackend`, resolve the two resource paths and call `preflightRuntimeTools`. If status is non-ready, throw a user-readable startup error; if ready, prepend `status.toolDirectory` to `buildPackagedBackendPath(piBin)`. Keep dev startup unchanged.
+- [x] Add electron-builder `extraResources`: `{ "from": "build/runtime-tools", "to": "tools", "filter": ["**/*"] }`.
+- [x] `startPackagedBackend` preflights private tool paths and prepends the ready tool directory; development startup remains unchanged.
 - [ ] Run `cd frontend && npm run test:main && npm run typecheck && npm run build`; expect exit 0 and a built resources tree containing `tools/ffmpeg`, `tools/ffprobe`, and `tools/licenses/ffmpeg/`.
 - [ ] Commit with `git commit -m "feat: bundle and prefer private ffmpeg tools"`.
 

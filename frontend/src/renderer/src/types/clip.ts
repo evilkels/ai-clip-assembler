@@ -134,10 +134,15 @@ export interface ClipGenerationStats {
 
 export type AssemblyProfile = NonNullable<CreativeVersion['profile']>;
 
+// Not a pydantic field on the backend (a plain dict key in analysis_service.py
+// / api.py), so `npm run gen:types` cannot pick it up; kept here by hand.
+export type FormatName = 'short' | 'medium' | 'long';
+
 export interface AssemblyRecommendation {
   profile: AssemblyProfile;
   target_duration_sec: number;
   reason: string;
+  format?: FormatName;
 }
 
 export interface DraftTimeline {
@@ -154,6 +159,7 @@ export interface DraftTimeline {
 export interface DraftResult {
   project_id: string;
   profile: AssemblyProfile;
+  format?: FormatName | null;
   timeline: DraftTimeline;
 }
 

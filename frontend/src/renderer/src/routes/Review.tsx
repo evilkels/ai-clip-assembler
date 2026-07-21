@@ -9,8 +9,14 @@ import { useReview } from '../state/ReviewContext';
 import { usePanelWidth } from '../hooks/usePanelWidth';
 import { useReviewConversation } from '../hooks/useReviewConversation';
 import { buildVersionMembership } from '../state/versionState';
-import type { ClipCandidate } from '../types/clip';
+import type { ClipCandidate, FormatName } from '../types/clip';
 import type { Version } from '../types/version';
+
+const FORMAT_OPTIONS: Array<{ value: FormatName; label: string }> = [
+  { value: 'short', label: 'Short' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'long', label: 'Long' },
+];
 
 function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
   // The project targets a pre-ES2023 TS lib, so toSorted() does not compile;
@@ -22,17 +28,21 @@ function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
 export function ReviewPage() {
   const [versionToApply, setVersionToApply] = useState<Version | null>(null);
   const [refreshingVersions, setRefreshingVersions] = useState(false);
+  const [switchingFormat, setSwitchingFormat] = useState(false);
+  const [formatError, setFormatError] = useState<string | null>(null);
   const {
     acceptedOrder,
     applyTimelineOperation,
     clips,
     decisions,
+    draftFormat,
     error,
     exclude,
     generationStats,
     include,
     loading,
     projectId,
+    regenerateDraft,
     smoothnessThreshold,
     setSmoothnessThreshold,
     timelineSnapshot,
@@ -81,6 +91,21 @@ export function ReviewPage() {
     }
     return result;
   }, [clips]);
+
+  const selectFormat = useCallback(
+    async (format: FormatName) => {
+      setSwitchingFormat(true);
+      setFormatError(null);
+      try {
+        await regenerateDraft({ format });
+      } catch (reason: unknown) {
+        setFormatError(reason instanceof Error ? reason.message : 'Unable to switch format');
+      } finally {
+        setSwitchingFormat(false);
+      }
+    },
+    [regenerateDraft],
+  );
 
   const applyVersion = useCallback(
     async (version: Version, expectedRevision: number) => {
@@ -151,8 +176,23 @@ export function ReviewPage() {
             </div>
             <p className="review-pipeline-helper">
               Complete edits the AI assembles from your clips. Preview one and apply it to your
-              timeline — or build your own below by adding individual clips.
+              timeline, or build your own below by adding individual clips.
             </p>
+            <fieldset className="format-switcher" aria-label="Length format">
+              {FORMAT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={draftFormat === option.value ? 'btn primary' : 'btn subtle'}
+                  disabled={switchingFormat || !projectId}
+                  onClick={() => void selectFormat(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+              {switchingFormat ? <span className="draft-summary">Rebuilding timeline…</span> : null}
+              {formatError ? <span className="empty-state">{formatError}</span> : null}
+            </fieldset>
             {versionSetIsStale ? (
               <output className="version-stale-banner">
                 <span>Your video or clip choices changed since these suggestions were made.</span>

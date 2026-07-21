@@ -1,8 +1,7 @@
 # Plans
 
 Single home for all written plans (completed ones move to [`done/`](done/)).
-Numbered plans (001-…) are self-contained executor handoffs from the improve
-skill's audits; named plans are feature/product docs, `Status:` mirrored below.
+Numbered plans are improve handoffs; named plans are product docs, mirrored below.
 
 ## Advisor queue
 
@@ -26,6 +25,7 @@ skill's audits; named plans are feature/product docs, `Status:` mirrored below.
 | [016](016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | Steps 1–2 DONE (`edd4f16`); step 3 superseded by 018; step 4 TODO |
 | [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 DONE (2026-07-20); steps 2–6 TODO |
 | [018](018-diverse-clip-generation.md) | Diverse clip generation (per-moment fragments, look-groups, multi-format) | CODE COMPLETE (2026-07-21) — remaining, not code: export and bundle `backend/models/siglip_image_encoder.onnx`; without it every clip is its own look group and diversity is inert |
+| [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — characterization-first architecture debt after `ad62ed1` |
 
 ## Product plans
 

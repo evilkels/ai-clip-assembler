@@ -10,13 +10,16 @@ class EmbeddingProvider(Protocol):
 
 class FakeEmbeddingProvider:
     def __init__(self, dim: int = 32):
+        if dim <= 0:
+            raise ValueError("Embedding dimension must be positive")
         self.dim = dim
 
     def embed_images(self, paths: List[str]) -> List[List[float]]:
         return [self._embed_path(path) for path in paths]
 
     def _embed_path(self, path: str) -> List[float]:
-        digest = hashlib.sha256(open(path, "rb").read()).digest()
+        with open(path, "rb") as image_file:
+            digest = hashlib.sha256(image_file.read()).digest()
         vector = [float(digest[index % len(digest)]) for index in range(self.dim)]
         return _l2_normalize(vector)
 
@@ -32,12 +35,19 @@ def embed_candidate(
         return None
 
     normalized = [_l2_normalize(vector) for vector in vectors]
-    mean = [sum(vector[index] for vector in normalized) / len(normalized) for index in range(len(normalized[0]))]
-    return _l2_normalize(mean)
+    usable_vectors = [vector for vector in normalized if vector]
+    if not usable_vectors:
+        return None
+
+    mean = [
+        sum(vector[index] for vector in usable_vectors) / len(usable_vectors)
+        for index in range(len(usable_vectors[0]))
+    ]
+    return _l2_normalize(mean) or None
 
 
 def _l2_normalize(vector: List[float]) -> List[float]:
     norm = math.sqrt(sum(value * value for value in vector))
     if norm == 0:
-        return vector
+        return []
     return [value / norm for value in vector]

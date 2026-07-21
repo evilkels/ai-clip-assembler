@@ -302,6 +302,45 @@
       margin-bottom: 10px;
     }
 
+    /* ---------- Hero: horizontal layout on desktop ---------- */
+    @media (min-width: 801px) {
+      .hero-brand {
+        justify-content: flex-start;
+      }
+
+      .hero-grid {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 56px;
+      }
+
+      .hero-copy {
+        text-align: left;
+        flex: 1 1 auto;
+        max-width: 640px;
+      }
+
+      .hero h1 {
+        margin-left: 0;
+        margin-right: 0;
+      }
+
+      .hero-sub {
+        margin-left: 0;
+        margin-right: 0;
+      }
+
+      .hero-cta {
+        justify-content: flex-start;
+      }
+
+      .hero-mark {
+        flex: 0 0 auto;
+        align-self: center;
+      }
+    }
+
     /* ---------- Ruler / playhead signature ---------- */
     .ruler {
       position: relative;

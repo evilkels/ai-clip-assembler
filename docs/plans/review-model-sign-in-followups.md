@@ -44,39 +44,46 @@ Landed as low-risk refactors with `npm run typecheck`, `npm run lint`, and the
 
 ---
 
-## Task 1: Answer the owner's component question — OPEN
+## Task 1: Extract the review-model section — DONE
 
-**Finding:** Extracting `ReviewModelAccountSection` to its own *file* is optional,
-not required. `SettingsModal.tsx` already colocates `SettingsTabPanel`,
-`ConnectionsTabPanel` (renamed from `ConnectAiTabPanel`), `DiagnosticsTabPanel`,
-and the `SettingsModal` shell, and `TimelineEditor.tsx`, `ReviewChatPanel.tsx`,
-and `ClipCard.tsx` each bundle two components too — so panels-in-one-file is the
-repo's established pattern (CONTRIBUTING: "follow the existing code style in
-nearby files"). The genuine smell is the section's **internal breadth**: it
-interleaves status-load, sign-in/cancel action, and diagnostics polling, with the
-`mountedRef.current && requestId === requestIdRef.current` guard copied three
-times (~lines 196, 219, 243).
+The owner's comment is a direct instruction (a separate child component, in its
+own file), which overrides the repo's prior panels-in-one-file convention.
 
-**Files:** `frontend/src/renderer/src/components/SettingsModal.tsx`
-(+ any new `hooks/`/`components/` file this task decides to create).
+**Files:** `frontend/src/renderer/src/components/ReviewModelAccountSection.tsx`
+(new), `frontend/src/renderer/src/components/SettingsModal.tsx`.
 
-- [ ] **Step 1: Extract the request-lifecycle logic into a hook.** Move the
-  `mounted`/`requestId` bookkeeping, status load, `handleAccountAction`, and
-  `runDiagnostics` into a `useReviewModelAccount()` hook that returns
-  `{ account, actionPending, diagnosticState, handleAccountAction }`. Collapse the
-  triplicated guard into one predicate (e.g. `isCurrent(requestId)`). This removes
-  the duplication regardless of whether the JSX moves.
-- [ ] **Step 2: Decide on file extraction.** If Step 1 leaves the section thin and
-  presentational, keep it in `SettingsModal.tsx` (consistent with the file's
-  pattern) and note the decision in the PR. Only split into a separate file if the
-  section stays large after the hook extraction. Record the rationale either way so
-  the owner's question is explicitly answered.
-- [ ] **Step 3: Audit for other multi-component files** (the owner's second ask).
-  Confirm the colocation in `TimelineEditor.tsx`, `ReviewChatPanel.tsx`, and
-  `ClipCard.tsx` is intentional/consistent; do NOT churn them in this PR unless one
-  is clearly over the line. Leave a one-line note in the PR summarising the audit.
-- [ ] **Step 4: Verify.** `npm run typecheck`, `npm run lint`, `npm run build`, and
-  the Connections E2E spec (`frontend/e2e/settings-connections.spec.ts`) stay green.
+- [x] **Step 1: Extract the request-lifecycle logic into a hook.** Added a
+  `useReviewModelAccount()` hook returning
+  `{ account, actionPending, diagnosticState, handleAccountAction }`. The
+  `mountedRef.current && requestId === requestIdRef.current` guard that was copied
+  three times is now one `isCurrent(requestId)` predicate.
+- [x] **Step 2: Move it to its own file.** `ReviewModelAccountSection` (plus its
+  `accountStateLabels`/`DiagnosticState` locals and the hook) now lives in
+  `ReviewModelAccountSection.tsx`; `SettingsModal.tsx` imports it and dropped the
+  now-unused `useRef`, review-model client wrappers, `ReviewModelAccountStatus`,
+  and `REVIEW_MODEL_PROVIDER` imports.
+- [x] **Step 3: Audit for other multi-component files** (the owner's second ask).
+  Files still declaring >1 top-level component: `SettingsModal.tsx` (4 remaining:
+  `ThemeToggle`, `SettingsTabPanel`, `ConnectionsTabPanel`, `DiagnosticsTabPanel`
+  + the `SettingsModal` shell), `ClipCard.tsx` (`SourceTrack` + `ClipCard`),
+  `ReviewChatPanel.tsx` (`ReviewChatPanel` + `ProposalCard`), `TimelineEditor.tsx`
+  (`TimelineEditor` + `TimelineItemRow`). All are **pre-existing** and untouched by
+  this PR; splitting them is unrelated refactor churn (CONTRIBUTING: "keep changes
+  scoped to one problem"). Flagged for a separate cleanup pass — see Task 4.
+- [x] **Step 4: Verify.** `npm run typecheck`, `npm run lint`, `npm run build`, the
+  33 main-process tests, and all 8 Connections E2E tests
+  (`frontend/e2e/settings-connections.spec.ts`) green after the move.
+
+## Task 4: Split the pre-existing multi-component files — OPEN (out of PR #56 scope)
+
+Only open if the owner wants the audit acted on repo-wide. Each is a mechanical
+one-component-per-file split with no behaviour change:
+
+- [ ] `SettingsModal.tsx` → `ThemeToggle`, `SettingsTabPanel`, `ConnectionsTabPanel`,
+  `DiagnosticsTabPanel` into their own files.
+- [ ] `ClipCard.tsx` → extract `SourceTrack`.
+- [ ] `ReviewChatPanel.tsx` → extract `ProposalCard`.
+- [ ] `TimelineEditor.tsx` → extract `TimelineItemRow`.
 
 ## Task 2: Reconcile the plan record with what shipped — OPEN
 

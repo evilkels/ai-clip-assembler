@@ -74,16 +74,25 @@ own file), which overrides the repo's prior panels-in-one-file convention.
   33 main-process tests, and all 8 Connections E2E tests
   (`frontend/e2e/settings-connections.spec.ts`) green after the move.
 
-## Task 4: Split the pre-existing multi-component files — OPEN (out of PR #56 scope)
+## Task 4: Split the pre-existing multi-component files — DONE
 
-Only open if the owner wants the audit acted on repo-wide. Each is a mechanical
-one-component-per-file split with no behaviour change:
+Done at the owner's request, on this PR. Each is a mechanical one-component-per-file
+split with no behaviour change; every affected component is now the sole component
+in its file.
 
-- [ ] `SettingsModal.tsx` → `ThemeToggle`, `SettingsTabPanel`, `ConnectionsTabPanel`,
-  `DiagnosticsTabPanel` into their own files.
-- [ ] `ClipCard.tsx` → extract `SourceTrack`.
-- [ ] `ReviewChatPanel.tsx` → extract `ProposalCard`.
-- [ ] `TimelineEditor.tsx` → extract `TimelineItemRow`.
+- [x] `SettingsModal.tsx` → `ThemeToggle.tsx`, `SettingsTabPanel.tsx`,
+  `ConnectionsTabPanel.tsx`, `DiagnosticsTabPanel.tsx`; `SettingsModal.tsx` keeps
+  only the shell + `SettingsTab` type.
+- [x] `ClipCard.tsx` → `SourceTrack.tsx` (the `Range` type and `clamp01` helper
+  moved with it).
+- [x] `ReviewChatPanel.tsx` → `ProposalCard.tsx`.
+- [x] `TimelineEditor.tsx` → `TimelineItemRow.tsx` (the `round` helper moved with it).
+
+**Verify:** typecheck, lint, build, 33 main tests green; the affected E2E specs
+(settings-connections, compare-versions, timeline-playback) pass. One
+timeline-playback test (`crosses the clip boundary…`) fails, but it fails
+identically on the pre-refactor commit — a pre-existing fixture/playback issue,
+not caused by this split.
 
 ## Task 2: Reconcile the plan record with what shipped — OPEN
 

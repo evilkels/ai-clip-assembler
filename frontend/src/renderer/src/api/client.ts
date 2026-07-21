@@ -200,25 +200,29 @@ export async function openInDaVinci(exportPath: string, sourceFolder?: string): 
 
 const REVIEW_MODEL_DESKTOP_ERROR = 'Review model sign-in is only available in the desktop app';
 
-export async function getReviewModelAccountStatus(): Promise<ReviewModelAccountStatus> {
-  if (!window.clipAssembler?.getReviewModelAccountStatus) {
+type ReviewModelBridgeMethod =
+  | 'getReviewModelAccountStatus'
+  | 'signInReviewModel'
+  | 'cancelReviewModelSignIn';
+
+function callReviewModelBridge(method: ReviewModelBridgeMethod): Promise<ReviewModelAccountStatus> {
+  const call = window.clipAssembler?.[method];
+  if (!call) {
     throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
   }
-  return window.clipAssembler.getReviewModelAccountStatus();
+  return call();
+}
+
+export async function getReviewModelAccountStatus(): Promise<ReviewModelAccountStatus> {
+  return callReviewModelBridge('getReviewModelAccountStatus');
 }
 
 export async function signInReviewModel(): Promise<ReviewModelAccountStatus> {
-  if (!window.clipAssembler?.signInReviewModel) {
-    throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
-  }
-  return window.clipAssembler.signInReviewModel();
+  return callReviewModelBridge('signInReviewModel');
 }
 
 export async function cancelReviewModelSignIn(): Promise<ReviewModelAccountStatus> {
-  if (!window.clipAssembler?.cancelReviewModelSignIn) {
-    throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
-  }
-  return window.clipAssembler.cancelReviewModelSignIn();
+  return callReviewModelBridge('cancelReviewModelSignIn');
 }
 
 export async function detectMcpClients(): Promise<McpClientStatus[]> {

@@ -16,6 +16,7 @@ import {
   type ReviewModelAccountStatus,
   type SettingsUpdate,
 } from '../api/client';
+import { REVIEW_MODEL_PROVIDER } from '../../../shared/reviewModelAuth';
 import { useTheme, type ThemePreference } from '../state/ThemeContext';
 
 export type SettingsTab = 'settings' | 'connect-ai' | 'diagnostics';
@@ -198,7 +199,7 @@ function ReviewModelAccountSection() {
       .catch(() => {
         if (mountedRef.current && requestId === requestIdRef.current) {
           setAccount({
-            provider: 'openai-codex',
+            provider: REVIEW_MODEL_PROVIDER,
             state: 'failed',
             detail: 'Review model account status could not be loaded.',
             pi: { state: 'incompatible', detail: 'Pi could not be inspected.' },
@@ -226,7 +227,7 @@ function ReviewModelAccountSection() {
     }
   };
 
-  const act = async () => {
+  const handleAccountAction = async () => {
     if (!account) return;
     const requestId = ++requestIdRef.current;
     setActionPending(true);
@@ -285,7 +286,7 @@ function ReviewModelAccountSection() {
               {account.detail}
             </p>
           </div>
-          <button type="button" className="btn" onClick={act} disabled={actionDisabled}>
+          <button type="button" className="btn" onClick={handleAccountAction} disabled={actionDisabled}>
             {actionLabel}
           </button>
         </div>

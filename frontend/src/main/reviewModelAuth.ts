@@ -132,6 +132,8 @@ function isMissingExecutable(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === 'ENOENT');
 }
 
+export const OPENAI_OAUTH_AUTHORIZE_PATH = '/oauth/authorize';
+
 export function isAllowedOpenAiAuthUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -140,7 +142,9 @@ export function isAllowedOpenAiAuthUrl(value: string): boolean {
       url.hostname === 'auth.openai.com' &&
       (url.port === '' || url.port === '443') &&
       url.username === '' &&
-      url.password === ''
+      url.password === '' &&
+      url.pathname === OPENAI_OAUTH_AUTHORIZE_PATH &&
+      url.hash === ''
     );
   } catch {
     return false;
@@ -201,24 +205,18 @@ function mapCredentialStatus(
   pi: PiInstallationStatus,
   now: number,
 ): ReviewModelAccountStatus {
-  if (credential?.type !== 'oauth') {
-    return {
-      provider: REVIEW_MODEL_PROVIDER,
-      state: 'disconnected',
-      detail: 'Sign in with ChatGPT to use the review model.',
-      pi,
-    };
-  }
+  const disconnected: ReviewModelAccountStatus = {
+    provider: REVIEW_MODEL_PROVIDER,
+    state: 'disconnected',
+    detail: 'Sign in with ChatGPT to use the review model.',
+    pi,
+  };
+
+  if (credential?.type !== 'oauth') return disconnected;
 
   const expiresAt = credential.expires;
-  if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) {
-    return {
-      provider: REVIEW_MODEL_PROVIDER,
-      state: 'disconnected',
-      detail: 'Sign in with ChatGPT to use the review model.',
-      pi,
-    };
-  }
+  if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return disconnected;
+
   const expired = expiresAt <= now;
   return {
     provider: REVIEW_MODEL_PROVIDER,

@@ -35,12 +35,26 @@ The tap builds from source; expect 10–30 minutes. `brew options
 homebrew-ffmpeg/ffmpeg/ffmpeg` lists further optional codecs.
 
 The AI harness uses the [`pi`](https://github.com/earendil-works/pi-mono) CLI.
-Install it and authenticate a provider once:
+The desktop authentication integration pins both `@earendil-works/pi-ai` and
+`@earendil-works/pi-coding-agent` to exactly `0.80.10`; keep those production
+dependency versions in lockstep. Install a compatible CLI (0.73.1 or newer,
+but earlier than 1.0.0):
 
 ```bash
 npm install -g @earendil-works/pi-coding-agent   # provides the `pi` binary
-pi /login                                         # pick a provider (e.g. openai-codex)
+pi --version
 ```
+
+For normal development, launch Electron and use **Settings → Connections →
+Review model account → Sign in**. Electron main opens the system browser and
+owns the callback listener on `127.0.0.1:1455`; credentials are stored through
+Pi in `~/.pi/agent/auth.json`. Running `pi /login` in a terminal is an advanced
+fallback for debugging the same shared Pi credential store, not a separate app
+account.
+
+Never use a real `auth.json` as a test fixture, print it, copy it into the repo,
+or commit it. Main-process auth tests must use the in-memory/fake credential
+store and synthetic token values already used by the test suite.
 
 ## Backend (FastAPI)
 
@@ -100,11 +114,13 @@ npm run dev:with-backend
 ```bash
 cd frontend
 npm run typecheck   # tsc --noEmit
+npm run test:main   # Electron main-process unit tests
 npm run build       # electron-vite production build
 ```
 
-There is no frontend unit-test runner configured; `typecheck` + `build` are the
-gate for frontend changes.
+Renderer behavior is covered by focused Playwright specs; Electron main-process
+logic uses Node's test runner through `npm run test:main`. Run both the relevant
+focused test and `typecheck` + `build` for frontend changes.
 
 ## Project layout
 

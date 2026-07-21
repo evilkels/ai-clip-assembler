@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  shell,
+  type IpcMainInvokeEvent,
+} from 'electron';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
@@ -11,6 +19,11 @@ import {
   waitForRuntimeDescriptorPort,
 } from './backendLifecycle';
 import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
+import {
+  PI_BIN_RESOLUTION_MARKER,
+  resolvePiExecutableFromShellOutput,
+} from './piExecutable';
+import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
 import { installSingleInstanceGuard } from './singleInstance';
 
 const isDev = !app.isPackaged;
@@ -20,6 +33,8 @@ let backendProcess: ChildProcessWithoutNullStreams | undefined;
 let packagedBackendUrl: string | undefined;
 let stoppingBackend = false;
 let quitAfterBackendStops = false;
+let quitCleanupStarted = false;
+let reviewModelAuth: ReviewModelAuthController | undefined;
 
 interface RecentProject {
   folderPath: string;
@@ -82,7 +97,14 @@ function packagedBackendExecutablePath(): string {
   return join(process.resourcesPath, 'backend', 'ai-clip-backend');
 }
 
-function registerIpcHandlers(): void {
+function assertApplicationSender(event: IpcMainInvokeEvent): void {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!senderWindow || !BrowserWindow.getAllWindows().includes(senderWindow)) {
+    throw new Error('Unauthorized IPC sender');
+  }
+}
+
+function registerIpcHandlers(authController: ReviewModelAuthController): void {
   ipcMain.handle('project:select-folder', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -164,6 +186,18 @@ function registerIpcHandlers(): void {
   ipcMain.handle('mcp:connect-client', async (_event, clientId: McpClientId) => {
     return connectMcpClient(clientId, packagedBackendExecutablePath(), runtimeFilePath());
   });
+
+  const reviewModelHandler =
+    (operation: () => Promise<unknown>) =>
+    async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+      assertApplicationSender(event);
+      if (args.length !== 0) throw new Error('Invalid review model authentication request');
+      return operation();
+    };
+
+  ipcMain.handle('review-model-auth:status', reviewModelHandler(() => authController.getStatus()));
+  ipcMain.handle('review-model-auth:sign-in', reviewModelHandler(() => authController.signIn()));
+  ipcMain.handle('review-model-auth:cancel', reviewModelHandler(() => authController.cancel()));
 }
 
 function resolveAssetPath(filename: string): string {
@@ -186,17 +220,13 @@ async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
   if (process.platform !== 'darwin') return undefined;
 
   return new Promise((resolve) => {
-    execFile('/bin/zsh', ['-lc', 'command -v pi'], { timeout: 5000 }, (error, stdout) => {
+    const command = `printf '\\n${PI_BIN_RESOLUTION_MARKER}%s\\n' "$(whence -p pi 2>/dev/null)"`;
+    execFile('/bin/zsh', ['-lc', command], { timeout: 5000 }, (error, stdout) => {
       if (error) {
         resolve(undefined);
         return;
       }
-
-      const piBin = stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .find(Boolean);
-      resolve(piBin);
+      void resolvePiExecutableFromShellOutput(stdout).then(resolve);
     });
   });
 }
@@ -211,7 +241,7 @@ function buildPackagedBackendPath(piBin: string | undefined): string {
   return [...new Set(paths)].join(':');
 }
 
-async function startPackagedBackend(): Promise<void> {
+async function startPackagedBackend(piBin: string | undefined): Promise<void> {
   if (!app.isPackaged) return;
 
   const backendExecutable = packagedBackendExecutablePath();
@@ -220,7 +250,6 @@ async function startPackagedBackend(): Promise<void> {
     throw new Error(`Packaged backend not found at ${backendExecutable}`);
   }
 
-  const piBin = await resolvePiBinFromLoginShell();
   const runtimeTools = await preflightRuntimeTools({
     ffmpegPath: join(process.resourcesPath, 'tools', 'ffmpeg'),
     ffprobePath: join(process.resourcesPath, 'tools', 'ffprobe'),
@@ -366,8 +395,12 @@ if (installSingleInstanceGuard(app, BrowserWindow)) {
         const icon = resolveOptionalAssetPath('icon.png');
         if (icon) app.dock.setIcon(icon);
       }
-      await startPackagedBackend();
-      registerIpcHandlers();
+      const piBin = await resolvePiBinFromLoginShell();
+      await startPackagedBackend(piBin);
+      reviewModelAuth = new ReviewModelAuthController({
+        piInspector: () => inspectPiInstallation({ piBin }),
+      });
+      registerIpcHandlers(reviewModelAuth);
       createWindow();
 
       app.on('activate', () => {
@@ -381,12 +414,21 @@ if (installSingleInstanceGuard(app, BrowserWindow)) {
     });
 
   app.on('before-quit', (event) => {
-    if (!backendProcess || quitAfterBackendStops) return;
+    if (quitAfterBackendStops) return;
+    if (quitCleanupStarted) {
+      event.preventDefault();
+      return;
+    }
+    if (!backendProcess && !reviewModelAuth) return;
     event.preventDefault();
-    void stopPackagedBackend().finally(() => {
-      quitAfterBackendStops = true;
-      app.quit();
-    });
+    quitCleanupStarted = true;
+    void Promise.resolve(reviewModelAuth?.cancel())
+      .catch(() => undefined)
+      .then(() => stopPackagedBackend())
+      .finally(() => {
+        quitAfterBackendStops = true;
+        app.quit();
+      });
   });
 
   process.once('exit', () => {

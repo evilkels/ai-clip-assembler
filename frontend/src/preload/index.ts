@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ReviewModelAccountStatus } from '../shared/reviewModelAuth';
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
 const BACKEND_URL_ARG = '--clip-assembler-backend-url=';
@@ -35,6 +36,12 @@ const bridge = {
   setWindowTitle: (projectName?: string) => ipcRenderer.invoke('window:set-title', projectName),
   openInDaVinci: (exportPath: string, sourceFolder?: string) =>
     ipcRenderer.invoke('davinci:open-handoff', exportPath, sourceFolder) as Promise<{ opened: boolean }>,
+  getReviewModelAccountStatus: () =>
+    ipcRenderer.invoke('review-model-auth:status') as Promise<ReviewModelAccountStatus>,
+  signInReviewModel: () =>
+    ipcRenderer.invoke('review-model-auth:sign-in') as Promise<ReviewModelAccountStatus>,
+  cancelReviewModelSignIn: () =>
+    ipcRenderer.invoke('review-model-auth:cancel') as Promise<ReviewModelAccountStatus>,
   detectMcpClients: () =>
     ipcRenderer.invoke('mcp:detect-clients') as Promise<
       Array<{

@@ -80,9 +80,10 @@ The backend MVP requires `vidstabdetect`. The grep check above must list the
 filter in the shell you start the backend from — the backend resolves `ffmpeg`
 from that shell's `PATH`.
 
-For the `pi_agent` AI harness, authenticate the pi CLI once (or set a provider
-key such as `OPENCODE_API_KEY`); the backend inherits that environment and reads
-`PI_PROVIDER`/`PI_MODEL`/`PI_BIN`/`PI_TIMEOUT_SEC` from the repo-root `.env`:
+For the `pi_agent` AI harness, install a compatible Pi CLI and use **Settings →
+Connections → Review model account** for the normal OpenAI sign-in flow. The
+backend inherits `PI_PROVIDER`/`PI_MODEL`/`PI_BIN`/`PI_TIMEOUT_SEC` defaults from
+the repo-root `.env`. Terminal login remains an advanced fallback:
 
 ```bash
 pi /login
@@ -92,7 +93,7 @@ pi --provider openai-codex --model gpt-5.4-mini --print --mode text \
 
 ## Install Dependencies
 
-From the repo root (`/Users/elvijs/DEV/personal/ai-clip-assembler`).
+From the repository root.
 
 Backend (the repo already has `backend/.venv` on Python 3.9; recreate only if
 missing):
@@ -120,7 +121,7 @@ backend suite from the frontend dir.)
 One terminal, both halves (backend + Electron app, killed together on Ctrl+C):
 
 ```bash
-cd /Users/elvijs/DEV/personal/ai-clip-assembler/frontend
+cd frontend
 npm run dev:with-backend
 ```
 
@@ -228,6 +229,54 @@ Empty-folder check:
 > budget — see [`specs/2026-06-19-pi-harness-scaling-design.md`](specs/2026-06-19-pi-harness-scaling-design.md).
 > `local_qwen` is postponed/disabled; see `LOCAL_QWEN_SETUP.md` if it is re-enabled.
 
+## Review Model OAuth Manual Matrix
+
+Use a disposable macOS test account or an isolated temporary home directory.
+Never copy a real `~/.pi/agent/auth.json` into this repository or use it as a
+fixture, and never record real OAuth URLs, codes, or tokens.
+
+1. **Fresh sign-in and persistence:** begin without a Pi auth file, open
+   **Settings → Connections**, sign in through the system browser, restart the
+   app, and confirm the Review model account remains Connected.
+2. **Permissions and provider preservation:** confirm `~/.pi/agent` is mode
+   `0700` and `auth.json` is mode `0600`. Start with a synthetic unrelated
+   provider entry, reconnect OpenAI, and confirm that entry remains present.
+   Inspect only keys/types in the synthetic fixture; never print real values.
+3. **Cancel, retry, and cleanup:** cancel a waiting flow, confirm the Cancelled
+   state, and retry successfully. Separately close/reopen the modal during a
+   wait and confirm the reopened card reports the controller's current state;
+   quit the app during a wait and confirm a later launch can sign in. No stale
+   completion may overwrite a newer Cancelled or retry result.
+4. **Port collision and callback validation:** occupy `127.0.0.1:1455` and
+   confirm an actionable failure/retry path. Send a callback with invalid state
+   using only synthetic values; confirm it is rejected and the account does not
+   become Connected.
+5. **Provider failures:** test offline mode, supported proxy failure, account
+   denial, and a revoked/expired login. Confirm safe errors, Reconnect behavior,
+   and no raw provider response or credential appears in the renderer.
+6. **Storage boundaries:** using synthetic fixtures, test corrupt JSON,
+   read-only storage, a home path containing spaces/non-ASCII characters, and a
+   missing parent directory. Confirm failures do not clobber the file or other
+   provider entries.
+7. **Pi compatibility:** repeat with the CLI missing, below 0.73.1, at the
+   current supported version, and at/above 1.0.0. Confirm missing/incompatible
+   detail is separate, Sign in/Reconnect is disabled when necessary, and the
+   packaged backend and account card inspect the same executable.
+8. **Diagnostics and consent:** after sign-in, confirm diagnostics reruns. Test
+   both reachable and “Connected, but configured model is not reachable.” Grant
+   project cloud AI consent, run `pi_agent`, then revoke consent and confirm the
+   backend refuses another provider-backed analysis despite the connected
+   account.
+9. **MCP regression:** confirm the separate **Connect your AI** Claude Desktop
+   and Codex detection/connect/reconnect controls behave identically before and
+   after Review model sign-in/logout/cancellation.
+10. **Browser and architecture matrix:** complete the flow in Safari and one
+    non-default browser on both Apple Silicon and Intel packaged builds.
+11. **Secret scan:** inspect captured Electron/backend logs, screenshots, and
+    the bug-report draft. They must contain no `auth.json` contents, OAuth
+    authorization/callback URLs, authorization codes, access tokens, or refresh
+    tokens. Record only sanitized states, versions, and error text.
+
 ## Timeline Editing Check (operations core + undo/redo)
 
 On the Review route, after accepting clips:
@@ -253,7 +302,7 @@ Use a short local drone MP4 or MOV. Replace the path below.
 
 ```bash
 VIDEO_PATH="/absolute/path/to/your/drone-footage.mp4"
-cd /Users/elvijs/DEV/personal/ai-clip-assembler
+cd /path/to/ai-clip-assembler
 backend/.venv/bin/python scripts/backend_smoke_test.py "$VIDEO_PATH"
 ```
 

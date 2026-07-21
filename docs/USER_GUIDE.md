@@ -5,9 +5,11 @@ You import MP4/MOV files, the app suggests the smoothest, most interesting
 clips, you pick the keepers, fine-tune the sequence on a timeline, and export to
 Final Cut Pro (FCPXML) or any NLE (EDL).
 
-Everything runs on your machine — footage never leaves the device. The AI
-scoring step calls the [`pi`](https://github.com/earendil-works/pi-mono) coding
-agent locally (default harness); you can also run with no AI at all (`manual`).
+The default `manual` harness processes Source Videos and Frame Samples locally
+without AI. The optional `pi_agent` harness runs the
+[`pi`](https://github.com/earendil-works/pi-mono) CLI locally, but sends selected
+Frame Samples to the configured cloud provider for Visual Interest scoring only
+after you grant explicit consent for that project.
 
 > Screenshots referenced below live in `docs/images/`. Drop a GIF/PNG in that
 > folder and update the caption when capturing a fresh build.
@@ -112,6 +114,28 @@ Qwen/Ollama harness is currently **postponed**. See
 [HARNESS_SPEC.md](HARNESS_SPEC.md) and the README's *AI Harness* section for
 configuration.
 
+## Review model account (optional)
+
+The `openai-codex` provider can use your ChatGPT subscription through Pi:
+
+1. Install a compatible `pi` CLI. In **Settings → Connections**, the Review
+   model account card shows Pi as ready, missing, or incompatible.
+2. Choose **Sign in**. AI Clip Assembler opens the OpenAI page in your system
+   browser; return to the app after the browser confirms completion.
+3. Confirm the card says **Connected** and the configured-model diagnostic is
+   reachable. Use **Reconnect** after expiry or revocation, and **Cancel** to
+   stop a waiting browser flow.
+
+Pi stores the shared credential in `~/.pi/agent/auth.json`. The renderer never
+receives its tokens. Signing in only configures the Review model account: it
+does not install the Pi CLI, select a harness, upload footage, or grant the
+per-project cloud AI consent required before `pi_agent` analysis.
+
+This account is separate from the MCP connection controls below. Review model
+sign-in lets the in-app harness call its provider; **Connect your AI** lets an
+external desktop assistant inspect candidates and edit an already analyzed
+Timeline.
+
 ## Connect your AI (optional)
 
 If you already chat with an AI assistant on your Mac — **Claude Desktop** or
@@ -122,7 +146,7 @@ app. The assistant works on whatever project you have open.
 
 ### How to connect
 
-1. In the app, open **Settings → Connect your AI**.
+1. In the app, open **Settings → Connections**, then find **Connect your AI**.
 2. You'll see a row for each supported assistant with its status:
    **Connected**, **Detected** (installed but not connected yet), or
    **Config not found** (the assistant isn't installed, or has never run).

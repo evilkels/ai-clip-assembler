@@ -21,6 +21,9 @@ import type {
 import { mockClips } from './mockClips';
 import type { ClipSuggestion } from '../types/generated';
 import type { VersionSet } from '../types/version';
+import type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
+
+export type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
 
 export type McpClientId = 'claude_desktop' | 'codex';
 
@@ -53,6 +56,9 @@ declare global {
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
       openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
+      getReviewModelAccountStatus?: () => Promise<ReviewModelAccountStatus>;
+      signInReviewModel?: () => Promise<ReviewModelAccountStatus>;
+      cancelReviewModelSignIn?: () => Promise<ReviewModelAccountStatus>;
       detectMcpClients?: () => Promise<McpClientStatus[]>;
       connectMcpClient?: (clientId: McpClientId) => Promise<McpConnectResult>;
     };
@@ -190,6 +196,33 @@ export async function setWindowTitle(projectName?: string): Promise<void> {
 export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
   const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
   return result?.opened ?? false;
+}
+
+const REVIEW_MODEL_DESKTOP_ERROR = 'Review model sign-in is only available in the desktop app';
+
+type ReviewModelBridgeMethod =
+  | 'getReviewModelAccountStatus'
+  | 'signInReviewModel'
+  | 'cancelReviewModelSignIn';
+
+function callReviewModelBridge(method: ReviewModelBridgeMethod): Promise<ReviewModelAccountStatus> {
+  const call = window.clipAssembler?.[method];
+  if (!call) {
+    throw new Error(REVIEW_MODEL_DESKTOP_ERROR);
+  }
+  return call();
+}
+
+export async function getReviewModelAccountStatus(): Promise<ReviewModelAccountStatus> {
+  return callReviewModelBridge('getReviewModelAccountStatus');
+}
+
+export async function signInReviewModel(): Promise<ReviewModelAccountStatus> {
+  return callReviewModelBridge('signInReviewModel');
+}
+
+export async function cancelReviewModelSignIn(): Promise<ReviewModelAccountStatus> {
+  return callReviewModelBridge('cancelReviewModelSignIn');
 }
 
 export async function detectMcpClients(): Promise<McpClientStatus[]> {

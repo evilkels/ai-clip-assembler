@@ -1,4 +1,10 @@
-from src.assembly_profiles import build_draft_timeline, recommend_assembly_profile
+from src.assembly_profiles import (
+    FORMATS,
+    PROFILE_DEFAULTS,
+    build_draft_timeline,
+    recommend_assembly_profile,
+    recommend_format,
+)
 
 
 def clip(clip_id, start, end, score=8.0, file_name="DJI_0001.MP4", scene_id=0, smoothness=0.0, max_turn=999.0):
@@ -133,6 +139,69 @@ def test_draft_skips_overlap_per_file_not_across_files():
     draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=60)
 
     assert {entry["clip_id"] for entry in draft["clips"]} == {"f1", "f2"}
+
+
+def test_draft_uses_one_clip_per_look_group():
+    clips = [
+        clip("a", 0, 30, score=9.5), clip("b", 40, 70, score=9.0),   # same look
+        clip("c", 80, 110, score=8.0),                                # different look
+    ]
+    clips[0]["look_group"] = 0
+    clips[1]["look_group"] = 0
+    clips[2]["look_group"] = 1
+
+    draft = build_draft_timeline(clips, profile="cinematic_highlight", target_duration_sec=300)
+    kept = [entry["clip_id"] for entry in draft["clips"]]
+
+    assert "a" in kept and "c" in kept and "b" not in kept  # b is a look-dupe of a
+
+
+def test_draft_ignores_look_group_constraint_when_absent():
+    # No look_group set anywhere -> no diversity constraint, existing behavior.
+    clips = [clip("a", 0, 30, score=9.5), clip("b", 40, 70, score=9.0)]
+
+    draft = build_draft_timeline(clips, profile="cinematic_highlight", target_duration_sec=300)
+    kept = {entry["clip_id"] for entry in draft["clips"]}
+
+    assert kept == {"a", "b"}
+
+
+def test_formats_registry_maps_to_existing_profiles():
+    assert FORMATS["short"]["profile"] == "short_social"
+    assert FORMATS["medium"]["profile"] == "cinematic_highlight"
+    assert FORMATS["long"]["profile"] == "long_scenic"
+    for info in FORMATS.values():
+        assert info["target_duration_sec"] == PROFILE_DEFAULTS[info["profile"]]["target_duration_sec"]
+
+
+def test_recommend_format_wraps_recommend_assembly_profile():
+    clips = [clip("a", 0, 25), clip("b", 30, 55), clip("c", 60, 85)]
+
+    assert recommend_format(clips) == "long"
+
+
+def test_slowmo_is_sparing_not_blanket():
+    # Six very-smooth low-turn clips -> at most a couple end up slowed, not all.
+    clips = [
+        clip(f"s{i}", i * 40, i * 40 + 30, score=9.5 - i / 10, smoothness=9.6, max_turn=1.0)
+        for i in range(6)
+    ]
+    for i, c in enumerate(clips):
+        c["look_group"] = i
+
+    draft = build_draft_timeline(clips, profile="long_scenic", target_duration_sec=480)
+    slowed = [entry for entry in draft["clips"] if entry["suggested_speed"] != 1.0]
+
+    assert len(slowed) <= 2
+
+
+def test_short_format_never_slowmos():
+    clips = [clip("x", 0, 30, score=9, smoothness=9.9, max_turn=0.2)]
+    clips[0]["look_group"] = 0
+
+    draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
+
+    assert draft["clips"][0]["suggested_speed"] == 1.0
 
 
 def test_draft_does_not_emit_sliver_tail_to_hit_target():

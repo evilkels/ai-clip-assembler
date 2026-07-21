@@ -3,11 +3,7 @@ import type { ClipCandidate, ClipDecision } from '../types/clip';
 import { verdictFor } from '../lib/scoring';
 import { formatClock } from '../lib/format';
 import { ScoreChip } from './ScoreChip';
-
-interface Range {
-  start: number;
-  end: number;
-}
+import { SourceTrack, type Range } from './SourceTrack';
 
 const EMPTY_RANGES: Range[] = [];
 const EMPTY_VERSION_LABELS: string[] = [];
@@ -50,10 +46,6 @@ function formatRange(start: number, end: number): string {
   return `${formatClock(start)} → ${formatClock(end)} (${(end - start).toFixed(1)}s)`;
 }
 
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
 function generationWhy(clip: ClipCandidate): string {
   const kind = clip.tags?.includes('fallback') ? 'fallback' : 'smooth';
   const turn =
@@ -61,57 +53,6 @@ function generationWhy(clip: ClipCandidate): string {
       ? `${clip.max_turn_rate_deg_per_sec.toFixed(1)}°/s turn`
       : 'turn unavailable';
   return `Scene ${clip.scene_id ?? '—'} · ${kind} · smooth ${clip.scores.smoothness.toFixed(1)} · ${turn}`;
-}
-
-/** A bar spanning the full source file with the clip region, sibling candidates
- *  and a live playhead marked on it. */
-function SourceTrack({
-  durationSec,
-  startSec,
-  endSec,
-  playheadSec,
-  siblings,
-  accent,
-  onSeek,
-}: {
-  durationSec: number;
-  startSec: number;
-  endSec: number;
-  playheadSec: number;
-  siblings: Range[];
-  accent: string;
-  onSeek?: (event: React.MouseEvent<HTMLButtonElement>) => void;
-}) {
-  const left = (t: number) => `${clamp01(t / durationSec) * 100}%`;
-  const width = (a: number, b: number) => `${clamp01((b - a) / durationSec) * 100}%`;
-  return (
-    <div className="source-track-wrap">
-      <button
-        type="button"
-        className={`source-track${onSeek ? ' seekable' : ''}`}
-        onClick={onSeek}
-        disabled={!onSeek}
-        aria-label={`Seek preview within ${formatClock(startSec)} to ${formatClock(endSec)}`}
-        title={`Clip is ${formatClock(startSec)}–${formatClock(endSec)} of a ${formatClock(durationSec)} file`}
-      >
-        {siblings.map((s, i) => (
-          <span
-            key={`${s.start}-${i}`}
-            className="source-track-sibling"
-            style={{ left: left(s.start), width: width(s.start, s.end) }}
-          />
-        ))}
-        <span
-          className="source-track-clip"
-          style={{ left: left(startSec), width: width(startSec, endSec), background: accent }}
-        />
-        <span className="source-track-playhead" style={{ left: left(playheadSec) }} />
-      </button>
-      <span className="source-track-caption">
-        {formatClock(startSec)}–{formatClock(endSec)} of {formatClock(durationSec)}
-      </span>
-    </div>
-  );
 }
 
 export function ClipCard({

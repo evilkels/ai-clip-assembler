@@ -34,6 +34,24 @@ shortcuts), harness selection, export format selection, settings.
 Tech: Electron (main + renderer), React + TypeScript, Tailwind CSS, a custom
 timeline component, and HTTP calls to the backend on localhost.
 
+#### Review model authentication boundary
+
+Review model sign-in is privileged Electron-main work, separate from FastAPI:
+
+```text
+Connections UI → sandboxed preload → ReviewModelAuthController
+  → system browser / callback 127.0.0.1:1455 → Pi AuthStorage
+```
+
+Only sanitized account/Pi readiness reaches the renderer—never URLs, codes,
+tokens, or auth-file contents. Main validates IPC senders, fixes the provider and
+authorization endpoint, cancels login on shutdown, and shares Pi's credential
+file/executable with the CLI. Project cloud consent remains separate.
+
+**Connect your AI** is another boundary: external MCP client → packaged stdio
+bridge → local FastAPI Timeline operations. MCP configuration and Review model
+OAuth neither authenticate nor connect one another.
+
 ### Backend (FastAPI + Python)
 
 Video ingestion (FFmpeg probe, frame extraction), motion analysis
@@ -128,6 +146,5 @@ bundled into the Electron app or run as a subprocess.
 
 ## Future Considerations
 
-GPU acceleration for vision inference (MLX), a background processing queue
-for long videos, a plugin system for custom harnesses, and non-real-time
-project-sharing collaboration.
+GPU vision inference (MLX), long-video queues, custom harness plugins, and
+non-real-time project-sharing collaboration.

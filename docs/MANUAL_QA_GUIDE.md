@@ -24,9 +24,10 @@ cd ../frontend && npm install && npm run typecheck && npm run build
 npm run dev:with-backend
 ```
 
-Confirm ffmpeg/ffprobe, Python 3.9+, Node/npm versions. The starting shell must
-resolve `vidstabdetect`. For Pi, authenticate (`pi /login`) and smoke-test the
-selected provider/model; backend reads `PI_PROVIDER`, `PI_MODEL`, `PI_BIN`, and
+Confirm ffmpeg/ffprobe, Python 3.9+, Node/npm versions, and `vidstabdetect` in
+the launching shell. For Pi, install a compatible CLI and normally sign in via
+**Settings → Connections → Review model account**; `pi /login` is the advanced
+fallback. The backend reads `PI_PROVIDER`, `PI_MODEL`, `PI_BIN`, and
 `PI_TIMEOUT_SEC` from root `.env`.
 
 ## Folder-project flow
@@ -37,30 +38,37 @@ selected provider/model; backend reads `PI_PROVIDER`, `PI_MODEL`, `PI_BIN`, and
 3. Confirm samples, motion outputs, and Pi cache when used; accept clips.
 4. Export EDL/FCPXML/Resolve XML and confirm `exports/{edl,fcp,davinci}` paths.
 5. Move/rename the folder; old recent entry shows missing; Locate reopens it
-   without replacing sources. Add a video; Rescan adds it once and keeps old ones.
-6. Remove recent entry without touching media. Reopen; Delete project files
-   removes only `clipassembler/` and `exports/`, never sources.
-7. Export twice: overwrite warns and Cancel preserves the file. Empty folder:
-   actionable error and no `clipassembler/` mutation.
+   without replacing sources. Rescan adds new videos once and keeps old ones.
+6. Remove recent without touching media. Delete project files removes only
+   `clipassembler/` and `exports/`, never sources. Verify overwrite cancellation.
 
-## Pi harness
+## Pi harness and account
 
-Analyze with authenticated Pi: Candidate Clips gain visual-interest and written
-Clip Reason. Relaunch backend with `PI_BIN=/bin/false`, reanalyze, and confirm
-per-video Manual fallback with warning—no crash/lost project. Sequential scoring
-is ~9s/clip; see the Pi scaling design. Local Qwen remains disabled.
+Analyze with authenticated Pi: candidates gain visual interest and a Clip
+Reason. Set `PI_BIN=/bin/false`, reanalyze, and confirm per-video Manual fallback
+with warning. Local Qwen remains disabled. For OAuth QA, use disposable data and
+never record real auth files, URLs, codes, or tokens:
+
+1. Sign in from a fresh state; restart and confirm Connected. Verify Pi's auth
+   directory/file modes `0700`/`0600` and preservation of synthetic providers.
+2. Cancel and retry; close/reopen Settings and quit/relaunch while waiting.
+   Stale completions must not replace a newer Cancelled or successful result.
+3. Test port `1455` collision, invalid state, offline/proxy/denial/revocation,
+   corrupt/read-only storage, non-ASCII paths, and missing/incompatible Pi.
+4. Confirm diagnostics rerun after sign-in. Grant then revoke project consent;
+   sign-in alone must never permit provider-backed analysis.
+5. Recheck Claude/Codex MCP controls, Safari plus another browser, Apple Silicon
+   and Intel packages. Secret-scan logs, screenshots, and bug-report drafts.
 
 ## Timeline and agents
 
-1. Reorder; extend/trim and confirm source-bound clamping; set Speed 0.5/2.0
-   and confirm effective duration; Zoom 1.5; split; remove; undo/redo.
-2. Quit/reopen: order, bounds, speed, transforms, and splits restore. Resolve XML
-   preserves speed/transform; EDL carries a flatten warning.
-3. Connect an external client:
+1. Reorder; extend/trim with source-bound clamping; set Speed 0.5/2.0 and Zoom
+   1.5; split; remove; undo/redo. Quit/reopen and verify all state restores.
+2. Connect an external client:
    `claude mcp add --transport http clip-assembler http://127.0.0.1:8000/mcp`.
-   List candidates/read frames/apply include, speed, or split; GUI updates live.
-4. In Review chat, Accept a Proposal (Timeline changes and is undoable); Reject
-   another (Timeline unchanged). See `MCP_SERVER.md` and Flow F.
+   List candidates/read frames/apply edits; confirm the GUI updates live.
+3. Accept a Review Proposal (Timeline changes and is undoable); reject another
+   (Timeline unchanged). Resolve XML preserves speed/transform; EDL warns.
 
 ## Backend smoke/API
 
@@ -76,21 +84,12 @@ curl -s -H 'Content-Type: application/json' -X POST \
   -d "{\"project_id\":\"${PROJECT_ID}\",\"harness_id\":\"manual\",\"preferences\":{}}"
 ```
 
-Expect duration/FPS/resolution/codec, complete status, smooth Candidate Clips,
-and actionable missing-tool errors rather than tracebacks.
+Expect metadata, complete status, smooth candidates, and actionable tool errors.
 
-## Resolve validation
+## Resolve validation and evidence
 
-1. Import `exports/davinci/timeline.xml` via File → Import → Timeline; confirm
-   zero relink prompts and matching count/order/in-out/speed/transform.
-2. Move the whole folder and import again: still zero relink.
-3. EDL fallback: add source media, import `timeline.edl`, and confirm count,
-   source timing, orientation, and plausible playback. Track non-30fps/vertical
-   metadata limitation in issue #19.
-
-## Evidence to capture
-
-Per clip: filename/duration/codec/resolution/FPS, smooth/shaky/blurry/exposure
-character, harness/count, editorial usefulness, confusing scores/reasons. Per
-Timeline: operations and save/reload/export survival. Per agent: live external
-edit and Accept/Reject result. File findings using `QA.md`.
+Import `exports/davinci/timeline.xml`; confirm no relink and matching
+count/order/in-out/speed/transform. Move the folder and repeat. Import EDL after
+adding source media; verify timing and orientation. Capture media properties,
+quality examples, harness/count, editorial usefulness, Timeline persistence,
+agent outcomes, and sanitized failures in `QA.md`.

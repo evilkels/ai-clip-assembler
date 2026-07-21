@@ -1,7 +1,6 @@
 # Plans
 
-Single home for all written plans (completed ones move to [`done/`](done/)).
-Numbered plans are improve handoffs; named plans are product docs, mirrored below.
+Single home for written plans; completed plans move to [`done/`](done/). Numbered plans are improve handoffs; named plans are product docs.
 
 ## Advisor queue
 
@@ -22,29 +21,29 @@ Numbered plans are improve handoffs; named plans are product docs, mirrored belo
 | [013](done/013-reliable-browser-e2e-signals.md) | Deterministic browser E2E signals | DONE (2026-07-21) at `9a6d56a` |
 | [014](done/014-extract-timeline-lifecycle-service.md) | Extract Timeline lifecycle service | DONE (2026-07-09) at `1c88a22` |
 | [015](done/015-record-core-architecture-decisions.md) | Record core architecture decisions as ADRs | DONE (2026-07-09) at `93b0d37` |
-| [016](016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | Steps 1–2 DONE (`edd4f16`); step 3 superseded by 018; step 4 TODO |
+| [016](016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | Steps 1–2 DONE; step 3 superseded by 018; step 4 TODO |
 | [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 DONE (2026-07-20); steps 2–6 TODO |
-| [018](018-diverse-clip-generation.md) | Diverse clip generation (per-moment fragments, look-groups, multi-format) | CODE COMPLETE (2026-07-21) — remaining, not code: export and bundle `backend/models/siglip_image_encoder.onnx`; without it every clip is its own look group and diversity is inert |
-| [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — characterization-first architecture debt after `ad62ed1` |
+| [018](018-diverse-clip-generation.md) | Diverse clip generation | CODE COMPLETE — SigLIP ONNX export/bundling remains; without it diversity is inert |
+| [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — architecture debt after `ad62ed1` |
 
 ## Product plans
 
 | Plan | Status |
 |------|--------|
-| [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — ordered roadmap (trust → installability → presentability → arch debt → launch) |
-| [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — ffmpeg/ffprobe bundled; signing/notarization and clean-machine validation remain |
-| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — coding-agent work separated from maintainer-owned demo/SEO/distribution tasks |
-| [seo-plan](seo-plan.md) | IN PROGRESS — technical SEO + tests + CI on `seo`; Search Console setup remains |
-| [seo-content-pilot](seo-content-pilot.md) | GATED — one workflow guide pending query evidence and editorial input |
-| [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Acceptance bar (Flows A–E); real-footage/perf/DaVinci QA remain |
-| [project-folder-model](project-folder-model.md) | Implementation + automated QA complete; manual app QA pending |
-| [project-sidebar](project-sidebar.md) | Partial; auto-reopen shipped; collapse/resize/context-menu/keyboard nav deferred |
-| [settings-page](done/settings-page.md) | DONE (2026-07-03) — Settings & Diagnostics modal + theme switching |
-| [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02) — MCP bridge + Settings panel; live desktop smoke is a human step |
-| [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; realtime preview + chat streaming + Playwright e2e pending visual QA |
-| [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partial; component migration and command palette remain |
-| [react-doctor-triage](react-doctor-triage.md) | Partial; mechanical pass cut issues 47→33; refactor/judgment items remain |
-| [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE (2026-06-11) |
-| [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE (2026-06-21) |
-
-Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
+| [review-model-sign-in](review-model-sign-in.md) | DONE (2026-07-19) — automated checks green; live OAuth/package smoke remains |
+| [review-model-sign-in-followups](review-model-sign-in-followups.md) | IN PROGRESS — Tasks 0, 1, 4 done; plan/spec reconciliation remains |
+| [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
+| [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
+| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — coding-agent and maintainer launch work separated |
+| [seo-plan](seo-plan.md) | IN PROGRESS — Search Console setup remains |
+| [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
+| [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |
+| [project-folder-model](project-folder-model.md) | Automated QA complete; manual app QA pending |
+| [project-sidebar](project-sidebar.md) | Partial; collapse/resize/context-menu/keyboard nav deferred |
+| [settings-page](done/settings-page.md) | DONE (2026-07-03) |
+| [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
+| [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
+| [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partial; migration and command palette remain |
+| [react-doctor-triage](react-doctor-triage.md) | Partial; issues reduced 47→33 |
+| [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |
+| [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE |

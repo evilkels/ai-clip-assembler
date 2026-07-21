@@ -57,7 +57,7 @@ vidstab/OpenCV remains authoritative for Smoothness Score. In Review, the same
 Pi configuration receives at most 12 labelled, scene-diverse Frame Samples plus
 recent conversation history and may propose validated complete Versions.
 
-**Config (environment variables only):**
+**Runtime configuration:**
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -66,9 +66,17 @@ recent conversation history and may propose validated complete Versions.
 | `PI_MODEL` | `gpt-5.4-mini` | Model pattern/ID for that provider |
 | `PI_TIMEOUT_SEC` | `180` | Per-clip subprocess timeout in seconds |
 
-Provider credentials are managed by `pi` itself (`pi /login`, `~/.pi/agent/auth.json`,
-or provider env vars such as `OPENCODE_API_KEY`); the harness inherits the backend
-process environment when spawning the CLI.
+Environment variables provide defaults. Provider, model, and timeout can be
+edited in Settings and are persisted in `.ai-clip-assembler/settings.json`;
+`PI_BIN` remains environment/main-process resolved and read-only in the UI.
+
+For `openai-codex`, the renderer calls three token-free preload methods. Electron
+main owns the OAuth state machine, opens the external browser, receives the
+loopback callback on `127.0.0.1:1455`, and uses Pi's credential storage. Pi CLI
+and the embedded Pi SDK share `~/.pi/agent/auth.json`; the renderer and FastAPI
+HTTP API never receive OAuth credentials. Terminal `pi /login` and supported
+provider environment variables remain advanced alternatives. Authentication
+does not replace the backend's required per-project cloud AI consent check.
 
 ### 1. Local Model Harness (Postponed)
 

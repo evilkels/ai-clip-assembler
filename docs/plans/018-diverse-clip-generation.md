@@ -31,8 +31,16 @@ exist, "Analyze" re-derives instantly with no FFmpeg.
 `onnxruntime` + a bundled CLIP image-encoder ONNX model (new, Phase B); React 19
 + TypeScript + Vite (Electron renderer), plain CSS + design tokens.
 
-**Status:** IN PROGRESS (2026-07-20) — Phase A and Phase E complete. Phases
-B–D remain; Phase B is the next dependency.
+**Status:** IN PROGRESS (2026-07-21) — Phases A, B, C and E complete. Phase D
+(library grouping UI) is the only phase remaining.
+
+The Task B3 model decision is settled: **SigLIP base-patch16-224** vision tower
+(Apache-2.0 for both code and weights) instead of OpenAI CLIP — MobileCLIP and
+OpenAI CLIP were rejected for ambiguous/research-only redistribution terms. See
+`backend/models/README.md`. **The `.onnx` file is not yet exported or bundled**,
+so today `default_embedding_provider()` returns `None` and every candidate
+falls into its own Look Group — the diversity features are inert in real runs
+until the model ships.
 
 ## Global Constraints
 
@@ -235,7 +243,7 @@ no re-embedding needed unless clips changed).
   - `def embed_candidate(provider: EmbeddingProvider, frame_paths: list[str]) -> Optional[list[float]]`
     — mean of per-frame L2-normalized vectors, re-normalized; `None` if no paths.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # backend/tests/test_embeddings.py
 import math
@@ -253,9 +261,9 @@ def test_embed_candidate_none_without_frames():
     assert embed_candidate(FakeEmbeddingProvider(dim=8), []) is None
 ```
 
-- [ ] **Step 2: Run, verify fail** — `python -m pytest tests/test_embeddings.py -v` → FAIL (module missing).
+- [x] **Step 2: Run, verify fail** — `python -m pytest tests/test_embeddings.py -v` → FAIL (module missing).
 
-- [ ] **Step 3: Implement `embeddings.py`**
+- [x] **Step 3: Implement `embeddings.py`**
 ```python
 import hashlib
 from typing import List, Optional, Protocol, runtime_checkable
@@ -299,8 +307,8 @@ def embed_candidate(
     return (mean / norm).tolist()
 ```
 
-- [ ] **Step 4: Run, verify pass** — `python -m pytest tests/test_embeddings.py -v` → PASS.
-- [ ] **Step 5: Commit** — `git add backend/src/embeddings.py backend/tests/test_embeddings.py && git commit -m "feat(embeddings): provider interface + deterministic fake"`
+- [x] **Step 4: Run, verify pass** — `python -m pytest tests/test_embeddings.py -v` → PASS.
+- [x] **Step 5: Commit** — `git add backend/src/embeddings.py backend/tests/test_embeddings.py && git commit -m "feat(embeddings): provider interface + deterministic fake"`
 
 ### Task B2: Look-group clustering
 
@@ -317,7 +325,7 @@ def embed_candidate(
   Group ids are assigned in descending `overall_score` order so group 0 is the
   strongest, making downstream ordering stable/deterministic.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # backend/tests/test_clip_diversity.py
 from src.clip_diversity import assign_look_groups
@@ -341,9 +349,9 @@ def test_missing_embedding_gets_unique_group():
     assert grouped[0]["look_group"] != grouped[1]["look_group"]
 ```
 
-- [ ] **Step 2: Run, verify fail** — `python -m pytest tests/test_clip_diversity.py -v` → FAIL.
+- [x] **Step 2: Run, verify fail** — `python -m pytest tests/test_clip_diversity.py -v` → FAIL.
 
-- [ ] **Step 3: Implement `clip_diversity.py`**
+- [x] **Step 3: Implement `clip_diversity.py`**
 ```python
 from typing import List
 
@@ -383,8 +391,8 @@ def assign_look_groups(candidates: List[dict], *, threshold: float = 0.92) -> Li
     return ordered
 ```
 
-- [ ] **Step 4: Run, verify pass** — PASS.
-- [ ] **Step 5: Commit** — `git add backend/src/clip_diversity.py backend/tests/test_clip_diversity.py && git commit -m "feat(diversity): cosine look-group clustering"`
+- [x] **Step 4: Run, verify pass** — PASS.
+- [x] **Step 5: Commit** — `git add backend/src/clip_diversity.py backend/tests/test_clip_diversity.py && git commit -m "feat(diversity): cosine look-group clustering"`
 
 ### Task B3: ONNX CLIP provider (real embeddings, skip-if-absent)
 
@@ -406,7 +414,7 @@ def assign_look_groups(candidates: List[dict], *, threshold: float = 0.92) -> Li
   model + its license for redistribution in the DMG (note in
   `docs/plans/README.md` findings + `LICENSE`/NOTICE if bundled).
 
-- [ ] **Step 1: Write the smoke test (auto-skip)**
+- [x] **Step 1: Write the smoke test (auto-skip)**
 ```python
 import pytest
 from src.embeddings import default_embedding_provider, embed_candidate
@@ -421,9 +429,9 @@ def test_onnx_provider_smoke(tmp_path):
     assert vec is not None and len(vec) > 0
 ```
 
-- [ ] **Step 2: Run, verify skip/behavior** — `python -m pytest tests/test_embeddings.py::test_onnx_provider_smoke -v` → SKIP until model present (mirrors existing OpenCV-skipped tests).
+- [x] **Step 2: Run, verify skip/behavior** — `python -m pytest tests/test_embeddings.py::test_onnx_provider_smoke -v` → SKIP until model present (mirrors existing OpenCV-skipped tests).
 
-- [ ] **Step 3: Implement provider** (CLIP ViT-B/32 preprocessing; adjust
+- [x] **Step 3: Implement provider** (CLIP ViT-B/32 preprocessing; adjust
   `mean`/`std`/size if the chosen model differs)
 ```python
 import os
@@ -480,8 +488,8 @@ def default_embedding_provider() -> Optional[EmbeddingProvider]:
         return None
 ```
 
-- [ ] **Step 4: Run gate** — `python -m pytest -q` (smoke skips), ruff clean.
-- [ ] **Step 5: Commit** — `git commit -am "feat(embeddings): local ONNX CLIP provider with skip-if-absent"`
+- [x] **Step 4: Run gate** — `python -m pytest -q` (smoke skips), ruff clean.
+- [x] **Step 5: Commit** — `git commit -am "feat(embeddings): local ONNX CLIP provider with skip-if-absent"`
 
 ### Task B4: Persist embeddings + attach look_group during analysis
 
@@ -505,17 +513,17 @@ def default_embedding_provider() -> Optional[EmbeddingProvider]:
 - Produces: every clip dict/`ClipSuggestion` carries `look_group`;
   `frame_scores.json` carries `embeddings` per file.
 
-- [ ] **Step 1: Failing test** — analyze a seeded project with the
+- [x] **Step 1: Failing test** — analyze a seeded project with the
   `FakeEmbeddingProvider` injected; assert every clip has an integer
   `look_group`, and two clips fed identical frame bytes share a group.
-- [ ] **Step 2: Run, verify fail.**
-- [ ] **Step 3: Implement** — thread an optional `embedding_provider` param
+- [x] **Step 2: Run, verify fail.**
+- [x] **Step 3: Implement** — thread an optional `embedding_provider` param
   through `run_analysis_pipeline`/`analysis_service` (default
   `default_embedding_provider()`); compute per-candidate embeddings from frame
   paths; `assign_look_groups`; persist; bump sidecar schema with a v1→v2
   read shim (v1 sidecars → clips get unique groups on reopen).
-- [ ] **Step 4: Run, verify pass; full gate.**
-- [ ] **Step 5: Commit** — `git commit -am "feat(analysis): persist embeddings and assign look groups"`
+- [x] **Step 4: Run, verify pass; full gate.**
+- [x] **Step 5: Commit** — `git commit -am "feat(analysis): persist embeddings and assign look groups"`
 
 **STOP** if attaching embeddings would require re-running any FFmpeg step, or if
 `rederive_clips` re-embeds (it must reuse cached vectors).
@@ -542,7 +550,7 @@ Keep `build_draft_timeline`'s existing per-file overlap + sliver-floor guards
   each clip as its own group (no diversity constraint).
 - Produces: `build_draft_timeline` selects at most one clip per `look_group`.
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 ```python
 def test_draft_uses_one_clip_per_look_group():
     clips = [
@@ -554,13 +562,13 @@ def test_draft_uses_one_clip_per_look_group():
     kept = [e["clip_id"] for e in draft["clips"]]
     assert "a" in kept and "c" in kept and "b" not in kept  # b is a look-dupe of a
 ```
-- [ ] **Step 2: Run, verify fail.**
-- [ ] **Step 3: Implement** — add a `claimed_look_groups: set` in
+- [x] **Step 2: Run, verify fail.**
+- [x] **Step 3: Implement** — add a `claimed_look_groups: set` in
   `build_draft_timeline`; skip a clip whose `look_group` is already claimed (only
   when `look_group is not None`); claim on selection.
-- [ ] **Step 4: Run, verify pass; full gate** (existing tests must stay green —
+- [x] **Step 4: Run, verify pass; full gate** (existing tests must stay green —
   they use clips without `look_group`, so no diversity constraint applies).
-- [ ] **Step 5: Commit** — `git commit -am "feat(assembly): one clip per look group in drafts"`
+- [x] **Step 5: Commit** — `git commit -am "feat(assembly): one clip per look group in drafts"`
 
 ### Task C2: Short/Medium/Long format registry + sparing slow-mo
 
@@ -575,7 +583,7 @@ def test_draft_uses_one_clip_per_look_group():
   for `"short"|"medium"|"long"`; `recommend_format(clips) -> str` (wraps
   `recommend_assembly_profile`); slow-mo capped.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 ```python
 def test_slowmo_is_sparing_not_blanket():
     # Six very-smooth low-turn clips → at most a couple end up slowed, not all.
@@ -593,15 +601,15 @@ def test_short_format_never_slowmos():
     draft = build_draft_timeline(clips, profile="short_social", target_duration_sec=30)
     assert draft["clips"][0]["suggested_speed"] == 1.0
 ```
-- [ ] **Step 2: Run, verify fail.**
-- [ ] **Step 3: Implement** — change slow-mo so `slowmo_smooth` applies to at most
+- [x] **Step 2: Run, verify fail.**
+- [x] **Step 3: Implement** — change slow-mo so `slowmo_smooth` applies to at most
   N clips per edit (e.g. the 2 smoothest, low-turn), not every qualifying clip;
   `short_social` stays `speed_policy: "none"`. Add the `FORMATS` map +
   `recommend_format`.
-- [ ] **Step 4: Run, verify pass; full gate.** Update
+- [x] **Step 4: Run, verify pass; full gate.** Update
   `test_cinematic_applies_slowmo_to_very_smooth_clips_only` if the cap changes its
   expectation.
-- [ ] **Step 5: Commit** — `git commit -am "feat(assembly): length formats + sparing slow-mo"`
+- [x] **Step 5: Commit** — `git commit -am "feat(assembly): length formats + sparing slow-mo"`
 
 ### Task C3: Build recommended format on analyze; on-demand endpoint
 
@@ -616,11 +624,11 @@ def test_short_format_never_slowmos():
   `short|medium|long`; `POST /projects/{id}/draft` accepts `{"format": "..."}`
   (existing `profile`/`target_duration_sec` still honored for back-compat).
 
-- [ ] **Step 1: Failing test** — analyze a seeded project; assert
+- [x] **Step 1: Failing test** — analyze a seeded project; assert
   `recommendation["format"]` present; `POST /draft {"format":"short"}` returns a
   timeline whose total ≤ the short target.
-- [ ] **Step 2–4:** implement, run, gate.
-- [ ] **Step 5: Commit** — `git commit -am "feat(api): recommend a format and build others on demand"`
+- [x] **Step 2–4:** implement, run, gate.
+- [x] **Step 5: Commit** — `git commit -am "feat(api): recommend a format and build others on demand"`
 
 ---
 

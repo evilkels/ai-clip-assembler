@@ -534,3 +534,36 @@ test('Resolve export exposes an Open in DaVinci handoff', async ({ page }) => {
   await expect(page.getByText('DaVinci Resolve XML exported')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open in DaVinci Resolve' })).toBeVisible();
 });
+
+test('export reads the authoritative Timeline without a legacy write', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  await replaceWithRepeatedItems(page, projectId);
+  const before = await page.request
+    .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+    .then((response) => response.json());
+  const legacyWrites: string[] = [];
+  page.on('request', (request) => {
+    if (
+      request.url().endsWith(`/projects/${projectId}/timeline`) &&
+      request.method() !== 'GET'
+    ) {
+      legacyWrites.push(request.method());
+    }
+  });
+
+  await page.goto('/#/export');
+  await page.getByRole('button', { name: 'Export EDL' }).click();
+
+  const after = await page.request
+    .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+    .then((response) => response.json());
+  expect(legacyWrites).toEqual([]);
+  expect(after.document).toEqual(before.document);
+  await expect(page.getByTestId('export-result-edl')).toContainText('2 items');
+  await expect(page.getByTestId('export-result-edl')).toContainText('4.0s');
+  await expect(page.getByTestId('export-warning-edl')).toContainText(/flatten/i);
+  await page.getByText('Review export payload').click();
+  await expect(page.getByTestId('export-payload')).toContainText('item_id');
+  await expect(page.getByTestId('export-payload')).toContainText('speed');
+  await expect(page.getByTestId('export-payload')).toContainText('transform');
+});

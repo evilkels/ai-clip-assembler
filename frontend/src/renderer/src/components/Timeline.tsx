@@ -96,10 +96,7 @@ export function Timeline() {
       const preview = trimPreview?.itemId === item.item_id ? trimPreview : undefined;
       const trimStart = preview?.startSec ?? item.start_sec;
       const trimEnd = preview?.endSec ?? item.end_sec;
-      const duration = Math.max(
-        MIN_CLIP_DURATION,
-        (trimEnd - trimStart) / item.speed,
-      );
+      const duration = (trimEnd - trimStart) / item.speed;
       const seg: Segment = {
         itemId: item.item_id,
         sourceClipId: item.source_clip_id,
@@ -124,6 +121,7 @@ export function Timeline() {
   const sequenceSegments = useMemo(
     () =>
       segments.map((segment) => ({
+        item_id: segment.itemId,
         file_id: segment.fileId,
         start_sec: segment.trimStart,
         end_sec: segment.trimEnd,
@@ -307,12 +305,10 @@ export function Timeline() {
   // Keyboard transport, scrubbing, selection, and reordering.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
+      const target = e.target instanceof Element ? e.target : null;
       if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
+        target?.closest('button, a, select, input, textarea') ||
+        (target instanceof HTMLElement && target.isContentEditable)
       ) {
         return;
       }
@@ -510,7 +506,7 @@ export function Timeline() {
       const nextBounds = { startSec: origStart, endSec: origEnd };
 
       const onMove = (ev: MouseEvent) => {
-        const deltaSec = (ev.clientX - startX) / pxPerSec;
+        const deltaSec = ((ev.clientX - startX) / pxPerSec) * seg.speed;
         if (edge === 'left') {
           nextBounds.startSec = round1(
             clamp(origStart + deltaSec, 0, origEnd - MIN_CLIP_DURATION),
@@ -584,9 +580,12 @@ export function Timeline() {
             testId="timeline-preview-video"
           />
           <div className="timeline-preview-meta">
-            <strong data-testid="timeline-preview-current-clip">
-              {previewSegment.fileName}
-            </strong>
+              <strong
+                data-testid="timeline-preview-current-clip"
+                data-timeline-active-item-id={previewSegment.itemId}
+              >
+                {previewSegment.fileName}
+              </strong>
             <span>
               Source {formatClock(previewSegment.trimStart)} → {formatClock(previewSegment.trimEnd)}
             </span>
@@ -690,6 +689,7 @@ export function Timeline() {
                     .join(' ')
                     .trim()}
                   style={{
+                    left: seg.offset * pxPerSec,
                     width,
                   }}
                   onPointerDown={(e) => {

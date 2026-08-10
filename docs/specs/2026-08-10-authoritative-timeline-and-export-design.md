@@ -33,7 +33,7 @@ make the visible sequence, persisted sequence, and exported sequence disagree.
 The Timeline page and its visual sequence use `timelineItems`. A focused,
 pure projection maps each Timeline Item to its source Candidate Clip and derives
 its effective duration as `(end_sec - start_sec) / speed`. Item identity uses
-`item_id`, so repeated source clips remain separate and selectable.
+`item_id`, so repeated Candidate Clips remain separate and selectable.
 
 Timeline operations address `item_id` directly:
 
@@ -76,7 +76,7 @@ interface ExportResult {
 
 The page stores each complete result and presents its file path, clip count,
 effective duration, and warnings. The payload inspector shows ordered Timeline
-Items including `item_id`, source clip, bounds, Speed, and Transform. EDL
+Items including `item_id`, Candidate Clip, bounds, Speed, and Transform. EDL
 flatten warnings are prominent and persistent with that result, satisfying
 ADR-0004. FCPXML and Resolve XML remain encode-or-warn formats as implemented by
 the backend.

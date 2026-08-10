@@ -131,9 +131,9 @@ endpoint. It does not issue the legacy Timeline write as a pre-export step, so
 the document exported is the document visible to the backend. The result cards
 preserve the backend's `project_id`, format, status, file path, item count,
 `total_duration_sec`, and warnings; they also show the item-derived effective
-duration `(end_sec - start_sec) / speed` separately from the raw backend duration
-metadata. The payload inspector lists every ordered Timeline Item with its
-`item_id`, source clip, resolved file metadata, bounds, Speed, and Transform.
+duration `(end_sec - start_sec) / speed`, captured with that export result,
+separately from the raw backend duration metadata. The payload inspector lists every ordered Timeline Item with its
+`item_id`, Candidate Clip, resolved file metadata, bounds, Speed, and Transform.
 
 EDL visibly warns when Speed or Transform is flattened. FCPXML and Resolve XML
 carry the supported Speed and Transform values. Existing-file conflicts still

@@ -116,7 +116,7 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
         source_in = clip["start_sec"]
         source_out = clip["end_sec"]
         record_in = timeline_cursor
-        record_out = timeline_cursor + effective_duration(clip)
+        record_out = timeline_cursor + float(clip["duration_sec"])
         lines.append(
             f"{index:03d}  AX       V     C        "
             f"{seconds_to_timecode(source_in, fps)} "
@@ -125,11 +125,6 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
             f"{seconds_to_timecode(record_out, fps)}"
         )
         lines.append(f"* FROM CLIP NAME: {clip['file_name']}")
-        speed = float(clip.get("suggested_speed", 1.0) or 1.0)
-        if speed != 1.0:
-            lines.append(
-                f"M2   AX      {speed * fps:.3f} {seconds_to_timecode(source_in, fps)}"
-            )
         lines.append("")
         timeline_cursor = record_out
     return "\n".join(lines)

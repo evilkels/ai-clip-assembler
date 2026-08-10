@@ -432,6 +432,24 @@ def test_edl_flatten_warnings_flags_speed_and_transform():
     assert edl_flatten_warnings(zoomed)
 
 
+def test_generate_edl_flattens_speed_instead_of_emitting_retime_commands():
+    clip = {
+        "clip_id": "c",
+        "file_id": "f",
+        "file_name": "x.MP4",
+        "start_sec": 10,
+        "end_sec": 14,
+        "duration_sec": 4,
+        "suggested_speed": 2,
+    }
+
+    edl = generate_edl("T", [clip], fps=30)
+
+    assert "00:00:10:00 00:00:14:00 00:00:00:00 00:00:04:00" in edl
+    assert "M2" not in edl
+    assert "Speed" in edl
+
+
 def test_generate_edl_notes_flattening_when_transform_present():
     edl = generate_edl("T", [_transform_clip(scale=1.4)], fps=30)
     assert "flatten" in edl.lower()

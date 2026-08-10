@@ -224,7 +224,7 @@ test('trimming keeps Timeline Items contiguous and shrinks the selected item', a
   expect(afterLeft!.width).toBeLessThan(before!.width);
 });
 
-test('renders repeated source clips as distinct authoritative Timeline Items', async ({ page }) => {
+test('renders repeated Candidate Clips as distinct authoritative Timeline Items', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA()]);
   const items = await replaceWithRepeatedItems(page, projectId);
   await expect(page.locator('.tl-clip')).toHaveCount(2);
@@ -560,10 +560,14 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
   expect(legacyWrites).toEqual([]);
   expect(after.document).toEqual(before.document);
   await expect(page.getByTestId('export-result-edl')).toContainText('2 items');
-  await expect(page.getByTestId('export-result-edl')).toContainText('4.0s');
+  await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
   await expect(page.getByTestId('export-warning-edl')).toContainText(/flatten/i);
   await page.getByText('Review export payload').click();
   await expect(page.getByTestId('export-payload')).toContainText('item_id');
   await expect(page.getByTestId('export-payload')).toContainText('speed');
   await expect(page.getByTestId('export-payload')).toContainText('transform');
+
+  await replaceWithItems(page, projectId, [{ offset: 0, duration: 6, speed: 1 }]);
+  await expect(page.getByText('1 item in the Timeline · 6.0s total.')).toBeVisible();
+  await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
 });

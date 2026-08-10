@@ -16,12 +16,12 @@ transform/split/remove + undo/redo). Plan 020 closes the remaining visual
 projection defect: the Timeline page reads every backend Timeline Item,
 including repeated Candidate Clips, computes effective duration from source
 span divided by Speed, and mutates by `item_id`; Transform values are editable.
-Backend tests green (248 + synthetic e2e); frontend build green; docs shipped
-(README, MCP_SERVER, ARCHITECTURE, runbook Flow F). **Remaining**: realtime
-speed/transform preview on the player, chat token streaming (deferred, SSE
-still live-updates the timeline), and several Playwright e2e specs (GUI
-live-update, speed/zoom, propose→accept) — all pending visual QA on the
-Electron stack.
+Backend tests green (393 passed, 3 skipped + synthetic e2e); frontend build green; docs shipped
+(README, MCP_SERVER, ARCHITECTURE, runbook Flow F). **Remaining**: full
+real-time pan/crop preview on the player, chat token streaming (deferred, SSE
+still live-updates the timeline), and propose→accept Playwright coverage — all
+pending visual QA on the Electron stack. Speed playback and Timeline scale are
+covered by the Plan 020 browser regression.
 
 ## Why this matters / decisions locked (see spec for rationale)
 

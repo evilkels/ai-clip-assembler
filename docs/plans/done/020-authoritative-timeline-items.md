@@ -1,5 +1,7 @@
 # Authoritative Timeline Items Implementation Plan
 
+> **Status:** DONE (2026-08-10; review-fix pass verified in `a707f96`)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the Timeline page render, play, and edit every backend-authoritative Timeline Item without collapsing repeated Candidate Clips.
@@ -334,4 +336,3 @@ git add docs/ARCHITECTURE.md docs/USER_GUIDE.md docs/QA.md \
   docs/reviews/2026-08-10-authoritative-timeline-items.html
 git commit -m "docs: report authoritative timeline fix"
 ```
-

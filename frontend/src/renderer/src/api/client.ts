@@ -467,9 +467,12 @@ export async function getClips(projectId: string): Promise<ClipCandidate[]> {
 
 export interface ExportResult {
   project_id: string;
-  format: string;
+  format: ExportFormat;
   status: string;
   file_path: string;
+  clip_count: number;
+  total_duration_sec: number;
+  warnings: string[];
 }
 
 export type ExportFormat = 'edl' | 'fcpxml' | 'resolve_xml';

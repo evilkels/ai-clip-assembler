@@ -72,10 +72,10 @@ Reorder items, drag edges to trim, click to scrub, and zoom. Shortcuts:
 Choose Resolve XML, FCPXML, or EDL. Folder-project exports live under
 `exports/{davinci,fcp,edl}` with relative media paths. Use **Review export
 payload** to inspect every ordered Timeline Item before importing into your
-NLE: repeated items, `item_id`, source clip and resolved file metadata, bounds,
+NLE: repeated items, `item_id`, Candidate Clip and resolved file metadata, bounds,
 Speed, and Transform are shown. Export reads the current backend Timeline
 Document directly; it does not first save the Review page's legacy order or
-trim projection. Each result keeps its file path, item count, effective
+trim projection. Each result keeps its file path, item count, export-time effective
 duration, status, backend duration metadata, and warnings. EDL warns when Speed
 or Transform was flattened; FCPXML and Resolve XML carry those supported values.
 Existing-file exports ask for overwrite confirmation, and a Resolve XML result

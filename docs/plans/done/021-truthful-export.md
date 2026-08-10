@@ -96,6 +96,8 @@ git commit -m "test: cover truthful timeline export"
 **Files:**
 - Modify: `frontend/src/renderer/src/api/client.ts`
 - Modify: `frontend/src/renderer/src/routes/Export.tsx`
+- Modify: `backend/src/export_engine.py`
+- Modify: `backend/tests/test_export_engine.py`
 
 **Interfaces:**
 - Consumes: `ReviewState.timelineItems`, `ReviewState.clips`, and `exportTimeline(projectId, format, options)`.
@@ -124,17 +126,18 @@ Keep `updateTimeline` for compatibility callers, but remove its import and use f
 Read `{ clips, timelineItems, projectId, projectFolder }`. Create `clipsById` for display metadata, but use `timelineItems` for item count, empty state, summary, and payload. Derive effective duration as:
 
 ```ts
-const totalDuration = timelineItems.reduce(
+const effectiveDuration = timelineItems.reduce(
   (sum, item) => sum + (item.end_sec - item.start_sec) / item.speed,
   0,
 );
 ```
 
-Store full results:
+Store full results plus the effective duration captured when each export starts,
+so later Timeline edits cannot rewrite an older result card:
 
 ```ts
 const [exportResults, setExportResults] = useState<
-  Partial<Record<ExportFormat, ExportResult>>
+  Partial<Record<ExportFormat, ExportResult & { effective_duration_sec: number }>>
 >({});
 ```
 
@@ -148,6 +151,10 @@ setExportResults((previous) => ({ ...previous, [format]: result }));
 ```
 
 Retain the current overwrite confirmation retry using `{ overwrite: true }`.
+
+Keep ADR-0004 true in the generated EDL: use the unretimed source span for the
+record duration and do not emit an `M2` command. The explicit warning remains
+the handoff contract for flattened Speed and Transform.
 
 - [ ] **Step 4: Render metadata, warnings, and authoritative payload**
 

@@ -14,17 +14,19 @@ const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }>
   { id: 'edl', button: 'Export EDL', label: 'EDL exported' },
 ];
 
+type DisplayExportResult = ExportResult & { effective_duration_sec: number };
+
 export function ExportPage() {
   const { clips, timelineItems, projectId, projectFolder } = useReview();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportResults, setExportResults] = useState<
-    Partial<Record<ExportFormat, ExportResult>>
+    Partial<Record<ExportFormat, DisplayExportResult>>
   >({});
   const [exportError, setExportError] = useState<string | null>(null);
 
   const clipsById = useMemo(() => new Map(clips.map((clip) => [clip.clip_id, clip])), [clips]);
 
-  const totalDuration = timelineItems.reduce(
+  const effectiveDuration = timelineItems.reduce(
     (sum, item) => sum + (item.end_sec - item.start_sec) / item.speed,
     0,
   );
@@ -46,14 +48,17 @@ export function ExportPage() {
           if (!overwrite) throw err;
           result = await exportTimeline(projectId, format, { overwrite: true });
         }
-        setExportResults((previous) => ({ ...previous, [format]: result }));
+        setExportResults((previous) => ({
+          ...previous,
+          [format]: { ...result, effective_duration_sec: effectiveDuration },
+        }));
       } catch (err) {
         setExportError(err instanceof Error ? err.message : String(err));
       } finally {
         setExporting(null);
       }
     },
-    [projectId],
+    [effectiveDuration, projectId],
   );
 
   const copyPath = useCallback((path: string) => {
@@ -67,7 +72,7 @@ export function ExportPage() {
           <h1>Export</h1>
           <p>
             {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'} in the Timeline ·{' '}
-            {totalDuration.toFixed(1)}s total.
+            {effectiveDuration.toFixed(1)}s total.
           </p>
         </div>
       </div>
@@ -124,7 +129,8 @@ export function ExportPage() {
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{format.label}</div>
                 <div style={{ marginBottom: 4 }}>
                   {result.clip_count} item{result.clip_count === 1 ? '' : 's'} ·{' '}
-                  {totalDuration.toFixed(1)}s effective · backend {result.total_duration_sec.toFixed(1)}s ·{' '}
+                  {result.effective_duration_sec.toFixed(1)}s effective · backend{' '}
+                  {result.total_duration_sec.toFixed(1)}s ·{' '}
                   {result.status}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

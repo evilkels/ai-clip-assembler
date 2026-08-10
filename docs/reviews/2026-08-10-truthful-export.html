@@ -93,9 +93,9 @@
         <dt>Source of truth</dt>
         <dd>The Export page reads <code>timelineItems</code> and calls only the backend export endpoint; the regression observed no legacy Timeline write.</dd>
         <dt>Result surface</dt>
-        <dd>Each format keeps the backend project, format, status, path, item count, duration metadata, and warnings. Effective duration is shown from item bounds and Speed.</dd>
+        <dd>Each format keeps the backend project, format, status, path, item count, duration metadata, and warnings. Effective duration is captured from item bounds and Speed when that export starts.</dd>
         <dt>Payload</dt>
-        <dd>The inspector preserves every ordered item with <code>item_id</code>, source clip, resolved file metadata, bounds, Speed, and Transform, including repeated sources.</dd>
+        <dd>The inspector preserves every ordered Timeline Item with <code>item_id</code>, Candidate Clip, resolved file metadata, bounds, Speed, and Transform, including repeated Candidate Clips.</dd>
         <dt>Safety</dt>
         <dd>Existing-file overwrite confirmation and the Open in DaVinci Resolve handoff remain available.</dd>
       </dl>
@@ -126,7 +126,7 @@
             </tr>
             <tr>
               <th scope="row">EDL</th>
-              <td>Clip order and bounds are exported; Speed and Transform are intentionally flattened.</td>
+              <td>Timeline Item order and bounds are exported; Speed and Transform are intentionally flattened.</td>
               <td><div class="edl-warning" role="note" aria-label="EDL degradation warning">EDL degradation warning: Speed and Transform were flattened, and the backend warning is shown with the result.</div></td>
             </tr>
           </tbody>
@@ -138,10 +138,11 @@
       <h2 id="evidence-heading">Evidence</h2>
       <ul>
         <li>Red test: <code>npx playwright test e2e/timeline-playback.spec.ts --grep "without a legacy write"</code> failed because the old Export path emitted <code>["PUT"]</code>.</li>
+        <li>Closure regressions prove EDL emits no <code>M2</code> retime command and a completed result keeps its export-time effective duration after later Timeline edits.</li>
         <li>Focused green export checks: <code>2 passed</code>.</li>
         <li>Full <code>frontend/e2e/timeline-playback.spec.ts</code>: <code>16 passed</code>.</li>
         <li><code>npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build</code>: exited 0.</li>
-        <li>Backend baseline: <code>393 passed, 3 skipped, 3 warnings</code>.</li>
+        <li>Backend baseline: <code>394 passed, 3 skipped, 3 warnings</code>.</li>
         <li><code>scripts/synthetic_e2e_qa.py</code>: all checks passed.</li>
       </ul>
       <dl>

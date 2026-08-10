@@ -1,8 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useReview } from '../state/ReviewContext';
-import { exportTimeline, openInDaVinci, updateTimeline, type ExportFormat } from '../api/client';
+import {
+  exportTimeline,
+  openInDaVinci,
+  type ExportFormat,
+  type ExportResult,
+} from '../api/client';
 import { EmptyState } from '../components/EmptyState';
-import type { ClipCandidate } from '../types/clip';
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }> = [
   { id: 'resolve_xml', button: 'Export for DaVinci Resolve', label: 'DaVinci Resolve XML exported' },
@@ -11,29 +15,17 @@ const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }>
 ];
 
 export function ExportPage() {
-  const { clips, acceptedOrder, trims, projectId, projectFolder } = useReview();
+  const { clips, timelineItems, projectId, projectFolder } = useReview();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
-  const [exportResult, setExportResult] = useState<Partial<Record<ExportFormat, string>>>({});
+  const [exportResults, setExportResults] = useState<
+    Partial<Record<ExportFormat, ExportResult>>
+  >({});
   const [exportError, setExportError] = useState<string | null>(null);
-  const [syncWarning, setSyncWarning] = useState(false);
 
-  const acceptedClips = useMemo(
-    () => {
-      const clipsById = new Map(clips.map((clip) => [clip.clip_id, clip]));
-      return acceptedOrder
-        .map((id) => clipsById.get(id))
-        .filter((c): c is ClipCandidate => Boolean(c));
-    },
-    [acceptedOrder, clips],
-  );
+  const clipsById = useMemo(() => new Map(clips.map((clip) => [clip.clip_id, clip])), [clips]);
 
-  const totalDuration = acceptedClips.reduce(
-    (sum, c) => {
-      const trim = trims[c.clip_id];
-      const start = trim?.start_sec ?? c.start_sec;
-      const end = trim?.end_sec ?? c.end_sec;
-      return sum + (end - start);
-    },
+  const totalDuration = timelineItems.reduce(
+    (sum, item) => sum + (item.end_sec - item.start_sec) / item.speed,
     0,
   );
 
@@ -42,27 +34,9 @@ export function ExportPage() {
       if (!projectId) return;
       setExporting(format);
       setExportError(null);
-      setSyncWarning(false);
-
-      const hasCustomTrims = acceptedClips.some(
-        (c) => {
-          const t = trims[c.clip_id];
-          return t && (Math.abs(t.start_sec - c.start_sec) > 0.01 || Math.abs(t.end_sec - c.end_sec) > 0.01);
-        },
-      );
-
-      if (hasCustomTrims || acceptedOrder.length > 0) {
-        const syncResult = await updateTimeline(projectId, {
-          order: acceptedOrder,
-          trims,
-        });
-        if (!syncResult.ok) {
-          setSyncWarning(true);
-        }
-      }
 
       try {
-        let result;
+        let result: ExportResult;
         try {
           result = await exportTimeline(projectId, format);
         } catch (err) {
@@ -72,14 +46,14 @@ export function ExportPage() {
           if (!overwrite) throw err;
           result = await exportTimeline(projectId, format, { overwrite: true });
         }
-        setExportResult((prev) => ({ ...prev, [format]: result.file_path }));
+        setExportResults((previous) => ({ ...previous, [format]: result }));
       } catch (err) {
         setExportError(err instanceof Error ? err.message : String(err));
       } finally {
         setExporting(null);
       }
     },
-    [projectId, acceptedOrder, trims, acceptedClips],
+    [projectId],
   );
 
   const copyPath = useCallback((path: string) => {
@@ -92,30 +66,13 @@ export function ExportPage() {
         <div>
           <h1>Export</h1>
           <p>
-            {acceptedClips.length} clip{acceptedClips.length === 1 ? '' : 's'} accepted ·{' '}
+            {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'} in the Timeline ·{' '}
             {totalDuration.toFixed(1)}s total.
           </p>
         </div>
       </div>
       <div className="page-body">
-        {syncWarning && (
-          <div
-            style={{
-              background: 'var(--bg-warning)',
-              border: '1px solid var(--border-warning)',
-              borderRadius: 6,
-              padding: '8px 12px',
-              marginBottom: 16,
-              fontSize: 12,
-            }}
-          >
-            <strong>Backend update needed for order/trim sync.</strong> The current backend does
-            not support timeline updates. Export uses original analysis order and timings. Trims
-            and accepted order are saved in the frontend session only.
-          </div>
-        )}
-
-        {acceptedClips.length === 0 ? (
+        {timelineItems.length === 0 ? (
           <EmptyState
             icon={
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -149,9 +106,13 @@ export function ExportPage() {
               <p style={{ color: 'var(--text-error)', fontSize: 13 }}>{exportError}</p>
             )}
 
-            {EXPORT_FORMATS.map((format) => exportResult[format.id] && (
+            {EXPORT_FORMATS.map((format) => {
+              const result = exportResults[format.id];
+              if (!result) return null;
+              return (
               <div
                 key={format.id}
+                data-testid={`export-result-${format.id}`}
                 style={{
                   background: 'var(--bg-1)',
                   border: '1px solid var(--border)',
@@ -161,14 +122,19 @@ export function ExportPage() {
                 }}
               >
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{format.label}</div>
+                <div style={{ marginBottom: 4 }}>
+                  {result.clip_count} item{result.clip_count === 1 ? '' : 's'} ·{' '}
+                  {totalDuration.toFixed(1)}s effective · backend {result.total_duration_sec.toFixed(1)}s ·{' '}
+                  {result.status}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <code style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {exportResult[format.id]}
+                    {result.file_path}
                   </code>
                   <button
                     type="button"
                     className="btn subtle"
-                    onClick={() => copyPath(exportResult[format.id]!)}
+                    onClick={() => copyPath(result.file_path)}
                   >
                     Copy
                   </button>
@@ -179,7 +145,7 @@ export function ExportPage() {
                       onClick={async () => {
                         setExportError(null);
                         try {
-                          const opened = await openInDaVinci(exportResult.resolve_xml!, projectFolder ?? undefined);
+                          const opened = await openInDaVinci(result.file_path, projectFolder ?? undefined);
                           if (!opened) {
                             setExportError('Open the exported XML in DaVinci Resolve to import the draft.');
                           }
@@ -192,14 +158,28 @@ export function ExportPage() {
                     </button>
                   )}
                 </div>
+                {result.warnings.length > 0 && (
+                  <div
+                    role="status"
+                    data-testid={`export-warning-${format.id}`}
+                    style={{
+                      marginTop: 8,
+                      color: 'var(--text-warning)',
+                    }}
+                  >
+                    {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
 
             <details style={{ fontSize: 12 }}>
               <summary style={{ cursor: 'pointer', color: 'var(--text-muted)' }}>
                 Review export payload
               </summary>
               <pre
+                data-testid="export-payload"
                 style={{
                   background: 'var(--bg-1)',
                   border: '1px solid var(--border)',
@@ -213,15 +193,18 @@ export function ExportPage() {
               >
                 {JSON.stringify(
                   {
-                    timeline: acceptedClips.map((c, idx) => {
-                      const trim = trims[c.clip_id];
+                    timeline: timelineItems.map((item, index) => {
+                      const clip = clipsById.get(item.source_clip_id);
                       return {
-                        order: idx + 1,
-                        clip_id: c.clip_id,
-                        file_id: c.file_id,
-                        file_name: c.file_name,
-                        start_sec: trim?.start_sec ?? c.start_sec,
-                        end_sec: trim?.end_sec ?? c.end_sec,
+                        order: index + 1,
+                        item_id: item.item_id,
+                        source_clip_id: item.source_clip_id,
+                        file_id: clip?.file_id ?? null,
+                        file_name: clip?.file_name ?? item.source_clip_id,
+                        start_sec: item.start_sec,
+                        end_sec: item.end_sec,
+                        speed: item.speed,
+                        transform: item.transform,
                       };
                     }),
                   },

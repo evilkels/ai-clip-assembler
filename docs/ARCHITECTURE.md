@@ -110,6 +110,19 @@ more than one item (multi-instance).
   FCPXML (`adjust-transform`) and Resolve XML (Basic Motion); EDL flattens
   them with a warning.
 
+#### Timeline page projection
+
+The Timeline page reads every `TimelineItem` from the backend Timeline
+Document in document order. It resolves Candidate Clip metadata only for the
+display label and media URL, so a repeated Candidate Clip remains a separate
+Timeline Item with its own `item_id`, bounds, speed, and transform.
+
+Each item's effective duration is `(end_sec - start_sec) / speed`. The visual
+track and the detailed `TimelineEditor` both send reorder, remove, trim, speed,
+and transform edits through the Operations core using `item_id`; Review Board
+include/exclude decisions remain Candidate-Clip-based. Transform values are
+editable, while full real-time pan/crop preview remains pending visual QA.
+
 See [MCP_SERVER.md](MCP_SERVER.md) for the agent surface and the
 [agent-operable-timeline design](specs/2026-06-19-agent-operable-timeline-design.md).
 

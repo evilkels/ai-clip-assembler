@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Authoritative Timeline Items — Engineering Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3f0e9;
+      --sheet: #fffdf8;
+      --graphite: #252a2e;
+      --muted: #6f7678;
+      --line: #d8d4ca;
+      --amber: #c97819;
+      --amber-soft: #f5dfbb;
+      --green: #2f6b4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--graphite);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { max-width: 920px; margin: auto; padding: 48px 24px 64px; }
+    header, section {
+      background: var(--sheet);
+      border: 1px solid var(--line);
+      padding: clamp(20px, 4vw, 34px);
+      margin-bottom: 16px;
+    }
+    header { border-top: 4px solid #a9a69e; }
+    h1, h2 { margin: 0; letter-spacing: -0.02em; }
+    h1 { max-width: 720px; font-size: clamp(2.3rem, 8vw, 5rem); line-height: .96; }
+    h2 { font-size: 1.25rem; }
+    p { max-width: 72ch; }
+    .eyebrow, .muted { color: var(--muted); }
+    .eyebrow {
+      margin-top: 0;
+      font: 700 .74rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .lede { color: #4f5759; font-size: 1.08rem; }
+    .status { color: var(--green); font-weight: 700; }
+    .status::before { content: ""; display: inline-block; width: .58rem; height: .58rem; margin-right: .45rem; background: var(--green); border-radius: 50%; }
+    dl { display: grid; grid-template-columns: minmax(7rem, max-content) 1fr; gap: 10px 22px; margin: 20px 0 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; }
+    code, .data { font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { background: #ece9e1; padding: .08em .3em; }
+    ul { margin: 18px 0 0; padding-left: 1.2rem; }
+    li + li { margin-top: 9px; }
+    .timeline-figure { margin: 26px 0 0; }
+    .timeline-track { position: relative; display: flex; height: 58px; border: 1px solid #bcb8ae; background: #e8e4da; overflow: hidden; }
+    .timeline-item { display: flex; align-items: center; min-width: 0; padding: 0 12px; border-right: 1px solid var(--sheet); color: #354047; font: .78rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .timeline-item.one { width: 50%; background: #d7ddd9; }
+    .timeline-item.two { width: 50%; background: #cdd5d5; }
+    .playhead { position: absolute; top: -8px; bottom: -8px; left: 51%; width: 2px; background: var(--amber); }
+    .playhead::before { content: ""; position: absolute; top: 0; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--amber); }
+    figcaption { margin-top: 9px; color: var(--muted); font-size: .86rem; }
+    footer { color: var(--muted); font-size: .84rem; }
+    a { color: #89520f; }
+    @media (max-width: 560px) {
+      main { padding: 24px 14px 40px; }
+      dl { grid-template-columns: 1fr; gap: 3px; }
+      dd { margin-bottom: 8px; }
+      .timeline-item { padding: 0 7px; font-size: .7rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Engineering report · 2026-08-10</p>
+      <h1>Authoritative Timeline Items</h1>
+      <p class="lede">The Timeline now follows the backend document item-for-item, including repeated placements of one Candidate Clip.</p>
+      <p class="status" role="status">Verified by automated checks</p>
+    </header>
+
+    <section aria-labelledby="outcome-heading">
+      <h2 id="outcome-heading">Outcome</h2>
+      <dl>
+        <dt>Identity</dt>
+        <dd>Every visual segment is keyed by <code>item_id</code>; repeated source clips remain distinct.</dd>
+        <dt>Timing</dt>
+        <dd>Effective duration is <code>(end_sec - start_sec) / speed</code>; the synthetic two-item case reports <code>4.0s</code>.</dd>
+        <dt>Mutations</dt>
+        <dd>Visual and detailed controls route reorder, trim, remove, Speed, and Transform through the Operations core by <code>item_id</code>.</dd>
+        <dt>Review</dt>
+        <dd>Review Board include/exclude decisions remain Candidate-Clip-based.</dd>
+      </dl>
+      <figure class="timeline-figure" aria-labelledby="timeline-caption">
+        <div class="timeline-track" role="img" aria-label="Two contiguous Timeline Items with an amber playhead">
+          <span class="timeline-item one">item 01 · 2.0s</span>
+          <span class="timeline-item two">item 02 · 2.0s @ 2×</span>
+          <span class="playhead" aria-hidden="true"></span>
+        </div>
+        <figcaption id="timeline-caption">A compact view of the verified repeated-item timing case. The amber line is the playhead.</figcaption>
+      </figure>
+    </section>
+
+    <section aria-labelledby="evidence-heading">
+      <h2 id="evidence-heading">Evidence</h2>
+      <ul>
+        <li>Test checkpoint <code>68efc8b</code>: Playwright regressions for repeated items and selected-item mutation.</li>
+        <li>Implementation checkpoint <code>eeb68d0</code>: item-authoritative projection, speed-aware player mapping, and mounted Timeline editor.</li>
+        <li><code>npx playwright test e2e/timeline-playback.spec.ts --grep "authoritative Timeline Items|selected Timeline Item"</code>: 2 passed.</li>
+        <li><code>npx playwright test e2e/timeline-playback.spec.ts</code>: 9 passed.</li>
+        <li><code>npm run typecheck</code>, <code>npm run lint</code>, and <code>npm run build</code>: exited 0.</li>
+        <li>Backend baseline: 393 passed, 3 skipped; synthetic end-to-end QA: all checks passed.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="limits-heading">
+      <h2 id="limits-heading">Known limits</h2>
+      <ul>
+        <li>Transform values are editable, but full real-time pan/crop preview remains pending visual QA.</li>
+        <li>Chat token streaming and the remaining GUI live-update and propose→accept Playwright coverage remain deferred limitations.</li>
+        <li>Real-footage and Final Cut Pro/DaVinci Resolve import validation were not performed in this run; human QA is still required.</li>
+      </ul>
+    </section>
+
+    <footer>Local-only report: semantic HTML, inline CSS, no scripts, gradients, or network assets.</footer>
+  </main>
+</body>
+</html>

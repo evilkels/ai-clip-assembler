@@ -1,5 +1,7 @@
 # Truthful Export Implementation Plan
 
+> **Status:** DONE (2026-08-10; implementation checkpoints `d232a70` and `8058e1a`)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Export the current authoritative Timeline without a legacy pre-export mutation and display the backend's complete result and degradation warnings.

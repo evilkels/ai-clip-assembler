@@ -37,6 +37,16 @@ Record names, durations, codec, and expected behavior outside git.
 
 ### Export and Pi
 
+The Export page must read the current backend Timeline Document without a
+legacy Timeline write. Its result card shows the generated path, item count,
+effective duration, backend status and duration metadata, and every backend
+warning. **Review export payload** must retain repeated Timeline Items with
+`item_id`, resolved file metadata, bounds, Speed, and Transform. EDL must make
+its Speed/Transform flattening warning visible; FCPXML and Resolve XML must
+retain their supported values. The synthetic browser regression covers these
+read-only UI and response-surface checks; it does not replace manual NLE import
+validation.
+
 1. Accept 3+ clips from 2 sources. Import FCPXML into FCP; inspect/import EDL.
    Original media references, order, edit timecodes, and source timecodes match.
    FCPXML/Resolve preserve speed/transform; EDL flattens and warns.
@@ -90,6 +100,8 @@ Review Board renders it.
 
 The Plan 020 browser regression uses deterministic synthetic fixtures. It does
 not replace the real-footage, Final Cut Pro, or DaVinci Resolve checks below.
+The Plan 021 browser regression also uses synthetic fixtures and does not prove
+real-footage behavior or NLE import compatibility.
 
 ## Risks
 

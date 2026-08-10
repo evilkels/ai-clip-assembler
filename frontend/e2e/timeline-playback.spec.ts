@@ -71,6 +71,10 @@ async function setupTimeline(page: Page, files: string[]) {
     await expect.poll(() => includeButton.count()).toBeLessThan(before);
   }
 
+  await page.goto('/#/playwriter');
+  const projectId = (await page.getByTestId('qa-project-id').textContent())?.trim();
+  expect(projectId).toBeTruthy();
+
   await page.goto('/#/timeline');
   const video = page.getByTestId('timeline-preview-video');
   await expect(video).toBeVisible({ timeout: 15_000 });
@@ -80,7 +84,43 @@ async function setupTimeline(page: Page, files: string[]) {
       timeout: 30_000,
     })
     .toBeGreaterThanOrEqual(2);
-  return video;
+  return { video, projectId: projectId! };
+}
+
+async function replaceWithRepeatedItems(page: Page, projectId: string) {
+  const snapshot = await page.request.get(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+  );
+  const document = (await snapshot.json()).document;
+  const source = document.items[0];
+  const response = await page.request.post(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/op`,
+    {
+      data: {
+        operation: 'replace_timeline',
+        args: {
+          items: [
+            {
+              source_clip_id: source.source_clip_id,
+              start_sec: source.start_sec,
+              end_sec: source.start_sec + 2,
+              speed: 1,
+              transform: { scale: 1, x: 0, y: 0 },
+            },
+            {
+              source_clip_id: source.source_clip_id,
+              start_sec: source.start_sec + 2,
+              end_sec: source.start_sec + 6,
+              speed: 2,
+              transform: { scale: 1.25, x: 0.1, y: 0 },
+            },
+          ],
+        },
+      },
+    },
+  );
+  expect(response.ok()).toBe(true);
+  return (await response.json()).document.items as Array<{ item_id: string }>;
 }
 
 const fixtureA = () => ensureFixtureVideo('seq-fixture-a.mp4', 'gray');
@@ -99,7 +139,7 @@ test('timeline preview has no native controls; review cards use poster videos', 
   await expect(reviewVideo).not.toHaveAttribute('controls');
 });
 
-test('left and right trims move their own visual edges', async ({ page }) => {
+test('trimming keeps Timeline Items contiguous and shrinks the selected item', async ({ page }) => {
   await setupTimeline(page, [fixtureA(), fixtureB()]);
   const ruler = await page.locator('.timeline-ruler').boundingBox();
   expect(ruler).toBeTruthy();
@@ -119,14 +159,41 @@ test('left and right trims move their own visual edges', async ({ page }) => {
 
   const afterLeft = await clip.boundingBox();
   expect(afterLeft).toBeTruthy();
-  expect(afterLeft!.x).toBeGreaterThan(before!.x + 5);
+  expect(Math.abs(afterLeft!.x - before!.x)).toBeLessThan(1);
   expect(afterLeft!.width).toBeLessThan(before!.width);
+});
+
+test('renders repeated source clips as distinct authoritative Timeline Items', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  await page.goto('/#/review');
+  await page.goto('/#/timeline');
+  await expect(page.locator('.tl-clip')).toHaveCount(2);
+  await expect(page.locator(`[data-timeline-item-id="${items[0].item_id}"]`)).toBeVisible();
+  await expect(page.locator(`[data-timeline-item-id="${items[1].item_id}"]`)).toBeVisible();
+  await expect(page.getByTestId('timeline-summary')).toContainText('2 items · 4.0s');
+});
+
+test('visual edits address the selected Timeline Item', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  await page.goto('/#/review');
+  await page.goto('/#/timeline');
+  await page.locator(`[data-timeline-item-id="${items[1].item_id}"]`).click();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect.poll(async () => {
+    const response = await page.request.get(
+      `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+    );
+    const document = (await response.json()).document;
+    return document.items[0].item_id;
+  }).toBe(items[1].item_id);
 });
 
 test('forward play is video-driven: monotonic advance, stable src, zero seeking events', async ({
   page,
 }) => {
-  const video = await setupTimeline(page, [fixtureA(), fixtureB()]);
+  const { video } = await setupTimeline(page, [fixtureA(), fixtureB()]);
 
   // Let the initial seek (to clip 1's trim start) settle before counting.
   await page.waitForTimeout(500);
@@ -177,7 +244,7 @@ async function findFileBoundary(page: Page): Promise<{ boundaryIndex: number; fi
 }
 
 test('playback crosses the clip boundary and continues into the next file', async ({ page }) => {
-  const video = await setupTimeline(page, [fixtureA(), fixtureB()]);
+  const { video } = await setupTimeline(page, [fixtureA(), fixtureB()]);
 
   const { boundaryIndex, firstName, secondName } = await findFileBoundary(page);
 
@@ -213,7 +280,7 @@ test('playback crosses the clip boundary and continues into the next file', asyn
 });
 
 test('play restarts from the first item after reaching the sequence end', async ({ page }) => {
-  const video = await setupTimeline(page, [fixtureA(), fixtureB()]);
+  const { video } = await setupTimeline(page, [fixtureA(), fixtureB()]);
   const firstClipName = await page.getByTestId('timeline-preview-current-clip').textContent();
   const clips = page.locator('.tl-clip');
   const clipCount = await clips.count();
@@ -260,11 +327,11 @@ test('playhead drags continuously and wheel zoom changes timeline scale', async 
   );
   expect(after).toBeGreaterThan(before + 100);
 
-  const zoomBefore = Number(await page.getByLabel('Zoom').inputValue());
+  const zoomBefore = Number(await page.getByRole('slider', { name: 'Zoom' }).inputValue());
   await page.mouse.move(rulerBox!.x + rulerBox!.width / 2, rulerBox!.y + 10);
   await page.mouse.wheel(0, -300);
   await expect
-    .poll(async () => Number(await page.getByLabel('Zoom').inputValue()))
+    .poll(async () => Number(await page.getByRole('slider', { name: 'Zoom' }).inputValue()))
     .toBeGreaterThan(zoomBefore);
 });
 

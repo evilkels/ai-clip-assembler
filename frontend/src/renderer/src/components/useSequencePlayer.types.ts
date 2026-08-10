@@ -1,5 +1,5 @@
 export interface SequenceSegment {
-  file_id: string;
+  file_id?: string;
   start_sec: number;
   end_sec: number;
   speed?: number;

@@ -140,7 +140,7 @@ export function useSequencePlayer({
   const previewProps = useMemo<UseSequencePlayerResult['previewProps']>(
     () => ({
       mediaUrl:
-        projectId && segment
+        projectId && segment?.file_id
           ? buildVideoMediaUrl(projectId, segment.file_id)
           : undefined,
       startSec: segment?.start_sec ?? 0,

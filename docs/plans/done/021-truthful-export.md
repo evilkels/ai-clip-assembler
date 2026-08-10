@@ -1,6 +1,6 @@
 # Truthful Export Implementation Plan
 
-> **Status:** DONE (2026-08-10; implementation checkpoints `d232a70` and `8058e1a`)
+> **Status:** DONE (2026-08-10; checkpoints `d232a70`, `8058e1a`, and closure `25b29f0`)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -16,7 +16,7 @@
 - ADR-0002 remains authoritative: Export must not mutate the Timeline Document.
 - ADR-0004 remains authoritative: EDL flattening must be explicit and visible.
 - Existing-file overwrite confirmation and DaVinci-open behavior remain intact.
-- No export format rewrite, render-to-video feature, dependency upgrade, or unrelated UI redesign.
+- No new export format, render-to-video feature, dependency upgrade, or unrelated UI redesign. The existing EDL writer may be corrected only as needed to honor ADR-0004.
 - Reports must be standalone semantic HTML with inline CSS only and no network dependency.
 
 ---
@@ -147,7 +147,10 @@ Delete `syncWarning`, `hasCustomTrims`, and the `updateTimeline` preflight block
 
 ```ts
 const result = await exportTimeline(projectId, format);
-setExportResults((previous) => ({ ...previous, [format]: result }));
+setExportResults((previous) => ({
+  ...previous,
+  [format]: { ...result, effective_duration_sec: effectiveDuration },
+}));
 ```
 
 Retain the current overwrite confirmation retry using `{ overwrite: true }`.

@@ -150,6 +150,8 @@
         <dd><code>d232a70</code> · <code>test: cover truthful timeline export</code></dd>
         <dt>Implementation checkpoint</dt>
         <dd><code>8058e1a</code> · <code>fix: export authoritative timeline</code></dd>
+        <dt>Review closure</dt>
+        <dd><code>25b29f0</code> · <code>fix(export): preserve truthful result semantics</code></dd>
       </dl>
     </section>
 
@@ -158,7 +160,7 @@
       <ul>
         <li>No real-footage, Final Cut Pro import, or DaVinci Resolve import validation was performed; those remain manual QA.</li>
         <li>Full real-time pan/crop preview remains pending visual QA.</li>
-        <li>The synthetic repeated-item result shows <code>4.0s</code> effective duration and keeps the backend-reported <code>6.0s</code> duration metadata visible; the backend exporter was not rewritten.</li>
+        <li>The synthetic repeated-item result shows <code>4.0s</code> effective duration while the backend response still reports <code>6.0s</code> raw source-span metadata; the UI keeps both values explicit.</li>
       </ul>
     </section>
 

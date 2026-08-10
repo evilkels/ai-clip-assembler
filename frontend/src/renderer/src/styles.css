@@ -2166,14 +2166,15 @@ a {
 
 .timeline-clips {
   position: relative;
-  display: flex;
-  align-items: stretch;
+  display: block;
   height: 80px;
   padding: 8px 0;
 }
 
 .tl-clip {
-  position: relative;
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
   display: flex;
   align-items: stretch;
   min-width: 8px;
@@ -2186,7 +2187,7 @@ a {
 }
 
 .tl-clip + .tl-clip {
-  margin-left: 2px;
+  margin-left: 0;
 }
 
 .tl-clip.selected {

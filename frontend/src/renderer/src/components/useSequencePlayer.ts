@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import type {
   SequenceSegment,
@@ -42,7 +42,7 @@ export function useSequencePlayer({
   onProgress,
 }: UseSequencePlayerArgs): UseSequencePlayerResult {
   const [playing, setPlaying] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndexState, setCurrentIndex] = useState(0);
   const [currentSourceTimeSec, setCurrentSourceTimeSec] = useState(
     segments[0]?.start_sec ?? 0,
   );
@@ -50,31 +50,74 @@ export function useSequencePlayer({
   const advanceLockRef = useRef(false);
   const endedRef = useRef(false);
   const segmentsRef = useRef<SequenceSegment[]>(segments);
+  const activeItemIdRef = useRef<string | undefined>(segments[0]?.item_id);
+  const currentIndexRef = useRef(0);
   segmentsRef.current = segments;
 
   const timing = useMemo(() => computeTiming(segments), [segments]);
 
+  // Timeline segments carry stable item IDs, while VersionPlayer's legacy
+  // segments do not. Resolve by identity when available and retain the old
+  // index-based behavior for callers without IDs.
+  const currentIndex = useMemo(() => {
+    if (segments.length === 0) return 0;
+    const activeItemId = activeItemIdRef.current;
+    if (activeItemId !== undefined) {
+      const identityIndex = segments.findIndex((segment) => segment.item_id === activeItemId);
+      if (identityIndex >= 0) return identityIndex;
+    }
+    return clamp(currentIndexState, 0, segments.length - 1);
+  }, [currentIndexState, segments]);
+  currentIndexRef.current = currentIndex;
+
   const seekTo = useCallback((index: number, sourceTimeSec: number) => {
     advanceLockRef.current = false;
     endedRef.current = false;
+    activeItemIdRef.current = segmentsRef.current[index]?.item_id;
+    currentIndexRef.current = index;
     setCurrentIndex(index);
     setCurrentSourceTimeSec(sourceTimeSec);
     setSeek((previous) => ({ time: sourceTimeSec, epoch: previous.epoch + 1 }));
   }, []);
 
+  // Reconcile the public index after Timeline Items are reordered, removed,
+  // or replaced by an SSE snapshot. A removed active item falls back to the
+  // surviving item at the old index (or the final item), and seeks to its
+  // source start. ID-less VersionPlayer sequences remain index-based.
+  useEffect(() => {
+    if (segments.length === 0) {
+      activeItemIdRef.current = undefined;
+      if (currentIndexState !== 0) setCurrentIndex(0);
+      return;
+    }
+
+    const hasItemIds = segments.some((segment) => segment.item_id !== undefined);
+    const activeItemId = activeItemIdRef.current;
+    if (activeItemId === undefined && hasItemIds) {
+      activeItemIdRef.current = segments[currentIndex]?.item_id;
+    } else if (activeItemId !== undefined && !segments.some((segment) => segment.item_id === activeItemId)) {
+      const fallbackIndex = clamp(currentIndexState, 0, segments.length - 1);
+      seekTo(fallbackIndex, segments[fallbackIndex].start_sec);
+      return;
+    }
+
+    if (currentIndexState !== currentIndex) setCurrentIndex(currentIndex);
+  }, [currentIndex, currentIndexState, seekTo, segments]);
+
   const onPlaybackTime = useCallback(
     (sourceTimeSec: number) => {
       const currentSegments = segmentsRef.current;
-      const segment = currentSegments[currentIndex];
+      const playbackIndex = currentIndexRef.current;
+      const segment = currentSegments[playbackIndex];
       if (!segment) return;
 
       if (sourceTimeSec >= segment.end_sec - SEGMENT_END_EPSILON) {
         if (advanceLockRef.current) return;
         advanceLockRef.current = true;
-        const nextIndex = currentIndex + 1;
+        const nextIndex = playbackIndex + 1;
         if (nextIndex >= currentSegments.length) {
           setCurrentSourceTimeSec(segment.end_sec);
-          onProgress?.(currentIndex, segment.end_sec);
+          onProgress?.(playbackIndex, segment.end_sec);
           if (loop && currentSegments.length > 0) {
             seekTo(0, currentSegments[0].start_sec);
             return;
@@ -89,9 +132,9 @@ export function useSequencePlayer({
 
       advanceLockRef.current = false;
       setCurrentSourceTimeSec(sourceTimeSec);
-      onProgress?.(currentIndex, sourceTimeSec);
+      onProgress?.(playbackIndex, sourceTimeSec);
     },
-    [currentIndex, loop, onProgress, seekTo],
+    [loop, onProgress, seekTo],
   );
 
   const seekToTimelineTime = useCallback(

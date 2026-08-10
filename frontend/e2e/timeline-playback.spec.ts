@@ -37,7 +37,11 @@ function ensureFixtureVideo(name: string, color: string): string {
 
 /** Import the given fixture files, run the manual harness, accept all clips,
  * and land on the Timeline page. */
-async function setupTimeline(page: Page, files: string[]) {
+async function setupTimeline(
+  page: Page,
+  files: string[],
+  options: { omitAnalyzedClips?: boolean } = {},
+) {
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
 
@@ -54,40 +58,80 @@ async function setupTimeline(page: Page, files: string[]) {
     ).toBeVisible();
   }
 
+  if (options.omitAnalyzedClips) {
+    await page.route('**/projects/*/analyze', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, clips: [] } });
+    });
+  }
   await page.getByLabel('Harness').selectOption('manual');
   await page.getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({
     timeout: 180_000,
   });
 
-  await page.goto('/#/review');
-  await page.getByTestId('source-clips-panel').locator('summary').click();
-  await expect(page.getByLabel(/Preview /).first()).toBeVisible();
-  // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
-  const includeButton = page.getByRole('button', { name: 'Include', exact: true });
-  for (let i = 0; i < 6 && (await includeButton.count()) > 0; i++) {
-    const before = await includeButton.count();
-    await includeButton.first().click();
-    await expect.poll(() => includeButton.count()).toBeLessThan(before);
+  let projectId: string | undefined;
+  if (options.omitAnalyzedClips) {
+    await page.goto('/#/playwriter');
+    projectId = (await page.getByTestId('qa-project-id').textContent())?.trim();
+    expect(projectId).toBeTruthy();
+    const clipsResponse = await page.request.get(
+      `http://127.0.0.1:8000/projects/${projectId}/clips`,
+    );
+    const sourceClip = (await clipsResponse.json()).clips[0];
+    const includeResponse = await page.request.post(
+      `http://127.0.0.1:8000/projects/${projectId}/timeline/op`,
+      { data: { operation: 'include', args: { clip_id: sourceClip.clip_id } } },
+    );
+    expect(includeResponse.ok()).toBe(true);
+  } else {
+    await page.goto('/#/review');
+    await page.getByTestId('source-clips-panel').locator('summary').click();
+    await expect(page.getByLabel(/Preview /).first()).toBeVisible();
+    // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
+    const includeButton = page.getByRole('button', { name: 'Include', exact: true });
+    for (let i = 0; i < 6 && (await includeButton.count()) > 0; i++) {
+      const before = await includeButton.count();
+      await includeButton.first().click();
+      await expect.poll(() => includeButton.count()).toBeLessThan(before);
+    }
+    await page.goto('/#/playwriter');
+    projectId = (await page.getByTestId('qa-project-id').textContent())?.trim();
+    expect(projectId).toBeTruthy();
   }
-
-  await page.goto('/#/playwriter');
-  const projectId = (await page.getByTestId('qa-project-id').textContent())?.trim();
-  expect(projectId).toBeTruthy();
 
   await page.goto('/#/timeline');
   const video = page.getByTestId('timeline-preview-video');
-  await expect(video).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('timeline-preview-current-clip')).not.toHaveText('');
-  await expect
-    .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).readyState), {
-      timeout: 30_000,
-    })
-    .toBeGreaterThanOrEqual(2);
+  if (options.omitAnalyzedClips) {
+    await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
+  } else {
+    await expect(video).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('timeline-preview-current-clip')).not.toHaveText('');
+    await expect
+      .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).readyState), {
+        timeout: 30_000,
+      })
+      .toBeGreaterThanOrEqual(2);
+  }
+  // The visible Timeline is mounted and hydrated before the SSE effect is
+  // subscribed. The live-mutation assertions below prove reconciliation.
+  await page.waitForTimeout(100);
   return { video, projectId: projectId! };
 }
 
-async function replaceWithRepeatedItems(page: Page, projectId: string) {
+interface TimelineItemSpec {
+  offset: number;
+  duration: number;
+  speed: number;
+  transform?: { scale: number; x: number; y: number };
+}
+
+async function replaceWithItems(
+  page: Page,
+  projectId: string,
+  specs: TimelineItemSpec[],
+) {
   const snapshot = await page.request.get(
     `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
   );
@@ -99,28 +143,45 @@ async function replaceWithRepeatedItems(page: Page, projectId: string) {
       data: {
         operation: 'replace_timeline',
         args: {
-          items: [
-            {
-              source_clip_id: source.source_clip_id,
-              start_sec: source.start_sec,
-              end_sec: source.start_sec + 2,
-              speed: 1,
-              transform: { scale: 1, x: 0, y: 0 },
-            },
-            {
-              source_clip_id: source.source_clip_id,
-              start_sec: source.start_sec + 2,
-              end_sec: source.start_sec + 6,
-              speed: 2,
-              transform: { scale: 1.25, x: 0.1, y: 0 },
-            },
-          ],
+          items: specs.map((spec) => ({
+            source_clip_id: source.source_clip_id,
+            start_sec: source.start_sec + spec.offset,
+            end_sec: source.start_sec + spec.offset + spec.duration,
+            speed: spec.speed,
+            transform: spec.transform ?? { scale: 1, x: 0, y: 0 },
+          })),
         },
       },
     },
   );
   expect(response.ok()).toBe(true);
-  return (await response.json()).document.items as Array<{ item_id: string }>;
+  return (await response.json()).document.items as Array<{
+    item_id: string;
+    source_clip_id: string;
+    start_sec: number;
+    end_sec: number;
+  }>;
+}
+
+async function replaceWithRepeatedItems(page: Page, projectId: string) {
+  return replaceWithItems(page, projectId, [
+    { offset: 0, duration: 2, speed: 1 },
+    { offset: 2, duration: 4, speed: 2, transform: { scale: 1.25, x: 0.1, y: 0 } },
+  ]);
+}
+
+async function postTimelineOperation(
+  page: Page,
+  projectId: string,
+  operation: string,
+  args: Record<string, unknown>,
+) {
+  const response = await page.request.post(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/op`,
+    { data: { operation, args } },
+  );
+  expect(response.ok()).toBe(true);
+  return (await response.json()).document;
 }
 
 const fixtureA = () => ensureFixtureVideo('seq-fixture-a.mp4', 'gray');
@@ -166,28 +227,157 @@ test('trimming keeps Timeline Items contiguous and shrinks the selected item', a
 test('renders repeated source clips as distinct authoritative Timeline Items', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA()]);
   const items = await replaceWithRepeatedItems(page, projectId);
-  await page.goto('/#/review');
-  await page.goto('/#/timeline');
   await expect(page.locator('.tl-clip')).toHaveCount(2);
   await expect(page.locator(`[data-timeline-item-id="${items[0].item_id}"]`)).toBeVisible();
   await expect(page.locator(`[data-timeline-item-id="${items[1].item_id}"]`)).toBeVisible();
   await expect(page.getByTestId('timeline-summary')).toContainText('2 items · 4.0s');
 });
 
-test('visual edits address the selected Timeline Item', async ({ page }) => {
+test('keeps the active Timeline Item through live reorder and removal', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA()]);
   const items = await replaceWithRepeatedItems(page, projectId);
-  await page.goto('/#/review');
-  await page.goto('/#/timeline');
   await page.locator(`[data-timeline-item-id="${items[1].item_id}"]`).click();
-  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(page.getByTestId('timeline-preview-current-clip')).toHaveAttribute(
+    'data-timeline-active-item-id',
+    items[1].item_id,
+  );
+
+  await postTimelineOperation(page, projectId, 'reorder', {
+    item_id: items[1].item_id,
+    to_index: 0,
+  });
+  await expect(page.getByTestId('timeline-preview-current-clip')).toHaveAttribute(
+    'data-timeline-active-item-id',
+    items[1].item_id,
+  );
+
+  await postTimelineOperation(page, projectId, 'remove_item', { item_id: items[1].item_id });
+  await expect(page.locator('.tl-clip')).toHaveCount(1);
+  await expect(page.getByTestId('timeline-preview-current-clip')).toHaveAttribute(
+    'data-timeline-active-item-id',
+    items[0].item_id,
+  );
+});
+
+test('applies repeated-item speed and transform to playback and preview', async ({ page }) => {
+  const { projectId, video } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const second = page.locator(`[data-timeline-item-id="${items[1].item_id}"]`);
+  await second.click();
+
+  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).playbackRate)).toBe(2);
+  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).style.transform)).toBe(
+    'scale(1.25)',
+  );
+  await expect(second.locator('.tl-clip-dur')).toHaveText('2.0s');
+});
+
+test('persists one speed-correct trim operation for the selected repeated item', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const boundsRequests: Array<Record<string, unknown>> = [];
+  page.on('request', (request) => {
+    if (!request.url().endsWith(`/projects/${projectId}/timeline/op`) || request.method() !== 'POST') return;
+    const body = request.postDataJSON() as { operation?: string; args?: Record<string, unknown> };
+    if (body.operation === 'set_bounds') boundsRequests.push(body.args ?? {});
+  });
+
+  const second = page.locator(`[data-timeline-item-id="${items[1].item_id}"]`);
+  await second.click();
+  const right = second.locator('.tl-trim-handle.right');
+  const rightBox = await right.boundingBox();
+  expect(rightBox).toBeTruthy();
+  await page.mouse.move(rightBox!.x + rightBox!.width / 2, rightBox!.y + rightBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    rightBox!.x + rightBox!.width / 2 + 20,
+    rightBox!.y + rightBox!.height / 2,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+
   await expect.poll(async () => {
     const response = await page.request.get(
       `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
     );
     const document = (await response.json()).document;
-    return document.items[0].item_id;
-  }).toBe(items[1].item_id);
+    return document.items.find((item: { item_id: string }) => item.item_id === items[1].item_id)?.end_sec;
+  }).toBe(7);
+  expect(boundsRequests).toHaveLength(1);
+  expect(boundsRequests[0]).toMatchObject({
+    item_id: items[1].item_id,
+    start_sec: 2,
+    end_sec: 7,
+  });
+});
+
+test('removes the selected repeated Timeline Item', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  await page.locator(`[data-timeline-item-id="${items[1].item_id}"]`).click();
+  await page.keyboard.press('Delete');
+
+  await expect.poll(async () => {
+    const response = await page.request.get(
+      `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+    );
+    const document = (await response.json()).document;
+    return document.items.map((item: { item_id: string }) => item.item_id);
+  }).toEqual([items[0].item_id]);
+});
+
+test('Space on a focused TimelineEditor button activates the button, not playback', async ({ page }) => {
+  const { projectId, video } = await setupTimeline(page, [fixtureA()]);
+  const snapshot = await page.request.get(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+  );
+  const itemId = (await snapshot.json()).document.items[0].item_id as string;
+  await postTimelineOperation(page, projectId, 'set_speed', { item_id: itemId, speed: 2 });
+  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).playbackRate)).toBe(2);
+
+  await page.getByTestId('timeline-undo').focus();
+  await page.keyboard.press('Space');
+
+  await expect.poll(async () => {
+    const response = await page.request.get(
+      `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+    );
+    const document = (await response.json()).document;
+    return document.items[0]?.speed;
+  }).toBe(1);
+  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).playbackRate)).toBe(1);
+});
+
+test('keeps short high-speed visual timing exact while retaining a visible hit target', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithItems(page, projectId, [
+    { offset: 0, duration: 0.05, speed: 2 },
+    { offset: 0.05, duration: 2, speed: 1 },
+  ]);
+
+  await expect(page.getByTestId('timeline-summary')).toContainText('2 items · 2.0s');
+  const short = page.locator(`[data-timeline-item-id="${items[0].item_id}"]`);
+  const following = page.locator(`[data-timeline-item-id="${items[1].item_id}"]`);
+  await expect.poll(() => short.evaluate((element) => parseFloat((element as HTMLElement).style.width))).toBe(1);
+  await expect.poll(() => following.evaluate((element) => parseFloat((element as HTMLElement).style.left))).toBe(1);
+  await expect(short.locator('.tl-trim-handle.left')).toBeVisible();
+});
+
+test('retains an authoritative Timeline Item when Candidate Clip metadata is stale', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()], { omitAnalyzedClips: true });
+  const snapshot = await page.request.get(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+  );
+  const sourceItem = (await snapshot.json()).document.items[0] as {
+    item_id: string;
+    source_clip_id: string;
+  };
+  await expect(page.getByTestId('timeline-summary')).toContainText('1 item ·');
+  await expect(page.locator('.tl-clip')).toHaveCount(1);
+  await expect(page.locator(`[data-timeline-item-id="${sourceItem.item_id}"] .tl-clip-name`)).toHaveText(
+    sourceItem.source_clip_id,
+  );
+  await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
 });
 
 test('forward play is video-driven: monotonic advance, stable src, zero seeking events', async ({

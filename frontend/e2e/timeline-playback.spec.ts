@@ -218,10 +218,18 @@ test('trimming keeps Timeline Items contiguous and shrinks the selected item', a
   await page.mouse.move(leftBox!.x + 40, leftBox!.y + leftBox!.height / 2, { steps: 5 });
   await page.mouse.up();
 
-  const afterLeft = await clip.boundingBox();
-  expect(afterLeft).toBeTruthy();
-  expect(Math.abs(afterLeft!.x - before!.x)).toBeLessThan(1);
-  expect(afterLeft!.width).toBeLessThan(before!.width);
+  // The trim round-trips through the backend, so the box is read on a retrying
+  // poll rather than once: a single read can land before the re-render commits.
+  await expect
+    .poll(async () => {
+      const box = await clip.boundingBox();
+      if (!box) return null;
+      return {
+        movedLeftEdge: Math.abs(box.x - before!.x) < 1,
+        narrower: box.width < before!.width,
+      };
+    })
+    .toEqual({ movedLeftEdge: true, narrower: true });
 });
 
 test('renders repeated Candidate Clips as distinct authoritative Timeline Items', async ({ page }) => {

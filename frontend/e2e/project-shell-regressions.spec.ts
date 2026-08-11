@@ -233,3 +233,112 @@ test('project cards expose labelled actions and locate only for missing folders'
   );
   expect(buttonGeometry.every(({ height, ariaLabel }) => height >= 24 && ariaLabel?.includes('Missing Project'))).toBe(true);
 });
+
+test('renaming a recent project updates its row and header without changing the folder', async ({ page }) => {
+  const folderPath = '/projects/bravo';
+  const seededProjects = [
+    { folderPath: '/projects/zulu', lastOpenedAt: '2026-08-11T13:00:00Z', name: 'zulu Project', missing: false },
+    { folderPath: '/projects/alpha', lastOpenedAt: '2026-08-11T10:00:00Z', name: 'alpha Project', missing: false },
+    { folderPath, lastOpenedAt: '2026-08-11T11:00:00Z', name: 'bravo Project', missing: false },
+    { folderPath: '/projects/mike', lastOpenedAt: '2026-08-11T12:00:00Z', name: 'Mike Project', missing: false },
+  ];
+
+  await page.addInitScript(({ projects, openPath }) => {
+    let recents = projects;
+    const find = (path: string) => recents.find((project) => project.folderPath === path);
+    Object.assign(window, {
+      clipAssembler: {
+        backendUrl: 'http://127.0.0.1:8000',
+        platform: 'darwin',
+        listRecentProjects: async () => recents,
+        getLastOpenedRecentProject: async () => find(openPath) ?? null,
+        addRecentProject: async (path: string) => {
+          const selected = find(path);
+          recents = selected
+            ? [{ ...selected, lastOpenedAt: '2026-08-11T14:00:00Z' }, ...recents.filter((project) => project.folderPath !== path)]
+            : recents;
+          return recents;
+        },
+        renameRecentProject: async (path: string, name: string) => {
+          const normalized = name.trim();
+          if (!normalized) throw new Error('Project name must contain at least one non-whitespace character');
+          recents = recents.map((project) =>
+            project.folderPath === path ? { ...project, name: Array.from(normalized).slice(0, 80).join('') } : project,
+          );
+          return recents;
+        },
+        checkForAppUpdate: async () => ({ state: 'up-to-date', currentVersion: '0.1.4', latestVersion: '0.1.4' }),
+      },
+    });
+  }, { projects: seededProjects, openPath: folderPath });
+
+  await page.route('http://127.0.0.1:8000/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/projects/from-folder') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          project_id: 'rename-project',
+          project_folder: folderPath,
+          project: {
+            schema_version: 1,
+            name: 'bravo Project',
+            created_at: '2026-08-11T10:00:00Z',
+            harness: 'manual',
+            cloud_ai_consent: false,
+            source_videos: [],
+            settings_overrides: {},
+          },
+          videos: [],
+          clips: [],
+          timeline: null,
+          generation_stats: null,
+        }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 204, body: '' });
+  });
+
+  await page.goto('/#/import');
+  await expect(page.locator('.project-header-name')).toHaveText('bravo Project');
+  const rows = page.locator('.project-row-name');
+  await expect(rows).toHaveText(['alpha Project', 'bravo Project', 'Mike Project', 'zulu Project']);
+
+  const originalRow = page.locator('.project-row-wrap').filter({ hasText: 'bravo Project' });
+  await originalRow.getByRole('button', { name: 'Rename bravo Project' }).click();
+  const input = page.getByLabel('Project name');
+  await expect(input).toBeFocused();
+  await input.fill('Aardvark Project');
+  await input.press('Enter');
+
+  await expect(page.locator('.project-header-name')).toHaveText('Aardvark Project');
+  await expect(rows).toHaveText(['Aardvark Project', 'alpha Project', 'Mike Project', 'zulu Project']);
+  const renamedRow = page.locator('.project-row-wrap').filter({ hasText: 'Aardvark Project' });
+  await expect(renamedRow.getByRole('button', { name: 'Rename Aardvark Project' })).toBeFocused();
+
+  await renamedRow.getByRole('button', { name: 'Rename Aardvark Project' }).click();
+  await page.getByLabel('Project name').fill('Discarded Project');
+  await page.getByLabel('Project name').press('Escape');
+  await expect(page.locator('.project-header-name')).toHaveText('Aardvark Project');
+  await expect(page.locator('.project-row-wrap').filter({ hasText: 'Aardvark Project' })).toBeVisible();
+
+  const preservedRow = page.locator('.project-row-wrap').filter({ hasText: 'Aardvark Project' });
+  await preservedRow.getByRole('button', { name: 'Rename Aardvark Project' }).click();
+  await page.getByLabel('Project name').fill('   ');
+  await page.getByLabel('Project name').press('Enter');
+  await expect(page.getByRole('alert')).toHaveText('Project name must contain at least one non-whitespace character');
+  await expect(page.locator('.project-header-name')).toHaveText('Aardvark Project');
+  await expect(preservedRow).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  const header = page.locator('.project-header');
+  await header.getByRole('button', { name: 'Rename Aardvark Project' }).click();
+  await expect(page.getByLabel('Project name')).toBeFocused();
+  await page.getByLabel('Project name').fill('Header Project');
+  await page.getByLabel('Project name').press('Enter');
+  await expect(header.locator('.project-header-name')).toHaveText('Header Project');
+  await expect(rows).toHaveText(['alpha Project', 'Header Project', 'Mike Project', 'zulu Project']);
+  await expect(header.locator('.project-header-path')).toHaveAttribute('title', folderPath);
+  await expect(header.getByRole('button', { name: 'Rename Header Project' })).toBeFocused();
+});

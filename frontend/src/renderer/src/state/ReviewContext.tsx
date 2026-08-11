@@ -23,6 +23,7 @@ import {
   listRecentProjects,
   redoTimeline,
   relocateRecentProject,
+  renameRecentProject as renameRecentProjectEntry,
   removeRecentProject,
   regenerateDraft as requestDraft,
   rederiveClips as requestClipRederive,
@@ -105,6 +106,7 @@ interface ReviewState {
   openProjectFolder: (folderPath: string) => Promise<void>;
   refreshRecentProjects: () => Promise<void>;
   removeRecent: (folderPath: string) => Promise<void>;
+  renameRecent: (folderPath: string, name: string) => Promise<void>;
   relocateRecent: (folderPath: string) => Promise<void>;
   rescanOpenProject: () => Promise<void>;
   acceptedCount: number;
@@ -351,6 +353,10 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const removeRecent = useCallback(async (folderPath: string) => {
     setRecentProjects(await removeRecentProject(folderPath));
+  }, []);
+
+  const renameRecent = useCallback(async (folderPath: string, name: string) => {
+    setRecentProjects(await renameRecentProjectEntry(folderPath, name));
   }, []);
 
   const relocateRecent = useCallback(async (folderPath: string) => {
@@ -620,6 +626,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       openProjectFolder,
       refreshRecentProjects,
       removeRecent,
+      renameRecent,
       relocateRecent,
       rescanOpenProject,
       acceptedCount: acceptedOrder.length,
@@ -667,6 +674,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       openProjectFolder,
       refreshRecentProjects,
       removeRecent,
+      renameRecent,
       relocateRecent,
       rescanOpenProject,
     ],

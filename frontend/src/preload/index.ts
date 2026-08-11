@@ -26,6 +26,10 @@ const bridge = {
     ipcRenderer.invoke('project:recent-add', folderPath, name) as Promise<
       Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
     >,
+  renameRecentProject: (folderPath: string, name: string) =>
+    ipcRenderer.invoke('project:recent-rename', folderPath, name) as Promise<
+      Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>
+    >,
   removeRecentProject: (folderPath: string) =>
     ipcRenderer.invoke('project:recent-remove', folderPath) as Promise<
       Array<{ folderPath: string; lastOpenedAt: string; name?: string; missing?: boolean }>

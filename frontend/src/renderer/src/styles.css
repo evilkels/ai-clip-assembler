@@ -77,6 +77,8 @@ a {
 }
 
 .project-header-name {
+  flex: 0 0 auto;
+  max-width: min(40%, 360px);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -87,6 +89,7 @@ a {
 }
 
 .project-header-path {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -102,6 +105,10 @@ a {
 .project-header-empty {
   color: var(--text-muted);
   font-size: var(--text-sm);
+}
+
+.project-header > .project-rename-editor {
+  width: 100%;
 }
 
 .app-workspace {
@@ -408,7 +415,7 @@ a {
 .project-row-actions button,
 .project-empty,
 .sidebar-error {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: var(--text-xs);
 }
 
@@ -428,6 +435,40 @@ a {
 .project-row-actions button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.project-rename-editor {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.project-rename-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.project-rename-input {
+  min-width: 0;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.project-rename-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.project-rename-error {
+  margin: 0;
+  color: var(--text-error);
+  font-size: var(--text-xs);
+  line-height: 1.35;
 }
 
 .project-empty,

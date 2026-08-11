@@ -55,6 +55,7 @@ declare global {
       listRecentProjects?: () => Promise<RecentProject[]>;
       getLastOpenedRecentProject?: () => Promise<RecentProject | null>;
       addRecentProject?: (folderPath: string, name?: string) => Promise<RecentProject[]>;
+      renameRecentProject?: (folderPath: string, name: string) => Promise<RecentProject[]>;
       removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
@@ -185,6 +186,13 @@ export async function addRecentProject(
   name?: string,
 ): Promise<RecentProject[]> {
   return window.clipAssembler?.addRecentProject?.(folderPath, name) ?? [];
+}
+
+export async function renameRecentProject(
+  folderPath: string,
+  name: string,
+): Promise<RecentProject[]> {
+  return window.clipAssembler?.renameRecentProject?.(folderPath, name) ?? [];
 }
 
 export async function removeRecentProject(folderPath: string): Promise<RecentProject[]> {

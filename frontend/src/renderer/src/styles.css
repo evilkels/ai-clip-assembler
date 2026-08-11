@@ -52,11 +52,56 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) 28px;
+  grid-template-rows: auto auto minmax(0, 1fr) 28px;
   height: 100vh;
   min-width: 1024px;
   overflow: hidden;
   background: var(--bg-0);
+}
+
+.project-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+
+.project-header-content {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.project-header-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+
+.project-header-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.project-header-rename {
+  flex: 0 0 auto;
+}
+
+.project-header-empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 .app-workspace {

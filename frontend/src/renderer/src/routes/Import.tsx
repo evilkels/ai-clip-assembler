@@ -99,7 +99,6 @@ function estimatedRemaining(progress: AnalysisProgress, percent: number | null):
 export function ImportPage() {
   const {
     projectId,
-    projectName,
     projectFolder,
     cloudAiConsent,
     uploadedVideos,
@@ -402,11 +401,7 @@ export function ImportPage() {
       <div className="page-header">
         <div className="page-header-text">
           <h1>Import</h1>
-          <p title={projectFolder ?? undefined}>
-            {projectFolder
-              ? `${projectName ?? 'Project'} · ${projectFolder}`
-              : 'Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates.'}
-          </p>
+          <p>Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates.</p>
         </div>
       </div>
       <div className="page-body">

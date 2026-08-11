@@ -2,10 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 import type { UpdateStatus } from '../src/shared/updateStatus';
 
 /**
- * The shell is a three-row grid: banner slot, workspace, status bar. Hiding the
- * empty banner slot with `display: none` silently shifted every row up one, so
- * the status bar inherited the `1fr` row and grew to ~156px while the workspace
- * shrank to its content height. Nothing caught it — hence these measurements.
+ * The shell keeps one grid item for each row: project header, banner slot,
+ * workspace, and status bar. Hiding an empty row with `display: none` silently
+ * shifts every later row and makes the fixed status row inherit the `1fr` track.
+ * These tests measure the geometry instead of only asserting visibility.
  */
 const STATUS_BAR_HEIGHT = 28;
 
@@ -29,15 +29,21 @@ async function installBridge(page: Page, status: UpdateStatus | null) {
 async function measure(page: Page) {
   return page.evaluate(() => {
     const bar = document.querySelector('.statusbar') as HTMLElement;
+    const header = document.querySelector('.project-header') as HTMLElement | null;
     const workspace = document.querySelector('.app-workspace') as HTMLElement;
     const banners = document.querySelector('.app-banners') as HTMLElement;
     const barBox = bar.getBoundingClientRect();
+    const headerBox = header?.getBoundingClientRect();
+    const workspaceBox = workspace.getBoundingClientRect();
     return {
       viewportHeight: window.innerHeight,
+      headerHeight: headerBox?.height ?? 0,
+      headerBottom: headerBox?.bottom ?? 0,
       barHeight: barBox.height,
       barBottom: barBox.bottom,
       bannerHeight: banners.getBoundingClientRect().height,
-      workspaceHeight: workspace.getBoundingClientRect().height,
+      workspaceTop: workspaceBox.top,
+      workspaceHeight: workspaceBox.height,
     };
   });
 }
@@ -54,10 +60,14 @@ test('status bar keeps its own row when there is no banner to show', async ({ pa
   const layout = await measure(page);
 
   expect(layout.bannerHeight).toBe(0);
+  expect(layout.headerHeight).toBeGreaterThan(0);
+  expect(layout.workspaceTop).toBe(layout.headerBottom);
   expect(layout.barHeight).toBe(STATUS_BAR_HEIGHT);
   // Flush with the bottom of the window, not pushed past it.
   expect(layout.barBottom).toBe(layout.viewportHeight);
-  expect(layout.workspaceHeight).toBe(layout.viewportHeight - STATUS_BAR_HEIGHT);
+  expect(layout.workspaceHeight).toBe(
+    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
+  );
 });
 
 test('a visible banner takes its own row without displacing the status bar', async ({ page }) => {
@@ -73,10 +83,12 @@ test('a visible banner takes its own row without displacing the status bar', asy
   const layout = await measure(page);
 
   expect(layout.bannerHeight).toBeGreaterThan(0);
+  expect(layout.headerHeight).toBeGreaterThan(0);
+  expect(layout.workspaceTop).toBe(layout.headerBottom + layout.bannerHeight);
   expect(layout.barHeight).toBe(STATUS_BAR_HEIGHT);
   expect(layout.barBottom).toBe(layout.viewportHeight);
   expect(layout.workspaceHeight).toBe(
-    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight,
+    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
   );
 });
 
@@ -87,6 +99,10 @@ test('the layout survives a failing update check', async ({ page }) => {
 
   const layout = await measure(page);
 
+  expect(layout.headerHeight).toBeGreaterThan(0);
   expect(layout.barHeight).toBe(STATUS_BAR_HEIGHT);
   expect(layout.barBottom).toBe(layout.viewportHeight);
+  expect(layout.workspaceHeight).toBe(
+    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
+  );
 });

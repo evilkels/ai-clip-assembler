@@ -59,7 +59,6 @@ function basename(path: string): string {
 export function Sidebar() {
   const {
     projectFolder,
-    projectName,
     recentProjects,
     loading,
     openProjectFolder,
@@ -186,7 +185,6 @@ export function Sidebar() {
           Diagnostics
         </button>
         {error && <div className="sidebar-error">{error}</div>}
-        {projectName && <div className="sidebar-current">{projectName}</div>}
       </div>
 
       {settingsTab && (

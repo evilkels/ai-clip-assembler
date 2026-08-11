@@ -5,6 +5,7 @@ import { ResizeHandle } from '../components/ResizeHandle';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { usePanelWidth } from '../hooks/usePanelWidth';
 import { Sidebar } from './Sidebar';
+import { ProjectHeader } from './ProjectHeader';
 import { StatusBar } from './StatusBar';
 
 type AppShellProps = {
@@ -21,6 +22,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app-shell">
+      <ProjectHeader />
       {/* Always-present grid row so the shell keeps its layout when empty. */}
       <div className="app-banners">
         <UpdateBanner />

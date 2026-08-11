@@ -278,7 +278,6 @@ a {
   gap: 4px;
 }
 
-.project-row,
 .route-link,
 .sidebar-action {
   min-width: 0;
@@ -290,16 +289,6 @@ a {
   font-weight: 500;
 }
 
-.project-row {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  width: 100%;
-}
-
-.project-row:hover,
 .route-link:hover,
 .sidebar-action:hover {
   background: var(--bg-2);
@@ -353,56 +342,96 @@ a {
   color: var(--text);
 }
 
-.project-row.active {
+.project-row-wrap {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+
+.project-row-wrap.active {
+  border-color: var(--border-strong);
   background: var(--bg-active);
-  color: var(--text);
-  font-weight: 620;
 }
 
-.project-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-
-.project-row.active .project-dot {
-  background: var(--accent);
-  box-shadow: 0 0 16px rgba(255, 77, 109, 0.28);
+.project-row-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .project-row-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
-.project-row-count {
-  color: var(--text-muted);
+.project-state-chip {
+  flex: 0 0 auto;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
+.project-state-chip.open {
+  color: var(--green);
+}
+
+.project-state-chip.missing {
+  color: var(--yellow);
+}
+
+.project-list-hint {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
 .project-row-actions {
   display: flex;
-  gap: 6px;
-  padding: 0 8px 6px 28px;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }
 
 .project-row-actions button,
 .project-empty,
-.sidebar-error,
-.sidebar-current {
+.sidebar-error {
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
 
+.project-row-actions button {
+  min-height: 24px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
 .project-row-actions button:hover {
   color: var(--text);
+  background: var(--bg-3);
+}
+
+.project-row-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .project-empty,
-.sidebar-error,
-.sidebar-current {
+.sidebar-error {
   padding: 6px 8px;
 }
 

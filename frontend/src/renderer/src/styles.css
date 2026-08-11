@@ -65,9 +65,16 @@ a {
   min-height: 0;
 }
 
-/* Collapses to zero height while there is nothing to announce. */
-.app-banners:empty {
-  display: none;
+/* Occupies the shell's first row and collapses to zero height when there is
+   nothing to announce. It must stay a grid item even when empty: `display:none`
+   here would shift .app-workspace into this `auto` row and hand the status bar
+   the `1fr` row, making it ~156px tall and pushing content off-screen. */
+.app-banners {
+  min-height: 0;
+}
+
+.update-status-available {
+  color: var(--yellow);
 }
 
 .update-banner {

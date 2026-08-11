@@ -67,4 +67,5 @@ update check then sees no update. So:
 2. Merge that to `main`.
 3. Tag it: `git tag v<x.y.z> && git push origin v<x.y.z>`.
 4. `.github/workflows/build-dmg.yml` builds both architectures and attaches the
-   DMGs to the release.
+   DMGs to the release. It fails fast if the tag disagrees with either version,
+   so a forgotten bump can no longer ship a mislabeled DMG.

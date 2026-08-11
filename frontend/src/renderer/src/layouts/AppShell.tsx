@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { setWindowTitle } from '../api/client';
 import { useReview } from '../state/ReviewContext';
 import { ResizeHandle } from '../components/ResizeHandle';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { usePanelWidth } from '../hooks/usePanelWidth';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
@@ -20,6 +21,10 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app-shell">
+      {/* Always-present grid row so the shell keeps its layout when empty. */}
+      <div className="app-banners">
+        <UpdateBanner />
+      </div>
       <div
         className="app-workspace"
         style={{ gridTemplateColumns: `${sidebarWidth}px 6px minmax(0, 1fr)` }}

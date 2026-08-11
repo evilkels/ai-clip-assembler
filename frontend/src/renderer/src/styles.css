@@ -52,7 +52,7 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 1fr 28px;
+  grid-template-rows: auto minmax(0, 1fr) 28px;
   height: 100vh;
   min-width: 1024px;
   overflow: hidden;
@@ -63,6 +63,67 @@ a {
   display: grid;
   grid-template-columns: 232px 6px minmax(0, 1fr);
   min-height: 0;
+}
+
+/* Collapses to zero height while there is nothing to announce. */
+.app-banners:empty {
+  display: none;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-warning);
+  background: var(--bg-warning);
+  color: var(--text);
+  font-size: var(--text-xs);
+}
+
+.update-banner-text {
+  min-width: 0;
+}
+
+.update-banner-error {
+  color: var(--yellow);
+}
+
+.update-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.update-banner-primary,
+.update-banner-dismiss {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.update-banner-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.update-banner-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.update-banner-dismiss {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.update-banner-dismiss:hover {
+  color: var(--text);
 }
 
 .resize-handle {

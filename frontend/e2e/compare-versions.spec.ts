@@ -510,5 +510,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   // The adopted cut lands on the Working Timeline; verify it on the Timeline page
   // (the Review page no longer embeds a duplicate timeline strip).
   await page.getByRole('link', { name: 'Timeline' }).click();
-  await expect(page.locator('.tl-clip')).toHaveCount(1, { timeout: 10_000 });
+  // The adopted Version has four items over the same Candidate Clip; the
+  // authoritative Timeline keeps them distinct instead of collapsing them.
+  await expect(page.locator('.tl-clip')).toHaveCount(4, { timeout: 10_000 });
 });

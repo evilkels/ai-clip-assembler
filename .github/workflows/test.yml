@@ -1,0 +1,91 @@
+name: Tests
+
+# Until this workflow existed, nothing verified a PR beyond the static-site
+# contract: no typecheck, no lint, no backend tests, no browser tests. A PR
+# could merge green with a Playwright assertion encoding the very bug it fixed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck, lint, unit and browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Analysis degrades gracefully without vidstab, but the browser tests
+      # exercise the normal path — fail loudly rather than silently testing the
+      # degraded one. Ubuntu's ffmpeg ships with libvidstab.
+      - name: Install FFmpeg with vidstab
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -hide_banner -filters | grep vidstabdetect
+
+      # `npm run typecheck` regenerates TypeScript types from the backend
+      # Pydantic models through backend/.venv, so the venv is not optional.
+      - name: Set up backend venv
+        working-directory: backend
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend and backend
+        working-directory: frontend
+        run: npm run lint
+
+      # Also fails when generated.ts has drifted from the Pydantic models.
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Backend tests
+        working-directory: frontend
+        run: npm run test:backend
+
+      - name: Main-process tests
+        working-directory: frontend
+        run: npm run test:main
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser end-to-end tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+          if-no-files-found: ignore

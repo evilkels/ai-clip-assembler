@@ -25,9 +25,17 @@ import {
 } from './piExecutable';
 import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
 import { installSingleInstanceGuard } from './singleInstance';
+import {
+  createUpdateChecker,
+  fetchLatestRelease,
+  RELEASE_URL_PREFIX,
+  type UpdateChecker,
+  type UpdateCheckState,
+} from './updateCheck';
 
 const isDev = !app.isPackaged;
 const recentProjectsPath = () => join(app.getPath('userData'), 'recent.json');
+const updateCheckPath = () => join(app.getPath('userData'), 'update-check.json');
 const runtimeFilePath = () => join(app.getPath('userData'), '.ai-clip-assembler', 'runtime.json');
 let backendProcess: ChildProcessWithoutNullStreams | undefined;
 let packagedBackendUrl: string | undefined;
@@ -93,6 +101,25 @@ async function writeRecentProjects(projects: RecentProject[]): Promise<void> {
   await writeFile(recentProjectsPath(), JSON.stringify(projects, null, 2) + '\n', 'utf-8');
 }
 
+function buildUpdateChecker(): UpdateChecker {
+  return createUpdateChecker({
+    currentVersion: app.getVersion(),
+    readState: async () => {
+      try {
+        const parsed: unknown = JSON.parse(await readFile(updateCheckPath(), 'utf-8'));
+        return parsed && typeof parsed === 'object' ? (parsed as UpdateCheckState) : {};
+      } catch {
+        return {};
+      }
+    },
+    writeState: async (state) => {
+      await mkdir(app.getPath('userData'), { recursive: true });
+      await writeFile(updateCheckPath(), JSON.stringify(state, null, 2) + '\n', 'utf-8');
+    },
+    fetchRelease: () => fetchLatestRelease(fetch),
+  });
+}
+
 function packagedBackendExecutablePath(): string {
   return join(process.resourcesPath, 'backend', 'ai-clip-backend');
 }
@@ -104,7 +131,10 @@ function assertApplicationSender(event: IpcMainInvokeEvent): void {
   }
 }
 
-function registerIpcHandlers(authController: ReviewModelAuthController): void {
+function registerIpcHandlers(
+  authController: ReviewModelAuthController,
+  updateChecker: UpdateChecker,
+): void {
   ipcMain.handle('project:select-folder', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -198,6 +228,31 @@ function registerIpcHandlers(authController: ReviewModelAuthController): void {
   ipcMain.handle('review-model-auth:status', reviewModelHandler(() => authController.getStatus()));
   ipcMain.handle('review-model-auth:sign-in', reviewModelHandler(() => authController.signIn()));
   ipcMain.handle('review-model-auth:cancel', reviewModelHandler(() => authController.cancel()));
+
+  ipcMain.handle('update:check', async (event, force?: unknown) => {
+    assertApplicationSender(event);
+    return updateChecker.check({ force: force === true });
+  });
+
+  ipcMain.handle('update:dismiss', async (event, version: unknown) => {
+    assertApplicationSender(event);
+    if (typeof version !== 'string' || version.length === 0) {
+      throw new Error('A version is required to dismiss an update notice');
+    }
+    return updateChecker.dismiss(version);
+  });
+
+  // The renderer never supplies the URL — it comes from the last checked
+  // release and is re-validated against the project's releases path.
+  ipcMain.handle('update:open-release-page', async (event) => {
+    assertApplicationSender(event);
+    const url = await updateChecker.releaseUrl();
+    if (!url.startsWith(RELEASE_URL_PREFIX)) {
+      throw new Error('Refusing to open an unexpected release URL');
+    }
+    await shell.openExternal(url);
+    return { opened: true };
+  });
 }
 
 function resolveAssetPath(filename: string): string {
@@ -400,7 +455,7 @@ if (installSingleInstanceGuard(app, BrowserWindow)) {
       reviewModelAuth = new ReviewModelAuthController({
         piInspector: () => inspectPiInstallation({ piBin }),
       });
-      registerIpcHandlers(reviewModelAuth);
+      registerIpcHandlers(reviewModelAuth, buildUpdateChecker());
       createWindow();
 
       app.on('activate', () => {

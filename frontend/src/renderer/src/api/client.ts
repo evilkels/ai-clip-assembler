@@ -23,8 +23,10 @@ import { mockClips } from './mockClips';
 import type { ClipSuggestion } from '../types/generated';
 import type { VersionSet } from '../types/version';
 import type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
+import type { UpdateStatus } from '../../../shared/updateStatus';
 
 export type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
+export type { UpdateStatus } from '../../../shared/updateStatus';
 
 export type McpClientId = 'claude_desktop' | 'codex';
 
@@ -62,6 +64,9 @@ declare global {
       cancelReviewModelSignIn?: () => Promise<ReviewModelAccountStatus>;
       detectMcpClients?: () => Promise<McpClientStatus[]>;
       connectMcpClient?: (clientId: McpClientId) => Promise<McpConnectResult>;
+      checkForAppUpdate?: (force?: boolean) => Promise<UpdateStatus>;
+      dismissAppUpdate?: (version: string) => Promise<UpdateStatus>;
+      openAppReleasePage?: () => Promise<{ opened: boolean }>;
     };
   }
 }
@@ -235,6 +240,26 @@ export async function connectMcpClient(clientId: McpClientId): Promise<McpConnec
     throw new Error('MCP client connection is only available in the desktop app');
   }
   return window.clipAssembler.connectMcpClient(clientId);
+}
+
+/** Outside the desktop shell there is nothing to update, so report unknown. */
+const NO_UPDATE_BRIDGE: UpdateStatus = {
+  state: 'unknown',
+  currentVersion: 'dev',
+  detail: 'Update checks are only available in the desktop app.',
+};
+
+export async function checkForAppUpdate(force = false): Promise<UpdateStatus> {
+  return window.clipAssembler?.checkForAppUpdate?.(force) ?? NO_UPDATE_BRIDGE;
+}
+
+export async function dismissAppUpdate(version: string): Promise<UpdateStatus> {
+  return window.clipAssembler?.dismissAppUpdate?.(version) ?? NO_UPDATE_BRIDGE;
+}
+
+export async function openAppReleasePage(): Promise<boolean> {
+  const result = await window.clipAssembler?.openAppReleasePage?.();
+  return result?.opened ?? false;
 }
 
 export async function activateProject(projectId: string): Promise<void> {

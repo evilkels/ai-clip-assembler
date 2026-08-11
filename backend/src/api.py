@@ -85,9 +85,13 @@ from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 # uvicorn's logger so progress messages reach the dev console without extra config
 logger = logging.getLogger("uvicorn.error")
 
+# Kept in step with frontend/package.json so the status bar and the update
+# check report the same release.
+APP_VERSION = "0.1.4"
+
 app = FastAPI(
     title="AI Clip Assembler API",
-    version="0.1.0",
+    version=APP_VERSION,
     description="Local-first video analysis and AI clip assembly backend",
 )
 
@@ -208,7 +212,7 @@ class CloudAiConsentRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.post("/projects")

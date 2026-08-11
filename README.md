@@ -55,6 +55,14 @@ Connecting an external AI assistant through MCP is a separate trust boundary. If
 
 Download the macOS DMG from [Releases](https://github.com/evilkels/ai-clip-assembler/releases), drag AI Clip Assembler into Applications, and open it. Release builds include the Python backend and a private FFmpeg runtime with motion-analysis support; no Python, Homebrew, or terminal setup is required.
 
+The app tells you when a newer release is out. To update or remove an installed copy from the terminal:
+
+```bash
+./scripts/app-wizard.sh          # status, update, or uninstall
+```
+
+See [docs/UPDATING.md](docs/UPDATING.md) for what the wizard touches (and what it never touches).
+
 The instructions below are for contributors running the project from source.
 
 ## Getting started

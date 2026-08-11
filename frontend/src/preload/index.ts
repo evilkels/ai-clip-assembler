@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ReviewModelAccountStatus } from '../shared/reviewModelAuth';
+import type { UpdateStatus } from '../shared/updateStatus';
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
 const BACKEND_URL_ARG = '--clip-assembler-backend-url=';
@@ -53,6 +54,12 @@ const bridge = {
         needsRestart: boolean;
       }>
     >,
+  checkForAppUpdate: (force?: boolean) =>
+    ipcRenderer.invoke('update:check', force) as Promise<UpdateStatus>,
+  dismissAppUpdate: (version: string) =>
+    ipcRenderer.invoke('update:dismiss', version) as Promise<UpdateStatus>,
+  openAppReleasePage: () =>
+    ipcRenderer.invoke('update:open-release-page') as Promise<{ opened: boolean }>,
   connectMcpClient: (clientId: 'claude_desktop' | 'codex') =>
     ipcRenderer.invoke('mcp:connect-client', clientId) as Promise<{
       id: 'claude_desktop' | 'codex';

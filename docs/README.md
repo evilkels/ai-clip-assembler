@@ -19,6 +19,7 @@ Top-level guides:
 - [HARNESS_SPEC.md](HARNESS_SPEC.md) — pluggable AI-harness contract
 - [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) — environment setup + workflow conventions
 - [USER_GUIDE.md](USER_GUIDE.md) — end-user guide
+- [UPDATING.md](UPDATING.md) — in-app update notice, the install wizard, and how to cut a release
 - [MANUAL_QA_GUIDE.md](MANUAL_QA_GUIDE.md) — launch + smoke test
 - [QA.md](QA.md) — per-feature acceptance tests
 - [DEMO_RECORDING_GUIDE.md](DEMO_RECORDING_GUIDE.md) — pre-demo production guide: shot list, capture setup, script, asset naming, FFmpeg commands, agent handoff

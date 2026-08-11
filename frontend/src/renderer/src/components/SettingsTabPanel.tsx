@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getSettings, updateSettings, type AppSettings, type SettingsUpdate } from '../api/client';
 import { ThemeToggle } from './ThemeToggle';
+import { UpdateSection } from './UpdateSection';
 
 export function SettingsTabPanel() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -108,6 +109,8 @@ export function SettingsTabPanel() {
           </span>
         </div>
       </section>
+
+      <UpdateSection />
 
       {saveError && <p className="settings-error" role="alert">{saveError}</p>}
 

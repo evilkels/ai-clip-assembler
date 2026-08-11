@@ -112,6 +112,37 @@ test('checker caches a fresh result instead of hitting the network again', async
   assert.equal(fetches, 2, 'cache expired');
 });
 
+test('concurrent checks share one request instead of racing GitHub', async () => {
+  const store = createStateStore();
+  const pending: Array<(value: ReleaseSummary) => void> = [];
+  const checker = createUpdateChecker({
+    currentVersion: '0.1.0',
+    ...store,
+    fetchRelease: () =>
+      new Promise<ReleaseSummary>((resolve) => {
+        pending.push(resolve);
+      }),
+  });
+
+  // The shell banner and the Settings section both check on mount.
+  const first = checker.check();
+  const second = checker.check();
+  // Let the readState() microtasks drain so fetchRelease has been reached.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(pending.length, 1, 'both callers share one request');
+  pending[0](release('v0.1.4'));
+  const [a, b] = await Promise.all([first, second]);
+  assert.deepEqual(a, b);
+
+  // Once settled, a later check is free to open its own request.
+  const third = checker.check({ force: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(pending.length, 2);
+  pending[1](release('v0.1.5'));
+  const status = await third;
+  assert.equal(status.state === 'update-available' && status.latestVersion, '0.1.5');
+});
+
 test('checker force-refreshes past a fresh cache', async () => {
   const store = createStateStore({
     lastCheckedAt: '2026-08-11T10:00:00.000Z',

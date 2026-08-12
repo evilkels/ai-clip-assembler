@@ -52,11 +52,63 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) 28px;
+  grid-template-rows: auto auto minmax(0, 1fr) 28px;
   height: 100vh;
   min-width: 1024px;
   overflow: hidden;
   background: var(--bg-0);
+}
+
+.project-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+
+.project-header-content {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.project-header-name {
+  flex: 0 0 auto;
+  max-width: min(40%, 360px);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+
+.project-header-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.project-header-rename {
+  flex: 0 0 auto;
+}
+
+.project-header-empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.project-header > .project-rename-editor {
+  width: 100%;
 }
 
 .app-workspace {
@@ -65,9 +117,16 @@ a {
   min-height: 0;
 }
 
-/* Collapses to zero height while there is nothing to announce. */
-.app-banners:empty {
-  display: none;
+/* Occupies the shell's first row and collapses to zero height when there is
+   nothing to announce. It must stay a grid item even when empty: `display:none`
+   here would shift .app-workspace into this `auto` row and hand the status bar
+   the `1fr` row, making it ~156px tall and pushing content off-screen. */
+.app-banners {
+  min-height: 0;
+}
+
+.update-status-available {
+  color: var(--yellow);
 }
 
 .update-banner {
@@ -226,7 +285,6 @@ a {
   gap: 4px;
 }
 
-.project-row,
 .route-link,
 .sidebar-action {
   min-width: 0;
@@ -238,16 +296,6 @@ a {
   font-weight: 500;
 }
 
-.project-row {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  width: 100%;
-}
-
-.project-row:hover,
 .route-link:hover,
 .sidebar-action:hover {
   background: var(--bg-2);
@@ -301,56 +349,130 @@ a {
   color: var(--text);
 }
 
-.project-row.active {
+.project-row-wrap {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+
+.project-row-wrap.active {
+  border-color: var(--border-strong);
   background: var(--bg-active);
-  color: var(--text);
-  font-weight: 620;
 }
 
-.project-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-
-.project-row.active .project-dot {
-  background: var(--accent);
-  box-shadow: 0 0 16px rgba(255, 77, 109, 0.28);
+.project-row-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .project-row-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
-.project-row-count {
-  color: var(--text-muted);
+.project-state-chip {
+  flex: 0 0 auto;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
+.project-state-chip.open {
+  color: var(--green);
+}
+
+.project-state-chip.missing {
+  color: var(--yellow);
+}
+
+.project-list-hint {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
 .project-row-actions {
   display: flex;
-  gap: 6px;
-  padding: 0 8px 6px 28px;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }
 
 .project-row-actions button,
 .project-empty,
-.sidebar-error,
-.sidebar-current {
-  color: var(--text-muted);
+.sidebar-error {
+  color: var(--text-dim);
   font-size: var(--text-xs);
+}
+
+.project-row-actions button {
+  min-height: 24px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
 }
 
 .project-row-actions button:hover {
   color: var(--text);
+  background: var(--bg-3);
+}
+
+.project-row-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.project-rename-editor {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.project-rename-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.project-rename-input {
+  min-width: 0;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.project-rename-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.project-rename-error {
+  margin: 0;
+  color: var(--text-error);
+  font-size: var(--text-xs);
+  line-height: 1.35;
 }
 
 .project-empty,
-.sidebar-error,
-.sidebar-current {
+.sidebar-error {
   padding: 6px 8px;
 }
 
@@ -580,6 +702,7 @@ a {
 
 .page {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -596,6 +719,11 @@ a {
   flex-wrap: wrap;
 }
 
+.page-header-text {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
 .page-header h1 {
   font-size: 15px;
   font-weight: 600;
@@ -603,6 +731,9 @@ a {
 }
 
 .page-header p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 4px 0 0;
   color: var(--text-dim);
   font-size: 12px;
@@ -612,6 +743,12 @@ a {
   flex: 1;
   overflow: auto;
   padding: 20px 24px;
+}
+
+.source-videos-table-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .empty-state {
@@ -1462,7 +1599,9 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
+  /* Sits on top of video, not on a themed surface, so it stays light in both
+     themes — the shadow below is what keeps it legible over bright frames. */
+  color: #fff;
   font-size: 11px;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
   text-transform: none;
@@ -2166,14 +2305,15 @@ a {
 
 .timeline-clips {
   position: relative;
-  display: flex;
-  align-items: stretch;
+  display: block;
   height: 80px;
   padding: 8px 0;
 }
 
 .tl-clip {
-  position: relative;
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
   display: flex;
   align-items: stretch;
   min-width: 8px;
@@ -2186,7 +2326,7 @@ a {
 }
 
 .tl-clip + .tl-clip {
-  margin-left: 2px;
+  margin-left: 0;
 }
 
 .tl-clip.selected {
@@ -2504,9 +2644,9 @@ a {
 /* Timeline editor (A2.4) */
 .timeline-editor {
   margin-top: 16px;
-  border: 1px solid var(--border, #2a2f3a);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface, #161a22);
+  background: var(--bg-surface);
   padding: 12px 14px;
 }
 .timeline-editor-head {
@@ -2518,10 +2658,10 @@ a {
 .timeline-editor-tools { margin-left: auto; display: flex; gap: 8px; }
 .timeline-editor-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .timeline-item-row {
-  border: 1px solid var(--border, #2a2f3a);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-1);
 }
 .timeline-item-head { display: flex; align-items: center; gap: 10px; }
 .timeline-item-name { font-weight: 600; }

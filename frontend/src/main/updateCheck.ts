@@ -192,50 +192,28 @@ export function createUpdateChecker(deps: UpdateCheckerDeps): UpdateChecker {
     return now() - checkedAt < checkIntervalMs;
   };
 
+  // The shell banner and the Settings section both check on mount, so
+  // concurrent calls are normal. Without this, a cold cache lets each one open
+  // its own request to GitHub.
+  let inFlight: Promise<UpdateStatus> | undefined;
+  let inFlightIsForced = false;
+  let queuedForcedCheck: Promise<UpdateStatus> | undefined;
+
   return {
     async check(options) {
-      const state = await readState();
-      if (!options?.force && isCacheFresh(state)) {
-        return evaluateRelease({
-          currentVersion,
-          release: state.release,
-          dismissedVersion: state.dismissedVersion,
-        });
-      }
+      if (options?.force && queuedForcedCheck) return queuedForcedCheck;
+      if (inFlight) {
+        if (!options?.force || inFlightIsForced) return inFlight;
 
-      let release: ReleaseSummary;
-      try {
-        release = await fetchRelease();
-      } catch (error) {
-        // Offline or rate-limited: fall back to whatever we last saw rather
-        // than surfacing an error the user can do nothing about.
-        if (state.release) {
-          return evaluateRelease({
-            currentVersion,
-            release: state.release,
-            dismissedVersion: state.dismissedVersion,
+        queuedForcedCheck = inFlight
+          .catch(() => undefined)
+          .then(() => startCheck({ force: true }))
+          .finally(() => {
+            queuedForcedCheck = undefined;
           });
-        }
-        return {
-          state: 'unknown',
-          currentVersion,
-          detail: error instanceof Error ? error.message : String(error),
-        };
+        return queuedForcedCheck;
       }
-
-      // A dismissal only silences the version it was made against.
-      const dismissedVersion =
-        state.dismissedVersion && normalizeVersion(state.dismissedVersion) === normalizeVersion(release.tag)
-          ? state.dismissedVersion
-          : undefined;
-
-      await writeState({
-        lastCheckedAt: new Date(now()).toISOString(),
-        release,
-        ...(dismissedVersion ? { dismissedVersion } : {}),
-      });
-
-      return evaluateRelease({ currentVersion, release, dismissedVersion });
+      return startCheck(options);
     },
 
     async dismiss(version) {
@@ -255,4 +233,61 @@ export function createUpdateChecker(deps: UpdateCheckerDeps): UpdateChecker {
       return url && url.startsWith(RELEASE_URL_PREFIX) ? url : RELEASES_PAGE_URL;
     },
   };
+
+  function startCheck(options?: { force?: boolean }): Promise<UpdateStatus> {
+    const check = performCheck(options).finally(() => {
+      if (inFlight === check) {
+        inFlight = undefined;
+        inFlightIsForced = false;
+      }
+    });
+    inFlight = check;
+    inFlightIsForced = Boolean(options?.force);
+    return check;
+  }
+
+  async function performCheck(options?: { force?: boolean }): Promise<UpdateStatus> {
+    const state = await readState();
+    if (!options?.force && isCacheFresh(state)) {
+      return evaluateRelease({
+        currentVersion,
+        release: state.release,
+        dismissedVersion: state.dismissedVersion,
+      });
+    }
+
+    let release: ReleaseSummary;
+    try {
+      release = await fetchRelease();
+    } catch (error) {
+      // Offline or rate-limited: fall back to whatever we last saw rather
+      // than surfacing an error the user can do nothing about.
+      if (state.release) {
+        return evaluateRelease({
+          currentVersion,
+          release: state.release,
+          dismissedVersion: state.dismissedVersion,
+        });
+      }
+      return {
+        state: 'unknown',
+        currentVersion,
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    // A dismissal only silences the version it was made against.
+    const dismissedVersion =
+      state.dismissedVersion && normalizeVersion(state.dismissedVersion) === normalizeVersion(release.tag)
+        ? state.dismissedVersion
+        : undefined;
+
+    await writeState({
+      lastCheckedAt: new Date(now()).toISOString(),
+      release,
+      ...(dismissedVersion ? { dismissedVersion } : {}),
+    });
+
+    return evaluateRelease({ currentVersion, release, dismissedVersion });
+  }
 }

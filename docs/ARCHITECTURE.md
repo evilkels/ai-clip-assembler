@@ -13,7 +13,7 @@ per-project consent.
 
 ```
 ELECTRON FRONTEND
-  Dropzone (files) → Timeline (clips) → Preview (frames) → Export Panel (FCPXML/EDL)
+  Dropzone (files) → Timeline (Timeline Items) → Preview (frames) → Export Panel (FCPXML/EDL/Resolve XML)
             IPC (Electron ↔ FastAPI, HTTP over localhost)
                               │
                               ▼
@@ -108,7 +108,37 @@ more than one item (multi-instance).
   `{clip_id, start_sec, end_sec}` timeline into timeline items.
 - **Export** (`export_engine.py`): speed and transform are encoded into
   FCPXML (`adjust-transform`) and Resolve XML (Basic Motion); EDL flattens
-  them with a warning.
+  them with a warning. The export response returns the generated path, format,
+  status, item count, duration metadata, and warnings.
+
+#### Timeline page projection
+
+The Timeline page reads every `TimelineItem` from the backend Timeline
+Document in document order. It resolves Candidate Clip metadata only for the
+display label and media URL, so a repeated Candidate Clip remains a separate
+Timeline Item with its own `item_id`, bounds, speed, and transform.
+
+Each item's effective duration is `(end_sec - start_sec) / speed`. The visual
+track and the detailed `TimelineEditor` both send reorder, remove, trim, speed,
+and transform edits through the Operations core using `item_id`; Review Board
+include/exclude decisions remain Candidate-Clip-based. Transform values are
+editable, while full real-time pan/crop preview remains pending visual QA.
+
+#### Export page projection
+
+The Export page reads the current backend Timeline Document through the export
+endpoint. It does not issue the legacy Timeline write as a pre-export step, so
+the document exported is the document visible to the backend. The result cards
+preserve the backend's `project_id`, format, status, file path, item count,
+`total_duration_sec`, and warnings; they also show the item-derived effective
+duration `(end_sec - start_sec) / speed`, captured with that export result,
+separately from the raw backend duration metadata. The payload inspector lists every ordered Timeline Item with its
+`item_id`, Candidate Clip, resolved file metadata, bounds, Speed, and Transform.
+
+EDL visibly warns when Speed or Transform is flattened. FCPXML and Resolve XML
+carry the supported Speed and Transform values. Existing-file conflicts still
+require explicit overwrite confirmation, and a successful Resolve XML result
+retains the Open in DaVinci Resolve handoff.
 
 See [MCP_SERVER.md](MCP_SERVER.md) for the agent surface and the
 [agent-operable-timeline design](specs/2026-06-19-agent-operable-timeline-design.md).

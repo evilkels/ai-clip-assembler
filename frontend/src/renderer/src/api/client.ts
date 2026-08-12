@@ -55,6 +55,7 @@ declare global {
       listRecentProjects?: () => Promise<RecentProject[]>;
       getLastOpenedRecentProject?: () => Promise<RecentProject | null>;
       addRecentProject?: (folderPath: string, name?: string) => Promise<RecentProject[]>;
+      renameRecentProject?: (folderPath: string, name: string) => Promise<RecentProject[]>;
       removeRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
@@ -185,6 +186,13 @@ export async function addRecentProject(
   name?: string,
 ): Promise<RecentProject[]> {
   return window.clipAssembler?.addRecentProject?.(folderPath, name) ?? [];
+}
+
+export async function renameRecentProject(
+  folderPath: string,
+  name: string,
+): Promise<RecentProject[]> {
+  return window.clipAssembler?.renameRecentProject?.(folderPath, name) ?? [];
 }
 
 export async function removeRecentProject(folderPath: string): Promise<RecentProject[]> {
@@ -467,9 +475,12 @@ export async function getClips(projectId: string): Promise<ClipCandidate[]> {
 
 export interface ExportResult {
   project_id: string;
-  format: string;
+  format: ExportFormat;
   status: string;
   file_path: string;
+  clip_count: number;
+  total_duration_sec: number;
+  warnings: string[];
 }
 
 export type ExportFormat = 'edl' | 'fcpxml' | 'resolve_xml';

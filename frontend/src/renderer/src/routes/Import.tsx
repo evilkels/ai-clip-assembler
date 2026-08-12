@@ -99,7 +99,6 @@ function estimatedRemaining(progress: AnalysisProgress, percent: number | null):
 export function ImportPage() {
   const {
     projectId,
-    projectName,
     projectFolder,
     cloudAiConsent,
     uploadedVideos,
@@ -400,13 +399,9 @@ export function ImportPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div>
+        <div className="page-header-text">
           <h1>Import</h1>
-          <p>
-            {projectFolder
-              ? `${projectName ?? 'Project'} · ${projectFolder}`
-              : 'Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates.'}
-          </p>
+          <p>Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates.</p>
         </div>
       </div>
       <div className="page-body">
@@ -479,16 +474,17 @@ export function ImportPage() {
                 {selectedCount} of {uploadedVideos.length} selected
               </span>
             </div>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: 12,
-                tableLayout: 'auto',
-              }}
-            >
-              <thead>
-                <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
+            <div className="source-videos-table-scroll">
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: 12,
+                  tableLayout: 'auto',
+                }}
+              >
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
                   <th style={{ padding: '6px 8px', width: 28 }}>
                     <input
                       type="checkbox"
@@ -571,22 +567,22 @@ export function ImportPage() {
                       Analysis{sortArrow('analyzed')}
                     </button>
                   </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedVideos.map((v) => {
-                  const checked = !deselected.has(v.file_id);
-                  return (
-                    <tr
-                      key={v.file_id}
-                      onClick={() => !isAnalyzing && toggleOne(v.file_id)}
-                      style={{
-                        borderTop: '1px solid var(--border)',
-                        cursor: isAnalyzing ? 'default' : 'pointer',
-                        opacity: checked ? 1 : 0.45,
-                        background: checked ? 'transparent' : 'var(--bg-subtle, transparent)',
-                      }}
-                    >
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedVideos.map((v) => {
+                    const checked = !deselected.has(v.file_id);
+                    return (
+                      <tr
+                        key={v.file_id}
+                        onClick={() => !isAnalyzing && toggleOne(v.file_id)}
+                        style={{
+                          borderTop: '1px solid var(--border)',
+                          cursor: isAnalyzing ? 'default' : 'pointer',
+                          opacity: checked ? 1 : 0.45,
+                          background: checked ? 'transparent' : 'var(--bg-subtle, transparent)',
+                        }}
+                      >
                       <td style={{ padding: '6px 8px' }}>
                         <input
                           type="checkbox"
@@ -638,11 +634,12 @@ export function ImportPage() {
                       >
                         {analyzedIds.has(v.file_id) ? '✓ Analyzed' : '— Not analyzed'}
                       </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

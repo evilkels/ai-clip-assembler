@@ -24,6 +24,7 @@ import {
   resolvePiExecutableFromShellOutput,
 } from './piExecutable';
 import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
+import { normalizeRecentProjectName } from './projectRecents';
 import { installSingleInstanceGuard } from './singleInstance';
 import {
   createUpdateChecker,
@@ -152,6 +153,31 @@ function registerIpcHandlers(
     const now = new Date().toISOString();
     const rest = (await readRecentProjects()).filter((item) => item.folderPath !== folderPath);
     const next = [{ folderPath, lastOpenedAt: now, name }, ...rest].slice(0, 20);
+    await writeRecentProjects(next);
+    return enrichRecentProjects();
+  });
+
+  ipcMain.handle('project:recent-rename', async (event, folderPath: unknown, name: unknown) => {
+    assertApplicationSender(event);
+    if (typeof folderPath !== 'string' || folderPath.trim().length === 0) {
+      throw new Error('A project folder is required to rename a recent project');
+    }
+    if (typeof name !== 'string') {
+      throw new Error('A project name is required');
+    }
+    const projects = await readRecentProjects();
+    if (!projects.some((project) => project.folderPath === folderPath)) {
+      return enrichRecentProjects();
+    }
+
+    const normalizedName = normalizeRecentProjectName(name);
+    if (!normalizedName) {
+      throw new Error('Project name must contain at least one non-whitespace character');
+    }
+
+    const next = projects.map((project) =>
+      project.folderPath === folderPath ? { ...project, name: normalizedName } : project,
+    );
     await writeRecentProjects(next);
     return enrichRecentProjects();
   });

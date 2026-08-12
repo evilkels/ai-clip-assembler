@@ -31,10 +31,21 @@ Record names, durations, codec, and expected behavior outside git.
 1. Analyze mixed footage at default smoothness 7. Candidate Clips are normally
    3–15s (unless preferences change), shaky spans excluded/low, and Clip Reason
    explains technical quality; total duration approaches target when possible.
-2. Change filter; accept/reject/reorder. States are distinct, export order follows
-   accepted order, and rule-based scores avoid AI-only language.
+2. Change filter; accept/reject/reorder. States are distinct, export order
+   follows the Review Board's Candidate Clip decisions, and rule-based scores
+   avoid AI-only language.
 
 ### Export and Pi
+
+The Export page must read the current backend Timeline Document without a
+legacy Timeline write. Its result card shows the generated path, item count,
+effective duration, backend status and duration metadata, and every backend
+warning. **Review export payload** must retain repeated Timeline Items with
+`item_id`, resolved file metadata, bounds, Speed, and Transform. EDL must make
+its Speed/Transform flattening warning visible; FCPXML and Resolve XML must
+retain their supported values. The synthetic browser regression covers these
+read-only UI and response-surface checks; it does not replace manual NLE import
+validation.
 
 1. Accept 3+ clips from 2 sources. Import FCPXML into FCP; inspect/import EDL.
    Original media references, order, edit timecodes, and source timecodes match.
@@ -46,7 +57,11 @@ Record names, durations, codec, and expected behavior outside git.
 ### Timeline and agents
 
 1. Reorder/extend/speed/transform/split/remove; undo/redo; reopen and export.
-   All edits use the Operations core, are undoable, and survive persistence.
+   Every backend Timeline Item remains visible, including repeated Candidate
+   Clips. Effective duration is source span divided by Speed; visual and
+   detailed edits use `item_id` through the Operations core and are undoable.
+   Transform values are editable; full pan/crop preview remains pending visual
+   QA.
 2. Apply one `/mcp` operation; it appears live in GUI over SSE. Accept one in-app
    Proposal and reject another: Accept mutates through core, Reject does nothing.
    Run measured Flow F from `VALIDATION_RUNBOOK.md`.
@@ -82,6 +97,11 @@ backend/.venv/bin/python scripts/synthetic_e2e_qa.py
 
 Also smoke a real drone MP4: Manual analysis produces a Candidate Clip and the
 Review Board renders it.
+
+The Plan 020 browser regression uses deterministic synthetic fixtures. It does
+not replace the real-footage, Final Cut Pro, or DaVinci Resolve checks below.
+The Plan 021 browser regression also uses synthetic fixtures and does not prove
+real-footage behavior or NLE import compatibility.
 
 ## Risks
 

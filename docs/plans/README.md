@@ -27,6 +27,8 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — architecture debt after `ad62ed1` |
 | [020](done/020-authoritative-timeline-items.md) | Render and edit authoritative Timeline Items | DONE (2026-08-10) — first stacked branch |
 | [021](done/021-truthful-export.md) | Export authoritative Timeline with complete warnings | DONE (2026-08-10) — second stacked branch |
+| [023](023-macos-app-icon-geometry.md) | Correct macOS app icon geometry | TODO |
+| [024](024-source-audio-in-exports.md) | Source audio in exports | TODO |
 
 ## Product plans
 

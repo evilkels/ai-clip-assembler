@@ -221,9 +221,12 @@ test('project cards expose labelled actions and locate only for missing folders'
 
   await expect(missingRow.getByText('missing', { exact: true })).toBeVisible();
   await expect(missingRow.getByRole('button', { name: 'Locate Missing Project' })).toBeVisible();
-  await expect(visibleRow.getByText('open', { exact: true })).toBeVisible();
+  // Healthy projects carry no state chip; only the exceptional "missing" state is labelled.
+  await expect(visibleRow.getByText('missing', { exact: true })).toHaveCount(0);
   await expect(visibleRow.getByRole('button', { name: 'Locate Visible Project' })).toHaveCount(0);
-  await expect(page.getByText(/Remove only forgets a project from this list/)).toBeVisible();
+  await expect(visibleRow.getByRole('button', { name: 'Open Visible Project' })).toBeVisible();
+  await expect(visibleRow.getByRole('button', { name: 'Rename Visible Project' })).toBeVisible();
+  await expect(visibleRow.getByRole('button', { name: 'Remove Visible Project' })).toBeVisible();
 
   const buttonGeometry = await missingRow.getByRole('button').evaluateAll((buttons) =>
     buttons.map((button) => {
@@ -232,6 +235,48 @@ test('project cards expose labelled actions and locate only for missing folders'
     }),
   );
   expect(buttonGeometry.every(({ height, ariaLabel }) => height >= 24 && ariaLabel?.includes('Missing Project'))).toBe(true);
+});
+
+test('removing a recent project is gated behind a confirmation dialog', async ({ page }) => {
+  const seededProjects = [
+    { folderPath: '/projects/alpha', lastOpenedAt: '2026-08-11T10:00:00Z', name: 'Alpha Project', missing: false },
+    { folderPath: '/projects/bravo', lastOpenedAt: '2026-08-11T11:00:00Z', name: 'Bravo Project', missing: false },
+  ];
+
+  await page.addInitScript((projects) => {
+    let recents = projects;
+    Object.assign(window, {
+      clipAssembler: {
+        backendUrl: 'http://127.0.0.1:8000',
+        platform: 'darwin',
+        listRecentProjects: async () => recents,
+        getLastOpenedRecentProject: async () => null,
+        removeRecentProject: async (folderPath: string) => {
+          recents = recents.filter((project) => project.folderPath !== folderPath);
+          return recents;
+        },
+        checkForAppUpdate: async () => ({ state: 'up-to-date', currentVersion: '0.1.4', latestVersion: '0.1.4' }),
+      },
+    });
+  }, seededProjects);
+  await page.route('http://127.0.0.1:8000/**', (route) => route.fulfill({ status: 204, body: '' }));
+
+  await page.goto('/#/import');
+  const rows = page.locator('.project-row-name');
+  await expect(rows).toHaveText(['Alpha Project', 'Bravo Project']);
+
+  // Cancelling leaves the project in place.
+  await page.getByRole('button', { name: 'Remove Alpha Project' }).click();
+  const dialog = page.getByRole('dialog', { name: /Remove Alpha Project\?/ });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(rows).toHaveText(['Alpha Project', 'Bravo Project']);
+
+  // Confirming drops it from the list.
+  await page.getByRole('button', { name: 'Remove Alpha Project' }).click();
+  await page.getByRole('button', { name: 'Remove from list' }).click();
+  await expect(rows).toHaveText(['Bravo Project']);
 });
 
 test('renaming a recent project updates its row and header without changing the folder', async ({ page }) => {
@@ -323,12 +368,19 @@ test('renaming a recent project updates its row and header without changing the 
   await expect(page.locator('.project-header-name')).toHaveText('Aardvark Project');
   await expect(page.locator('.project-row-wrap').filter({ hasText: 'Aardvark Project' })).toBeVisible();
 
-  const preservedRow = page.locator('.project-row-wrap').filter({ hasText: 'Aardvark Project' });
-  await preservedRow.getByRole('button', { name: 'Rename Aardvark Project' }).click();
+  await page
+    .locator('.project-row-wrap')
+    .filter({ hasText: 'Aardvark Project' })
+    .getByRole('button', { name: 'Rename Aardvark Project' })
+    .click();
   await page.getByLabel('Project name').fill('   ');
   await page.getByLabel('Project name').press('Enter');
   await expect(page.getByRole('alert')).toHaveText('Project name must contain at least one non-whitespace character');
   await expect(page.locator('.project-header-name')).toHaveText('Aardvark Project');
+  // The row survives the rejected rename — while editing it is the row holding the editor.
+  const preservedRow = page
+    .locator('.project-row-wrap')
+    .filter({ has: page.locator('.project-rename-editor') });
   await expect(preservedRow).toBeVisible();
   await page.getByRole('button', { name: 'Cancel' }).click();
 

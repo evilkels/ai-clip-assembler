@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { selectProjectFolder } from '../api/client';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProjectRenameEditor } from '../components/ProjectRenameEditor';
 import { recentProjectDisplayName, sortRecentProjects } from '../lib/projectSort';
 import { useReview } from '../state/ReviewContext';
@@ -40,6 +41,21 @@ const CheckIcon = (
   </svg>
 );
 
+const PencilIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+    <path d="m14.5 7.5 2 2" />
+  </svg>
+);
+
+const TrashIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16" />
+    <path d="M9 7V5h6v2" />
+    <path d="M6 7v13h12V7" />
+  </svg>
+);
+
 type WorkflowStep = {
   to: string;
   label: string;
@@ -71,6 +87,9 @@ export function Sidebar() {
   const [error, setError] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [editingFolderPath, setEditingFolderPath] = useState<string | null>(null);
+  const [removingProject, setRemovingProject] = useState<
+    { folderPath: string; displayName: string } | null
+  >(null);
   const renameTriggers = useRef(new Map<string, HTMLButtonElement>());
   const focusAfterRename = useRef<string | null>(null);
   const orderedRecentProjects = useMemo(
@@ -122,9 +141,6 @@ export function Sidebar() {
 
       <div className="sidebar-section">
         <div className="sidebar-section-label">Projects</div>
-        <p className="project-list-hint">
-          Remove only forgets a project from this list; it leaves the folder and footage on disk.
-        </p>
         <div className="project-list">
           {orderedRecentProjects.length === 0 && (
             <div className="project-empty">No recent projects</div>
@@ -133,13 +149,10 @@ export function Sidebar() {
             const active = project.folderPath === projectFolder;
             const displayName = recentProjectDisplayName(project);
             return (
-              <div className={active ? 'project-row-wrap active' : 'project-row-wrap'} key={project.folderPath}>
-                <div className="project-row-heading">
-                  <span className="project-row-name">{displayName}</span>
-                  <span className={project.missing ? 'project-state-chip missing' : 'project-state-chip open'}>
-                    {project.missing ? 'missing' : 'open'}
-                  </span>
-                </div>
+              <div
+                className={`project-row-wrap${active ? ' active' : ''}${project.missing ? ' missing' : ''}`}
+                key={project.folderPath}
+              >
                 {editingFolderPath === project.folderPath ? (
                   <ProjectRenameEditor
                     key={project.folderPath}
@@ -152,47 +165,58 @@ export function Sidebar() {
                     onCancel={() => closeRename(project.folderPath)}
                   />
                 ) : (
-                  <div className="project-row-actions">
+                  <div className="project-row">
                     <button
                       type="button"
+                      className="project-row-open"
                       disabled={loading || project.missing}
                       aria-label={`Open ${displayName}`}
                       onClick={() => openProjectFolder(project.folderPath).catch((err) => {
                         setError(err instanceof Error ? err.message : String(err));
                       })}
                     >
-                      Open
+                      <span className="project-row-name">{displayName}</span>
                     </button>
-                    <button
-                      type="button"
-                      aria-label={`Rename ${displayName}`}
-                      ref={(element) => {
-                        if (element) renameTriggers.current.set(project.folderPath, element);
-                        else renameTriggers.current.delete(project.folderPath);
-                      }}
-                      onClick={() => {
-                        setError(null);
-                        setEditingFolderPath(project.folderPath);
-                      }}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${displayName}`}
-                      onClick={() => removeRecent(project.folderPath)}
-                    >
-                      Remove
-                    </button>
-                    {project.missing && (
+                    <div className="project-row-actions">
                       <button
                         type="button"
-                        aria-label={`Locate ${displayName}`}
-                        onClick={() => relocateRecent(project.folderPath)}
+                        className="project-row-icon"
+                        aria-label={`Rename ${displayName}`}
+                        title="Rename"
+                        ref={(element) => {
+                          if (element) renameTriggers.current.set(project.folderPath, element);
+                          else renameTriggers.current.delete(project.folderPath);
+                        }}
+                        onClick={() => {
+                          setError(null);
+                          setEditingFolderPath(project.folderPath);
+                        }}
                       >
-                        Locate
+                        {PencilIcon}
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        className="project-row-icon danger"
+                        aria-label={`Remove ${displayName}`}
+                        title="Remove from list"
+                        onClick={() => setRemovingProject({ folderPath: project.folderPath, displayName })}
+                      >
+                        {TrashIcon}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {project.missing && editingFolderPath !== project.folderPath && (
+                  <div className="project-row-missing-note">
+                    <span className="project-state-chip missing">missing</span>
+                    <button
+                      type="button"
+                      className="project-row-locate"
+                      aria-label={`Locate ${displayName}`}
+                      onClick={() => relocateRecent(project.folderPath)}
+                    >
+                      Locate folder
+                    </button>
                   </div>
                 )}
               </div>
@@ -249,6 +273,23 @@ export function Sidebar() {
 
       {settingsTab && (
         <SettingsModal initialTab={settingsTab} onClose={() => setSettingsTab(null)} />
+      )}
+
+      {removingProject && (
+        <ConfirmDialog
+          title={`Remove ${removingProject.displayName}?`}
+          body="This only forgets the project in this list. The folder and your footage stay on disk."
+          confirmLabel="Remove from list"
+          destructive
+          onCancel={() => setRemovingProject(null)}
+          onConfirm={() => {
+            const { folderPath } = removingProject;
+            setRemovingProject(null);
+            void Promise.resolve(removeRecent(folderPath)).catch((err) => {
+              setError(err instanceof Error ? err.message : String(err));
+            });
+          }}
+        />
       )}
     </aside>
   );

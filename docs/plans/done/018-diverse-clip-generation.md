@@ -1,6 +1,6 @@
 # Diverse Clip Generation — Implementation Plan (Plan 018)
 
-**Status:** CODE COMPLETE (2026-07-21) — all five phases A–E landed on `feature/diverse-clip-generation`. One non-code task remains before the feature does anything for a user: **the SigLIP ONNX model is not yet exported or bundled**. `backend/models/README.md` records the decision but the `.onnx` file itself does not exist in the repo/build. Until it's added, `default_embedding_provider()` returns `None` and every candidate falls into its own Look Group — diversity features are inert (a documented no-op degradation, not a bug) in real runs.
+**Status:** CODE COMPLETE (2026-07-21) — all five phases A–E landed on `feature/diverse-clip-generation`. Filed here (2026-08-13) as the delivery record for that code. One non-code task remained and has been split into its own plan: **the SigLIP ONNX model is not yet exported or bundled** — see [`025-bundle-siglip-embedding-model.md`](../025-bundle-siglip-embedding-model.md). `backend/models/README.md` records the model decision but the `.onnx` file itself does not exist in the repo/build. Until plan 025 lands, `default_embedding_provider()` returns `None` and every candidate falls into its own Look Group — diversity features are inert (a documented no-op degradation, not a bug) in real runs.
 
 **Goal:** Make clip generation produce a diverse library of distinct best fragments (no temporal duplicates, no look-alike monotony) and drive diversity-aware multi-format edits; relocate the six generation controls to the Import page.
 

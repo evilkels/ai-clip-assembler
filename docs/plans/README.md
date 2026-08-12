@@ -23,18 +23,20 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [015](done/015-record-core-architecture-decisions.md) | Record core architecture decisions as ADRs | DONE (2026-07-09) at `93b0d37` |
 | [016](016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | Steps 1–2 DONE; step 3 superseded by 018; step 4 TODO |
 | [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 DONE (2026-07-20); steps 2–6 TODO |
-| [018](018-diverse-clip-generation.md) | Diverse clip generation | CODE COMPLETE — SigLIP ONNX export/bundling remains; without it diversity is inert |
+| [018](done/018-diverse-clip-generation.md) | Diverse clip generation | DONE (2026-07-21) — code complete; model bundling split out to plan 025 |
 | [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — architecture debt after `ad62ed1` |
 | [020](done/020-authoritative-timeline-items.md) | Render and edit authoritative Timeline Items | DONE (2026-08-10) — first stacked branch |
 | [021](done/021-truthful-export.md) | Export authoritative Timeline with complete warnings | DONE (2026-08-10) — second stacked branch |
+| [022](done/022-project-shell-header-and-sidebar.md) | Project shell header and project list redesign | DONE (2026-08-12) at `c186ef4`, polished at `998f6d7` |
 | [023](023-macos-app-icon-geometry.md) | Correct macOS app icon geometry | TODO |
 | [024](024-source-audio-in-exports.md) | Source audio in exports | TODO |
+| [025](025-bundle-siglip-embedding-model.md) | Export and bundle the SigLIP embedding model | TODO — until it lands, plan 018's diversity is inert in real runs |
 
 ## Product plans
 
 | Plan | Status |
 |------|--------|
-| [review-model-sign-in](review-model-sign-in.md) | DONE (2026-07-19) — automated checks green; live OAuth/package smoke remains |
+| [review-model-sign-in](done/review-model-sign-in.md) | DONE (2026-07-19) — automated checks green; live OAuth/package smoke remains human QA |
 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | IN PROGRESS — Tasks 0, 1, 4 done; plan/spec reconciliation remains |
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
@@ -43,11 +45,11 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |
 | [project-folder-model](project-folder-model.md) | Automated QA complete; manual app QA pending |
-| [project-sidebar](project-sidebar.md) | Partial; collapse/resize/context-menu/keyboard nav deferred |
+| [project-sidebar](project-sidebar.md) | Partial; rename + row redesign shipped via plan 022; collapse/resize/context-menu/keyboard nav deferred |
 | [settings-page](done/settings-page.md) | DONE (2026-07-03) |
 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
 | [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
-| [ui-polish-modern-shell](ui-polish-modern-shell.md) | Partial; migration and command palette remain |
-| [react-doctor-triage](react-doctor-triage.md) | Partial; issues reduced 47→33 |
+| [ui-polish-modern-shell](ui-polish-modern-shell.md) | BLOCKED on a decision — prescribes shadcn/Radix, none installed; shipped path is hand-authored tokens/CSS |
+| [react-doctor-triage](react-doctor-triage.md) | Partial; issues reduced 47→33, but all file/line citations are stale — re-run the tool first |
 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |
 | [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE |

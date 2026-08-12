@@ -1,8 +1,22 @@
 # Plan: Modern professional UI shell
 
-Status: PARTIAL. `AppShell`, Sidebar, TitleBar, StatusBar, tokens, and dark
-editor chrome shipped; component migration, Cmd-K palette, style consolidation,
-and score verification remain. Pairs with sidebar/settings/react-doctor plans.
+Status: PARTIAL, **and its central library decision is now contradicted by what
+shipped** (reconciled 2026-08-13). `AppShell`, Sidebar, TitleBar, StatusBar,
+tokens, and dark editor chrome shipped; component migration, Cmd-K palette,
+style consolidation, and score verification remain. Pairs with
+sidebar/settings/react-doctor plans.
+
+> **Decide before implementing anything below.** This plan prescribes shadcn/ui
+> + Radix + lucide-react + `cmdk`. None of those are installed: `package.json`
+> carries only `tailwindcss` (no config file, no `components.json`), and every
+> shell surface delivered so far is hand-authored CSS against
+> `styles/tokens.css` with hand-written inline SVG icons — a path
+> `project-sidebar.md` records as a deliberate choice *over* a component
+> library, and which plan 022 then built on. The remaining work is therefore not
+> executable as written: either adopt the stack for real (a large migration that
+> would rework shipped surfaces) or rewrite this plan around the tokens/CSS
+> approach that actually shipped. Do not start a route migration until that
+> choice is made.
 
 ## Goal and decision
 

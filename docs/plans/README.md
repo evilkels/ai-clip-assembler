@@ -31,6 +31,7 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [023](023-macos-app-icon-geometry.md) | Correct macOS app icon geometry | TODO |
 | [024](024-source-audio-in-exports.md) | Source audio in exports | TODO |
 | [025](025-bundle-siglip-embedding-model.md) | Export and bundle the SigLIP embedding model | TODO — until it lands, plan 018's diversity is inert in real runs |
+| [026](026-preview-audio-in-app.md) | Hear source audio in the app | TODO — depends on plan 024's `has_audio` |
 
 ## Product plans
 

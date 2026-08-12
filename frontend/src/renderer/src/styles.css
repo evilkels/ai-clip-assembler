@@ -1599,7 +1599,9 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
+  /* Sits on top of video, not on a themed surface, so it stays light in both
+     themes — the shadow below is what keeps it legible over bright frames. */
+  color: #fff;
   font-size: 11px;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
   text-transform: none;

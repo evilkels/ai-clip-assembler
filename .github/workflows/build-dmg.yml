@@ -6,10 +6,16 @@ on:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: dmg-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-dmg:
     name: Build DMG on macOS (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -108,24 +114,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  release:
-    name: Attach DMG to GitHub Release
-    needs: build-dmg
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    steps:
-      - name: Download DMG artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: ai-clip-assembler-dmg-*
-          merge-multiple: true
-          path: dist
-
+      # Publish each architecture as soon as its build completes. A downstream
+      # matrix join made the faster arm64 DMG wait for the slower x64 build.
       - name: Create or update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/*.dmg
+          files: frontend/dist/*.dmg
           generate_release_notes: true
           fail_on_unmatched_files: true

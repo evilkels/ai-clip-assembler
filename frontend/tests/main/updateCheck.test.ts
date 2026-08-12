@@ -143,6 +143,33 @@ test('concurrent checks share one request instead of racing GitHub', async () =>
   assert.equal(status.state === 'update-available' && status.latestVersion, '0.1.5');
 });
 
+test('a forced check refreshes after an in-flight non-forced check', async () => {
+  const store = createStateStore();
+  const pending: Array<(value: ReleaseSummary) => void> = [];
+  const checker = createUpdateChecker({
+    currentVersion: '0.1.0',
+    ...store,
+    fetchRelease: () =>
+      new Promise<ReleaseSummary>((resolve) => {
+        pending.push(resolve);
+      }),
+  });
+
+  const initialCheck = checker.check();
+  await new Promise((resolve) => setImmediate(resolve));
+  const forcedCheck = checker.check({ force: true });
+
+  assert.equal(pending.length, 1, 'the forced check waits for the existing request');
+  pending[0](release('v0.1.4'));
+  await initialCheck;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(pending.length, 2, 'the forced check performs its own refresh');
+
+  pending[1](release('v0.1.5'));
+  const status = await forcedCheck;
+  assert.equal(status.state === 'update-available' && status.latestVersion, '0.1.5');
+});
+
 test('checker force-refreshes past a fresh cache', async () => {
   const store = createStateStore({
     lastCheckedAt: '2026-08-11T10:00:00.000Z',

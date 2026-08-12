@@ -196,14 +196,24 @@ export function createUpdateChecker(deps: UpdateCheckerDeps): UpdateChecker {
   // concurrent calls are normal. Without this, a cold cache lets each one open
   // its own request to GitHub.
   let inFlight: Promise<UpdateStatus> | undefined;
+  let inFlightIsForced = false;
+  let queuedForcedCheck: Promise<UpdateStatus> | undefined;
 
   return {
     async check(options) {
-      if (inFlight) return inFlight;
-      inFlight = performCheck(options).finally(() => {
-        inFlight = undefined;
-      });
-      return inFlight;
+      if (options?.force && queuedForcedCheck) return queuedForcedCheck;
+      if (inFlight) {
+        if (!options?.force || inFlightIsForced) return inFlight;
+
+        queuedForcedCheck = inFlight
+          .catch(() => undefined)
+          .then(() => startCheck({ force: true }))
+          .finally(() => {
+            queuedForcedCheck = undefined;
+          });
+        return queuedForcedCheck;
+      }
+      return startCheck(options);
     },
 
     async dismiss(version) {
@@ -223,6 +233,18 @@ export function createUpdateChecker(deps: UpdateCheckerDeps): UpdateChecker {
       return url && url.startsWith(RELEASE_URL_PREFIX) ? url : RELEASES_PAGE_URL;
     },
   };
+
+  function startCheck(options?: { force?: boolean }): Promise<UpdateStatus> {
+    const check = performCheck(options).finally(() => {
+      if (inFlight === check) {
+        inFlight = undefined;
+        inFlightIsForced = false;
+      }
+    });
+    inFlight = check;
+    inFlightIsForced = Boolean(options?.force);
+    return check;
+  }
 
   async function performCheck(options?: { force?: boolean }): Promise<UpdateStatus> {
     const state = await readState();

@@ -2644,9 +2644,9 @@ a {
 /* Timeline editor (A2.4) */
 .timeline-editor {
   margin-top: 16px;
-  border: 1px solid var(--border, #2a2f3a);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface, #161a22);
+  background: var(--bg-surface);
   padding: 12px 14px;
 }
 .timeline-editor-head {
@@ -2658,10 +2658,10 @@ a {
 .timeline-editor-tools { margin-left: auto; display: flex; gap: 8px; }
 .timeline-editor-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .timeline-item-row {
-  border: 1px solid var(--border, #2a2f3a);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-1);
 }
 .timeline-item-head { display: flex; align-items: center; gap: 10px; }
 .timeline-item-name { font-weight: 600; }

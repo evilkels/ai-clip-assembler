@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { sortRecentProjects } from '../../src/renderer/src/lib/projectSort.js';
+import { currentProjectDisplayName, sortRecentProjects } from '../../src/renderer/src/lib/projectSort.js';
 import type { RecentProject } from '../../src/renderer/src/types/clip.js';
 
 function project(folderPath: string, name?: string, lastOpenedAt = '2026-08-11T10:00:00Z'): RecentProject {
@@ -41,4 +41,17 @@ test('sortRecentProjects falls back to the folder basename when name is absent',
   ]);
 
   assert.deepEqual(sorted.map((item) => item.folderPath), ['/projects/alpha', '/projects/Bravo']);
+});
+
+test('currentProjectDisplayName keeps an unnamed recent aligned with its project row', () => {
+  const recentProject = project('/projects/older-recent');
+
+  assert.equal(
+    currentProjectDisplayName({
+      recentProject,
+      projectName: 'Manifest project name',
+      projectFolder: recentProject.folderPath,
+    }),
+    'older-recent',
+  );
 });

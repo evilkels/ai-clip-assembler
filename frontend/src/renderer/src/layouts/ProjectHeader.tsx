@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectRenameEditor } from '../components/ProjectRenameEditor';
+import { currentProjectDisplayName } from '../lib/projectSort';
 import { useReview } from '../state/ReviewContext';
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
-}
 
 export function ProjectHeader() {
   const { projectFolder, projectName, recentProjects, renameRecent } = useReview();
   const recentProject = recentProjects.find((project) => project.folderPath === projectFolder);
-  const displayName = recentProject?.name ?? projectName ?? (projectFolder ? basename(projectFolder) : null);
+  const displayName = currentProjectDisplayName({ recentProject, projectName, projectFolder });
   const hasProject = Boolean(displayName || projectFolder);
   const [editing, setEditing] = useState(false);
   const renameTrigger = useRef<HTMLButtonElement>(null);

@@ -1,4 +1,5 @@
 import json
+import math
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -47,6 +48,16 @@ def display_resolution(width: int, height: int, rotation_degrees: int) -> list[i
     return [width, height]
 
 
+def parse_positive_int(value: Any) -> Optional[int]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or number <= 0 or not number.is_integer():
+        return None
+    return int(number)
+
+
 def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMetadata:
     video_stream = next(
         (stream for stream in payload.get("streams", []) if stream.get("codec_type") == "video"),
@@ -54,6 +65,19 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
     )
     if video_stream is None:
         raise FFprobeError(f"No video stream found in {video_path}")
+    audio_stream = next(
+        (stream for stream in payload.get("streams", []) if stream.get("codec_type") == "audio"),
+        None,
+    )
+    audio_channels = parse_positive_int(audio_stream.get("channels")) if audio_stream else None
+    audio_sample_rate = parse_positive_int(audio_stream.get("sample_rate")) if audio_stream else None
+    audio_bit_depth = None
+    if audio_stream:
+        audio_bit_depth = parse_positive_int(audio_stream.get("bits_per_sample"))
+        if audio_bit_depth is None:
+            audio_bit_depth = parse_positive_int(audio_stream.get("bits_per_raw_sample"))
+        if audio_bit_depth is None:
+            audio_bit_depth = 16
 
     duration_value = payload.get("format", {}).get("duration") or video_stream.get("duration") or 0
     width = int(video_stream["width"])
@@ -80,6 +104,11 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
         codec=str(video_stream.get("codec_name", "unknown")),
         size_bytes=size_bytes,
         created_at=created_at,
+        has_audio=audio_stream is not None,
+        audio_channels=audio_channels,
+        audio_sample_rate=audio_sample_rate,
+        audio_codec=str(audio_stream["codec_name"]) if audio_stream and audio_stream.get("codec_name") else None,
+        audio_bit_depth=audio_bit_depth,
     )
 
 

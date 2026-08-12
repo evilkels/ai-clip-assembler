@@ -1239,7 +1239,12 @@ async def export_timeline(
         file_path = export_dir / "timeline.edl"
         ensure_export_can_write(file_path, overwrite)
         file_path.write_text(
-            generate_edl("AI Clip Assembler", clips, fps=round_edl_fps(choose_timeline_fps(videos_by_id))),
+            generate_edl(
+                "AI Clip Assembler",
+                clips,
+                fps=round_edl_fps(choose_timeline_fps(videos_by_id)),
+                videos_by_id=videos_by_id,
+            ),
             encoding="utf-8",
         )
     elif format == "fcpxml":
@@ -1276,7 +1281,7 @@ async def export_timeline(
         "file_path": str(file_path),
         "clip_count": len(clips),
         "total_duration_sec": round(sum(clip["duration_sec"] for clip in clips), 3),
-        "warnings": edl_flatten_warnings(clips) if format == "edl" else [],
+        "warnings": edl_flatten_warnings(clips, videos_by_id) if format == "edl" else [],
     }
 
 

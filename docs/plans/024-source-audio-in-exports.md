@@ -72,19 +72,19 @@ the API serializes `VideoMetadata.model_dump()` directly.
 - Produces: `VideoMetadata` with the five audio fields above, serialized by
   the existing upload and folder-project API paths.
 
-- [ ] **Step 1: Define the backward-compatible fields.** Keep all new fields
+- [x] **Step 1: Define the backward-compatible fields.** Keep all new fields
   optional/defaulted as specified above. Do not make an audio field required;
   old project results, test doubles, and source records without audio keys must
   continue to validate and export video-only.
 
-- [ ] **Step 2: Parse the first audio stream independently of video order.**
+- [x] **Step 2: Parse the first audio stream independently of video order.**
   Select the first `codec_type == "audio"` stream, whether it appears before or
   after video. Convert valid positive numeric strings to integers. Treat absent,
   zero, malformed, or negative channel/rate/depth values as unavailable rather
   than raising while probing an otherwise usable video. Set `has_audio` from
   stream existence, not from whether optional fields happened to parse.
 
-- [ ] **Step 3: Add probe tests.** Cover audio-before-video with AAC, 2 channels,
+- [x] **Step 3: Add probe tests.** Cover audio-before-video with AAC, 2 channels,
   48,000 Hz, and missing bit depth; assert `has_audio`, channels, rate, codec,
   and the depth fallback. Cover a payload containing only a video stream and
   assert `has_audio is False` plus `None` optional fields. Cover an old
@@ -113,13 +113,13 @@ focused probe tests pass.
 - Produces: XMEML v5 with a sequence audio branch only when at least one
   timeline source has audio.
 
-- [ ] **Step 1: Preserve the existing video branch and add explicit source
+- [x] **Step 1: Preserve the existing video branch and add explicit source
   media typing.** Each video sequence `clipitem` gets
   `<sourcetrack><mediatype>video</mediatype><trackindex>1</trackindex></sourcetrack>`.
   Keep the existing video timing, relative paths, Basic Motion, and source-file
   deduplication behavior.
 
-- [ ] **Step 2: Declare audio on each first-use source file.** Under the
+- [x] **Step 2: Declare audio on each first-use source file.** Under the
   existing `<file><media>`, add this shape only for an audio-bearing source:
 
   ```xml
@@ -144,7 +144,7 @@ focused probe tests pass.
   repeated file reference must continue to be only `<file id="..."/>`, while
   its first declaration carries both video and audio media.
 
-- [ ] **Step 3: Add the sequence audio branch.** Under the sequence's existing
+- [x] **Step 3: Add the sequence audio branch.** Under the sequence's existing
   `<media>`, add `<audio>` after `<video>` when any timeline item has audio.
   Add an audio `<format><samplecharacteristics>` using the first audio-bearing
   source's positive sample rate and bit depth, with 48,000/16 fallbacks. Create
@@ -155,7 +155,7 @@ focused probe tests pass.
   reinterpret one multichannel item. A mono source occupies track 1; a mixed
   timeline leaves absent channel tracks empty for that item.
 
-- [ ] **Step 4: Mirror every audio-bearing video item.** For a timeline item
+- [x] **Step 4: Mirror every audio-bearing video item.** For a timeline item
   with `N` source channels, create one audio `clipitem` in each of the first
   `N` sequence audio tracks. Each mirrored item must carry the same
   `<name>`, `<duration>`, `<rate>`, `<start>`, `<end>`, `<in>`, and `<out>` as
@@ -173,7 +173,7 @@ focused probe tests pass.
   existing item index (for example, `clipitem-1`) so they use XMEML's
   documented shared-id convention and are one linked edit in Resolve.
 
-- [ ] **Step 5: Emit the link group on each video clipitem.** For a stereo
+- [x] **Step 5: Emit the link group on each video clipitem.** For a stereo
   item, emit three links on the video clipitem, in this order:
 
   ```xml
@@ -191,7 +191,7 @@ focused probe tests pass.
   Apple's XMEML `link` example and avoids Resolve's silent unlinked-audio
   failure mode.
 
-- [ ] **Step 6: Omit audio completely for silent items.** A silent source gets
+- [x] **Step 6: Omit audio completely for silent items.** A silent source gets
   no mirrored audio clipitems and no audio links. If the whole timeline is
   silent, omit sequence `<audio>` entirely. Its source `<file><media>` remains
   video-only. This keeps V1/A1 counts truthful for drone footage without a
@@ -216,7 +216,7 @@ focused probe tests pass.
 - Produces: audio and video with matching timeline bounds in formats that can
   carry retime information.
 
-- [ ] **Step 1: Apply Resolve Time Remap to both linked media types.** When
+- [x] **Step 1: Apply Resolve Time Remap to both linked media types.** When
   `suggested_speed != 1.0`, emit the existing percentage speed effect on the
   video clipitem and an equivalent Time Remap effect on each mirrored audio
   clipitem, with `mediatype` set to the relevant media type. Keep identical
@@ -225,14 +225,14 @@ focused probe tests pass.
   Resolve's audio-retime policy and must be observed in manual QA, not
   asserted by XML alone. Silent clips get no audio effect.
 
-- [ ] **Step 2: Keep FCPXML's retime on the composite asset clip.** For an
+- [x] **Step 2: Keep FCPXML's retime on the composite asset clip.** For an
   audio-bearing asset, retain the existing `timeMap` and set `audioRole="dialogue"`
   on the `asset-clip`; `asset-clip` includes all media components of the asset,
   so no separate audio story element is needed. The time map's final `timept`
   must use the raw source `end` at the effective timeline duration, preserving
   audio/video sync. Silent assets omit `audioRole` and remain video-only.
 
-- [ ] **Step 3: Add retime assertions.** Parse Resolve XML and assert the
+- [x] **Step 3: Add retime assertions.** Parse Resolve XML and assert the
   retime effect/value exists on both video and audio clipitems and that their
   timing elements match. Parse FCPXML and assert the audio asset attributes,
   `audioRole`, `timeMap`, and effective duration coexist. Keep the existing EDL
@@ -255,7 +255,7 @@ known retime uncertainty is the audible pitch behavior, covered by manual QA.
 - Produces: version 1.10 assets whose `asset-clip` can pull embedded source
   audio.
 
-- [ ] **Step 1: Emit audio attributes only for audio-bearing assets.** Keep
+- [x] **Step 1: Emit audio attributes only for audio-bearing assets.** Keep
   `hasVideo="1"`. For audio sources add exactly:
 
   ```xml
@@ -266,13 +266,13 @@ known retime uncertainty is the audible pitch behavior, covered by manual QA.
   to silent assets. `audioSources="1"` is the explicit one-audio-stream scope
   from the target data contract.
 
-- [ ] **Step 2: Mark audio-bearing asset clips.** Add `audioRole="dialogue"`
+- [x] **Step 2: Mark audio-bearing asset clips.** Add `audioRole="dialogue"`
   to an audio-bearing `asset-clip`. Do not add a nested `<audio>` element:
   FCPXML 1.10's `asset-clip` implicitly includes all available audio and video
   components from the referenced asset. Preserve `start`, `duration`, `offset`,
   transforms, and existing source-relative path behavior.
 
-- [ ] **Step 3: Test mixed and silent assets structurally.** Assert exact asset
+- [x] **Step 3: Test mixed and silent assets structurally.** Assert exact asset
   attributes for a stereo source and absence of every audio attribute for a
   silent source. Assert the corresponding asset-clip role/ref/start/duration
   and that a mixed timeline references both assets without adding audio to the
@@ -299,7 +299,7 @@ known retime uncertainty is the audible pitch behavior, covered by manual QA.
 - Produces: a CMX3600 event whose channel column truthfully describes the
   source media, and warnings returned through the existing export response.
 
-- [ ] **Step 1: Centralize channel-code selection.** Pass `videos_by_id` into
+- [x] **Step 1: Centralize channel-code selection.** Pass `videos_by_id` into
   `generate_edl` and `edl_flatten_warnings` from `export_project`. Preserve a
   backwards-compatible optional default for direct callers/tests that do not
   provide source metadata. Use these CMX semantics:
@@ -315,20 +315,20 @@ known retime uncertainty is the audible pitch behavior, covered by manual QA.
   audio. For `audio_channels > 2`, emit `AA/V` for the representable first two
   channels and make the loss visible.
 
-- [ ] **Step 2: Extend warnings without warning for silence.** Keep existing
+- [x] **Step 2: Extend warnings without warning for silence.** Keep existing
   Speed and Transform flatten warnings. Add an audio warning only when a
   source has more than two channels, stating that CMX3600 output carries only
   channels 1–2. A silent source is not degradation: `V` faithfully says that
   there is no source audio and must not produce a warning. Missing audio keys in
   legacy metadata are treated as silent/unknown and remain warning-free.
 
-- [ ] **Step 3: Preserve current EDL timing policy.** EDL remains a flattened
+- [x] **Step 3: Preserve current EDL timing policy.** EDL remains a flattened
   interchange format: use raw source `start_sec`/`end_sec` and raw clip duration
   for record timing, emit no M2 speed command, and warn for Speed. Audio uses
   the same source and record timecodes as video, so retimed audio is also
   flattened to 100% in EDL. Transforms never affect the channel code.
 
-- [ ] **Step 4: Test all channel cases and a mixed timeline.** Assert exact event
+- [x] **Step 4: Test all channel cases and a mixed timeline.** Assert exact event
   lines for mono (`B`), stereo (`AA/V`), and silent (`V`) clips. Assert a mixed
   timeline has contiguous record times and one event per video clip, not a
   second audio-only event. Assert no warning for silent/stereo audio, an audio
@@ -349,25 +349,25 @@ known retime uncertainty is the audible pitch behavior, covered by manual QA.
 - Modify only if needed for serialized defaults: `backend/tests/test_api.py` or
   `backend/tests/test_project_store.py`
 
-- [ ] **Step 1: Introduce shared fixtures with explicit metadata.** Add one
+- [x] **Step 1: Introduce shared fixtures with explicit metadata.** Add one
   stereo video fixture (`has_audio=True`, 2 channels, 48,000 Hz, AAC, 16-bit)
   and one silent fixture (`has_audio=False`, no optional audio values). Keep
   existing fixtures valid to prove old callers remain tolerant.
 
-- [ ] **Step 2: Replace broad Resolve clipitem assertions with track-scoped
+- [x] **Step 2: Replace broad Resolve clipitem assertions with track-scoped
   assertions.** Once audio clipitems exist, `root.findall(".//clipitem")` is no
   longer a video count. Scope video assertions to
   `./sequence/media/video/track/clipitem`, audio assertions to each audio track,
   and file declarations to the first-use video file.
 
-- [ ] **Step 3: Add the required structural cases.** Cover one stereo source,
+- [x] **Step 3: Add the required structural cases.** Cover one stereo source,
   one silent source, a mixed two-item timeline, repeated source-file references,
   no-audio entire timeline, stereo links, mono links, file audio declarations,
   FCPXML asset attributes/roles, EDL channel codes/warnings, and Resolve/FCPXML
   retime synchronization. Every XML test parses with `ElementTree` and asserts
   parent/child paths, counts, values, and link relationships.
 
-- [ ] **Step 4: Run the focused suite.** Run:
+- [x] **Step 4: Run the focused suite.** Run:
 
   ```bash
   cd backend
@@ -387,7 +387,7 @@ fixtures remain valid; and the focused command exits 0.
 - Modify: `docs/MANUAL_QA_GUIDE.md`
 - Modify: `docs/plans/drone-workflow-qa-flows.md`
 
-- [ ] **Step 1: Update the product/flow contract.** Remove audio from the
+- [x] **Step 1: Update the product/flow contract.** Remove audio from the
   drone-flow explicit out-of-scope list. State that Resolve XML must preserve
   linked source audio for audio-bearing clips and must keep silent-source clips
   video-only. Keep EDL's explicit flattening/degradation warning language.
@@ -437,7 +437,7 @@ fixtures remain valid; and the focused command exits 0.
   `backend/src/models.py`, `backend/src/api.py`
 - Inspect: all tests and QA docs listed above
 
-- [ ] Run the complete backend checks used by the repository:
+- [x] Run the complete backend checks used by the repository:
 
   ```bash
   cd backend
@@ -445,7 +445,7 @@ fixtures remain valid; and the focused command exits 0.
   PYTHONPATH=. .venv/bin/ruff check src tests
   ```
 
-- [ ] Search for stale video-only assumptions in the touched export path:
+- [x] Search for stale video-only assumptions in the touched export path:
 
   ```bash
   rg -n "hasVideo|hasAudio|audioSources|audioChannels|audioRate|<audio>|AA/V|sourcetrack|mediatype" backend/src backend/tests docs/MANUAL_QA_GUIDE.md docs/plans/drone-workflow-qa-flows.md

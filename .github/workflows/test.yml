@@ -32,6 +32,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify release workflow contract
+        run: python3 scripts/tests/test_release_workflow.py -v
+
       # Analysis degrades gracefully without vidstab, but the browser tests
       # exercise the normal path — fail loudly rather than silently testing the
       # degraded one. Ubuntu's ffmpeg ships with libvidstab.

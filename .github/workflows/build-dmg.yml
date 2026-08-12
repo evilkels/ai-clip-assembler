@@ -6,6 +6,10 @@ on:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: dmg-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-dmg:
     name: Build DMG on macOS (${{ matrix.arch }})

@@ -494,6 +494,9 @@ def test_generate_resolve_xml_emits_linked_per_channel_audio_tracks():
     mono_item = video_track.findall("./clipitem")[2]
     mono_link_media = [link.find("./mediatype").text for link in mono_item.findall("./link")]
     assert mono_link_media == ["video", "audio"]
+    # The silent middle item holds a video slot but no audio slot, so the mono
+    # item is video clip 3 and audio clip 2 on its track.
+    assert [link.find("./clipindex").text for link in mono_item.findall("./link")] == ["3", "2"]
     assert mono_item.findall("./link/groupindex") == []
     mono_audio = audio_tracks[0].findall("./clipitem")[1]
     mono_video = video_track.findall("./clipitem")[2]

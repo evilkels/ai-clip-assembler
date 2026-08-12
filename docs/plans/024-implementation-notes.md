@@ -15,6 +15,18 @@
   metadata. It keeps one video event per timeline clip and warns when a source
   has more than two channels because CMX3600 carries only channels 1–2.
 
+## Deviation from the plan text
+
+Plan task 2 step 5 describes `clipindex` as "the 1-based item position in the
+sequence". The implementation instead counts items within the linked track,
+because a silent item occupies a video slot with no audio companion: in a
+stereo → silent → mono timeline the mono item is video clip 3 and audio clip 2.
+Using the sequence position would have pointed Resolve at a nonexistent audio
+clip. A cross-account review raised this; a second review finding — that
+per-channel `sourcetrack/trackindex` values of 1 and 2 are invalid — was
+rejected, since that is Apple's documented stereo representation and is the
+structure the manual Resolve import is meant to confirm.
+
 ## Scope limitation
 
 The probe and export contract uses the first audio stream from ffprobe. Multiple

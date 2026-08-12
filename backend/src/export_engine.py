@@ -390,7 +390,11 @@ def generate_resolve_xml(
                 audio_link = ET.SubElement(clipitem, "link")
                 ET.SubElement(audio_link, "mediatype").text = "audio"
                 ET.SubElement(audio_link, "trackindex").text = str(channel)
-                ET.SubElement(audio_link, "clipindex").text = str(index)
+                # clipindex counts items within the linked track, and a silent
+                # item occupies the video track without an audio companion.
+                ET.SubElement(audio_link, "clipindex").text = str(
+                    len(audio_tracks[channel - 1].findall("clipitem"))
+                )
                 if channel % 2 == 0:
                     ET.SubElement(audio_link, "groupindex").text = str((channel + 1) // 2)
                     previous_link = clipitem.findall("link")[-2]

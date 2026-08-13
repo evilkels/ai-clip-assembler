@@ -5,6 +5,11 @@ export default defineConfig({
   // Specs share one local FastAPI process and its in-memory project registry.
   // Parallel workers can clear another spec's project while analysis is running.
   workers: 1,
+  // A single flaky assertion previously failed a whole CI run (v0.1.6's main
+  // build) with no second chance. Retries only on CI, so a local failure still
+  // reports immediately, and a retried test is reported as flaky rather than
+  // silently green.
+  retries: process.env.CI ? 2 : 0,
   timeout: 180_000,
   expect: {
     timeout: 20_000,

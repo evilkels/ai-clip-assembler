@@ -1,5 +1,6 @@
 import type { TimelineItem } from '../api/client';
-import { SourceAudioBadge, sourceAudioState } from './SourceAudioBadge';
+import { SourceAudioBadge } from './SourceAudioBadge';
+import { sourceAudioState } from '../lib/sourceAudio';
 import { useReview } from '../state/ReviewContext';
 
 function round(value: number): number {

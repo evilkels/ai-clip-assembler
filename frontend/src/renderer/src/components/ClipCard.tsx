@@ -4,7 +4,8 @@ import { verdictFor } from '../lib/scoring';
 import { formatClock } from '../lib/format';
 import { ScoreChip } from './ScoreChip';
 import { SourceTrack, type Range } from './SourceTrack';
-import { SourceAudioBadge, sourceAudioState } from './SourceAudioBadge';
+import { SourceAudioBadge } from './SourceAudioBadge';
+import { sourceAudioState } from '../lib/sourceAudio';
 import { useReview } from '../state/ReviewContext';
 import { usePreviewAudio } from '../state/usePreviewAudio';
 
@@ -161,7 +162,11 @@ export function ClipCard({
                 }
                 setPlayheadSec(video.currentTime);
               }}
-            />
+            >
+              {/* Source footage carries no caption track; declaring an empty
+                  one keeps the now-audible preview accessible. */}
+              <track kind="captions" />
+            </video>
             <button
               type="button"
               className="clip-play-btn"

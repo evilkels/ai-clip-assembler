@@ -1,7 +1,5 @@
 import { sourceAudioLabel, type SourceAudioState } from '../lib/sourceAudio';
 
-export { sourceAudioState } from '../lib/sourceAudio';
-
 export function SourceAudioBadge({ hasAudio, channels }: SourceAudioState) {
   const label = sourceAudioLabel({ hasAudio, channels });
   if (label === null) return null;

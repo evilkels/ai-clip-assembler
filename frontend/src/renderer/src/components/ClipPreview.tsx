@@ -184,7 +184,11 @@ export function ClipPreview({
               }
             : undefined
         }
-      />
+      >
+        {/* Source footage carries no caption track; declaring an empty one
+            keeps the now-audible preview accessible. */}
+        <track kind="captions" />
+      </video>
       <div className="clip-preview-label">{label}</div>
     </div>
   );

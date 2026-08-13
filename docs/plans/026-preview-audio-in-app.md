@@ -48,7 +48,7 @@ probe change, or model change is required by this plan.
 **Files:**
 
 - Add: `frontend/src/renderer/src/state/usePreviewAudio.ts`
-- Test: `frontend/e2e/preview-audio.spec.ts`
+- Test: `frontend/e2e/preview-audio.spec.ts`, `frontend/tests/main/sourceAudio.test.ts`
 
 **Testing note for every task below:** this repo has no renderer unit-test
 runner. Renderer behavior is covered by Playwright specs in `frontend/e2e/`
@@ -62,15 +62,15 @@ this plan; assert against the rendered DOM and the media element's `muted`,
 - Consumes: `window.localStorage`.
 - Produces: `{ muted, volume, setMuted, setVolume }` shared by every preview.
 
-- [ ] **Step 1: Define the persisted shape.** Key
+- [x] **Step 1: Define the persisted shape.** Key
   `ai-clip-assembler:preview-audio:v1`, storing `{ muted: boolean; volume: number }`
   with `muted: true` and `volume: 0.8` as defaults. Clamp volume to `0..1` on
   read; treat malformed or absent JSON as the default rather than throwing.
-- [ ] **Step 2: Share one instance across routes.** Reads must not diverge
+- [x] **Step 2: Share one instance across routes.** Reads must not diverge
   between a Review card and the Timeline transport within a session. Either
   subscribe to a module-level store or put it on the existing context — do not
   give each component its own independent `useState` seeded from storage.
-- [ ] **Step 3: Test persistence and tolerance.** Assert the default when
+- [x] **Step 3: Test persistence and tolerance.** Assert the default when
   storage is empty, a round trip through set/read, and that a garbage value
   yields the default instead of an exception.
 
@@ -85,21 +85,21 @@ routes, and never throws on corrupt storage.
 - Modify: `frontend/src/renderer/src/components/ClipCard.tsx`
 - Test: `frontend/e2e/preview-audio.spec.ts`
 
-- [ ] **Step 1: Replace the hardcoded attribute with a prop.** `ClipPreview`
+- [x] **Step 1: Replace the hardcoded attribute with a prop.** `ClipPreview`
   takes `muted?: boolean` (default `true`) and `volume?: number`, applying
   `volume` through the element property in an effect — `volume` is not a valid
   HTML attribute and setting it in JSX silently does nothing.
-- [ ] **Step 2: Force silence for silent sources.** The caller passes
+- [x] **Step 2: Force silence for silent sources.** The caller passes
   `sourceHasAudio`; the element is muted when the user preference is muted
   **or** the source is known to have no audio. A source with unknown audio
   metadata follows the preference.
-- [ ] **Step 3: Survive a blocked play().** Chromium refuses unmuted
+- [x] **Step 3: Survive a blocked play().** Chromium refuses unmuted
   `play()` without a user gesture, and the Timeline advances between segments
   on its own clock. On rejection, retry once muted rather than leaving the
   playhead stalled, and reflect that the app fell back to muted so the state
   shown matches what is audible. Do not swallow the rejection silently as the
   current `.catch(() => {})` does.
-- [ ] **Step 4: Pin the retime pitch behavior.** Set `preservesPitch`
+- [x] **Step 4: Pin the retime pitch behavior.** Set `preservesPitch`
   explicitly rather than depending on the browser default, so a 0.5x or 2.0x
   clip sounds the same in every build. Time-stretched (pitch preserved) is the
   default choice: it matches Resolve's own retime behavior and keeps dialogue
@@ -117,14 +117,14 @@ stalls because audio was blocked.
 - Modify: `frontend/src/renderer/src/components/TimelineItemRow.tsx`
 - Test: `frontend/e2e/preview-audio.spec.ts`
 
-- [ ] **Step 1: Resolve the source per clip.** Look up the clip's `file_id` in
+- [x] **Step 1: Resolve the source per clip.** Look up the clip's `file_id` in
   the uploaded videos and read `metadata.has_audio`. The lookup must be by
   `file_id`, not by name — two folders can hold the same file name.
-- [ ] **Step 2: Render three honest states.** Audio-bearing gets an audio
+- [x] **Step 2: Render three honest states.** Audio-bearing gets an audio
   badge including the channel count when known (`Audio · 2ch`); a known-silent
   source gets a muted-source badge; unknown metadata gets nothing. Badges carry
   a `title`/`aria-label`, not colour alone.
-- [ ] **Step 3: Cover all three states** in the Playwright spec, including the
+- [x] **Step 3: Cover all three states** in the Playwright spec, including the
   unknown case, which is the one that regresses silently.
 
 **Acceptance criteria:** a mixed project visibly distinguishes phone clips from
@@ -138,12 +138,12 @@ drone clips before playback, and a legacy project shows no false claim.
 - Modify: the Review route header
 - Test: `frontend/e2e/preview-audio.spec.ts`
 
-- [ ] **Step 1: Add a mute toggle plus volume slider** to the Timeline
+- [x] **Step 1: Add a mute toggle plus volume slider** to the Timeline
   transport, next to the existing playback controls, with `aria-pressed` on the
   toggle and a labelled range input for volume.
-- [ ] **Step 2: Give Review the same control** so candidates can be auditioned
+- [x] **Step 2: Give Review the same control** so candidates can be auditioned
   without visiting the Timeline. Both drive the single preference from Task 1.
-- [ ] **Step 3: Keep the control usable when nothing has audio.** If no source
+- [x] **Step 3: Keep the control usable when nothing has audio.** If no source
   in the project has audio, the control stays visible but disabled with a
   reason — a missing control reads as a bug.
 
@@ -152,7 +152,7 @@ the two agree, and the state is keyboard reachable and announced.
 
 ### 5. Verify
 
-- [ ] Run the frontend gates:
+- [x] Run the frontend gates:
 
   ```bash
   cd frontend
@@ -173,6 +173,27 @@ the two agree, and the state is keyboard reachable and announced.
 
 **Acceptance criteria:** all frontend gates pass, sound is off until asked for,
 silent sources stay silent, and no preview stalls because of autoplay policy.
+
+## What implementation found
+
+- React does not reliably propagate a changed `muted` prop to a mounted media
+  element, so both previews set `muted`, `volume`, and `preservesPitch` on the
+  element in an effect rather than trusting JSX.
+- The clips panel collapsed on **any** unrelated re-render, because React resets
+  an uncontrolled `<details open>`. Fixed here as a drive-by: the panel is now
+  controlled and its summary drives the state directly. This was pre-existing,
+  not caused by preview audio, but preview state in Review is untestable while
+  the panel closes itself.
+- Making previews audible newly triggers `media-has-caption`: the rule ignores
+  muted elements. Both previews now declare an empty `<track kind="captions">`,
+  which is honest — source footage carries no caption track.
+- The unknown-metadata case moved out of the e2e spec into
+  `tests/main/sourceAudio.test.ts` against the pure `sourceAudioState` helper.
+  Faking it through the network was unreliable because project state also
+  arrives over SSE.
+- The audio control's labels are "Enable sound"/"Mute sound" and "Volume", not
+  "Preview …": an existing spec locates preview videos with
+  `getByLabel(/Preview /)`, which a "Preview volume" slider would break.
 
 ## Genuine uncertainties
 

@@ -52,7 +52,9 @@ export function ConfirmDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="confirm-dialog-title">{title}</h2>
-        <p className="confirm-dialog-body">{body}</p>
+        {/* A div, not a <p>: `body` is a ReactNode, and block content inside a
+            paragraph is invalid nesting. */}
+        <div className="confirm-dialog-body">{body}</div>
         <div className="confirm-dialog-actions">
           <button type="button" className="btn subtle" ref={cancelRef} onClick={onCancel}>
             Cancel

@@ -29,9 +29,11 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [021](done/021-truthful-export.md) | Export authoritative Timeline with complete warnings | DONE (2026-08-10) — second stacked branch |
 | [022](done/022-project-shell-header-and-sidebar.md) | Project shell header and project list redesign | DONE (2026-08-12) at `c186ef4`, polished at `998f6d7` |
 | [023](023-macos-app-icon-geometry.md) | Correct macOS app icon geometry | TODO |
-| [024](024-source-audio-in-exports.md) | Source audio in exports | TODO |
+| [024](done/024-source-audio-in-exports.md) | Source audio in exports | DONE (2026-08-13) — shipped in PR #65; real-footage/Resolve QA passed |
 | [025](025-bundle-siglip-embedding-model.md) | Export and bundle the SigLIP embedding model | TODO — until it lands, plan 018's diversity is inert in real runs |
-| [026](026-preview-audio-in-app.md) | Hear source audio in the app | TODO — depends on plan 024's `has_audio` |
+| [026](done/026-preview-audio-in-app.md) | Hear source audio in the app | DONE (2026-08-13) — shipped in PR #65; real-footage QA passed |
+| [027](027-authoritative-candidate-library-and-diverse-edits.md) | Make All Clips authoritative and diversify chat Versions | TODO — independent quick correctness/clarity plan |
+| [028](028-find-more-clips-from-source-video.md) | Find more Candidate Clips from one Source Video | TODO — depends on plan 019, then 027 terminology |
 
 ## Product plans
 

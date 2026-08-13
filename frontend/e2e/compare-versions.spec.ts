@@ -291,6 +291,13 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   expect(rederiveRequests[0]).toMatchObject({ max_candidates_per_video: 12 });
   expect(analyzeRequests).toHaveLength(1);
 
+  // Rederiving rebuilds the Candidate Clips, and review_context_fingerprint
+  // hashes those candidates. Keeping the memoized set would stamp the Versions
+  // with a pre-rederive fingerprint, making "Current suggestion" below depend on
+  // regeneration being byte-reproducible rather than on what this test is about.
+  // Rebuild the set against the regenerated library so the state is well-defined.
+  currentVersionSet = null;
+
   await page.goto('/#/review');
   const adjustClipSettings = page.getByRole('link', { name: 'Adjust clip settings' });
   await expect(adjustClipSettings).toHaveAttribute('href', '#/import');

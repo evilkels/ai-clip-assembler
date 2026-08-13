@@ -56,6 +56,13 @@ export interface VideoMetadata {
   codec: string;
   size_bytes?: number;
   created_at?: string;
+  // Audio fields are optional because projects probed before plan 024 have
+  // none: undefined means unknown, not silent.
+  has_audio?: boolean;
+  audio_channels?: number | null;
+  audio_sample_rate?: number | null;
+  audio_codec?: string | null;
+  audio_bit_depth?: number | null;
 }
 
 export interface UploadedVideo {

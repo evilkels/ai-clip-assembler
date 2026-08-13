@@ -27,6 +27,12 @@ interface ClipPreviewProps {
   playbackRate?: number;
   /** Digital zoom applied to the rendered video. */
   scale?: number;
+  /** Silence the element. Preview audio is off unless the user asks for it. */
+  muted?: boolean;
+  /** 0..1, applied as a property: `volume` is not a valid HTML attribute. */
+  volume?: number;
+  /** Called when Chromium refuses unmuted playback so the UI can show muted. */
+  onAudioBlocked?: () => void;
 }
 
 function boundedStart(startSec: number, endSec: number): number {
@@ -47,6 +53,9 @@ export function ClipPreview({
   onPlaybackTime,
   playbackRate = 1,
   scale = 1,
+  muted = true,
+  volume = 1,
+  onAudioBlocked,
 }: ClipPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const appliedSeekRef = useRef<{ epoch: number; mediaUrl: string } | null>(null);
@@ -86,16 +95,37 @@ export function ClipPreview({
     const video = videoRef.current;
     if (!video || !mediaUrl) return;
     if (playing) {
-      video.play().catch(() => {});
+      video.play().catch(() => {
+        // Chromium refuses unmuted playback without a user gesture, and the
+        // Timeline advances segments on its own clock. Retry muted so the
+        // playhead never stalls, and tell the owner the app fell back.
+        if (video.muted) return;
+        video.muted = true;
+        onAudioBlocked?.();
+        video.play().catch(() => {});
+      });
     } else {
       video.pause();
     }
-  }, [mediaUrl, playing]);
+  }, [mediaUrl, playing, onAudioBlocked]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (video) video.playbackRate = playbackRate;
   }, [mediaUrl, playbackRate]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    // React does not reliably propagate a changed `muted` prop to a mounted
+    // media element, so own it here rather than trusting the JSX attribute.
+    video.muted = muted;
+    video.volume = Math.max(0, Math.min(1, volume));
+    // Pin the retime behavior instead of relying on the browser default, so a
+    // 0.5x or 2x clip is time-stretched (dialogue stays intelligible) in every
+    // build, matching Resolve's own audio retime.
+    video.preservesPitch = true;
+  }, [mediaUrl, muted, volume]);
 
   // Report the video clock while playing (RAF for smooth playhead motion).
   useEffect(() => {
@@ -127,7 +157,7 @@ export function ClipPreview({
         data-testid={testId}
         src={mediaUrl}
         controls={controls}
-        muted
+        muted={muted}
         preload="metadata"
         playsInline
         aria-label={label}
@@ -154,7 +184,11 @@ export function ClipPreview({
               }
             : undefined
         }
-      />
+      >
+        {/* Source footage carries no caption track; declaring an empty one
+            keeps the now-audible preview accessible. */}
+        <track kind="captions" />
+      </video>
       <div className="clip-preview-label">{label}</div>
     </div>
   );

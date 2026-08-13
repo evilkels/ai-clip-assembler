@@ -1,4 +1,7 @@
 import type { TimelineItem } from '../api/client';
+import { SourceAudioBadge } from './SourceAudioBadge';
+import { sourceAudioState } from '../lib/sourceAudio';
+import { useReview } from '../state/ReviewContext';
 
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
@@ -9,21 +12,26 @@ export function TimelineItemRow({
   index,
   total,
   name,
+  fileId,
   apply,
 }: {
   item: TimelineItem;
   index: number;
   total: number;
   name: string;
+  fileId?: string;
   apply: (operation: string, args: Record<string, unknown>) => Promise<void>;
 }) {
   const effective = round((item.end_sec - item.start_sec) / item.speed);
+  const { uploadedVideos } = useReview();
+  const sourceAudio = sourceAudioState(fileId, uploadedVideos);
 
   return (
     <li className="timeline-item-row" data-testid="timeline-item-row">
       <div className="timeline-item-head">
         <span className="pill-rank">#{index + 1}</span>
         <span className="timeline-item-name">{name}</span>
+        <SourceAudioBadge hasAudio={sourceAudio.hasAudio} channels={sourceAudio.channels} />
         <span className="draft-summary">{effective}s on timeline</span>
         <div className="timeline-item-order">
           <button

@@ -10,7 +10,10 @@ Folder projects keep media in place and state under `clipassembler/`. Manual
 Harness is local/default; consented `pi_agent` adds cloud visual scoring and
 falls back per video. Timeline Document ownership and undo/redo live in the
 backend Operations core; GUI and `/mcp` edit that same state over SSE. FCPXML
-and Resolve XML preserve speed/transform; EDL flattens and warns.
+and Resolve XML preserve speed/transform and carry linked source audio for
+audio-bearing clips; clips from silent sources remain video-only. EDL carries
+its representable source channels, flattens speed/transform, and warns about
+those degradations.
 
 ## Setup and launch
 
@@ -68,7 +71,9 @@ never record real auth files, URLs, codes, or tokens:
    `claude mcp add --transport http clip-assembler http://127.0.0.1:8000/mcp`.
    List candidates/read frames/apply edits; confirm the GUI updates live.
 3. Accept a Review Proposal (Timeline changes and is undoable); reject another
-   (Timeline unchanged). Resolve XML preserves speed/transform; EDL warns.
+   (Timeline unchanged). Resolve XML preserves speed/transform and linked
+   source audio; silent-source clips stay video-only. EDL preserves its
+   representable audio channel code, flattens speed/transform, and warns.
 
 ## Backend smoke/API
 
@@ -89,7 +94,10 @@ Expect metadata, complete status, smooth candidates, and actionable tool errors.
 ## Resolve validation and evidence
 
 Import `exports/davinci/timeline.xml`; confirm no relink and matching
-count/order/in-out/speed/transform. Move the folder and repeat. Import EDL after
-adding source media; verify timing and orientation. Capture media properties,
-quality examples, harness/count, editorial usefulness, Timeline persistence,
-agent outcomes, and sanitized failures in `QA.md`.
+count/order/in-out/speed/transform. For audio-bearing source clips, verify
+linked waveforms on the corresponding audio tracks; a silent source must add no
+audio item. Move the folder and repeat. Import EDL after adding source media;
+verify timing/orientation and `B` or `AA/V` for audio-bearing sources versus
+`V` for silent sources. Capture media properties, quality examples,
+harness/count, editorial usefulness, Timeline persistence, agent outcomes, and
+sanitized failures in `QA.md`.

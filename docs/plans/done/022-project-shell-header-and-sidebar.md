@@ -1,6 +1,8 @@
 # Project Shell Header and Project List Redesign
 
-> **Status:** TODO — spec for a single bounded implementation pass.
+> **Status:** DONE (2026-08-12) at `c186ef4`, with a follow-up row/confirm-dialog
+> polish pass at `998f6d7`. All four tasks shipped; the temporary Task 1 probe
+> spec was removed as required.
 
 **Goal:** Put the current project's identity in one place above the whole layout,
 fix the main content area clipping horizontally, and turn the sidebar Projects

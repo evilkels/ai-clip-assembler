@@ -9,6 +9,15 @@ safe execution baseline. The last recorded mechanical pass reduced findings
 from 47 to 33 on local react-doctor 0.2.14. Re-run the installed tool and
 refresh file/line evidence before selecting another batch.
 
+Reconcile note (2026-08-13): every file/line citation in the batch list below
+is now stale and must be re-derived, not trusted. `Import.tsx:84` is analysis
+progress arithmetic, not the clickable `<div>` batch 2 describes; `Import.tsx`
+is 818 lines, so the `:119` list-key reference has moved; and `Timeline.tsx` is
+760 lines, not the 391 batch 4 cites for its split. The batch *themes*
+(a11y, list keys, state refactors) are still worth doing — the coordinates are
+not. Re-run `npm run doctor -- --verbose --diff` first and rebuild the batches
+from its output.
+
 **History:** score bounced between snapshots (88/100 → 90/100 staged →
 44/100 after the codebase grew with the agent-operable-timeline UI) — treat
 none of these counts as current. Batch 1 quick wins (`button-has-type` on 14

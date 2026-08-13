@@ -41,7 +41,11 @@ folder, falling back silently if it's missing.
 
 Remaining: `Cmd-B` collapsed/expanded rail + persisted resizable width;
 replacing inline Locate/Remove buttons with a context-menu interaction;
-keyboard-nav/a11y verification (react-doctor rules). Migration: first launch
+keyboard-nav/a11y verification (react-doctor rules). Superseded above:
+recents-label rename and alphabetical, card-style project rows shipped in
+[plan 022](done/022-project-shell-header-and-sidebar.md), so the "Rename ...
+deferred to v2" line no longer holds; `lastOpenedAt` is still written but no
+longer drives display order. Migration: first launch
 with no `recent.json` → empty state, no errors; a migration banner for the
 old `.ai-clip-assembler/projects/` scaffolding is deferred to v1.1 if scope
 creeps. Open questions: show backend health status in the sidebar (or push

@@ -178,4 +178,9 @@ export interface VideoMetadata {
   codec: string;
   size_bytes?: number;
   created_at?: string | null;
+  has_audio?: boolean;
+  audio_channels?: number | null;
+  audio_sample_rate?: number | null;
+  audio_codec?: string | null;
+  audio_bit_depth?: number | null;
 }

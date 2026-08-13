@@ -47,4 +47,4 @@ diagnostics/consent, MCP regression, browsers/architectures, and secret scanning
 
 No logout/device-code/manual-code UI, other OAuth providers, automatic Pi
 installation, footage upload, or changes to project consent. Follow-up record:
-[`review-model-sign-in-followups.md`](review-model-sign-in-followups.md).
+[`review-model-sign-in-followups.md`](../review-model-sign-in-followups.md).

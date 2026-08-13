@@ -21,6 +21,11 @@ class VideoMetadata(BaseModel):
     size_bytes: int = 0
     # ISO 8601 recording time from container metadata, or file mtime fallback.
     created_at: Optional[str] = None
+    has_audio: bool = False
+    audio_channels: Optional[int] = None
+    audio_sample_rate: Optional[int] = None
+    audio_codec: Optional[str] = None
+    audio_bit_depth: Optional[int] = None
 
 
 class FrameSample(BaseModel):

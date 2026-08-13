@@ -13,6 +13,12 @@ Neither `docs/QA.md` nor `docs/MANUAL_QA_GUIDE.md` answers the real question: do
 2. **Signal**: ≥70% of accepted clips would have been picked by manual review of the same footage (measured against the user's own ground truth, Flow D).
 3. **Handoff**: opening the exported DaVinci timeline resolves all media with zero relink prompts.
 
+Resolve XML must retain linked source audio for audio-bearing clips while
+silent-source clips remain video-only. EDL is a deliberately flattened handoff:
+it uses `B` for mono, `AA/V` for stereo (including the first two channels of a
+wider source), `V` for silent/legacy metadata, and warns only when channels
+beyond 1–2 are dropped.
+
 If any of these three fails, the workflow is not solved regardless of which feature shipped.
 
 ## Flows (A–E)
@@ -25,13 +31,14 @@ If any of these three fails, the workflow is not solved regardless of which feat
 
 ## Explicitly out of scope
 
-Audio, multi-track timeline, color grading/transitions/effects, Windows/Linux support (macOS-only for now), per-rule regression tests (already in `docs/QA.md`).
+Multi-track timeline, color grading/transitions/effects, Windows/Linux support
+(macOS-only for now), per-rule regression tests (already in `docs/QA.md`).
 
 ## Automation status
 
 **Implemented**: `scripts/synthetic_e2e_qa.py` generates synthetic smooth/shaky/mixed footage and drives the real backend pipeline — verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with relative paths, and close/reopen restore. Playwright covers upload, analysis completion, Review/Timeline video preview, inclusion.
 
-**Still manual** (not automatable): real-footage timing targets, renderer responsiveness under real load, actual DaVinci/FCP import with zero relink prompts, project move/Locate through the packaged app, and the Flow D AI-vs-Manual human judgment call.
+**Still manual** (not automatable): real-footage timing targets, renderer responsiveness under real load, actual DaVinci/FCP import with zero relink prompts and linked-audio verification, project move/Locate through the packaged app, and the Flow D AI-vs-Manual human judgment call.
 
 ## Open questions
 

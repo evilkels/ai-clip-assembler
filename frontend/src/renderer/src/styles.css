@@ -349,85 +349,161 @@ a {
   color: var(--text);
 }
 
+.project-list {
+  gap: 1px;
+}
+
+/* One-line project rows: the row itself opens the project, and the secondary
+   actions stay out of the way until the row is hovered or focused. */
 .project-row-wrap {
+  /* Tracks the row's own background so the hover actions can fade over the
+     name instead of permanently reserving width from it. */
+  --row-bg: var(--bg-2);
   min-width: 0;
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.project-row-wrap:hover,
+.project-row-wrap:focus-within {
+  background: var(--bg-2);
 }
 
 .project-row-wrap.active {
-  border-color: var(--border-strong);
+  --row-bg: var(--bg-active);
   background: var(--bg-active);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
-.project-row-heading {
+.project-row {
+  position: relative;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+}
+
+.project-row-open {
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.project-row-open:disabled {
+  cursor: default;
 }
 
 .project-row-name {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
+  color: var(--text-dim);
   font-size: var(--text-sm);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.project-row-wrap:hover .project-row-name,
+.project-row-wrap.active .project-row-name {
+  color: var(--text);
+}
+
+.project-row-wrap.active .project-row-name {
   font-weight: 600;
 }
 
 .project-state-chip {
   flex: 0 0 auto;
-  padding: 2px var(--space-2);
-  border: 1px solid var(--border);
+  padding: 1px 6px;
   border-radius: 999px;
   background: var(--bg-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
-.project-state-chip.open {
-  color: var(--green);
-}
-
 .project-state-chip.missing {
   color: var(--yellow);
 }
 
-.project-list-hint {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.35;
+/* A missing project needs an explanation and a repair action, so it earns a
+   second line. The common healthy case stays a single row. */
+.project-row-missing-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-1) var(--space-2);
 }
 
 .project-row-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  transform: translateY(-50%);
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--space-1);
+  background: var(--row-bg);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.project-row-actions button,
-.project-empty,
-.sidebar-error {
-  color: var(--text-dim);
-  font-size: var(--text-xs);
+/* Fades the truncated name out underneath the revealed actions. */
+.project-row-actions::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 20px;
+  background: linear-gradient(to right, transparent, var(--row-bg));
 }
 
-.project-row-actions button {
+/* Hover reveals the actions; focus-within keeps them reachable by keyboard. */
+.project-row-wrap:hover .project-row-actions,
+.project-row-wrap:focus-within .project-row-actions {
+  opacity: 1;
+}
+
+.project-row-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.project-row-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.project-row-icon:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+
+.project-row-icon.danger:hover {
+  color: var(--red);
+}
+
+.project-row-locate {
   min-height: 24px;
   padding: 2px var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-2);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
 }
 
-.project-row-actions button:hover {
+.project-row-locate:hover {
   color: var(--text);
   background: var(--bg-3);
 }
@@ -435,6 +511,12 @@ a {
 .project-row-actions button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.project-empty,
+.sidebar-error {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
 }
 
 .project-rename-editor {
@@ -508,18 +590,22 @@ a {
   position: relative;
 }
 
-/* Connector line linking each step marker to the next, so the four
-   steps read as a single top-to-bottom journey. */
-.workflow-step:not(:last-child) .step-marker::after {
+/* Connector line linking each step marker to the next, so the four steps read
+   as a single top-to-bottom journey. Anchored to the row rather than the
+   marker: a percentage height on the marker resolves against the marker's own
+   24px box, which collapses the line to a stub. Top/bottom offsets are the
+   marker's position inside .step-link (6px padding + 24px marker) and the
+   reach into the next row (2px list gap + 6px padding). */
+.workflow-step:not(:last-child)::after {
   content: '';
   position: absolute;
-  left: 50%;
-  top: 100%;
+  left: 20px;
+  top: 30px;
+  bottom: -8px;
   transform: translateX(-50%);
   width: 2px;
-  height: calc(100% - 24px + 4px);
-  background: var(--border);
   border-radius: 2px;
+  background: var(--border);
 }
 
 .step-link {
@@ -579,8 +665,13 @@ a {
   align-items: center;
   gap: 7px;
   font-size: var(--text-sm);
-  font-weight: 560;
+  font-weight: 500;
   line-height: 1.2;
+}
+
+/* Only the step you are on is emphasised; the rest recede into the journey. */
+.step-link.active .step-label {
+  font-weight: 620;
 }
 
 .step-icon {
@@ -621,7 +712,8 @@ a {
   color: var(--green);
 }
 
-.step-link.done:not(:last-child) .step-marker::after {
+/* A completed step's connector reads as progress travelled. */
+.workflow-step:not(:last-child):has(.step-link.done)::after {
   background: color-mix(in srgb, var(--green) 45%, var(--border));
 }
 
@@ -632,11 +724,12 @@ a {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/* The row already carries the accent bar and fill, so the marker only needs
+   the accent colour — the extra glow ring made the active row shout. */
 .step-link.active .step-marker {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .step-link.active .step-icon,
@@ -865,6 +958,17 @@ a {
 .btn.subtle:hover {
   color: var(--text);
   background: var(--bg-2);
+}
+
+.btn.destructive {
+  border-color: var(--red);
+  background: transparent;
+  color: var(--red);
+}
+
+.btn.destructive:hover {
+  background: var(--red);
+  color: var(--bg-0);
 }
 
 .btn:disabled {
@@ -1468,6 +1572,45 @@ a {
 .version-state-stale,
 .version-state-unavailable,
 .version-missing { color: var(--yellow); }
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.confirm-dialog {
+  display: grid;
+  gap: var(--space-3);
+  width: min(380px, 100%);
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.confirm-dialog-body {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
 
 .version-apply-backdrop {
   position: fixed;
@@ -2930,4 +3073,36 @@ a {
   background: var(--bg-0);
   color: var(--text);
   font-size: var(--text-xs);
+}
+
+/* Source audio state (plan 026): audio-bearing vs known-silent sources. An
+   unprobed source renders no badge at all rather than claiming silence. */
+.source-audio-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.source-audio-badge.has-audio {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.source-audio-badge.silent {
+  color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+.preview-audio-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-audio-control input[type='range'] {
+  width: 84px;
 }

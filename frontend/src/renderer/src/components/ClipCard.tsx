@@ -1,9 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ClipCandidate, ClipDecision } from '../types/clip';
 import { verdictFor } from '../lib/scoring';
 import { formatClock } from '../lib/format';
 import { ScoreChip } from './ScoreChip';
 import { SourceTrack, type Range } from './SourceTrack';
+import { SourceAudioBadge } from './SourceAudioBadge';
+import { sourceAudioState } from '../lib/sourceAudio';
+import { useReview } from '../state/ReviewContext';
+import { usePreviewAudio } from '../state/usePreviewAudio';
 
 const EMPTY_RANGES: Range[] = [];
 const EMPTY_VERSION_LABELS: string[] = [];
@@ -75,6 +79,11 @@ export function ClipCard({
   const accent = fileColor(clip.file_id);
   const hasSiblings = (fileClipCount ?? 1) > 1;
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { uploadedVideos } = useReview();
+  const { muted, volume, setMuted } = usePreviewAudio();
+  const sourceAudio = sourceAudioState(clip.file_id, uploadedVideos);
+  // A source known to have no audio stays silent whatever the preference says.
+  const cardMuted = muted || sourceAudio.hasAudio === false;
   const [playing, setPlaying] = useState(false);
   // Seed-only: playhead starts at the clip's in-point, then moves independently
   // as the preview plays. Not state derived from the prop on every render.
@@ -92,8 +101,25 @@ export function ClipCard({
     if (video.currentTime < clip.start_sec || video.currentTime >= clip.end_sec - 0.05) {
       video.currentTime = clip.start_sec;
     }
-    video.play().catch(() => {});
+    video.play().catch(() => {
+      // Chromium refuses unmuted playback without a gesture; fall back to
+      // muted rather than leaving a dead play button, and say so in the UI.
+      if (video.muted) return;
+      video.muted = true;
+      setMuted(true);
+      video.play().catch(() => {});
+    });
   };
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    // React does not reliably propagate a changed `muted` prop to a mounted
+    // media element, so own it here rather than trusting the JSX attribute.
+    video.muted = cardMuted;
+    video.volume = Math.max(0, Math.min(1, volume));
+    video.preservesPitch = true;
+  }, [cardMuted, volume]);
 
   const seekFromTrack = (event: React.MouseEvent<HTMLButtonElement>) => {
     const video = videoRef.current;
@@ -124,7 +150,7 @@ export function ClipCard({
               ref={videoRef}
               src={`${mediaUrl}#t=${clip.start_sec.toFixed(3)}`}
               preload="metadata"
-              muted
+              muted={cardMuted}
               playsInline
               aria-label={`Preview ${clip.file_name}`}
               onPlay={() => setPlaying(true)}
@@ -136,7 +162,11 @@ export function ClipCard({
                 }
                 setPlayheadSec(video.currentTime);
               }}
-            />
+            >
+              {/* Source footage carries no caption track; declaring an empty
+                  one keeps the now-audible preview accessible. */}
+              <track kind="captions" />
+            </video>
             <button
               type="button"
               className="clip-play-btn"
@@ -166,6 +196,7 @@ export function ClipCard({
         <div className="clip-source-row">
           <span className="clip-file-dot" style={{ background: accent }} title="Source file" />
           <strong className="clip-source">{clip.file_name}</strong>
+          <SourceAudioBadge hasAudio={sourceAudio.hasAudio} channels={sourceAudio.channels} />
           {hasSiblings && (
             <span className="clip-file-group" style={{ borderColor: accent, color: accent }}>
               {fileClipIndex} of {fileClipCount} from this file

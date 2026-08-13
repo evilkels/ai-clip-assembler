@@ -1,4 +1,5 @@
 import os
+import math
 from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import quote
@@ -71,6 +72,33 @@ def effective_duration(clip: dict) -> float:
     return float(clip["duration_sec"]) / max(0.01, float(clip.get("suggested_speed", 1.0) or 1.0))
 
 
+def _positive_int(value: object) -> Optional[int]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or number <= 0 or not number.is_integer():
+        return None
+    return int(number)
+
+
+def source_audio_channels(source: dict) -> int:
+    metadata = source.get("metadata") or {}
+    if metadata.get("has_audio") is not True:
+        return 0
+    return _positive_int(metadata.get("audio_channels")) or 1
+
+
+def source_audio_sample_rate(source: dict) -> int:
+    metadata = source.get("metadata") or {}
+    return _positive_int(metadata.get("audio_sample_rate")) or 48000
+
+
+def source_audio_bit_depth(source: dict) -> int:
+    metadata = source.get("metadata") or {}
+    return _positive_int(metadata.get("audio_bit_depth")) or 16
+
+
 def clip_transform(clip: dict) -> Optional[dict]:
     """A clip's non-identity Transform, or ``None`` for identity/absent."""
     transform = clip.get("transform")
@@ -84,7 +112,9 @@ def clip_transform(clip: dict) -> Optional[dict]:
     return {"scale": scale, "x": x, "y": y}
 
 
-def edl_flatten_warnings(clips: List[dict]) -> List[str]:
+def edl_flatten_warnings(
+    clips: List[dict], videos_by_id: Optional[Dict[str, dict]] = None
+) -> List[str]:
     """EDL cannot faithfully represent Speed/Transform; warn when present.
 
     Returned to the caller so the GUI can surface that an EDL export dropped
@@ -92,23 +122,48 @@ def edl_flatten_warnings(clips: List[dict]) -> List[str]:
     """
     has_speed = any(float(clip.get("suggested_speed", 1.0) or 1.0) != 1.0 for clip in clips)
     has_transform = any(clip_transform(clip) is not None for clip in clips)
-    if not (has_speed or has_transform):
-        return []
     flattened = []
+    flattened_warnings = []
     if has_speed:
         flattened.append("Speed")
     if has_transform:
         flattened.append("Transform")
-    return [
-        f"EDL cannot represent {' and '.join(flattened)}; it was flattened. "
-        "Export FCPXML or Resolve XML to preserve it."
-    ]
+    if flattened:
+        flattened_warnings.append(
+            f"EDL cannot represent {' and '.join(flattened)}; it was flattened. "
+            "Export FCPXML or Resolve XML to preserve it."
+        )
+    if videos_by_id:
+        has_more_than_two_channels = any(
+            source_audio_channels(videos_by_id.get(clip["file_id"], {})) > 2 for clip in clips
+        )
+        if has_more_than_two_channels:
+            flattened_warnings.append(
+                "EDL carries only audio channels 1–2; additional source channels were dropped."
+            )
+    return flattened_warnings
 
 
-def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
+def edl_channel_code(clip: dict, videos_by_id: Optional[Dict[str, dict]]) -> str:
+    if not videos_by_id:
+        return "V"
+    channels = source_audio_channels(videos_by_id.get(clip["file_id"], {}))
+    if channels <= 0:
+        return "V"
+    if channels == 1:
+        return "B"
+    return "AA/V"
+
+
+def generate_edl(
+    title: str,
+    clips: List[dict],
+    fps: float = 30,
+    videos_by_id: Optional[Dict[str, dict]] = None,
+) -> str:
     lines = [f"TITLE: {title}", "FCM: NON-DROP FRAME", ""]
-    for warning in edl_flatten_warnings(clips):
-        lines.append(f"* NOTE: {warning} (flattened)")
+    for warning in edl_flatten_warnings(clips, videos_by_id):
+        lines.append(f"* NOTE: {warning}")
     if len(lines) > 3:
         lines.append("")
     timeline_cursor = 0.0
@@ -118,7 +173,7 @@ def generate_edl(title: str, clips: List[dict], fps: float = 30) -> str:
         record_in = timeline_cursor
         record_out = timeline_cursor + float(clip["duration_sec"])
         lines.append(
-            f"{index:03d}  AX       V     C        "
+            f"{index:03d}  AX       {edl_channel_code(clip, videos_by_id):<5} C        "
             f"{seconds_to_timecode(source_in, fps)} "
             f"{seconds_to_timecode(source_out, fps)} "
             f"{seconds_to_timecode(record_in, fps)} "
@@ -152,6 +207,39 @@ def append_xmeml_rate(parent: ET.Element, fps: float) -> None:
 
 def seconds_to_frames(seconds: float, fps: float) -> int:
     return int(round(seconds * xmeml_timebase(fps)))
+
+
+def append_xmeml_time_remap(clipitem: ET.Element, speed: float, mediatype: str) -> None:
+    filter_element = ET.SubElement(clipitem, "filter")
+    effect = ET.SubElement(filter_element, "effect")
+    ET.SubElement(effect, "name").text = "Time Remap"
+    ET.SubElement(effect, "effectid").text = "timeremap"
+    ET.SubElement(effect, "mediatype").text = mediatype
+    parameter = ET.SubElement(effect, "parameter")
+    ET.SubElement(parameter, "parameterid").text = "speed"
+    ET.SubElement(parameter, "value").text = str(round(speed * 100, 3))
+
+
+def append_xmeml_clip_timing(
+    clipitem: ET.Element,
+    clip: dict,
+    source_duration: float,
+    timeline_cursor: float,
+    fps: float,
+) -> None:
+    ET.SubElement(clipitem, "name").text = clip["file_name"]
+    ET.SubElement(clipitem, "enabled").text = "TRUE"
+    ET.SubElement(clipitem, "duration").text = str(
+        seconds_to_frames(source_duration or clip["duration_sec"], fps)
+    )
+    append_xmeml_rate(clipitem, fps)
+    ET.SubElement(clipitem, "start").text = str(seconds_to_frames(timeline_cursor, fps))
+    timeline_duration = effective_duration(clip)
+    ET.SubElement(clipitem, "end").text = str(
+        seconds_to_frames(timeline_cursor + timeline_duration, fps)
+    )
+    ET.SubElement(clipitem, "in").text = str(seconds_to_frames(clip["start_sec"], fps))
+    ET.SubElement(clipitem, "out").text = str(seconds_to_frames(clip["end_sec"], fps))
 
 
 def generate_resolve_xml(
@@ -189,27 +277,42 @@ def generate_resolve_xml(
     append_xmeml_rate(characteristics, fps)
     track = ET.SubElement(video, "track")
 
+    audio_channel_counts = [
+        source_audio_channels(videos_by_id.get(clip["file_id"], {})) for clip in clips
+    ]
+    max_audio_channels = max(audio_channel_counts, default=0)
+    audio_tracks = []
+    if max_audio_channels:
+        audio = ET.SubElement(media, "audio")
+        ET.SubElement(audio, "channelcount").text = str(max_audio_channels)
+        audio_format = ET.SubElement(audio, "format")
+        audio_characteristics = ET.SubElement(audio_format, "samplecharacteristics")
+        first_audio_source = next(
+            videos_by_id.get(clip["file_id"], {})
+            for clip in clips
+            if source_audio_channels(videos_by_id.get(clip["file_id"], {}))
+        )
+        ET.SubElement(audio_characteristics, "depth").text = str(
+            source_audio_bit_depth(first_audio_source)
+        )
+        ET.SubElement(audio_characteristics, "samplerate").text = str(
+            source_audio_sample_rate(first_audio_source)
+        )
+        audio_tracks = [ET.SubElement(audio, "track") for _ in range(max_audio_channels)]
+
     defined_file_ids = set()
     timeline_cursor = 0.0
     for index, clip in enumerate(clips, start=1):
         source = videos_by_id.get(clip["file_id"], {})
         source_metadata = source.get("metadata") or {}
         source_duration = float(source_metadata.get("duration_sec", 0) or 0)
+        item_id = f"clipitem-{index}"
 
-        clipitem = ET.SubElement(track, "clipitem", {"id": f"clipitem-{index}"})
-        ET.SubElement(clipitem, "name").text = clip["file_name"]
-        ET.SubElement(clipitem, "enabled").text = "TRUE"
-        ET.SubElement(clipitem, "duration").text = str(
-            seconds_to_frames(source_duration or clip["duration_sec"], fps)
-        )
-        append_xmeml_rate(clipitem, fps)
-        ET.SubElement(clipitem, "start").text = str(seconds_to_frames(timeline_cursor, fps))
-        timeline_duration = effective_duration(clip)
-        ET.SubElement(clipitem, "end").text = str(
-            seconds_to_frames(timeline_cursor + timeline_duration, fps)
-        )
-        ET.SubElement(clipitem, "in").text = str(seconds_to_frames(clip["start_sec"], fps))
-        ET.SubElement(clipitem, "out").text = str(seconds_to_frames(clip["end_sec"], fps))
+        clipitem = ET.SubElement(track, "clipitem", {"id": item_id})
+        append_xmeml_clip_timing(clipitem, clip, source_duration, timeline_cursor, fps)
+        sourcetrack = ET.SubElement(clipitem, "sourcetrack")
+        ET.SubElement(sourcetrack, "mediatype").text = "video"
+        ET.SubElement(sourcetrack, "trackindex").text = "1"
 
         file_id = f"file-{clip['file_id']}"
         file_element = ET.SubElement(clipitem, "file", {"id": file_id})
@@ -217,10 +320,11 @@ def generate_resolve_xml(
             defined_file_ids.add(file_id)
             ET.SubElement(file_element, "name").text = clip["file_name"]
             pathurl = ET.SubElement(file_element, "pathurl")
-            if source.get("file_path"):
-                pathurl.text = path_to_asset_src(source["file_path"], media_base_path)
-            else:
-                pathurl.text = clip["file_name"]
+            pathurl.text = (
+                path_to_asset_src(source["file_path"], media_base_path)
+                if source.get("file_path")
+                else clip["file_name"]
+            )
             append_xmeml_rate(file_element, fps)
             ET.SubElement(file_element, "duration").text = str(
                 seconds_to_frames(source_duration, fps)
@@ -230,16 +334,23 @@ def generate_resolve_xml(
             file_characteristics = ET.SubElement(file_video, "samplecharacteristics")
             ET.SubElement(file_characteristics, "width").text = str(width)
             ET.SubElement(file_characteristics, "height").text = str(height)
+            if audio_channel_counts[index - 1]:
+                file_audio = ET.SubElement(file_media, "audio")
+                ET.SubElement(file_audio, "channelcount").text = str(audio_channel_counts[index - 1])
+                file_audio_format = ET.SubElement(file_audio, "format")
+                file_audio_characteristics = ET.SubElement(
+                    file_audio_format, "samplecharacteristics"
+                )
+                ET.SubElement(file_audio_characteristics, "depth").text = str(
+                    source_audio_bit_depth(source)
+                )
+                ET.SubElement(file_audio_characteristics, "samplerate").text = str(
+                    source_audio_sample_rate(source)
+                )
 
         speed = float(clip.get("suggested_speed", 1.0) or 1.0)
         if speed != 1.0:
-            filter_element = ET.SubElement(clipitem, "filter")
-            effect = ET.SubElement(filter_element, "effect")
-            ET.SubElement(effect, "name").text = "Time Remap"
-            ET.SubElement(effect, "effectid").text = "timeremap"
-            parameter = ET.SubElement(effect, "parameter")
-            ET.SubElement(parameter, "parameterid").text = "speed"
-            ET.SubElement(parameter, "value").text = str(round(speed * 100, 3))
+            append_xmeml_time_remap(clipitem, speed, "video")
 
         transform = clip_transform(clip)
         if transform is not None:
@@ -261,7 +372,35 @@ def generate_resolve_xml(
             ET.SubElement(center_value, "horiz").text = str(transform["x"])
             ET.SubElement(center_value, "vert").text = str(transform["y"])
 
-        timeline_cursor += timeline_duration
+        if audio_channel_counts[index - 1]:
+            video_link = ET.SubElement(clipitem, "link")
+            ET.SubElement(video_link, "mediatype").text = "video"
+            ET.SubElement(video_link, "trackindex").text = "1"
+            ET.SubElement(video_link, "clipindex").text = str(index)
+            for channel in range(1, audio_channel_counts[index - 1] + 1):
+                audio_item = ET.SubElement(audio_tracks[channel - 1], "clipitem", {"id": item_id})
+                append_xmeml_clip_timing(audio_item, clip, source_duration, timeline_cursor, fps)
+                audio_sourcetrack = ET.SubElement(audio_item, "sourcetrack")
+                ET.SubElement(audio_sourcetrack, "mediatype").text = "audio"
+                ET.SubElement(audio_sourcetrack, "trackindex").text = str(channel)
+                ET.SubElement(audio_item, "file", {"id": file_id})
+                if speed != 1.0:
+                    append_xmeml_time_remap(audio_item, speed, "audio")
+
+                audio_link = ET.SubElement(clipitem, "link")
+                ET.SubElement(audio_link, "mediatype").text = "audio"
+                ET.SubElement(audio_link, "trackindex").text = str(channel)
+                # clipindex counts items within the linked track, and a silent
+                # item occupies the video track without an audio companion.
+                ET.SubElement(audio_link, "clipindex").text = str(
+                    len(audio_tracks[channel - 1].findall("clipitem"))
+                )
+                if channel % 2 == 0:
+                    ET.SubElement(audio_link, "groupindex").text = str((channel + 1) // 2)
+                    previous_link = clipitem.findall("link")[-2]
+                    ET.SubElement(previous_link, "groupindex").text = str((channel + 1) // 2)
+
+        timeline_cursor += effective_duration(clip)
 
     body = ET.tostring(xmeml, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n' + body
@@ -292,16 +431,27 @@ def generate_fcpxml(
     for file_id, video in videos_by_id.items():
         metadata = video.get("metadata") or {}
         duration = float(metadata.get("duration_sec", 0) or 0)
+        asset_attributes = {
+            "id": f"asset-{file_id}",
+            "name": video["file_name"],
+            "src": path_to_asset_src(video["file_path"], media_base_path),
+            "duration": seconds_to_fcpx_duration(duration),
+            "hasVideo": "1",
+        }
+        audio_channels = source_audio_channels(video)
+        if audio_channels:
+            asset_attributes.update(
+                {
+                    "hasAudio": "1",
+                    "audioSources": "1",
+                    "audioChannels": str(audio_channels),
+                    "audioRate": str(source_audio_sample_rate(video)),
+                }
+            )
         ET.SubElement(
             resources,
             "asset",
-            {
-                "id": f"asset-{file_id}",
-                "name": video["file_name"],
-                "src": path_to_asset_src(video["file_path"], media_base_path),
-                "duration": seconds_to_fcpx_duration(duration),
-                "hasVideo": "1",
-            },
+            asset_attributes,
         )
 
     library = ET.SubElement(fcpxml, "library")
@@ -325,6 +475,8 @@ def generate_fcpxml(
                 "duration": seconds_to_fcpx_duration(timeline_duration),
             },
         )
+        if source_audio_channels(videos_by_id.get(clip["file_id"], {})):
+            asset_clip.set("audioRole", "dialogue")
         if speed != 1.0:
             time_map = ET.SubElement(asset_clip, "timeMap")
             ET.SubElement(

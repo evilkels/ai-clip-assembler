@@ -3074,3 +3074,35 @@ a {
   color: var(--text);
   font-size: var(--text-xs);
 }
+
+/* Source audio state (plan 026): audio-bearing vs known-silent sources. An
+   unprobed source renders no badge at all rather than claiming silence. */
+.source-audio-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.source-audio-badge.has-audio {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.source-audio-badge.silent {
+  color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+.preview-audio-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-audio-control input[type='range'] {
+  width: 84px;
+}

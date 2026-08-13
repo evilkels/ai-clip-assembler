@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
+import { PreviewAudioControl } from '../components/PreviewAudioControl';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
 import { useReview } from '../state/ReviewContext';
@@ -46,7 +47,9 @@ export function ReviewPage() {
     smoothnessThreshold,
     setSmoothnessThreshold,
     timelineSnapshot,
+    uploadedVideos,
   } = useReview();
+  const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
   const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 300, 240, 560);
 
@@ -132,6 +135,7 @@ export function ReviewPage() {
           <p>Let the AI suggest a full cut, or pick clips yourself, then refine.</p>
         </div>
         <div className="controls">
+          <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
           <div className="control">
             <label htmlFor="smoothness">Display filter</label>
             <input

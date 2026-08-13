@@ -87,9 +87,18 @@ export function SourceClipsPanel({
     <details
       className="source-clips-panel"
       data-testid="source-clips-panel"
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      // Controlled open: React resets an uncontrolled `open` on re-render, so
+      // the panel used to collapse on any unrelated update (an SSE event, the
+      // display filter). The summary drives the state directly rather than
+      // relying on the browser's own toggle.
+      open={open}
       >
-      <summary>
+      <summary
+        onClick={(event) => {
+          event.preventDefault();
+          setOpen((previous) => !previous);
+        }}
+      >
         <strong>{open ? 'Hide' : 'Browse'} your clips ({totalCount})</strong>
         <span className="draft-summary">
           {totals

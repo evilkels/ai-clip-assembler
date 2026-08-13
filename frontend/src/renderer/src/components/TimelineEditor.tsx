@@ -16,6 +16,7 @@ export function TimelineEditor() {
   if (!projectId) return null;
 
   const nameByClip = new Map(clips.map((clip) => [clip.clip_id, clip.file_name]));
+  const fileByClip = new Map(clips.map((clip) => [clip.clip_id, clip.file_id]));
 
   return (
     <section className="timeline-editor" aria-label="Timeline editor" data-testid="timeline-editor">
@@ -44,6 +45,7 @@ export function TimelineEditor() {
               index={index}
               total={timelineItems.length}
               name={nameByClip.get(item.source_clip_id) ?? item.source_clip_id}
+              fileId={fileByClip.get(item.source_clip_id)}
               apply={applyTimelineOperation}
             />
           ))}

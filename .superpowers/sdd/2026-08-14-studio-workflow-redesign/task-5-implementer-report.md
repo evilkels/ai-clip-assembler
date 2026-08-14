@@ -18,6 +18,23 @@ Status: DONE
 - Extended `timeline-playback.spec.ts` with selected-item inspector, repeated
   block, ruler/transport, and missing-source fallback assertions.
 
+## Review fix round
+
+- Sequence playback now deterministically skips missing-source placements when
+  a playable successor exists and safely stops when every remaining placement
+  is unavailable. Effective Timeline duration and offsets still include every
+  authoritative item.
+- Added mixed missing→valid and all-missing playback E2Es, plus request/document
+  assertions for `item_id`-targeted speed, transform, split, reorder,
+  undo/redo, and keyboard mutations. Existing live reorder/removal coverage
+  continues to verify SSE reconciliation.
+- Added native selection buttons to editor rows and clip blocks with
+  `aria-pressed`, avoiding nested interactive roles while preserving drag and
+  operation controls.
+- Added Timeline-specific dark/light surface assertions. Presentation remains
+  aligned with the supplied design reference: transport/ruler/playhead, clip
+  blocks with thumbnail treatment, selected inspector, and compact item rows.
+
 ## Verification
 
 - Red evidence: `npm run test:main -- --test-name-pattern='projects repeated|each item bounds|missing source'` initially failed because `timelineProjection` did not exist.
@@ -27,6 +44,8 @@ Status: DONE
 - `npm run lint:frontend`: PASS (0 warnings).
 - `npm run typecheck`: PASS, including generated-type freshness.
 - `git diff --check`: PASS.
+- Review fix focused E2Es: PASS (4/4 new Timeline cases).
+- Final combined focused E2Es: PASS (23/23 Timeline + preview-audio tests).
 
 ## Concerns
 

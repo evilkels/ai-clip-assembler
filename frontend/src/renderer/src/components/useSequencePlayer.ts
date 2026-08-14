@@ -39,6 +39,7 @@ export function useSequencePlayer({
   projectId,
   segments,
   loop = false,
+  skipUnavailable = false,
   onProgress,
 }: UseSequencePlayerArgs): UseSequencePlayerResult {
   const [playing, setPlaying] = useState(false);
@@ -55,6 +56,17 @@ export function useSequencePlayer({
   segmentsRef.current = segments;
 
   const timing = useMemo(() => computeTiming(segments), [segments]);
+
+  const findPlayableIndex = useCallback(
+    (fromIndex: number) => {
+      if (!skipUnavailable) return fromIndex < segments.length ? fromIndex : -1;
+      for (let index = Math.max(0, fromIndex); index < segments.length; index += 1) {
+        if (segments[index]?.file_id) return index;
+      }
+      return -1;
+    },
+    [segments, skipUnavailable],
+  );
 
   // Timeline segments carry stable item IDs, while VersionPlayer's legacy
   // segments do not. Resolve by identity when available and retain the old
@@ -114,13 +126,20 @@ export function useSequencePlayer({
       if (sourceTimeSec >= segment.end_sec - SEGMENT_END_EPSILON) {
         if (advanceLockRef.current) return;
         advanceLockRef.current = true;
-        const nextIndex = playbackIndex + 1;
-        if (nextIndex >= currentSegments.length) {
+        const nextIndex = skipUnavailable
+          ? currentSegments.findIndex(
+              (candidate, index) => index > playbackIndex && Boolean(candidate.file_id),
+            )
+          : playbackIndex + 1;
+        if (nextIndex < 0 || nextIndex >= currentSegments.length) {
           setCurrentSourceTimeSec(segment.end_sec);
           onProgress?.(playbackIndex, segment.end_sec);
           if (loop && currentSegments.length > 0) {
-            seekTo(0, currentSegments[0].start_sec);
-            return;
+            const loopIndex = skipUnavailable ? findPlayableIndex(0) : 0;
+            if (loopIndex >= 0) {
+              seekTo(loopIndex, currentSegments[loopIndex].start_sec);
+              return;
+            }
           }
           endedRef.current = true;
           setPlaying(false);
@@ -134,7 +153,7 @@ export function useSequencePlayer({
       setCurrentSourceTimeSec(sourceTimeSec);
       onProgress?.(playbackIndex, sourceTimeSec);
     },
-    [loop, onProgress, seekTo],
+    [findPlayableIndex, loop, onProgress, seekTo, skipUnavailable],
   );
 
   const seekToTimelineTime = useCallback(
@@ -161,9 +180,17 @@ export function useSequencePlayer({
   const play = useCallback(() => {
     const currentSegments = segmentsRef.current;
     if (currentSegments.length === 0) return;
-    if (endedRef.current) seekTo(0, currentSegments[0].start_sec);
+    const requestedIndex = endedRef.current ? 0 : currentIndexRef.current;
+    const playableIndex = findPlayableIndex(requestedIndex);
+    if (playableIndex < 0) {
+      setPlaying(false);
+      return;
+    }
+    if (playableIndex !== currentIndexRef.current) {
+      seekTo(playableIndex, currentSegments[playableIndex].start_sec);
+    }
     setPlaying(true);
-  }, [seekTo]);
+  }, [findPlayableIndex, seekTo]);
   const stop = useCallback(() => setPlaying(false), []);
   const toggle = useCallback(
     () => (playing ? stop() : play()),

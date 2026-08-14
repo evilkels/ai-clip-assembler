@@ -220,6 +220,7 @@ export function Timeline({
   const sequencePlayer = useSequencePlayer({
     projectId,
     segments: sequenceSegments,
+    skipUnavailable: true,
     onProgress: onSequenceProgress,
   });
   const { currentIndex, play, playing, previewProps, seekTo, stop } = sequencePlayer;
@@ -599,7 +600,7 @@ export function Timeline({
   const trackWidth = Math.max(totalDuration * pxPerSec, 1);
 
   return (
-    <div className="timeline">
+    <div className="timeline" data-timeline-playing={playing ? 'true' : 'false'}>
       {previewSegment && (
           <section
             className="timeline-preview"
@@ -766,6 +767,19 @@ export function Timeline({
                     <span className="tl-clip-thumb" aria-hidden="true">
                       {seg.missingSource ? '×' : '▦'}
                     </span>
+                    <button
+                      type="button"
+                      className="tl-clip-select"
+                      aria-label={`Select ${seg.fileName}`}
+                      aria-pressed={selected}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedId(seg.itemId);
+                        jumpTo(seg.offset);
+                      }}
+                    >
+                      Select
+                    </button>
                     <span className="tl-clip-rank">#{idx + 1}</span>
                     <span className="tl-clip-name">{seg.fileName}</span>
                     <span className="tl-clip-dur">{seg.duration.toFixed(1)}s</span>

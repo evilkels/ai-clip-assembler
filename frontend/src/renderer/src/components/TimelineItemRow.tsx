@@ -37,13 +37,17 @@ export function TimelineItemRow({
       className={`timeline-item-row${selected ? ' selected' : ''}`}
       data-testid="timeline-item-row"
       data-timeline-editor-item-id={item.item_id}
-      aria-selected={selected}
-      onClick={(event) => {
-        if ((event.target as HTMLElement).closest('button, input, select, textarea')) return;
-        onSelect?.();
-      }}
     >
       <div className="timeline-item-head">
+        <button
+          type="button"
+          className="timeline-item-select"
+          aria-label={`Select ${name}`}
+          aria-pressed={selected}
+          onClick={onSelect}
+        >
+          <span aria-hidden="true">{selected ? '●' : '○'}</span>
+        </button>
         <span className="pill-rank">#{index + 1}</span>
         <span className="timeline-item-name">{name}</span>
         <SourceAudioBadge hasAudio={sourceAudio.hasAudio} channels={sourceAudio.channels} />

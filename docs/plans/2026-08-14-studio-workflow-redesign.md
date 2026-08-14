@@ -16,7 +16,7 @@
 - [x] Task 2 — Import workflow (`468c0c7..0d56228`); reviewed clean for Critical/Important findings.
 - [x] Task 3 — Candidate Clip browser (`cffdf6e..722d4cf`); independent re-review clean.
 - [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
-- [ ] Task 5 — Timeline redesign; not started.
+- [x] Task 5 — Timeline redesign (`6dcd6a8..d8c45a9`); independent re-review clean.
 - [ ] Task 6 — Export redesign; not started and blocked on Task 5.
 - [ ] Task 7 — Integrated QA and documentation; not started and blocked on Tasks 4–6.
 
@@ -26,6 +26,7 @@ Current automated evidence: frontend typecheck and lint pass through Task 4; foc
 
 - Implement on the single branch `redesign/studio-workflows`.
 - Design source of truth: Claude Design project `e135e2f6-0c3f-444a-84e0-d269f4b59f4a`, file `Clip Assembler Restyle.dc.html`, reviewed 2026-08-14.
+- Local HTML reference: `AI CLIP ASSEMBLER Redesign APP + Landing page/Clip Assembler Restyle.dc.html`; use its workflow sections as the exact visual reference and do not stage or modify the supplied export.
 - Scope is the shared design system, shell, and Import/Review/Timeline/Export workflow pages. Landing and Settings redesigns are excluded.
 - Preserve the Manual Harness as the local default and existing explicit per-project consent for provider-backed analysis.
 - Preserve the backend Timeline Document as the only export authority; all Timeline operations continue to address `item_id`.
@@ -262,35 +263,35 @@ git commit -m "feat: restyle AI-assisted review"
 - Produces: `projectTimelineItems(items, clips): TimelineProjectionItem[]` and `effectiveTimelineDuration(items): number`.
 - Preserves: reorder, trim, split, remove, speed, transform, undo/redo, playback, keyboard transport, SSE reconciliation, repeated source clips, and `item_id` targeting.
 
-- [ ] **Step 1: Write failing projection tests**
+- [x] **Step 1: Write failing projection tests**
 
 Test repeated Candidate Clips, per-item bounds, speed-aware duration, transform passthrough, and missing-source fallback.
 
-- [ ] **Step 2: Run and verify the unit test fails**
+- [x] **Step 2: Run and verify the unit test fails**
 
 Run: `npm run test:main -- timelineProjection.test.ts`
 
 Expected: FAIL because the helper does not exist.
 
-- [ ] **Step 3: Implement and adopt the pure projection**
+- [x] **Step 3: Implement and adopt the pure projection**
 
 Remove duplicated duration/projection calculations from Timeline and Export consumers. Keep item identity stable by `item_id`.
 
-- [ ] **Step 4: Add failing Timeline presentation assertions**
+- [x] **Step 4: Add failing Timeline presentation assertions**
 
 Extend `timeline-playback.spec.ts` for selected-item inspector/table, transport/ruler/playhead, repeated blocks, thumbnail fallback, and light/dark presentation.
 
-- [ ] **Step 5: Implement the studio Timeline layout**
+- [x] **Step 5: Implement the studio Timeline layout**
 
 Lift selected `item_id` to the route or a shared parent. Restyle clip blocks, ruler, transport, preview, and compact inspector/table. Use a lightweight static thumbnail/fallback treatment until a real thumbnail endpoint exists; do not add a backend contract in this branch.
 
-- [ ] **Step 6: Verify Timeline behavior**
+- [x] **Step 6: Verify Timeline behavior**
 
 Run: `npm run typecheck && npm run test:main && npm run test:e2e -- timeline-playback.spec.ts preview-audio.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/renderer/src/routes/Timeline.tsx frontend/src/renderer/src/components/Timeline.tsx frontend/src/renderer/src/components/TimelineEditor.tsx frontend/src/renderer/src/components/TimelineItemRow.tsx frontend/src/renderer/src/lib/timelineProjection.ts frontend/tests/main/timelineProjection.test.ts frontend/src/renderer/src/styles.css frontend/e2e/timeline-playback.spec.ts

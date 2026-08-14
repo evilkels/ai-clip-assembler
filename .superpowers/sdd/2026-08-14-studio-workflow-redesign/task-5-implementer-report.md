@@ -35,6 +35,20 @@ Status: DONE
   aligned with the supplied design reference: transport/ruler/playhead, clip
   blocks with thumbnail treatment, selected inspector, and compact item rows.
 
+## Visual conformance round
+
+- Reorganized the Timeline page into a responsive two-column workspace: the
+  main preview/transport/ruler/track remains authoritative, while a roughly
+  320px inspector exposes editable In/Out/Speed/Zoom, Split, Remove, and the
+  compact all-items list.
+- Reused `TimelineItemControls` and `TimelineItemRow` so inspector mutations
+  continue to send the selected placement's `item_id`; no duplicate full-width
+  control rows were added below the track.
+- Strengthened Timeline presentation E2E coverage for representative track,
+  clip/static fallback, transport, ruler, inspector theme surfaces, desktop
+  column containment, responsive stacking, no horizontal overflow, and native
+  keyboard row selection.
+
 ## Verification
 
 - Red evidence: `npm run test:main -- --test-name-pattern='projects repeated|each item bounds|missing source'` initially failed because `timelineProjection` did not exist.
@@ -46,6 +60,9 @@ Status: DONE
 - `git diff --check`: PASS.
 - Review fix focused E2Es: PASS (4/4 new Timeline cases).
 - Final combined focused E2Es: PASS (23/23 Timeline + preview-audio tests).
+- Visual-round focused E2Es: PASS (23/23 Timeline + preview-audio tests),
+  including the two-column, responsive, theme, keyboard-selection, and
+  inspector Remove assertions.
 
 ## Concerns
 

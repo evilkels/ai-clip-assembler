@@ -329,6 +329,14 @@ test('studio Timeline selects an item and exposes its authoritative inspector', 
   const items = await replaceWithRepeatedItems(page, projectId);
   const second = page.locator(`[data-timeline-item-id="${items[1].item_id}"]`);
 
+  await expect(page.locator('.timeline-item-row')).toHaveCount(2);
+  const firstRow = page.locator(`[data-timeline-editor-item-id="${items[0].item_id}"]`);
+  const firstSelect = firstRow.getByRole('button', { name: /Select/ });
+  await firstSelect.focus();
+  await page.keyboard.press('Enter');
+  await expect(firstSelect).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('timeline-inspector')).toContainText(items[0].item_id);
+
   await second.click();
   await expect(page.getByTestId('timeline-inspector')).toContainText('seq-fixture-a.mp4');
   await expect(page.getByTestId('timeline-inspector')).toContainText(items[1].item_id);
@@ -341,15 +349,57 @@ test('studio Timeline selects an item and exposes its authoritative inspector', 
   await expect(page.getByTestId('transport-play')).toBeVisible();
   await expect(page.locator('.tl-clip-thumb')).toHaveCount(2);
   await expect(page.locator('.tl-clip video')).toHaveCount(0);
+  const workspaceGeometry = await page.evaluate(() => {
+    const workspace = document.querySelector<HTMLElement>('.timeline-page-body');
+    const timeline = document.querySelector<HTMLElement>('.timeline');
+    const inspector = document.querySelector<HTMLElement>('.timeline-editor');
+    const workspaceBox = workspace?.getBoundingClientRect();
+    const timelineBox = timeline?.getBoundingClientRect();
+    const inspectorBox = inspector?.getBoundingClientRect();
+    return {
+      twoColumns: Boolean(
+        workspaceBox && timelineBox && inspectorBox && timelineBox.right <= inspectorBox.left,
+      ),
+      inspectorWidth: inspectorBox?.width ?? 0,
+      noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    };
+  });
+  expect(workspaceGeometry.twoColumns).toBe(true);
+  expect(workspaceGeometry.inspectorWidth).toBeGreaterThanOrEqual(300);
+  expect(workspaceGeometry.noHorizontalOverflow).toBe(true);
   const themeColors = await page.evaluate(() => {
+    const selectors = [
+      '.timeline-track',
+      '.tl-clip',
+      '.timeline-toolbar',
+      '.timeline-ruler',
+      '.timeline-editor',
+      '.timeline-inspector',
+    ];
+    const read = () => selectors.map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return { selector, background: style.backgroundColor, border: style.borderColor };
+    });
     const root = document.documentElement;
     root.setAttribute('data-theme', 'dark');
-    const dark = getComputedStyle(document.querySelector('.timeline-editor')!).backgroundColor;
+    const dark = read();
     root.setAttribute('data-theme', 'light');
-    const light = getComputedStyle(document.querySelector('.timeline-editor')!).backgroundColor;
+    const light = read();
     return { dark, light };
   });
-  expect(themeColors.dark).not.toBe(themeColors.light);
+  expect(themeColors.dark).toHaveLength(6);
+  expect(themeColors.light).toHaveLength(6);
+  expect(themeColors.dark).not.toEqual(themeColors.light);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(page.getByTestId('timeline-inspector')).toBeVisible();
+  const responsiveGeometry = await page.evaluate(() => ({
+    noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    columns: getComputedStyle(document.querySelector<HTMLElement>('.timeline-page-body')!).gridTemplateColumns,
+  }));
+  expect(responsiveGeometry.noHorizontalOverflow).toBe(true);
+  expect(responsiveGeometry.columns.split(' ').length).toBe(1);
 });
 
 test('Timeline playback skips a missing placement and advances to the next valid item', async ({ page }) => {
@@ -394,7 +444,9 @@ test('Timeline editor mutations target item_id and reconcile undo redo and reord
   });
 
   const secondRow = page.locator('.timeline-item-row').nth(1);
-  const speed = secondRow.getByTestId('item-speed');
+  await secondRow.getByRole('button', { name: /Select/ }).click();
+  const inspector = page.getByTestId('timeline-inspector');
+  const speed = inspector.getByTestId('item-speed');
   await speed.fill('2');
   await speed.blur();
   await expect.poll(() => operations.at(-1)).toMatchObject({
@@ -402,7 +454,7 @@ test('Timeline editor mutations target item_id and reconcile undo redo and reord
     args: { item_id: items[1].item_id, speed: 2 },
   });
 
-  const zoom = secondRow.getByTestId('item-zoom');
+  const zoom = inspector.getByTestId('item-zoom');
   await zoom.fill('1.4');
   await zoom.blur();
   await expect.poll(() => operations.at(-1)).toMatchObject({
@@ -429,8 +481,7 @@ test('Timeline editor mutations target item_id and reconcile undo redo and reord
     return document.document.items[0].item_id;
   }).toBe(items[1].item_id);
 
-  const splitRow = page.locator(`[data-timeline-editor-item-id="${items[1].item_id}"]`);
-  await splitRow.getByTestId('item-split').click();
+  await page.getByTestId('timeline-inspector').getByTestId('item-split').click();
   await expect.poll(() => operations.at(-1)).toMatchObject({
     operation: 'split_item',
     args: { item_id: items[1].item_id },
@@ -456,6 +507,25 @@ test('Timeline editor mutations target item_id and reconcile undo redo and reord
       .then((response) => response.json());
     return document.document.items.length;
   }).toBe(3);
+  const postSplitSnapshot = await page.request
+    .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+    .then((response) => response.json());
+  const postSplitItemId = postSplitSnapshot.document.items[0].item_id as string;
+  await page
+    .locator(`[data-timeline-editor-item-id="${postSplitItemId}"]`)
+    .getByRole('button', { name: /Select/ })
+    .click();
+  await page.getByTestId('timeline-inspector-remove').click();
+  await expect.poll(() => operations.at(-1)).toMatchObject({
+    operation: 'remove_item',
+    args: { item_id: postSplitItemId },
+  });
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items.some((item: { item_id: string }) => item.item_id === postSplitItemId);
+  }).toBe(false);
 });
 
 test('keeps the active Timeline Item through live reorder and removal', async ({ page }) => {

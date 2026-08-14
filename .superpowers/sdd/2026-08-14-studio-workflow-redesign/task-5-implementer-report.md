@@ -49,6 +49,15 @@ Status: DONE
   column containment, responsive stacking, no horizontal overflow, and native
   keyboard row selection.
 
+## Inspector refresh fix
+
+- Keyed the selected-item control group by `item_id` and all mutable bounds,
+  speed, and transform fields so uncontrolled inputs remount whenever the
+  authoritative selection changes or SSE/undo/redo reconciliation updates it.
+- Added a deterministic repeated-item E2E with distinct In/Out/Speed/Zoom
+  values, selection switching assertions, and an authoritative SSE speed
+  update assertion.
+
 ## Verification
 
 - Red evidence: `npm run test:main -- --test-name-pattern='projects repeated|each item bounds|missing source'` initially failed because `timelineProjection` did not exist.
@@ -63,6 +72,8 @@ Status: DONE
 - Visual-round focused E2Es: PASS (23/23 Timeline + preview-audio tests),
   including the two-column, responsive, theme, keyboard-selection, and
   inspector Remove assertions.
+- Inspector refresh focused E2Es: PASS (24/24 Timeline + preview-audio tests),
+  including repeated-item selection switching and SSE field refresh.
 
 ## Concerns
 

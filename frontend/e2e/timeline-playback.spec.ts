@@ -402,6 +402,38 @@ test('studio Timeline selects an item and exposes its authoritative inspector', 
   expect(responsiveGeometry.columns.split(' ').length).toBe(1);
 });
 
+test('refreshes inspector fields when selection and authoritative Timeline state change', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithItems(page, projectId, [
+    { offset: 0, duration: 1.5, speed: 1, transform: { scale: 1.1, x: 0, y: 0 } },
+    { offset: 2, duration: 3, speed: 1.75, transform: { scale: 1.6, x: 0, y: 0 } },
+  ]);
+  await expect(page.locator('.timeline-item-row')).toHaveCount(2);
+
+  const inspector = page.getByTestId('timeline-inspector');
+  const selectItem = async (itemId: string) => {
+    await page
+      .locator(`[data-timeline-editor-item-id="${itemId}"]`)
+      .getByRole('button', { name: /Select/ })
+      .click();
+  };
+
+  await selectItem(items[1].item_id);
+  await expect(inspector.getByTestId('item-start')).toHaveValue('2');
+  await expect(inspector.getByTestId('item-end')).toHaveValue('5');
+  await expect(inspector.getByTestId('item-speed')).toHaveValue('1.75');
+  await expect(inspector.getByTestId('item-zoom')).toHaveValue('1.6');
+
+  await selectItem(items[0].item_id);
+  await expect(inspector.getByTestId('item-start')).toHaveValue('0');
+  await expect(inspector.getByTestId('item-end')).toHaveValue('1.5');
+  await expect(inspector.getByTestId('item-speed')).toHaveValue('1');
+  await expect(inspector.getByTestId('item-zoom')).toHaveValue('1.1');
+
+  await postTimelineOperation(page, projectId, 'set_speed', { item_id: items[0].item_id, speed: 2.5 });
+  await expect(inspector.getByTestId('item-speed')).toHaveValue('2.5');
+});
+
 test('Timeline playback skips a missing placement and advances to the next valid item', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA(), fixtureB()], {
     clipVisibility: 'first',

@@ -49,7 +49,11 @@ export function TimelineEditor({
             <strong>{selectedProjection.fileName}</strong>
             <span className="timeline-inspector-source">{selectedProjection.sourceClipId}</span>
           </div>
-          <TimelineItemControls item={selectedItem} apply={applyTimelineOperation} />
+          <TimelineItemControls
+            key={`${selectedItem.item_id}:${selectedItem.start_sec}:${selectedItem.end_sec}:${selectedItem.speed}:${selectedItem.transform.scale}:${selectedItem.transform.x}:${selectedItem.transform.y}`}
+            item={selectedItem}
+            apply={applyTimelineOperation}
+          />
           <div className="timeline-inspector-values">
             <span><b>Source</b> {selectedProjection.startSec.toFixed(1)} → {selectedProjection.endSec.toFixed(1)}s</span>
             <span><b>Timeline</b> {selectedProjection.durationSec.toFixed(1)}s</span>

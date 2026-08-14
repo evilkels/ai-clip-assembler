@@ -23,6 +23,7 @@ const videos = [
 
 async function openImportFixture(page: Page): Promise<void> {
   let analysisStarted = false;
+  let analysisCancelled = false;
   await page.addInitScript((path) => {
     Object.assign(window, {
       clipAssembler: {
@@ -67,6 +68,11 @@ async function openImportFixture(page: Page): Promise<void> {
       analysisStarted = true;
       await new Promise((resolve) => setTimeout(resolve, 700));
       analysisStarted = false;
+      const cancelled = analysisCancelled;
+      if (cancelled) {
+        await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ detail: 'Analysis cancelled' }) });
+        return;
+      }
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -87,6 +93,11 @@ async function openImportFixture(page: Page): Promise<void> {
           recommendation: { profile: 'cinematic_highlight', target_duration_sec: 120, format: 'fcpxml' },
         }),
       });
+      return;
+    }
+    if (url.pathname.endsWith('/analyze/cancel')) {
+      analysisCancelled = true;
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'cancelled' }) });
       return;
     }
     if (url.pathname.endsWith('/analyze/status')) {
@@ -119,6 +130,11 @@ test('source browser switches views, filters filenames, and preserves selection 
   await page.getByRole('button', { name: 'Compact' }).click();
   await expect(page.locator('[data-view-mode="compact"]')).toBeVisible();
   await page.getByRole('button', { name: 'Table' }).click();
+  const sizeHeader = page.locator('th').filter({ hasText: 'Size' });
+  await sizeHeader.getByRole('button').click();
+  await expect(sizeHeader).toHaveAttribute('aria-sort', 'ascending');
+  await sizeHeader.getByRole('button').click();
+  await expect(sizeHeader).toHaveAttribute('aria-sort', 'descending');
 
   await page.getByRole('searchbox', { name: 'Search source videos' }).fill('Valley');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
@@ -127,6 +143,13 @@ test('source browser switches views, filters filenames, and preserves selection 
   await page.getByRole('searchbox', { name: 'Search source videos' }).fill('');
   await expect(page.getByText('2 of 3 selected')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Select Valley pass.MOV' })).not.toBeChecked();
+
+  const row = page.locator('[data-source-video-row]').first();
+  await row.focus();
+  await row.press('Space');
+  await expect(page.getByText('1 of 3 selected')).toBeVisible();
+  await row.press('Enter');
+  await expect(page.getByText('2 of 3 selected')).toBeVisible();
 });
 
 test('source browser offers analysis filters and column choices', async ({ page }) => {
@@ -168,7 +191,20 @@ test('analysis rail exposes abort, progress phases, and theme-aware accent surfa
   await expect(page.locator('.source-video-name', { hasText: 'Valley pass.MOV' })).toBeVisible();
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('unanalyzed');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(2);
+  await expect(page.getByText('Analysis cancelled. Adjust your selection and analyze again when ready.')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('running');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(0);
+});
+
+test('completed analysis clears Running and marks the analyzed source', async ({ page }) => {
+  await openImportFixture(page);
+
+  await page.getByRole('button', { name: 'Analyze all 3' }).click();
   await expect(page.getByText('Analysis complete. Head to Review to see clip candidates.')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('running');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('unanalyzed');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(2);
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('analyzed');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
   await expect(page.locator('.source-video-name', { hasText: 'Shoreline sunrise.MP4' })).toBeVisible();

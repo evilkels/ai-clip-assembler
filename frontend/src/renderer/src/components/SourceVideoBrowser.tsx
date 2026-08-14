@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
 import {
@@ -108,6 +109,16 @@ export function SourceVideoBrowser({
     runningFileName ? video.file_name === runningFileName : /running|analyzing/i.test(video.status);
   const analysisLabel = (video: UploadedVideo) =>
     isRunning(video) ? 'Running' : analyzedIds.has(video.file_id) ? 'Analyzed' : 'Not analyzed';
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLElement>, fileId: string) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('button,input,select,a')) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (!disabled) onToggleOne(fileId);
+    }
+  };
+  const sortDirection = (key: SourceVideoSortKey): 'ascending' | 'descending' | 'none' =>
+    sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
 
   return (
     <section className="source-video-browser" aria-label="Source videos">
@@ -183,6 +194,9 @@ export function SourceVideoBrowser({
                 className={`source-video-card${checked ? '' : ' is-deselected'}`}
                 data-source-video-row
                 onClick={() => !disabled && onToggleOne(video.file_id)}
+                onKeyDown={(event) => handleRowKeyDown(event, video.file_id)}
+                role="button"
+                tabIndex={disabled ? -1 : 0}
               >
                 <div className="source-video-poster" aria-hidden="true"><span>MP4</span></div>
                 <div className="source-video-card-head">{selectionBox(video)}<strong title={video.file_name}>{video.file_name}</strong></div>
@@ -201,6 +215,9 @@ export function SourceVideoBrowser({
                 className={`source-video-compact-row${checked ? '' : ' is-deselected'}`}
                 data-source-video-row
                 onClick={() => !disabled && onToggleOne(video.file_id)}
+                onKeyDown={(event) => handleRowKeyDown(event, video.file_id)}
+                role="button"
+                tabIndex={disabled ? -1 : 0}
               >
                 {selectionBox(video)}
                 <button type="button" className="preview-eye" title={`Preview ${video.file_name}`} aria-label={`Preview ${video.file_name}`} onClick={(event) => { event.stopPropagation(); onPreview(video); }}>👁</button>
@@ -224,17 +241,17 @@ export function SourceVideoBrowser({
                 {columns.duration ? <th>{COLUMNS[0].label}</th> : null}
                 {columns.fps ? <th>{COLUMNS[1].label}</th> : null}
                 {columns.resolution ? <th>{COLUMNS[2].label}</th> : null}
-                {columns.size ? <th>{sortButton('size', COLUMNS[3].label)}</th> : null}
-                {columns.date ? <th>{sortButton('date', COLUMNS[4].label)}</th> : null}
+                {columns.size ? <th aria-sort={sortDirection('size')}>{sortButton('size', COLUMNS[3].label)}</th> : null}
+                {columns.date ? <th aria-sort={sortDirection('date')}>{sortButton('date', COLUMNS[4].label)}</th> : null}
                 {columns.codec ? <th>{COLUMNS[5].label}</th> : null}
-                {columns.analysis ? <th>{sortButton('analyzed', COLUMNS[6].label)}</th> : null}
+                {columns.analysis ? <th aria-sort={sortDirection('analyzed')}>{sortButton('analyzed', COLUMNS[6].label)}</th> : null}
               </tr>
             </thead>
             <tbody>
               {visible.map((video) => {
                 const checked = !deselected.has(video.file_id);
                 return (
-                  <tr key={video.file_id} data-source-video-row className={checked ? '' : 'is-deselected'} onClick={() => !disabled && onToggleOne(video.file_id)}>
+                  <tr key={video.file_id} data-source-video-row className={checked ? '' : 'is-deselected'} onClick={() => !disabled && onToggleOne(video.file_id)} onKeyDown={(event) => handleRowKeyDown(event, video.file_id)} tabIndex={disabled ? -1 : 0}>
                     <td className="source-video-select-cell">{selectionBox(video)}</td>
                     <td><button type="button" className="preview-eye" title={`Preview ${video.file_name}`} aria-label={`Preview ${video.file_name}`} disabled={!video.metadata} onClick={(event) => { event.stopPropagation(); onPreview(video); }}>👁</button></td>
                     <td className="source-video-name" title={video.file_name}>{video.file_name}</td>

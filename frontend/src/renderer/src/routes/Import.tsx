@@ -327,6 +327,7 @@ export function ImportPage() {
             status.phase === 'complete' ||
             status.phase === 'cancelled'
           ) {
+            setProgress(null);
             setAnalysisStatus(status);
           }
         })
@@ -360,8 +361,8 @@ export function ImportPage() {
   const hasError = analysisStatus.phase === 'error';
   const isCancelled = analysisStatus.phase === 'cancelled';
   const hasVideos = uploadedVideos.length > 0;
-  const activeProgress = progress ?? analysisStatus;
-  const runningFileName = activeProgress.phase === 'analyzing' ? activeProgress.file_name ?? null : null;
+  const activeProgress = isAnalyzing ? progress ?? analysisStatus : analysisStatus;
+  const runningFileName = isAnalyzing ? activeProgress.file_name ?? null : null;
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
   const eta = estimatedRemaining(activeProgress, activePercent);
 

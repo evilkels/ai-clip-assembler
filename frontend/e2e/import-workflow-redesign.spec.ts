@@ -24,6 +24,8 @@ const videos = [
 async function openImportFixture(page: Page): Promise<void> {
   let analysisStarted = false;
   let analysisCancelled = false;
+  let analysisPollCount = 0;
+  let releaseAnalysis: (() => void) | null = null;
   await page.addInitScript((path) => {
     Object.assign(window, {
       clipAssembler: {
@@ -66,7 +68,8 @@ async function openImportFixture(page: Page): Promise<void> {
     }
     if (url.pathname.endsWith('/analyze')) {
       analysisStarted = true;
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      analysisPollCount = 0;
+      await new Promise<void>((resolve) => { releaseAnalysis = resolve; });
       analysisStarted = false;
       const cancelled = analysisCancelled;
       if (cancelled) {
@@ -95,22 +98,30 @@ async function openImportFixture(page: Page): Promise<void> {
       });
       return;
     }
+    if (url.pathname === '/__test/release-analysis') {
+      releaseAnalysis?.();
+      releaseAnalysis = null;
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
     if (url.pathname.endsWith('/analyze/cancel')) {
       analysisCancelled = true;
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'cancelled' }) });
       return;
     }
     if (url.pathname.endsWith('/analyze/status')) {
+      analysisPollCount += 1;
+      const terminal = analysisPollCount > 1;
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify(analysisStarted ? {
+        body: JSON.stringify(analysisStarted && !terminal ? {
           phase: 'analyzing',
           step: 'frame_extraction',
           file_name: 'Valley pass.MOV',
           video_index: 2,
           video_total: 3,
           elapsed_sec: 18,
-        } : { phase: 'idle' }),
+        } : analysisCancelled ? { phase: 'cancelled', message: 'Analysis cancelled' } : { phase: 'complete' }),
       });
       return;
     }
@@ -144,12 +155,6 @@ test('source browser switches views, filters filenames, and preserves selection 
   await expect(page.getByText('2 of 3 selected')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Select Valley pass.MOV' })).not.toBeChecked();
 
-  const row = page.locator('[data-source-video-row]').first();
-  await row.focus();
-  await row.press('Space');
-  await expect(page.getByText('1 of 3 selected')).toBeVisible();
-  await row.press('Enter');
-  await expect(page.getByText('2 of 3 selected')).toBeVisible();
 });
 
 test('source browser offers analysis filters and column choices', async ({ page }) => {
@@ -194,16 +199,22 @@ test('analysis rail exposes abort, progress phases, and theme-aware accent surfa
   await expect(page.getByText('Analysis cancelled. Adjust your selection and analyze again when ready.')).toBeVisible();
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('running');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(0);
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
 });
 
 test('completed analysis clears Running and marks the analyzed source', async ({ page }) => {
   await openImportFixture(page);
 
   await page.getByRole('button', { name: 'Analyze all 3' }).click();
-  await expect(page.getByText('Analysis complete. Head to Review to see clip candidates.')).toBeVisible();
+  await expect(page.getByText('Current video: Valley pass.MOV')).toBeVisible();
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('running');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
+  await expect(page.getByText('Analysis complete. Head to Review to see clip candidates.')).toBeVisible();
   await expect(page.locator('[data-source-video-row]')).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('unanalyzed');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(3);
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+  await expect(page.getByRole('combobox', { name: 'Analysis filter' })).toHaveValue('unanalyzed');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(2);
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('analyzed');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(1);

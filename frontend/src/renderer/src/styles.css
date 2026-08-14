@@ -1289,6 +1289,9 @@ a {
 }
 
 .btn {
+  flex: 0 0 auto;
+  min-width: max-content;
+  white-space: nowrap;
   padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -1471,18 +1474,19 @@ a {
 
 .review-shell-body {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 6px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
+  background: var(--bg-0);
 }
 
 .review-spine {
   width: 300px;
-  flex-shrink: 0;
   min-height: 0;
   overflow: hidden;
   border-right: 1px solid var(--border);
-  background: var(--bg-surface);
+  background: var(--bg-1);
 }
 
 .review-spine .review-chat {
@@ -1491,23 +1495,26 @@ a {
   margin-top: 0;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: var(--bg-1);
 }
 
 .review-main {
-  flex: 1;
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 20px 24px;
+  padding: 18px 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .version-zone {
   display: grid;
   gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg-1);
 }
 
 .version-zone-head {
@@ -1556,16 +1563,22 @@ a {
   padding: 0;
 }
 
+.format-switcher .segmented-control-option {
+  min-width: 64px;
+  white-space: nowrap;
+}
+
 .version-stale-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--border-warning);
-  border-radius: 8px;
   color: var(--yellow);
-  background: var(--bg-warning);
+}
+
+[data-testid="version-stale-warning"] {
+  min-width: 0;
 }
 
 .source-clips-panel {
@@ -1573,6 +1586,10 @@ a {
   border-radius: 8px;
   background: var(--bg-surface);
   padding: 4px 4px 4px;
+}
+
+[data-testid="candidate-browser-zone"] {
+  min-width: 0;
 }
 
 .clip-generation-intro {
@@ -1862,14 +1879,14 @@ a {
 }
 
 .version-gallery {
-  display: flex;
-  align-items: stretch;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
   min-width: 0;
 }
 
 .version-card {
-  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1878,12 +1895,8 @@ a {
   transition: flex 180ms var(--ease-out), border-color 180ms var(--ease-out);
 }
 
-.version-gallery.has-focus .version-card:not(.expanded) {
-  flex: 0.72 1 0;
-}
-
 .version-gallery.has-focus .version-card.expanded {
-  flex: 1.56 1 0;
+  grid-column: 1 / -1;
   border-color: var(--border-strong);
 }
 
@@ -1943,6 +1956,8 @@ a {
   color: #fff;
   background: rgba(5, 7, 10, 0.78);
   backdrop-filter: blur(8px);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .version-scrubber {
@@ -2034,6 +2049,12 @@ a {
   display: grid;
   gap: 10px;
   padding: 14px;
+}
+
+.version-card-body > .btn {
+  width: 100%;
+  min-width: max-content;
+  white-space: nowrap;
 }
 
 .version-card-heading {
@@ -3083,10 +3104,10 @@ a {
 
 /* In-app review agent chat panel */
 .review-chat {
-  margin-top: 16px;
+  margin-top: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
+  border-radius: var(--radius-card);
+  background: var(--bg-1);
   display: flex;
   flex-direction: column;
   max-height: 420px;
@@ -3099,8 +3120,10 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 54px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
 }
 
 .review-chat-head > div {
@@ -3119,7 +3142,7 @@ a {
 .review-chat-log {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 14px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3130,7 +3153,7 @@ a {
 .chat-msg {
   width: fit-content;
   max-width: 82%;
-  padding: 9px 11px 10px;
+  padding: 10px 12px 11px;
   border: 1px solid var(--border);
   color: var(--text);
   overflow-wrap: anywhere;
@@ -3171,6 +3194,13 @@ a {
 .chat-msg-meta time {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
+}
+
+.version-vibe,
+.version-state,
+.version-missing,
+.version-scrubber-readout {
+  font-variant-numeric: tabular-nums;
 }
 
 .chat-msg-body {
@@ -3262,10 +3292,11 @@ a {
 .review-chat-input {
   display: flex;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-top: 1px solid var(--border);
+  background: var(--bg-2);
 }
-.review-chat-input input { flex: 1; }
+.review-chat-input input { flex: 1 1 auto; min-width: 0; }
 
 @keyframes chat-busy-pulse {
   0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }

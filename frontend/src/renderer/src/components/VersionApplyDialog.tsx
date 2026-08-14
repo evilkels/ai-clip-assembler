@@ -68,6 +68,7 @@ export function VersionApplyDialog({
     <div className="version-apply-backdrop" role="presentation">
       <section
         className="version-apply-dialog"
+        data-state={conflict ? 'conflict' : applying ? 'applying' : 'ready'}
         // Custom modal matches the existing dark editor-console surface; a native
         // <dialog> migration is a separate design decision (see react-doctor-triage).
         // react-doctor-disable-next-line react-doctor/prefer-html-dialog

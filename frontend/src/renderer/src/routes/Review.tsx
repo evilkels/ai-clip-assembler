@@ -4,6 +4,8 @@ import { ReviewChatPanel } from '../components/ReviewChatPanel';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { PreviewAudioControl } from '../components/PreviewAudioControl';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { StatusSurface } from '../components/StatusSurface';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
 import { useReview } from '../state/ReviewContext';
@@ -147,13 +149,13 @@ export function ReviewPage() {
         </div>
       </div>
 
-      <div className="review-shell-body">
-        <aside className="review-spine" style={{ width: chatWidth }}>
+      <div className="review-shell-body" data-testid="review-three-zone-layout">
+        <aside className="review-spine" style={{ width: chatWidth }} data-testid="ask-ai-rail">
           <ReviewChatPanel key={projectId} conversation={conversation} />
         </aside>
         <ResizeHandle ariaLabel="Resize the Ask the AI panel" onResize={resizeChat} />
         <main className="review-main">
-          <section className="version-zone" aria-label="Suggested cuts">
+          <section className="version-zone" aria-label="Suggested cuts" data-testid="suggested-versions-zone">
             <div className="version-zone-head">
               <div>
                 <strong>Suggested cuts</strong>
@@ -166,38 +168,37 @@ export function ReviewPage() {
               Complete edits the AI assembles from your clips. Preview one and apply it to your
               timeline, or build your own below by adding individual clips.
             </p>
-            <fieldset className="format-switcher" aria-label="Length format">
-              {FORMAT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={draftFormat === option.value ? 'btn primary' : 'btn subtle'}
-                  disabled={switchingFormat || !projectId}
-                  onClick={() => void selectFormat(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-              {switchingFormat ? <span className="draft-summary">Rebuilding timeline…</span> : null}
-              {formatError ? <span className="empty-state">{formatError}</span> : null}
-            </fieldset>
+            <SegmentedControl<FormatName>
+              value={draftFormat ?? 'short'}
+              options={FORMAT_OPTIONS.map((option) => ({
+                ...option,
+                disabled: switchingFormat || !projectId,
+              }))}
+              onChange={(format) => void selectFormat(format)}
+              ariaLabel="Length format"
+              className="format-switcher"
+            />
+            {switchingFormat ? <span className="draft-summary">Rebuilding timeline…</span> : null}
+            {formatError ? <span className="empty-state">{formatError}</span> : null}
             {versionSetIsStale ? (
-              <output className="version-stale-banner">
-                <span>Your video or clip choices changed since these suggestions were made.</span>
-                <button
-                  type="button"
-                  className="btn subtle"
-                  onClick={() => {
-                    setRefreshingVersions(true);
-                    void conversation
-                      .send('Refresh the three versions using my current Working Timeline and Source Clip decisions.')
-                      .finally(() => setRefreshingVersions(false));
-                  }}
-                  disabled={conversation.busy}
-                >
-                  Ask the AI to refresh suggestions
-                </button>
-              </output>
+              <div data-testid="version-stale-warning" data-tone="warning" role="status">
+                <StatusSurface tone="warning" className="version-stale-banner">
+                  <span>Your video or clip choices changed since these suggestions were made.</span>
+                  <button
+                    type="button"
+                    className="btn subtle"
+                    onClick={() => {
+                      setRefreshingVersions(true);
+                      void conversation
+                        .send('Refresh the three versions using my current Working Timeline and Source Clip decisions.')
+                        .finally(() => setRefreshingVersions(false));
+                    }}
+                    disabled={conversation.busy}
+                  >
+                    Ask the AI to refresh suggestions
+                  </button>
+                </StatusSurface>
+              </div>
             ) : null}
             {loading ? (
               <div className="empty-state">Loading candidates…</div>
@@ -213,22 +214,24 @@ export function ReviewPage() {
               />
             )}
           </section>
-          <SourceClipsPanel
-            clips={clips}
-            totalCount={clips.length}
-            projectId={projectId}
-            decisions={decisions}
-            acceptedOrder={acceptedOrder}
-            clipsByFile={clipsByFile}
-            versionMembership={versionMembership}
-            generationStats={generationStats}
-            loading={loading}
-            error={error}
-            smoothnessThreshold={smoothnessThreshold}
-            onSmoothnessThresholdChange={setSmoothnessThreshold}
-            onInclude={include}
-            onExclude={exclude}
-          />
+          <section data-testid="candidate-browser-zone" aria-label="Candidate Clips">
+            <SourceClipsPanel
+              clips={clips}
+              totalCount={clips.length}
+              projectId={projectId}
+              decisions={decisions}
+              acceptedOrder={acceptedOrder}
+              clipsByFile={clipsByFile}
+              versionMembership={versionMembership}
+              generationStats={generationStats}
+              loading={loading}
+              error={error}
+              smoothnessThreshold={smoothnessThreshold}
+              onSmoothnessThresholdChange={setSmoothnessThreshold}
+              onInclude={include}
+              onExclude={exclude}
+            />
+          </section>
           <Link className="draft-summary" to="/import">
             Adjust clip settings
           </Link>

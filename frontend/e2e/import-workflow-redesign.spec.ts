@@ -22,6 +22,7 @@ const videos = [
 }));
 
 async function openImportFixture(page: Page): Promise<void> {
+  let analysisStarted = false;
   await page.addInitScript((path) => {
     Object.assign(window, {
       clipAssembler: {
@@ -63,17 +64,42 @@ async function openImportFixture(page: Page): Promise<void> {
       return;
     }
     if (url.pathname.endsWith('/analyze')) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      analysisStarted = true;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      analysisStarted = false;
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
           project_id: 'import-redesign-project',
           harness_id: 'manual',
           status: 'complete',
-          clips: [],
+          clips: [{
+            clip_id: 'analyzed-clip',
+            file_id: 'shoreline',
+            file_name: 'Shoreline sunrise.MP4',
+            start_sec: 1,
+            end_sec: 7,
+            duration_sec: 6,
+            smoothness_score: 8,
+            overall_score: 8,
+          }],
           sequence: { items: [] },
           recommendation: { profile: 'cinematic_highlight', target_duration_sec: 120, format: 'fcpxml' },
         }),
+      });
+      return;
+    }
+    if (url.pathname.endsWith('/analyze/status')) {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(analysisStarted ? {
+          phase: 'analyzing',
+          step: 'frame_extraction',
+          file_name: 'Valley pass.MOV',
+          video_index: 2,
+          video_total: 3,
+          elapsed_sec: 18,
+        } : { phase: 'idle' }),
       });
       return;
     }
@@ -96,7 +122,7 @@ test('source browser switches views, filters filenames, and preserves selection 
 
   await page.getByRole('searchbox', { name: 'Search source videos' }).fill('Valley');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
-  await expect(page.getByText('Valley pass.MOV')).toBeVisible();
+  await expect(page.locator('.source-video-name', { hasText: 'Valley pass.MOV' })).toBeVisible();
   await page.getByRole('checkbox', { name: 'Select Valley pass.MOV' }).uncheck();
   await page.getByRole('searchbox', { name: 'Search source videos' }).fill('');
   await expect(page.getByText('2 of 3 selected')).toBeVisible();
@@ -120,6 +146,10 @@ test('analysis rail exposes abort, progress phases, and theme-aware accent surfa
   await page.getByRole('button', { name: 'Analyze all 3' }).click();
   await expect(page.getByRole('button', { name: 'Abort' })).toBeVisible();
   await expect(page.locator('[data-analysis-rail]')).toHaveAttribute('data-tone', 'accent');
+  await expect(page.getByText('Current video: Valley pass.MOV')).toBeVisible();
+  await expect(page.getByText('18s elapsed')).toBeVisible();
+  await expect(page.getByText(/about .* remaining/)).toBeVisible();
+  await expect(page.locator('.analysis-phase-rail .active')).toHaveText('Extracting frames');
   await expect(page.getByText('Running in the background')).toBeVisible();
 
   const colors = await page.evaluate(() => {
@@ -132,4 +162,26 @@ test('analysis rail exposes abort, progress phases, and theme-aware accent surfa
   });
   expect(colors.dark).not.toBe(colors.light);
   await page.getByRole('button', { name: 'Abort' }).click();
+
+  await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('running');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
+  await expect(page.locator('.source-video-name', { hasText: 'Valley pass.MOV' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('unanalyzed');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(2);
+  await expect(page.getByText('Analysis complete. Head to Review to see clip candidates.')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('analyzed');
+  await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
+  await expect(page.locator('.source-video-name', { hasText: 'Shoreline sunrise.MP4' })).toBeVisible();
+});
+
+test('selection bar selects and deselects the complete source set', async ({ page }) => {
+  await openImportFixture(page);
+
+  const selectAll = page.getByRole('checkbox', { name: 'Select all videos' });
+  await selectAll.uncheck();
+  await expect(page.getByText('0 of 3 selected')).toBeVisible();
+  await selectAll.check();
+  await expect(page.getByText('3 of 3 selected')).toBeVisible();
+  await selectAll.uncheck();
+  await expect(page.getByText('0 of 3 selected')).toBeVisible();
 });

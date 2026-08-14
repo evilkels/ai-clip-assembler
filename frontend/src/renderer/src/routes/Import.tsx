@@ -361,6 +361,7 @@ export function ImportPage() {
   const isCancelled = analysisStatus.phase === 'cancelled';
   const hasVideos = uploadedVideos.length > 0;
   const activeProgress = progress ?? analysisStatus;
+  const runningFileName = activeProgress.phase === 'analyzing' ? activeProgress.file_name ?? null : null;
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
   const eta = estimatedRemaining(activeProgress, activePercent);
 
@@ -437,6 +438,7 @@ export function ImportPage() {
               onToggleOne={toggleOne}
               onToggleAll={toggleAll}
               onPreview={(video) => setPreview({ fileId: video.file_id, fileName: video.file_name })}
+              runningFileName={runningFileName}
               disabled={isAnalyzing}
             />
             <label className="source-video-harness">

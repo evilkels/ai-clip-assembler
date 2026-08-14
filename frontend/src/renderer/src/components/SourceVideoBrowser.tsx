@@ -20,6 +20,7 @@ interface Props {
   onToggleOne: (fileId: string) => void;
   onToggleAll: () => void;
   onPreview: (video: UploadedVideo) => void;
+  runningFileName?: string | null;
   disabled?: boolean;
 }
 
@@ -35,7 +36,10 @@ const COLUMNS: Array<{ key: ColumnKey; label: string }> = [
 ];
 
 function formatResolution(metadata: NonNullable<UploadedVideo['metadata']>): string {
-  const [width, height] = metadata.display_resolution ?? metadata.resolution;
+  const display = metadata.display_resolution;
+  const hasUsableDisplay = Array.isArray(display) && display.length === 2 && display.every((value) => Number.isFinite(value) && value > 0);
+  const [width, height] = hasUsableDisplay ? display : metadata.resolution;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return '—';
   return `${width}×${height}${height > width ? ' ↕' : ''}`;
 }
 
@@ -53,17 +57,22 @@ export function SourceVideoBrowser({
   onToggleOne,
   onToggleAll,
   onPreview,
+  runningFileName = null,
   disabled = false,
 }: Props) {
   const [viewMode, setViewMode] = useState<SourceVideoViewMode>('table');
   const [filters, setFilters] = useState<SourceVideoFilters>({ query: '', analysis: 'all' });
+  const visibleFilters = useMemo(
+    () => ({ ...filters, runningFileName }),
+    [filters, runningFileName],
+  );
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columns, setColumns] = useState<Record<ColumnKey, boolean>>(
     () => Object.fromEntries(COLUMNS.map(({ key }) => [key, true])) as Record<ColumnKey, boolean>,
   );
   const visible = useMemo(
-    () => visibleSourceVideos(videos, analyzedIds, filters, sort),
-    [videos, analyzedIds, filters, sort],
+    () => visibleSourceVideos(videos, analyzedIds, visibleFilters, sort),
+    [videos, analyzedIds, visibleFilters, sort],
   );
   const allSelected = videos.length > 0 && selectedIds.length === videos.length;
   const someVisibleSelected = visible.some((video) => !deselected.has(video.file_id));
@@ -95,6 +104,10 @@ export function SourceVideoBrowser({
       {label}{sortArrow(sort, key)}
     </button>
   );
+  const isRunning = (video: UploadedVideo) =>
+    runningFileName ? video.file_name === runningFileName : /running|analyzing/i.test(video.status);
+  const analysisLabel = (video: UploadedVideo) =>
+    isRunning(video) ? 'Running' : analyzedIds.has(video.file_id) ? 'Analyzed' : 'Not analyzed';
 
   return (
     <section className="source-video-browser" aria-label="Source videos">
@@ -173,7 +186,7 @@ export function SourceVideoBrowser({
               >
                 <div className="source-video-poster" aria-hidden="true"><span>MP4</span></div>
                 <div className="source-video-card-head">{selectionBox(video)}<strong title={video.file_name}>{video.file_name}</strong></div>
-                <span>{video.metadata ? formatClock(video.metadata.duration_sec) : 'Pending'} · {analyzedIds.has(video.file_id) ? 'Analyzed' : 'Not analyzed'}</span>
+                <span>{video.metadata ? formatClock(video.metadata.duration_sec) : 'Pending'} · {analysisLabel(video)}</span>
               </article>
             );
           })}
@@ -193,7 +206,7 @@ export function SourceVideoBrowser({
                 <button type="button" className="preview-eye" title={`Preview ${video.file_name}`} aria-label={`Preview ${video.file_name}`} onClick={(event) => { event.stopPropagation(); onPreview(video); }}>👁</button>
                 <strong title={video.file_name}>{video.file_name}</strong>
                 <span>{video.metadata ? formatClock(video.metadata.duration_sec) : 'Pending'}</span>
-                <span>{analyzedIds.has(video.file_id) ? 'Analyzed' : 'Not analyzed'}</span>
+                <span>{analysisLabel(video)}</span>
               </div>
             );
           })}
@@ -231,7 +244,7 @@ export function SourceVideoBrowser({
                     {columns.size ? <td>{formatBytes(video.metadata?.size_bytes)}</td> : null}
                     {columns.date ? <td>{formatDate(video.metadata?.created_at)}</td> : null}
                     {columns.codec ? <td>{video.metadata?.codec ?? '—'}</td> : null}
-                    {columns.analysis ? <td className={analyzedIds.has(video.file_id) ? 'is-analyzed' : ''}>{analyzedIds.has(video.file_id) ? '✓ Analyzed' : '— Not analyzed'}</td> : null}
+                    {columns.analysis ? <td className={isRunning(video) ? 'is-running' : analyzedIds.has(video.file_id) ? 'is-analyzed' : ''}>{isRunning(video) ? 'Running' : analyzedIds.has(video.file_id) ? '✓ Analyzed' : '— Not analyzed'}</td> : null}
                   </tr>
                 );
               })}

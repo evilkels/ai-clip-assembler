@@ -1088,6 +1088,7 @@ a {
 .source-video-card.is-deselected,
 .source-video-compact-row.is-deselected { opacity: 0.45; }
 .source-videos-table .is-analyzed { color: var(--green); }
+.source-videos-table .is-running { color: var(--accent); }
 .source-video-select-cell { width: 30px; }
 .source-video-name { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; }
 .source-video-sort { all: unset; cursor: pointer; }
@@ -1588,13 +1589,13 @@ a {
   background: var(--bg-2);
 }
 
-.clip-generation-panel > summary {
+.clip-generation-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  cursor: pointer;
+  cursor: default;
 }
 
 .clip-generation-body {
@@ -1603,13 +1604,13 @@ a {
   padding: 0 14px 14px;
 }
 
-.clip-generation-controls {
+.clip-generation-rules {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
 }
 
-.clip-generation-controls label {
+.clip-generation-rule label {
   display: grid;
   gap: 5px;
   color: var(--text-dim);
@@ -1622,7 +1623,7 @@ a {
   line-height: 1.35;
 }
 
-.clip-generation-controls input {
+.clip-generation-rule input {
   width: 100%;
   min-width: 0;
   padding: 7px 8px;

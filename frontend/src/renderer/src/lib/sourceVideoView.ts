@@ -6,6 +6,8 @@ export type SourceVideoAnalysisFilter = 'all' | 'analyzed' | 'unanalyzed' | 'run
 export interface SourceVideoFilters {
   query: string;
   analysis: SourceVideoAnalysisFilter;
+  /** Backend progress identifies the active source without mutating uploads. */
+  runningFileName?: string | null;
 }
 
 export type SourceVideoSortKey = 'size' | 'date' | 'analyzed';
@@ -25,7 +27,9 @@ export function visibleSourceVideos(
   const filtered = videos.filter((video) => {
     const matchesQuery = !query || video.file_name.toLocaleLowerCase().includes(query);
     const analyzed = analyzedIds.has(video.file_id);
-    const running = /running|analyzing/i.test(video.status);
+    const running = filters.runningFileName
+      ? video.file_name === filters.runningFileName
+      : /running|analyzing/i.test(video.status);
     const matchesAnalysis =
       filters.analysis === 'all' ||
       (filters.analysis === 'analyzed' && analyzed) ||

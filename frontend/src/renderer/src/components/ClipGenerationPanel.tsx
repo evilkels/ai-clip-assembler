@@ -64,12 +64,12 @@ export function ClipGenerationPanel({
 
   return (
     <section className="clip-generation-panel">
-      <summary className="clip-generation-header">
+      <header className="clip-generation-header">
         <strong>Advanced: how clips are found</strong>
         <span className="draft-summary">
           Change what counts as a usable clip, then re-scan — no re-import needed
         </span>
-      </summary>
+      </header>
       <div className="clip-generation-body">
         <p className="clip-generation-intro">
           These control how your footage is cut into the clips above — clip length limits, how

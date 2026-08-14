@@ -245,7 +245,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await page.getByLabel('Harness').selectOption('manual');
   const generationPanel = page.locator('.analysis-controls + .clip-generation-panel');
   await expect(generationPanel).toBeVisible();
-  await generationPanel.locator('summary').click();
   const generationLabels = [
     'Shortest clip (s)',
     'Longest clip (s)',
@@ -271,9 +270,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   const regenerateButton = page.getByRole('button', { name: 'Regenerate clips' });
   await expect(regenerateButton).toBeEnabled();
   const cachedGenerationPanel = page.locator('.analysis-controls + .clip-generation-panel');
-  if ((await cachedGenerationPanel.getAttribute('open')) === null) {
-    await cachedGenerationPanel.locator('summary').click();
-  }
   await cachedGenerationPanel.getByLabel('Max clips per video', { exact: true }).fill('12');
   page.once('dialog', async (dialog) => {
     expect(dialog.message()).toContain('resets manual');

@@ -3,6 +3,9 @@ import {
   ClipGenerationPanel,
   preferencesFromGenerationStats,
 } from '../components/ClipGenerationPanel';
+import { SourceVideoBrowser } from '../components/SourceVideoBrowser';
+import { SourceVideoSelectionBar } from '../components/SourceVideoSelectionBar';
+import { StatusSurface } from '../components/StatusSurface';
 import { useReview } from '../state/ReviewContext';
 import {
   analyzeProject,
@@ -15,24 +18,8 @@ import {
   type AnalysisProgress,
   type HarnessInfo,
 } from '../api/client';
-import { formatBytes, formatClock, formatDate } from '../lib/format';
 import type { ClipGenerationPreferences } from '../types/clip';
-
-type SortKey = 'size' | 'date' | 'analyzed';
-
-function formatResolution(metadata: {
-  resolution: [number, number];
-  display_resolution?: [number, number];
-}): string {
-  // Display resolution accounts for rotation metadata, so vertical footage
-  // (e.g. drone clips with 90° rotation) reads as 1080×1920, matching export.
-  const [w, h] =
-    metadata.display_resolution && metadata.display_resolution.length === 2
-      ? metadata.display_resolution
-      : metadata.resolution;
-  const orientation = h > w ? ' ↕' : '';
-  return `${w}×${h}${orientation}`;
-}
+import type { SourceVideoSort, SourceVideoSortKey } from '../lib/sourceVideoView';
 
 const HARNESS_HINTS: Record<string, string> = {
   manual: 'rule-based, fast',
@@ -132,35 +119,18 @@ export function ImportPage() {
   const [cancelling, setCancelling] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; fileName: string } | null>(null);
-  const [sort, setSort] = useState<{ key: SortKey | null; dir: 'asc' | 'desc' }>({
+  const [sort, setSort] = useState<SourceVideoSort>({
     key: null,
     dir: 'asc',
   });
 
-  const toggleSort = useCallback((key: SortKey) => {
+  const toggleSort = useCallback((key: SourceVideoSortKey) => {
     setSort((prev) =>
       prev.key === key
         ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
         : { key, dir: 'asc' },
     );
   }, []);
-
-  const sortedVideos = useMemo(() => {
-    if (!sort.key) return uploadedVideos;
-    const factor = sort.dir === 'asc' ? 1 : -1;
-    const value = (v: (typeof uploadedVideos)[number]): number =>
-      sort.key === 'size'
-        ? v.metadata?.size_bytes ?? 0
-        : sort.key === 'analyzed'
-          ? Number(analyzedIds.has(v.file_id))
-        : v.metadata?.created_at
-          ? new Date(v.metadata.created_at).getTime() || 0
-          : 0;
-    return [...uploadedVideos].sort((a, b) => (value(a) - value(b)) * factor);
-  }, [uploadedVideos, sort, analyzedIds]);
-
-  const sortArrow = (key: SortKey) =>
-    sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 
   const triggerFilePicker = useCallback(() => {
     if (!projectFolder) fileInputRef.current?.click();
@@ -195,8 +165,6 @@ export function ImportPage() {
     return ids;
   }, [uploadedVideos, deselected]);
   const selectedCount = selectedIds.length;
-  const allSelected = uploadedVideos.length > 0 && selectedCount === uploadedVideos.length;
-
   const toggleOne = useCallback((fileId: string) => {
     setDeselected((prev) => {
       const next = new Set(prev);
@@ -457,244 +425,43 @@ export function ImportPage() {
           </div>
         )}
 
-        {uploadedVideos.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-                marginBottom: 8,
-              }}
-            >
-              <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--text-muted)' }}>
-                SOURCE VIDEOS
-              </h2>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {selectedCount} of {uploadedVideos.length} selected
-              </span>
-            </div>
-            <div className="source-videos-table-scroll">
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: 12,
-                  tableLayout: 'auto',
-                }}
-              >
-                <thead>
-                  <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px', width: 28 }}>
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = selectedCount > 0 && !allSelected;
-                      }}
-                      onChange={toggleAll}
-                      disabled={isAnalyzing}
-                      aria-label="Select all videos"
-                      style={{ cursor: isAnalyzing ? 'default' : 'pointer' }}
-                    />
-                  </th>
-                  <th style={{ padding: '6px 8px', width: 28 }} aria-label="Preview" />
-                  <th style={{ padding: '6px 8px' }}>File</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'right' }}>Duration</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'right' }}>FPS</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'right' }}>Resolution</th>
-                  <th
-                    aria-sort={sort.key === 'size' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    style={{ padding: 0, textAlign: 'right' }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('size')}
-                      style={{
-                        all: 'unset',
-                        display: 'block',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '6px 8px',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                      }}
-                      title="Sort by size"
-                    >
-                      Size{sortArrow('size')}
-                    </button>
-                  </th>
-                  <th
-                    aria-sort={sort.key === 'date' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    style={{ padding: 0, textAlign: 'right' }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('date')}
-                      style={{
-                        all: 'unset',
-                        display: 'block',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '6px 8px',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                      }}
-                      title="Sort by date"
-                    >
-                      Date{sortArrow('date')}
-                    </button>
-                  </th>
-                  <th style={{ padding: '6px 8px' }}>Codec</th>
-                  <th
-                    aria-sort={sort.key === 'analyzed' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    style={{ padding: 0 }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('analyzed')}
-                      style={{
-                        all: 'unset',
-                        display: 'block',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '6px 8px',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                      }}
-                      title="Sort by analysis status"
-                    >
-                      Analysis{sortArrow('analyzed')}
-                    </button>
-                  </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedVideos.map((v) => {
-                    const checked = !deselected.has(v.file_id);
-                    return (
-                      <tr
-                        key={v.file_id}
-                        onClick={() => !isAnalyzing && toggleOne(v.file_id)}
-                        style={{
-                          borderTop: '1px solid var(--border)',
-                          cursor: isAnalyzing ? 'default' : 'pointer',
-                          opacity: checked ? 1 : 0.45,
-                          background: checked ? 'transparent' : 'var(--bg-subtle, transparent)',
-                        }}
-                      >
-                      <td style={{ padding: '6px 8px' }}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleOne(v.file_id)}
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={isAnalyzing}
-                          aria-label={`Select ${v.file_name}`}
-                          style={{ cursor: isAnalyzing ? 'default' : 'pointer' }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <button
-                          type="button"
-                          className="preview-eye"
-                          title={`Preview ${v.file_name}`}
-                          aria-label={`Preview ${v.file_name}`}
-                          disabled={!projectId || !v.metadata}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreview({ fileId: v.file_id, fileName: v.file_name });
-                          }}
-                        >
-                          👁
-                        </button>
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>{v.file_name}</td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {v.metadata ? formatClock(v.metadata.duration_sec) : 'Pending'}
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {v.metadata ? v.metadata.fps.toFixed(2) : '—'}
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {v.metadata ? formatResolution(v.metadata) : '—'}
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {formatBytes(v.metadata?.size_bytes)}
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {formatDate(v.metadata?.created_at)}
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>{v.metadata?.codec ?? '—'}</td>
-                      <td
-                        style={{
-                          padding: '6px 8px',
-                          color: analyzedIds.has(v.file_id) ? 'var(--green)' : 'var(--text-muted)',
-                        }}
-                      >
-                        {analyzedIds.has(v.file_id) ? '✓ Analyzed' : '— Not analyzed'}
-                      </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {hasVideos && (
-          <div className="analysis-controls" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button"
-              className="btn primary"
-              onClick={handleAnalyze}
-              disabled={
-                isAnalyzing ||
-                regenerating ||
-                (selectedCount === 0 && generationStats === null)
-              }
-            >
-              {isAnalyzing
-                ? 'Analyzing…'
-                : regenerating
-                  ? 'Regenerating clips…'
-                : selectedCount === 0 && generationStats
-                  ? 'Regenerate clips'
-                : selectedCount === 0
-                  ? 'Select videos to analyze'
-                  : selectedCount === uploadedVideos.length
-                    ? `Analyze all ${selectedCount}`
-                    : `Analyze ${selectedCount} of ${uploadedVideos.length}`}
-            </button>
-            {isAnalyzing && (
-              <button type="button" className="btn subtle" onClick={handleAbort} disabled={cancelling}>
-                {cancelling ? 'Stopping…' : 'Abort'}
-              </button>
-            )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+          <>
+            <SourceVideoBrowser
+              videos={uploadedVideos}
+              analyzedIds={analyzedIds}
+              deselected={deselected}
+              selectedIds={selectedIds}
+              sort={sort}
+              onSort={toggleSort}
+              onToggleOne={toggleOne}
+              onToggleAll={toggleAll}
+              onPreview={(video) => setPreview({ fileId: video.file_id, fileName: video.file_name })}
+              disabled={isAnalyzing}
+            />
+            <label className="source-video-harness">
               Harness
               <select
                 value={harnessId}
-                onChange={(e) => setHarnessId(e.target.value)}
+                onChange={(event) => setHarnessId(event.target.value)}
                 disabled={isAnalyzing}
-                style={{
-                  background: 'transparent',
-                  color: 'inherit',
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  padding: '2px 6px',
-                  fontSize: 12,
-                }}
               >
-                {harnesses.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name}
-                    {HARNESS_HINTS[h.id] ? ` (${HARNESS_HINTS[h.id]})` : ''}
+                {harnesses.map((harness) => (
+                  <option key={harness.id} value={harness.id}>
+                    {harness.name}{HARNESS_HINTS[harness.id] ? ` (${HARNESS_HINTS[harness.id]})` : ''}
                   </option>
                 ))}
               </select>
             </label>
-          </div>
+            <SourceVideoSelectionBar
+              selectedCount={selectedCount}
+              totalCount={uploadedVideos.length}
+              analyzing={isAnalyzing}
+              regenerating={regenerating}
+              canRegenerate={generationStats !== null}
+              onAnalyze={handleAnalyze}
+            />
+          </>
         )}
 
         {hasVideos && (
@@ -707,14 +474,15 @@ export function ImportPage() {
         )}
 
         {isAnalyzing && (
-          <section className="analysis-progress" aria-live="polite">
+          <div className="analysis-progress" data-analysis-rail="true" data-tone="accent" aria-live="polite">
+            <StatusSurface tone="accent">
             <div className="analysis-progress-header">
               <div>
                 <div className="analysis-progress-title">
                   {activeProgress.message ?? describeProgress(activeProgress) ?? 'Starting analysis'}
                 </div>
                 <div className="analysis-progress-subtitle">
-                  {describeProgress(activeProgress) || 'Waiting for backend status'}
+                  {activeProgress.file_name ? `Current video: ${activeProgress.file_name}` : describeProgress(activeProgress) || 'Waiting for backend status'}
                 </div>
               </div>
               <div className="analysis-progress-time">
@@ -728,6 +496,13 @@ export function ImportPage() {
               max={100}
               aria-label="Analysis progress"
             />
+            <div className="analysis-phase-rail" aria-label="Analysis phases">
+              {(['motion_analysis', 'frame_extraction', 'scene_detection', 'scoring_clips'] as const).map((step) => (
+                <span key={step} className={activeProgress.step === step ? 'active' : ''}>
+                  {STEP_LABELS[step]}
+                </span>
+              ))}
+            </div>
             <div className="analysis-progress-meta">
               <span>{STEP_LABELS[activeProgress.step ?? ''] ?? activeProgress.step ?? 'Starting'}</span>
               {activeProgress.video_total ? (
@@ -741,7 +516,14 @@ export function ImportPage() {
                 </span>
               ) : null}
             </div>
-          </section>
+            <div className="analysis-progress-footer">
+              <span>Running in the background — you can keep preparing your edit.</span>
+              <button type="button" className="btn subtle" onClick={handleAbort} disabled={cancelling}>
+                {cancelling ? 'Stopping…' : 'Abort'}
+              </button>
+            </div>
+            </StatusSurface>
+          </div>
         )}
 
         {hasError && (

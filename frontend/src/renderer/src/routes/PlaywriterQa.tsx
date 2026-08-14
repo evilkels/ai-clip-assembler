@@ -30,6 +30,7 @@ export function PlaywriterQaPage() {
 
   const reviewPreviewReady = Boolean(projectId && clips.length > 0);
   const timelinePreviewReady = Boolean(projectId && acceptedCount > 0);
+  const exportPreviewReady = Boolean(projectId && acceptedCount > 0);
 
   return (
     <div className="page">
@@ -75,12 +76,17 @@ export function PlaywriterQaPage() {
               <span>Timeline preview</span>
               <strong data-testid="qa-timeline-preview">{timelinePreviewReady ? 'ready' : 'missing'}</strong>
             </div>
+            <div className="accepted-pill">
+              <span>Export preview</span>
+              <strong data-testid="qa-export-preview">{exportPreviewReady ? 'ready' : 'missing'}</strong>
+            </div>
           </div>
         </div>
         <div className="controls" style={{ marginTop: 16 }}>
           <Link className="btn" to="/import">Import</Link>
           <Link className="btn" to="/review">Review</Link>
           <Link className="btn" to="/timeline">Timeline</Link>
+          <Link className="btn" to="/export">Export</Link>
         </div>
       </div>
     </div>

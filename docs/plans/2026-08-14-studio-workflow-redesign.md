@@ -10,7 +10,7 @@
 
 ## Status — 2026-08-14
 
-**Overall:** In progress on `redesign/studio-workflows` (12 commits ahead of `origin/main`).
+**Overall:** Complete on `redesign/studio-workflows` (Task 7 automated gate passed; human Electron/NLE checks remain explicitly pending).
 
 - [x] Task 1 — Shared studio system and shell (`9061a42..a8a4d7a`); reviewed clean for Critical/Important findings.
 - [x] Task 2 — Import workflow (`468c0c7..0d56228`); reviewed clean for Critical/Important findings.
@@ -18,9 +18,9 @@
 - [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
 - [x] Task 5 — Timeline redesign (`6dcd6a8..d8c45a9`); independent re-review clean.
 - [x] Task 6 — Export redesign (`07f15a6`); independent re-review clean.
-- [ ] Task 7 — Integrated QA and documentation; not started and blocked on Tasks 4–6.
+- [x] Task 7 — Integrated QA and documentation; automated gate complete, human Electron/NLE checks pending.
 
-Current automated evidence: frontend typecheck and lint pass through Task 4; focused Review E2Es pass 7/7. The full repository gate is reserved for Task 7. Deferred UX/test notes are tracked in `.superpowers/sdd/2026-08-14-studio-workflow-redesign/progress.md`.
+Current automated evidence: full frontend gate passes — lint, typecheck, main 69/69, backend 404 passed/1 skipped, E2E 64/64, and build. Integrated workflow E2E passes 2/2 at 1440×900 and 1024×768 in both themes. Human Electron/macOS and real-NLE checks remain pending and are recorded in the Task 7 review record. Deferred UX/test notes are tracked in `.superpowers/sdd/2026-08-14-studio-workflow-redesign/progress.md`.
 
 ## Global Constraints
 
@@ -363,25 +363,25 @@ git commit -m "feat: redesign export handoff"
 - Consumes: the completed shared shell and four workflows.
 - Produces: one browser-driven acceptance path and a standalone review record.
 
-- [ ] **Step 1: Add the integrated acceptance path**
+- [x] **Step 1: Add the integrated acceptance path**
 
 Drive Import → Review → Timeline → Export through the real renderer/backend QA route. Verify focus-visible controls, accessible names, keyboard transport, no horizontal workflow-page overflow, and both themes at 1440×900 and 1024×768.
 
-- [ ] **Step 2: Run integrated E2E and fix only redesign regressions**
+- [x] **Step 2: Run integrated E2E and fix only redesign regressions**
 
 Run: `npm run test:e2e -- studio-workflow-redesign.spec.ts`
 
 Expected: PASS after focused fixes.
 
-- [ ] **Step 3: Update product and QA documentation**
+- [x] **Step 3: Update product and QA documentation**
 
 Document the three Import views, three Review views, selected Timeline inspector, Export receipt/actions, and the unchanged local-first/backend-authoritative behavior. Add the plan to `docs/plans/README.md` with ACTIVE status until final verification passes.
 
-- [ ] **Step 4: Write the review record**
+- [x] **Step 4: Write the review record**
 
 Record scope, design source, screenshots reviewed, automated evidence, known limitations (no Settings redesign and no real thumbnail endpoint), commit identifiers, and any pending human real-footage/NLE checks.
 
-- [ ] **Step 5: Run the full gate**
+- [x] **Step 5: Run the full gate**
 
 Run:
 
@@ -395,9 +395,9 @@ npm run test:e2e
 npm run build
 ```
 
-Expected: all automated checks PASS. Human macOS/Electron and real-NLE checks are recorded separately and never reported as automated proof.
+Evidence: lint PASS; typecheck PASS; main 69/69 PASS; backend 404 passed, 1 skipped, 3 existing deprecation warnings; E2E 64/64 PASS; build PASS. Human macOS/Electron and real-NLE checks are recorded separately and never reported as automated proof.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/renderer/src/routes/PlaywriterQa.tsx frontend/e2e/studio-workflow-redesign.spec.ts docs/QA.md docs/USER_GUIDE.md docs/ARCHITECTURE.md docs/plans/README.md docs/reviews/2026-08-14-studio-workflow-redesign.html

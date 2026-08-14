@@ -23,6 +23,35 @@ FASTAPI BACKEND
    vidstab, PyScene)  others disabled)  formats, speed)    Resolve XML)
 ```
 
+### Studio workflow presentation layer
+
+The shared Electron shell presents one local-first workflow rail:
+**Import → Review → Timeline → Export**. Task-specific view models remain
+renderer-local and presentational; `ReviewContext`, HTTP contracts, and the
+backend Timeline Document remain authoritative.
+
+- **Import** projects `UploadedVideo` records into Table, Thumbs, or Compact
+  views. Selection is keyed by source-video ID, so search/filter/view changes
+  do not alter the analysis batch. Analysis progress is a status surface over
+  the existing project analysis controller.
+- **Review** projects Candidate Clips into Grid, List, or Filmstrip records.
+  Include/Remove, accepted order, Version membership, and chat/proposal state
+  still flow through `ReviewContext` and existing backend operations.
+- **Timeline** projects every authoritative `TimelineItem` into the studio
+  track and selected-item Inspector. Repeated source clips retain independent
+  `item_id` identity; edits continue through the Operations core.
+- **Export** reads that document directly, presents controlled Resolve XML,
+  FCPXML, and EDL format cards, and snapshots a backend result into an
+  export-time receipt. It does not write a legacy Review order before export.
+
+The redesign acceptance route (`/#/playwriter`) is a browser-accessible QA
+surface for real renderer/backend fixture setup. Its integrated Playwright
+spec runs all four workflow pages at 1440×900 and 1024×768 in dark and light
+themes, checking accessible controls, keyboard transport, focus-visible
+styles, and horizontal containment. These checks are synthetic and do not
+replace human Electron/macOS, real-footage, Final Cut Pro, or DaVinci Resolve
+validation.
+
 ## Components
 
 ### Frontend (Electron + React)

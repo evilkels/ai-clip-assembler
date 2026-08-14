@@ -52,6 +52,7 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [settings-page](done/settings-page.md) | DONE (2026-07-03) |
 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
 | [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
+| [studio-workflow-redesign](2026-08-14-studio-workflow-redesign.md) | DONE (2026-08-14) — automated gate green; human Electron/NLE checks pending |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | BLOCKED on a decision — prescribes shadcn/Radix, none installed; shipped path is hand-authored tokens/CSS |
 | [react-doctor-triage](react-doctor-triage.md) | Partial; issues reduced 47→33, but all file/line citations are stale — re-run the tool first |
 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |

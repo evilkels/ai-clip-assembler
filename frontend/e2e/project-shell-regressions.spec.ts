@@ -226,6 +226,7 @@ test('the selected project receives the studio active treatment', async ({ page 
   expect(containment.row.bottom).toBeLessThanOrEqual(containment.sidebar.bottom);
   expect(containment.main.left).toBeGreaterThanOrEqual(containment.workspace.left);
   expect(containment.main.right).toBeLessThanOrEqual(containment.workspace.right);
+  expect(containment.main.left).toBeGreaterThanOrEqual(containment.sidebar.right);
   expect(containment.main.top).toBeGreaterThanOrEqual(containment.workspace.top);
   expect(containment.main.bottom).toBeLessThanOrEqual(containment.workspace.bottom);
   expect(containment.status.left).toBeGreaterThanOrEqual(0);

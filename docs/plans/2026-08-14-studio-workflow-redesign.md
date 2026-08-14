@@ -17,7 +17,7 @@
 - [x] Task 3 — Candidate Clip browser (`cffdf6e..722d4cf`); independent re-review clean.
 - [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
 - [x] Task 5 — Timeline redesign (`6dcd6a8..d8c45a9`); independent re-review clean.
-- [ ] Task 6 — Export redesign; not started and blocked on Task 5.
+- [x] Task 6 — Export redesign (`07f15a6`); independent re-review clean.
 - [ ] Task 7 — Integrated QA and documentation; not started and blocked on Tasks 4–6.
 
 Current automated evidence: frontend typecheck and lint pass through Task 4; focused Review E2Es pass 7/7. The full repository gate is reserved for Task 7. Deferred UX/test notes are tracked in `.superpowers/sdd/2026-08-14-studio-workflow-redesign/progress.md`.
@@ -313,35 +313,35 @@ git commit -m "feat: redesign the authoritative timeline"
 - Produces: `revealExportFile(filePath: string): Promise<void>` through a guarded preload/main IPC handler backed by `shell.showItemInFolder`.
 - Preserves: overwrite confirmation, Resolve-specific Open action, export-time receipt metadata, EDL degradation warnings, and payload inspector.
 
-- [ ] **Step 1: Add failing Export UI and IPC tests**
+- [x] **Step 1: Add failing Export UI and IPC tests**
 
 Cover selectable Resolve/FCPXML/EDL cards, no pre-export Timeline write, complete receipt metadata, persistent warning, Copy feedback, Resolve Open, Reveal, non-wrapping actions, and path containment/ellipsis.
 
-- [ ] **Step 2: Run the focused tests and verify failure**
+- [x] **Step 2: Run the focused tests and verify failure**
 
 Run: `npm run test:e2e -- timeline-playback.spec.ts`
 
 Expected: FAIL on cards, receipt hooks, and Reveal.
 
-- [ ] **Step 3: Add guarded Reveal IPC**
+- [x] **Step 3: Add guarded Reveal IPC**
 
 Validate that the requested path is a non-empty absolute path before calling `shell.showItemInFolder`. Return a rejected promise on invalid input or shell failure; do not expose a generic shell command surface.
 
-- [ ] **Step 4: Implement format cards and handoff summary**
+- [x] **Step 4: Implement format cards and handoff summary**
 
 Use a controlled selected format. Export remains an explicit action and calls the existing endpoint once. The right-hand summary lists item count, effective runtime, source-file count, repeated items, and format caveats.
 
-- [ ] **Step 5: Implement the success receipt**
+- [x] **Step 5: Implement the success receipt**
 
 Render a success `StatusSurface` with `min-width: 0` on every grid/flex ancestor, ellipsized path, and `flex: 0 0 auto; white-space: nowrap` actions. Preserve the result's duration and warnings even if Timeline state later changes.
 
-- [ ] **Step 6: Verify Export and main-process contracts**
+- [x] **Step 6: Verify Export and main-process contracts**
 
 Run: `npm run typecheck && npm run test:main && npm run test:e2e -- timeline-playback.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/renderer/src/routes/Export.tsx frontend/src/renderer/src/api/client.ts frontend/src/preload/index.ts frontend/src/main/index.ts frontend/src/renderer/src/styles.css frontend/e2e/timeline-playback.spec.ts

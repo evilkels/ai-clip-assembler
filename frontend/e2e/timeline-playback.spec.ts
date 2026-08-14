@@ -858,13 +858,96 @@ test('playhead drags continuously and wheel zoom changes timeline scale', async 
 });
 
 test('Resolve export exposes an Open in DaVinci handoff', async ({ page }) => {
+  await page.addInitScript(() => {
+    const calls: Array<{ method: string; args: string[] }> = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (value: string) => calls.push({ method: 'copy', args: [value] }) },
+    });
+    (window as unknown as { __exportHandoffCalls: typeof calls }).__exportHandoffCalls = calls;
+    (window as unknown as { __revealFails?: boolean }).__revealFails = false;
+    (window as unknown as { clipAssembler: unknown }).clipAssembler = {
+      backendUrl: 'http://127.0.0.1:8000',
+      platform: 'linux',
+      revealExportFile: async (filePath: string) => {
+        if ((window as unknown as { __revealFails?: boolean }).__revealFails) {
+          throw new Error('Reveal failed in test');
+        }
+        calls.push({ method: 'reveal', args: [filePath] });
+        return { revealed: true };
+      },
+      openInDaVinci: async (filePath: string, sourceFolder?: string) => {
+        calls.push({ method: 'open', args: [filePath, sourceFolder ?? ''] });
+        return { opened: true };
+      },
+    };
+  });
   await setupTimeline(page, [fixtureA()]);
+  await page.route('**/projects/*/export?*', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({ response, json: { ...body, file_path: '/tmp/resolve-handoff.xml' } });
+  });
   await page.goto('/#/export');
 
-  await page.getByRole('button', { name: 'Export for DaVinci Resolve' }).click();
+  await page.getByTestId('export-format-card-resolve_xml').click();
+  await page.getByTestId('export-selected').click();
 
   await expect(page.getByText('DaVinci Resolve XML exported')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open in DaVinci Resolve' })).toBeVisible();
+  const receipt = page.getByTestId('export-result-resolve_xml');
+  await receipt.getByRole('button', { name: 'Copy' }).click();
+  await expect(receipt.getByRole('button', { name: 'Copied' })).toBeVisible();
+  await receipt.getByRole('button', { name: 'Reveal' }).click();
+  await receipt.getByRole('button', { name: 'Open in DaVinci Resolve' }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as {
+    __exportHandoffCalls: Array<{ method: string; args: string[] }>;
+  }).__exportHandoffCalls.map((call) => call.method))).toEqual(['copy', 'reveal', 'open']);
+  const handoffPaths = await page.evaluate(() => (window as unknown as {
+    __exportHandoffCalls: Array<{ method: string; args: string[] }>;
+  }).__exportHandoffCalls.slice(1).map((call) => call.args[0]));
+  expect(handoffPaths).toHaveLength(2);
+  expect(handoffPaths[0]).toMatch(/^\//);
+  expect(handoffPaths[1]).toMatch(/^\//);
+  await page.evaluate(() => {
+    (window as unknown as { __revealFails: boolean }).__revealFails = true;
+  });
+  await receipt.getByRole('button', { name: 'Reveal' }).click();
+  await expect(page.getByRole('alert')).toContainText('Reveal failed in test');
+});
+
+test('export format cards control one explicit handoff and keep receipt actions contained', async ({ page }) => {
+  await setupTimeline(page, [fixtureA()]);
+  await page.goto('/#/export');
+
+  const cards = page.locator('[data-testid^="export-format-card-"]');
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator('.export-format-cards .btn')).toHaveCount(0);
+  await expect(page.getByTestId('export-format-card-edl')).toHaveAttribute('aria-pressed', 'true');
+
+  const edlCard = page.getByTestId('export-format-card-edl');
+  await edlCard.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('export-format-card-fcpxml')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('export-format-card-fcpxml')).toBeFocused();
+  await expect(page.getByTestId('export-selected')).toHaveText('Export FCPXML');
+
+  await page.getByTestId('export-selected').click();
+  const receipt = page.getByTestId('export-result-fcpxml');
+  await expect(receipt).toContainText('Final Cut Pro XML exported');
+  await expect(receipt.getByRole('button', { name: 'Copy' })).toBeVisible();
+  await expect(receipt.getByRole('button', { name: 'Reveal' })).toBeVisible();
+  await expect(receipt.locator('.export-receipt-path')).toHaveAttribute('title', /.+/);
+  await expect
+    .poll(() => receipt.locator('.export-receipt-path-row').evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true);
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect.poll(() => page.evaluate(() => ({
+    noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    actionsFit: Array.from(document.querySelectorAll<HTMLElement>('.export-receipt .btn')).every((button) =>
+      button.scrollWidth <= button.clientWidth && getComputedStyle(button).whiteSpace === 'nowrap'),
+  }))).toEqual({ noHorizontalOverflow: true, actionsFit: true });
 });
 
 test('export reads the authoritative Timeline without a legacy write', async ({ page }) => {
@@ -874,6 +957,7 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
     .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
     .then((response) => response.json());
   const legacyWrites: string[] = [];
+  let exportRequests = 0;
   page.on('request', (request) => {
     if (
       request.url().endsWith(`/projects/${projectId}/timeline`) &&
@@ -881,15 +965,19 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
     ) {
       legacyWrites.push(request.method());
     }
+    if (request.url().includes(`/projects/${projectId}/export?`) && request.method() === 'POST') {
+      exportRequests += 1;
+    }
   });
 
   await page.goto('/#/export');
-  await page.getByRole('button', { name: 'Export EDL' }).click();
+  await page.getByTestId('export-selected').click();
 
   const after = await page.request
     .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
     .then((response) => response.json());
   expect(legacyWrites).toEqual([]);
+  expect(exportRequests).toBe(1);
   expect(after.document).toEqual(before.document);
   await expect(page.getByTestId('export-result-edl')).toContainText('2 items');
   await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
@@ -902,4 +990,52 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
   await replaceWithItems(page, projectId, [{ offset: 0, duration: 6, speed: 1 }]);
   await expect(page.getByText('1 item in the Timeline · 6.0s total.')).toBeVisible();
   await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
+  await expect(page.getByTestId('export-warning-edl')).toContainText(/flatten/i);
+  const warningColors = await page.evaluate(() => {
+    const root = document.documentElement;
+    const warning = document.querySelector<HTMLElement>('[data-testid="export-warning-edl"]')!;
+    root.setAttribute('data-theme', 'dark');
+    const dark = getComputedStyle(warning).color;
+    root.setAttribute('data-theme', 'light');
+    const light = getComputedStyle(warning).color;
+    return { dark, light };
+  });
+  expect(warningColors.dark).not.toBe('');
+  expect(warningColors.light).not.toBe('');
+});
+
+test('export asks before overwrite and retries exactly once', async ({ page }) => {
+  await setupTimeline(page, [fixtureA()]);
+  let exportRequests = 0;
+  await page.route('**/projects/*/export?*', async (route) => {
+    exportRequests += 1;
+    if (exportRequests === 1) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Export already exists' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        project_id: 'overwrite-test',
+        format: 'edl',
+        status: 'exported',
+        file_path: '/tmp/overwrite-test.edl',
+        clip_count: 1,
+        total_duration_sec: 8,
+        warnings: ['EDL flatten warning'],
+      }),
+    });
+  });
+  await page.goto('/#/export');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByTestId('export-selected').click();
+
+  await expect(page.getByTestId('export-result-edl')).toContainText('overwrite-test.edl');
+  await expect(page.getByTestId('export-warning-edl')).toContainText('EDL flatten warning');
+  expect(exportRequests).toBe(2);
 });

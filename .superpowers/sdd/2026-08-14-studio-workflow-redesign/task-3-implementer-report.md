@@ -13,14 +13,16 @@
   handlers.
 - Added CSS-token/custom-property styling for browser rows, filmstrip items,
   filters, score rails, and per-source accents.
-- Added `review-browser-redesign.spec.ts` covering mode switches, filters,
-  no-eager-video behavior, and action toggling.
+- Added `review-browser-redesign.spec.ts` covering mode switches, deterministic
+  four-candidate score/decision fixtures, all filter dimensions, stable ranks
+  after filtering, Timeline include/remove state, Version A/B membership
+  labels, and no-eager-video behavior.
 
 ## Verification
 
 - `npm run typecheck` — PASS
 - `npm run lint:frontend` — PASS (0 warnings)
-- `npm run test:e2e -- review-browser-redesign.spec.ts` — PASS (2/2)
+- `npm run test:e2e -- review-browser-redesign.spec.ts` — PASS (3/3)
 - `npm run test:e2e -- review-browser-redesign.spec.ts preview-audio.spec.ts compare-versions.spec.ts` — PASS (6/6)
 - `git diff --check` — PASS
 

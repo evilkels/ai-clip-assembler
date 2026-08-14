@@ -8,6 +8,20 @@
 
 **Tech Stack:** Electron, React 19, TypeScript, Vite, CSS custom properties, Playwright.
 
+## Status — 2026-08-14
+
+**Overall:** In progress on `redesign/studio-workflows` (12 commits ahead of `origin/main`).
+
+- [x] Task 1 — Shared studio system and shell (`9061a42..a8a4d7a`); reviewed clean for Critical/Important findings.
+- [x] Task 2 — Import workflow (`468c0c7..0d56228`); reviewed clean for Critical/Important findings.
+- [x] Task 3 — Candidate Clip browser (`cffdf6e..722d4cf`); independent re-review clean.
+- [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
+- [ ] Task 5 — Timeline redesign; not started.
+- [ ] Task 6 — Export redesign; not started and blocked on Task 5.
+- [ ] Task 7 — Integrated QA and documentation; not started and blocked on Tasks 4–6.
+
+Current automated evidence: frontend typecheck and lint pass through Task 4; focused Review E2Es pass 7/7. The full repository gate is reserved for Task 7. Deferred UX/test notes are tracked in `.superpowers/sdd/2026-08-14-studio-workflow-redesign/progress.md`.
+
 ## Global Constraints
 
 - Implement on the single branch `redesign/studio-workflows`.
@@ -48,31 +62,31 @@
 - Produces: `ViewModeSwitcher<T extends string>` as a labeled `SegmentedControl` specialization.
 - Preserves: all current Sidebar project actions, workflow routes, rename behavior, resize behavior, and Settings/Diagnostics entry points.
 
-- [ ] **Step 1: Add failing shell and theme assertions**
+- [x] **Step 1: Add failing shell and theme assertions**
 
 Extend the shell E2E suites to assert the workflow rail, active-step semantics, project selection, footer status, and both `data-theme="dark"` and `data-theme="light"` renders. Assert geometric containment rather than pixel snapshots.
 
-- [ ] **Step 2: Run the focused tests and verify failure**
+- [x] **Step 2: Run the focused tests and verify failure**
 
 Run: `npm run test:e2e -- app-shell-layout.spec.ts project-shell-regressions.spec.ts`
 
 Expected: FAIL on the new studio-system hooks/classes or theme assertions.
 
-- [ ] **Step 3: Replace tokens and add primitives**
+- [x] **Step 3: Replace tokens and add primitives**
 
 Update the CSS variables to the approved palettes and geometry. Implement the three primitives as controlled, accessible components; options use `{ value: T; label: string; disabled?: boolean }` and buttons expose `aria-pressed`.
 
-- [ ] **Step 4: Restyle the shared shell**
+- [x] **Step 4: Restyle the shared shell**
 
 Apply the design's 34px expanded workflow rail rhythm, accent-wash active project/step treatment, compact mono metadata, quieter project header, and status rail. Keep `AppShell`'s grid ownership and resize bounds unchanged.
 
-- [ ] **Step 5: Verify shared shell behavior**
+- [x] **Step 5: Verify shared shell behavior**
 
 Run: `npm run typecheck && npm run test:e2e -- app-shell-layout.spec.ts project-shell-regressions.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/renderer/src/styles frontend/src/renderer/src/components/SegmentedControl.tsx frontend/src/renderer/src/components/StatusSurface.tsx frontend/src/renderer/src/components/ViewModeSwitcher.tsx frontend/src/renderer/src/layouts frontend/e2e/app-shell-layout.spec.ts frontend/e2e/project-shell-regressions.spec.ts
@@ -96,35 +110,35 @@ git commit -m "feat: add studio workflow design system"
 - Produces: `visibleSourceVideos(videos, analyzedIds, filters, sort): UploadedVideo[]` as a pure helper.
 - Consumes: current `uploadedVideos`, `deselected`, `selectedIds`, `toggleOne`, `toggleAll`, `handleAnalyze`, `handleAbort`, `analysisStatus`, and `ClipGenerationPreferences` from `ImportPage`.
 
-- [ ] **Step 1: Write failing Import workflow tests**
+- [x] **Step 1: Write failing Import workflow tests**
 
 Cover Table/Thumbs/Compact switches, filename search, analysis filter, column chooser, visible row counts, per-row selection, select/deselect all, Analyze/Abort state, and light/dark analysis surfaces.
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 Run: `npm run test:e2e -- import-workflow-redesign.spec.ts`
 
 Expected: FAIL because the new controls do not exist.
 
-- [ ] **Step 3: Extract pure source-video projection and browser**
+- [x] **Step 3: Extract pure source-video projection and browser**
 
 Move table rendering out of `ImportPage`. Keep selection identity keyed by source-video ID across filtered views. Thumbs use a static placeholder/poster treatment; do not mount one playing video per card and do not introduce a backend thumbnail contract.
 
-- [ ] **Step 4: Add view controls and selection bar**
+- [x] **Step 4: Add view controls and selection bar**
 
 Use `ViewModeSwitcher`; add Search, Analysis filter, and Columns controls. The selection bar shows the full selected count and delegates to existing analysis handlers.
 
-- [ ] **Step 5: Redesign analysis and generation controls**
+- [x] **Step 5: Redesign analysis and generation controls**
 
 Render analysis progress in an accent `StatusSurface` with phase rail, current video, elapsed/ETA, Abort, and background-run copy. Flatten `ClipGenerationPanel` into one bordered panel with a divided three-column rule list instead of nested mini-cards.
 
-- [ ] **Step 6: Verify Import and existing regressions**
+- [x] **Step 6: Verify Import and existing regressions**
 
 Run: `npm run typecheck && npm run test:e2e -- import-workflow-redesign.spec.ts project-shell-regressions.spec.ts compare-versions.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/renderer/src/routes/Import.tsx frontend/src/renderer/src/components/ClipGenerationPanel.tsx frontend/src/renderer/src/components/SourceVideoBrowser.tsx frontend/src/renderer/src/components/SourceVideoSelectionBar.tsx frontend/src/renderer/src/lib/sourceVideoView.ts frontend/src/renderer/src/styles.css frontend/e2e/import-workflow-redesign.spec.ts
@@ -149,35 +163,35 @@ git commit -m "feat: redesign the import workflow"
 - Produces: `buildReviewClipRecords(clips, decisions, acceptedOrder, versionMembership, filters): ReviewClipRecord[]`.
 - Preserves: `ClipDecision`, Include/Remove actions, `acceptedOrder`, Version membership, `SourceTrack`, `ScoreChip`, and Candidate Clip identity.
 
-- [ ] **Step 1: Add failing browser/filter tests**
+- [x] **Step 1: Add failing browser/filter tests**
 
 Test all three view modes, Overall/Smoothness/decision filters, stable rank ordering, Timeline membership, Include/Remove actions, and no eager video mounting in list/filmstrip modes.
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 Run: `npm run test:e2e -- review-browser-redesign.spec.ts`
 
 Expected: FAIL because the new modes and filters do not exist.
 
-- [ ] **Step 3: Extract pure Review view models**
+- [x] **Step 3: Extract pure Review view models**
 
 Centralize rank, filter, group, decision, Timeline position, and Version membership projections in `reviewView.ts`. Do not move authoritative state out of `ReviewContext`.
 
-- [ ] **Step 4: Add the three Candidate Clip projections**
+- [x] **Step 4: Add the three Candidate Clip projections**
 
 Keep `ClipCard` as the rich grid view. Implement compact list and filmstrip projections that reuse `SourceTrack`, `ScoreChip`, file/time metadata, and the same action callbacks. Use CSS custom properties for per-file accents instead of theme-dependent inline colors.
 
-- [ ] **Step 5: Add view/filter toolbar and score rails**
+- [x] **Step 5: Add view/filter toolbar and score rails**
 
 Use `ViewModeSwitcher`. Compose existing score/timecode primitives and keep the score thresholds centralized in `ScoreChip.tsx`.
 
-- [ ] **Step 6: Verify Review decisions and media behavior**
+- [x] **Step 6: Verify Review decisions and media behavior**
 
 Run: `npm run typecheck && npm run test:e2e -- review-browser-redesign.spec.ts preview-audio.spec.ts compare-versions.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/renderer/src/routes/Review.tsx frontend/src/renderer/src/components/SourceClipsPanel.tsx frontend/src/renderer/src/components/ClipCard.tsx frontend/src/renderer/src/components/ClipListRow.tsx frontend/src/renderer/src/components/ClipFilmstripItem.tsx frontend/src/renderer/src/lib/reviewView.ts frontend/src/renderer/src/styles.css frontend/e2e/review-browser-redesign.spec.ts
@@ -200,31 +214,31 @@ git commit -m "feat: add multi-view clip review"
 - Consumes: unchanged `useReviewConversation`, `VersionSet`, `VersionDisplayState`, `replace_timeline`, `useSequencePlayer`, and stale refresh behavior.
 - Produces: the approved three-zone Review layout: Ask AI rail, Suggested cuts, and Candidate Clip browser.
 
-- [ ] **Step 1: Add failing layout/state assertions**
+- [x] **Step 1: Add failing layout/state assertions**
 
 Extend the Version E2E suite for Ask AI rail containment, Short/Medium/Long selection, stale warning surface, non-mutating playback, out-of-date Apply state, and both themes.
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 Run: `npm run test:e2e -- compare-versions.spec.ts`
 
 Expected: FAIL on the new layout/state hooks.
 
-- [ ] **Step 3: Restyle Ask AI without changing its controller**
+- [x] **Step 3: Restyle Ask AI without changing its controller**
 
 Keep optimistic messages, retry, Proposal cards, resize persistence, and conversation API calls intact. Apply the compact studio rail and mono timestamps.
 
-- [ ] **Step 4: Restyle Suggested Versions**
+- [x] **Step 4: Restyle Suggested Versions**
 
 Use two-column cards at normal desktop widths, preserve complete-Version preview and segmented scrubbing, and show stale/out-of-date state with the approved warning family. Buttons must not shrink below their labels.
 
-- [ ] **Step 5: Verify complete Review workflow**
+- [x] **Step 5: Verify complete Review workflow**
 
 Run: `npm run typecheck && npm run test:e2e -- compare-versions.spec.ts review-browser-redesign.spec.ts preview-audio.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/renderer/src/routes/Review.tsx frontend/src/renderer/src/components/ReviewChatPanel.tsx frontend/src/renderer/src/components/VersionGallery.tsx frontend/src/renderer/src/components/VersionCard.tsx frontend/src/renderer/src/components/VersionPlayer.tsx frontend/src/renderer/src/components/VersionScrubber.tsx frontend/src/renderer/src/styles.css frontend/e2e/compare-versions.spec.ts

@@ -1,20 +1,22 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Timeline } from '../components/Timeline';
 import { TimelineEditor } from '../components/TimelineEditor';
 import { useReview } from '../state/ReviewContext';
+import { effectiveTimelineDuration } from '../lib/timelineProjection';
 
 export function TimelinePage() {
   const { timelineItems } = useReview();
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const totalDuration = effectiveTimelineDuration(timelineItems);
 
-  const totalDuration = useMemo(() => {
-    return timelineItems.reduce(
-      (sum, item) => sum + Math.max(0, (item.end_sec - item.start_sec) / item.speed),
-      0,
-    );
-  }, [timelineItems]);
+  useEffect(() => {
+    if (selectedItemId && !timelineItems.some((item) => item.item_id === selectedItemId)) {
+      setSelectedItemId(null);
+    }
+  }, [selectedItemId, timelineItems]);
 
   return (
-    <div className="page">
+    <div className="page timeline-page">
       <div className="page-header">
         <div>
           <h1>Timeline</h1>
@@ -27,9 +29,9 @@ export function TimelinePage() {
           </span>
         </div>
       </div>
-      <div className="page-body">
-        <Timeline />
-        <TimelineEditor />
+      <div className="page-body timeline-page-body">
+        <Timeline selectedId={selectedItemId} onSelectedItemChange={setSelectedItemId} />
+        <TimelineEditor selectedId={selectedItemId} onSelectedItemChange={setSelectedItemId} />
       </div>
     </div>
   );

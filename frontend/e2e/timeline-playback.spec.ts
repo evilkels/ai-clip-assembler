@@ -241,6 +241,25 @@ test('renders repeated Candidate Clips as distinct authoritative Timeline Items'
   await expect(page.getByTestId('timeline-summary')).toContainText('2 items · 4.0s');
 });
 
+test('studio Timeline selects an item and exposes its authoritative inspector', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const second = page.locator(`[data-timeline-item-id="${items[1].item_id}"]`);
+
+  await second.click();
+  await expect(page.getByTestId('timeline-inspector')).toContainText('seq-fixture-a.mp4');
+  await expect(page.getByTestId('timeline-inspector')).toContainText(items[1].item_id);
+  await expect(page.locator('.timeline-item-row.selected')).toHaveAttribute(
+    'data-timeline-editor-item-id',
+    items[1].item_id,
+  );
+  await expect(page.locator('.timeline-ruler')).toBeVisible();
+  await expect(page.locator('.timeline-playhead')).toBeVisible();
+  await expect(page.getByTestId('transport-play')).toBeVisible();
+  await expect(page.locator('.tl-clip-thumb')).toHaveCount(2);
+  await expect(page.locator('.tl-clip video')).toHaveCount(0);
+});
+
 test('keeps the active Timeline Item through live reorder and removal', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA()]);
   const items = await replaceWithRepeatedItems(page, projectId);
@@ -385,6 +404,11 @@ test('retains an authoritative Timeline Item when Candidate Clip metadata is sta
   await expect(page.locator(`[data-timeline-item-id="${sourceItem.item_id}"] .tl-clip-name`)).toHaveText(
     sourceItem.source_clip_id,
   );
+  await expect(page.locator(`.tl-clip[data-timeline-item-id="${sourceItem.item_id}"]`)).toHaveAttribute(
+    'data-timeline-missing-source',
+    'true',
+  );
+  await expect(page.locator('.tl-clip-thumb')).toHaveText('×');
   await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
 });
 

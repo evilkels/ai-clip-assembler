@@ -18,6 +18,7 @@ import { sourceAudioState } from '../lib/sourceAudio';
 import { usePreviewAudio } from '../state/usePreviewAudio';
 import { useSequencePlayer } from './useSequencePlayer';
 import { formatClock } from '../lib/format';
+import { projectTimelineItems } from '../lib/timelineProjection';
 
 const MIN_PX_PER_SEC = 6;
 const MAX_PX_PER_SEC = 160;
@@ -40,6 +41,8 @@ interface Segment {
   trimEnd: number;
   speed: number;
   scale: number;
+  transform: { scale: number; x: number; y: number };
+  missingSource: boolean;
   duration: number;
   offset: number;
 }
@@ -57,14 +60,28 @@ function niceStep(pxPerSec: number): number {
   return NICE_STEPS.find((step) => step >= raw) ?? NICE_STEPS[NICE_STEPS.length - 1];
 }
 
-export function Timeline() {
+export function Timeline({
+  selectedId: controlledSelectedId,
+  onSelectedItemChange,
+}: {
+  selectedId?: string | null;
+  onSelectedItemChange?: (itemId: string | null) => void;
+} = {}) {
   const { projectId, timelineItems, clips, applyTimelineOperation, uploadedVideos } = useReview();
   const { muted, volume, setMuted } = usePreviewAudio();
 
   const [pxPerSec, setPxPerSec] = useState(40);
   const [playhead, setPlayhead] = useState(0);
   const [direction, setDirection] = useState<-1 | 0 | 1>(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
+  const selectedId = controlledSelectedId !== undefined ? controlledSelectedId : localSelectedId;
+  const setSelectedId = useCallback(
+    (itemId: string | null) => {
+      setLocalSelectedId(itemId);
+      onSelectedItemChange?.(itemId);
+    },
+    [onSelectedItemChange],
+  );
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [canDrag, setCanDrag] = useState(true);
@@ -93,31 +110,39 @@ export function Timeline() {
   const lastPlayheadSetRef = useRef(0);
   const didInitialSeekRef = useRef(false);
 
+  const projectedItems = useMemo(
+    () => projectTimelineItems(timelineItems, clips),
+    [clips, timelineItems],
+  );
+
   const segments = useMemo<Segment[]>(() => {
-    const byId = new Map(clips.map((clip) => [clip.clip_id, clip]));
     let offset = 0;
-    return timelineItems.map((item) => {
-      const clip = byId.get(item.source_clip_id);
-      const preview = trimPreview?.itemId === item.item_id ? trimPreview : undefined;
-      const trimStart = preview?.startSec ?? item.start_sec;
-      const trimEnd = preview?.endSec ?? item.end_sec;
-      const duration = (trimEnd - trimStart) / item.speed;
+    const fileIdByClip = new Map(clips.map((clip) => [clip.clip_id, clip.file_id]));
+    return projectedItems.map((item) => {
+      const preview = trimPreview?.itemId === item.itemId ? trimPreview : undefined;
+      const trimStart = preview?.startSec ?? item.startSec;
+      const trimEnd = preview?.endSec ?? item.endSec;
+      const duration = preview
+        ? Math.max(0, trimEnd - trimStart) / item.speed
+        : item.durationSec;
       const seg: Segment = {
-        itemId: item.item_id,
-        sourceClipId: item.source_clip_id,
-        fileId: clip?.file_id,
-        fileName: clip?.file_name ?? item.source_clip_id,
+        itemId: item.itemId,
+        sourceClipId: item.sourceClipId,
+        fileId: fileIdByClip.get(item.sourceClipId),
+        fileName: item.fileName,
         trimStart,
         trimEnd,
         speed: item.speed,
         scale: item.transform.scale,
+        transform: item.transform,
+        missingSource: item.missingSource,
         duration,
         offset,
       };
       offset += duration;
       return seg;
     });
-  }, [clips, timelineItems, trimPreview]);
+  }, [clips, projectedItems, trimPreview]);
 
   const totalDuration = segments.length
     ? segments[segments.length - 1].offset + segments[segments.length - 1].duration
@@ -301,14 +326,12 @@ export function Timeline() {
 
   const selectRelative = useCallback(
     (delta: number) => {
-      setSelectedId((cur) => {
-        if (timelineItems.length === 0) return cur;
-        const i = cur ? timelineItems.findIndex((item) => item.item_id === cur) : -1;
-        const ni = clamp(i < 0 ? 0 : i + delta, 0, timelineItems.length - 1);
-        return timelineItems[ni].item_id;
-      });
+      if (timelineItems.length === 0) return;
+      const i = selectedId ? timelineItems.findIndex((item) => item.item_id === selectedId) : -1;
+      const ni = clamp(i < 0 ? 0 : i + delta, 0, timelineItems.length - 1);
+      setSelectedId(timelineItems[ni].item_id);
     },
-    [timelineItems],
+    [selectedId, setSelectedId, timelineItems],
   );
 
   // Keyboard transport, scrubbing, selection, and reordering.
@@ -396,6 +419,7 @@ export function Timeline() {
     return () => window.removeEventListener('keydown', onKey);
   }, [
     applyTimelineOperation,
+    setSelectedId,
     timelineItems,
     selectedId,
     selectRelative,
@@ -505,7 +529,7 @@ export function Timeline() {
   }, [applyTimelineOperation, dragId, dropIndex]);
 
   const startTrim = useCallback(
-    (e: ReactMouseEvent, seg: Segment, edge: 'left' | 'right') => {
+    (e: ReactMouseEvent | ReactPointerEvent, seg: Segment, edge: 'left' | 'right') => {
       e.stopPropagation();
       e.preventDefault();
       setCanDrag(false);
@@ -543,7 +567,7 @@ export function Timeline() {
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [applyTimelineOperation, pxPerSec],
+    [applyTimelineOperation, pxPerSec, setSelectedId],
   );
 
   if (timelineItems.length === 0) {
@@ -695,6 +719,8 @@ export function Timeline() {
                 <div
                   key={seg.itemId}
                   data-timeline-item-id={seg.itemId}
+                  data-testid="timeline-clip"
+                  data-timeline-missing-source={seg.missingSource ? 'true' : 'false'}
                   className={[
                     'tl-clip',
                     selected ? 'selected' : '',
@@ -712,6 +738,7 @@ export function Timeline() {
                     jumpTo(seg.offset);
                   }}
                   title={`${seg.fileName} — ${seg.duration.toFixed(1)}s`}
+                  aria-label={`${seg.fileName}, ${seg.duration.toFixed(1)} seconds`}
                 >
                   <div
                     className="tl-trim-handle left"
@@ -736,6 +763,9 @@ export function Timeline() {
                       setDropIndex(null);
                     }}
                   >
+                    <span className="tl-clip-thumb" aria-hidden="true">
+                      {seg.missingSource ? '×' : '▦'}
+                    </span>
                     <span className="tl-clip-rank">#{idx + 1}</span>
                     <span className="tl-clip-name">{seg.fileName}</span>
                     <span className="tl-clip-dur">{seg.duration.toFixed(1)}s</span>

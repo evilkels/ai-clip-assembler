@@ -9,13 +9,21 @@
  */
 import { useReview } from '../state/ReviewContext';
 import { TimelineItemRow } from './TimelineItemRow';
+import { projectTimelineItems } from '../lib/timelineProjection';
 
-export function TimelineEditor() {
+export function TimelineEditor({
+  selectedId,
+  onSelectedItemChange,
+}: {
+  selectedId?: string | null;
+  onSelectedItemChange?: (itemId: string | null) => void;
+} = {}) {
   const { projectId, timelineItems, clips, applyTimelineOperation, undo, redo } = useReview();
 
   if (!projectId) return null;
 
-  const nameByClip = new Map(clips.map((clip) => [clip.clip_id, clip.file_name]));
+  const projectedItems = projectTimelineItems(timelineItems, clips);
+  const projectionByItemId = new Map(projectedItems.map((item) => [item.itemId, item]));
   const fileByClip = new Map(clips.map((clip) => [clip.clip_id, clip.file_id]));
 
   return (
@@ -32,6 +40,21 @@ export function TimelineEditor() {
           </button>
         </div>
       </div>
+      {selectedId && projectionByItemId.has(selectedId) ? (
+        <div className="timeline-inspector" data-testid="timeline-inspector">
+          <div>
+            <span className="timeline-inspector-label">Selected item</span>
+            <strong>{projectionByItemId.get(selectedId)?.fileName}</strong>
+          </div>
+          <div className="timeline-inspector-values">
+            <span><b>In</b> {projectionByItemId.get(selectedId)?.startSec.toFixed(1)}s</span>
+            <span><b>Out</b> {projectionByItemId.get(selectedId)?.endSec.toFixed(1)}s</span>
+            <span><b>Speed</b> {projectionByItemId.get(selectedId)?.speed.toFixed(1)}×</span>
+            <span><b>Runtime</b> {projectionByItemId.get(selectedId)?.durationSec.toFixed(1)}s</span>
+            <span><b>Item</b> <code>{selectedId}</code></span>
+          </div>
+        </div>
+      ) : null}
       {timelineItems.length === 0 ? (
         <p className="draft-summary">Accept candidate clips to start building the timeline.</p>
       ) : (
@@ -44,8 +67,11 @@ export function TimelineEditor() {
               item={item}
               index={index}
               total={timelineItems.length}
-              name={nameByClip.get(item.source_clip_id) ?? item.source_clip_id}
+              name={projectionByItemId.get(item.item_id)?.fileName ?? item.source_clip_id}
               fileId={fileByClip.get(item.source_clip_id)}
+              durationSec={projectionByItemId.get(item.item_id)?.durationSec ?? 0}
+              selected={item.item_id === selectedId}
+              onSelect={() => onSelectedItemChange?.(item.item_id)}
               apply={applyTimelineOperation}
             />
           ))}

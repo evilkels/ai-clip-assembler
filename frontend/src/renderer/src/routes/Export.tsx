@@ -7,6 +7,7 @@ import {
   type ExportResult,
 } from '../api/client';
 import { EmptyState } from '../components/EmptyState';
+import { effectiveTimelineDuration, projectTimelineItems } from '../lib/timelineProjection';
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }> = [
   { id: 'resolve_xml', button: 'Export for DaVinci Resolve', label: 'DaVinci Resolve XML exported' },
@@ -26,9 +27,10 @@ export function ExportPage() {
 
   const clipsById = useMemo(() => new Map(clips.map((clip) => [clip.clip_id, clip])), [clips]);
 
-  const effectiveDuration = timelineItems.reduce(
-    (sum, item) => sum + (item.end_sec - item.start_sec) / item.speed,
-    0,
+  const effectiveDuration = effectiveTimelineDuration(timelineItems);
+  const projectedItems = useMemo(
+    () => projectTimelineItems(timelineItems, clips),
+    [clips, timelineItems],
   );
 
   const handleExport = useCallback(
@@ -199,16 +201,16 @@ export function ExportPage() {
               >
                 {JSON.stringify(
                   {
-                    timeline: timelineItems.map((item, index) => {
-                      const clip = clipsById.get(item.source_clip_id);
+                    timeline: projectedItems.map((item, index) => {
+                      const clip = clipsById.get(item.sourceClipId);
                       return {
                         order: index + 1,
-                        item_id: item.item_id,
-                        source_clip_id: item.source_clip_id,
+                        item_id: item.itemId,
+                        source_clip_id: item.sourceClipId,
                         file_id: clip?.file_id ?? null,
-                        file_name: clip?.file_name ?? item.source_clip_id,
-                        start_sec: item.start_sec,
-                        end_sec: item.end_sec,
+                        file_name: item.fileName,
+                        start_sec: item.startSec,
+                        end_sec: item.endSec,
                         speed: item.speed,
                         transform: item.transform,
                       };

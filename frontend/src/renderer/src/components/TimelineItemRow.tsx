@@ -13,6 +13,9 @@ export function TimelineItemRow({
   total,
   name,
   fileId,
+  durationSec,
+  selected,
+  onSelect,
   apply,
 }: {
   item: TimelineItem;
@@ -20,14 +23,26 @@ export function TimelineItemRow({
   total: number;
   name: string;
   fileId?: string;
+  durationSec: number;
+  selected?: boolean;
+  onSelect?: () => void;
   apply: (operation: string, args: Record<string, unknown>) => Promise<void>;
 }) {
-  const effective = round((item.end_sec - item.start_sec) / item.speed);
+  const effective = round(durationSec);
   const { uploadedVideos } = useReview();
   const sourceAudio = sourceAudioState(fileId, uploadedVideos);
 
   return (
-    <li className="timeline-item-row" data-testid="timeline-item-row">
+    <li
+      className={`timeline-item-row${selected ? ' selected' : ''}`}
+      data-testid="timeline-item-row"
+      data-timeline-editor-item-id={item.item_id}
+      aria-selected={selected}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('button, input, select, textarea')) return;
+        onSelect?.();
+      }}
+    >
       <div className="timeline-item-head">
         <span className="pill-rank">#{index + 1}</span>
         <span className="timeline-item-name">{name}</span>

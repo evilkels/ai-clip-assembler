@@ -890,6 +890,21 @@ a {
   min-height: 28px;
 }
 
+/* The shell status rail is the compact variant of StatusSurface: the same
+   semantic wash, inset hairline, and restrained glow without a card radius. */
+.statusbar[data-surface="status"] {
+  --status-color: var(--text-muted);
+  background: color-mix(in srgb, var(--status-color) 8%, var(--bg-1));
+  border-top-color: color-mix(in srgb, var(--status-color) 36%, var(--border));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--status-color) 12%, transparent),
+    0 -8px 22px color-mix(in srgb, var(--status-color) 6%, transparent);
+}
+
+.statusbar[data-surface="status"][data-tone="success"] { --status-color: var(--green); }
+.statusbar[data-surface="status"][data-tone="warning"] { --status-color: var(--yellow); }
+.statusbar[data-surface="status"][data-tone="danger"] { --status-color: var(--red); }
+.statusbar[data-surface="status"][data-tone="accent"] { --status-color: var(--accent); }
+
 /* ---------- Page wrappers ---------- */
 
 .page {

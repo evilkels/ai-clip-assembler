@@ -118,7 +118,37 @@ test('studio shell exposes an active workflow rail and themed surfaces', async (
   const rail = page.locator('.workflow-rail');
   await expect(rail).toBeVisible();
   await expect(rail.getByRole('link', { name: /Review/ })).toHaveAttribute('aria-current', 'page');
-  await expect(page.locator('.statusbar')).toHaveAttribute('data-surface', 'status');
+  const status = page.locator('.statusbar');
+  await expect(status).toHaveAttribute('data-surface', 'status');
+
+  const shellBounds = await page.evaluate(() => {
+    const box = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`Missing ${selector}`);
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    };
+    return {
+      sidebar: box('.sidebar'),
+      rail: box('.workflow-rail'),
+      workspace: box('.app-workspace'),
+      main: box('.main'),
+      status: box('.statusbar'),
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      statusStyle: (() => {
+        const style = getComputedStyle(document.querySelector('.statusbar')!);
+        return { background: style.backgroundColor, shadow: style.boxShadow };
+      })(),
+    };
+  });
+
+  expect(shellBounds.rail.left).toBeGreaterThanOrEqual(shellBounds.sidebar.left);
+  expect(shellBounds.rail.right).toBeLessThanOrEqual(shellBounds.sidebar.right);
+  expect(shellBounds.main.left).toBeGreaterThanOrEqual(shellBounds.workspace.left);
+  expect(shellBounds.main.right).toBeLessThanOrEqual(shellBounds.workspace.right);
+  expect(shellBounds.status.bottom).toBe(shellBounds.viewport.height);
+  expect(shellBounds.statusStyle.background).not.toBe('rgb(13, 15, 18)');
+  expect(shellBounds.statusStyle.shadow).not.toBe('none');
 
   const themes = await page.evaluate(() => {
     const root = document.documentElement;

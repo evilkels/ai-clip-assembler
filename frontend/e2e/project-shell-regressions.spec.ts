@@ -201,6 +201,27 @@ test('the selected project receives the studio active treatment', async ({ page 
   const row = page.locator('.project-row-wrap').filter({ hasText: projectName });
   await expect(row).toHaveAttribute('data-selected', 'true');
   await expect(row).toHaveClass(/project-row-active/);
+
+  const containment = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`Missing ${selector}`);
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    };
+    return {
+      sidebar: bounds('.sidebar'),
+      row: bounds('.project-row-wrap[data-selected="true"]'),
+      main: bounds('.main'),
+      status: bounds('.statusbar'),
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(containment.row.left).toBeGreaterThanOrEqual(containment.sidebar.left);
+  expect(containment.row.right).toBeLessThanOrEqual(containment.sidebar.right);
+  expect(containment.main.left).toBeGreaterThanOrEqual(containment.sidebar.right);
+  expect(containment.status.bottom).toBe(containment.viewportHeight);
 });
 
 test('project cards expose labelled actions and locate only for missing folders', async ({ page }) => {

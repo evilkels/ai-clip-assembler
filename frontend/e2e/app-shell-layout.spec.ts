@@ -144,8 +144,15 @@ test('studio shell exposes an active workflow rail and themed surfaces', async (
 
   expect(shellBounds.rail.left).toBeGreaterThanOrEqual(shellBounds.sidebar.left);
   expect(shellBounds.rail.right).toBeLessThanOrEqual(shellBounds.sidebar.right);
+  expect(shellBounds.rail.top).toBeGreaterThanOrEqual(shellBounds.sidebar.top);
+  expect(shellBounds.rail.bottom).toBeLessThanOrEqual(shellBounds.sidebar.bottom);
   expect(shellBounds.main.left).toBeGreaterThanOrEqual(shellBounds.workspace.left);
   expect(shellBounds.main.right).toBeLessThanOrEqual(shellBounds.workspace.right);
+  expect(shellBounds.main.top).toBeGreaterThanOrEqual(shellBounds.workspace.top);
+  expect(shellBounds.main.bottom).toBeLessThanOrEqual(shellBounds.workspace.bottom);
+  expect(shellBounds.status.left).toBeGreaterThanOrEqual(0);
+  expect(shellBounds.status.right).toBeLessThanOrEqual(shellBounds.viewport.width);
+  expect(shellBounds.status.top).toBeGreaterThanOrEqual(0);
   expect(shellBounds.status.bottom).toBe(shellBounds.viewport.height);
   expect(shellBounds.statusStyle.background).not.toBe('rgb(13, 15, 18)');
   expect(shellBounds.statusStyle.shadow).not.toBe('none');

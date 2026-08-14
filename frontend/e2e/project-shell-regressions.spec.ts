@@ -212,15 +212,25 @@ test('the selected project receives the studio active treatment', async ({ page 
     return {
       sidebar: bounds('.sidebar'),
       row: bounds('.project-row-wrap[data-selected="true"]'),
+      workspace: bounds('.app-workspace'),
       main: bounds('.main'),
       status: bounds('.statusbar'),
+      viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
     };
   });
 
   expect(containment.row.left).toBeGreaterThanOrEqual(containment.sidebar.left);
   expect(containment.row.right).toBeLessThanOrEqual(containment.sidebar.right);
-  expect(containment.main.left).toBeGreaterThanOrEqual(containment.sidebar.right);
+  expect(containment.row.top).toBeGreaterThanOrEqual(containment.sidebar.top);
+  expect(containment.row.bottom).toBeLessThanOrEqual(containment.sidebar.bottom);
+  expect(containment.main.left).toBeGreaterThanOrEqual(containment.workspace.left);
+  expect(containment.main.right).toBeLessThanOrEqual(containment.workspace.right);
+  expect(containment.main.top).toBeGreaterThanOrEqual(containment.workspace.top);
+  expect(containment.main.bottom).toBeLessThanOrEqual(containment.workspace.bottom);
+  expect(containment.status.left).toBeGreaterThanOrEqual(0);
+  expect(containment.status.right).toBeLessThanOrEqual(containment.viewportWidth);
+  expect(containment.status.top).toBeGreaterThanOrEqual(0);
   expect(containment.status.bottom).toBe(containment.viewportHeight);
 });
 

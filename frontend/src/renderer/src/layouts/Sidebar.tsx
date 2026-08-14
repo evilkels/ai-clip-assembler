@@ -150,7 +150,8 @@ export function Sidebar() {
             const displayName = recentProjectDisplayName(project);
             return (
               <div
-                className={`project-row-wrap${active ? ' active' : ''}${project.missing ? ' missing' : ''}`}
+                className={`project-row-wrap${active ? ' active project-row-active' : ''}${project.missing ? ' missing' : ''}`}
+                data-selected={active ? 'true' : undefined}
                 key={project.folderPath}
               >
                 {editingFolderPath === project.folderPath ? (
@@ -225,7 +226,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="sidebar-section" aria-label="Workflow">
+      <nav className="sidebar-section workflow-rail" aria-label="Workflow">
         <div className="sidebar-section-label">Workflow</div>
         <ol className="workflow-steps">
           {steps.map((step, index) => {

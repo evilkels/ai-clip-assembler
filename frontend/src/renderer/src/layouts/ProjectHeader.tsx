@@ -24,7 +24,7 @@ export function ProjectHeader() {
   }, []);
 
   return (
-    <header className="project-header" aria-label="Current project">
+    <header className="project-header" aria-label="Current project" data-surface="project-header">
       {!hasProject ? (
         <span className="project-header-empty">No project open</span>
       ) : editing && projectFolder ? (
@@ -41,7 +41,7 @@ export function ProjectHeader() {
         <div className="project-header-content">
           <strong className="project-header-name">{displayName ?? 'Project'}</strong>
           {projectFolder && (
-            <span className="project-header-path" title={projectFolder}>
+            <span className="project-header-path project-header-metadata" title={projectFolder}>
               {projectFolder}
             </span>
           )}

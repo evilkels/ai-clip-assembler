@@ -1,18 +1,18 @@
 @theme {
-  --color-bg-app: #090b0e;
-  --color-bg-bar: #0f1218;
-  --color-bg-surface: #11151c;
-  --color-bg-content: #0b0e13;
-  --color-bg-elevated: #151a22;
-  --color-bg-hover: #1b2230;
-  --color-bg-active: #1e2633;
+  --color-bg-app: #08090b;
+  --color-bg-bar: #0d0f12;
+  --color-bg-surface: #12151a;
+  --color-bg-content: #0d0f12;
+  --color-bg-elevated: #171b21;
+  --color-bg-hover: #171b21;
+  --color-bg-active: #23272e;
 
-  --color-border-subtle: #262d38;
-  --color-border-strong: #3a4453;
+  --color-border-subtle: #23272e;
+  --color-border-strong: #343a43;
 
-  --color-text-primary: #f7f8fb;
-  --color-text-secondary: #a4acba;
-  --color-text-muted: #626b79;
+  --color-text-primary: #f4f5f7;
+  --color-text-secondary: #a2a8b2;
+  --color-text-muted: #6b7280;
 
   --color-accent: #ff4d6d;
   --color-accent-hover: #ff6b85;
@@ -23,8 +23,8 @@
   --color-window-minimize: #ffbd2e;
   --color-window-zoom: #28c941;
 
-  --font-sans: "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --font-sans: "Plex Sans", "IBM Plex Sans", "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Plex Mono", "IBM Plex Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
 
   --text-xs: 11px;
   --text-sm: 13px;
@@ -39,9 +39,11 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
 
   --duration-fast: 80ms;
   --duration-base: 160ms;
@@ -50,8 +52,8 @@
 
 /* Non-color tokens shared across every theme. */
 :root {
-  --font-sans: "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --font-sans: "Plex Sans", "IBM Plex Sans", "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Plex Mono", "IBM Plex Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
   --text-xs: 11px;
   --text-sm: 13px;
   --text-md: 14px;
@@ -63,9 +65,11 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
   --duration-fast: 80ms;
   --duration-base: 160ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -75,20 +79,20 @@
    when the resolved theme is "dark". */
 :root,
 :root[data-theme="dark"] {
-  --bg-0: #090b0e;
-  --bg-1: #0f1218;
-  --bg-2: #151a22;
-  --bg-3: #1b2230;
-  --bg-surface: #11151c;
-  --bg-active: #1e2633;
-  --border: #262d38;
-  --border-strong: #3a4453;
-  --text: #f7f8fb;
-  --text-dim: #a4acba;
-  --text-muted: #626b79;
+  --bg-0: #08090b;
+  --bg-1: #0d0f12;
+  --bg-2: #12151a;
+  --bg-3: #171b21;
+  --bg-surface: #12151a;
+  --bg-active: #23272e;
+  --border: #23272e;
+  --border-strong: #343a43;
+  --text: #f4f5f7;
+  --text-dim: #a2a8b2;
+  --text-muted: #6b7280;
   --accent: #ff4d6d;
   --accent-hover: #ff6b85;
-  --accent-dim: #5b2632;
+  --accent-dim: rgba(255, 77, 109, 0.12);
   --green: #5fd18b;
   --yellow: #e6b450;
   --red: #f0443a;
@@ -109,20 +113,20 @@
    is done in CSS.) Once data-theme is present the explicit rules below win. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg-0: #eceef2;
-    --bg-1: #f6f7f9;
+    --bg-0: #e9eaec;
+    --bg-1: #f7f7f8;
     --bg-2: #ffffff;
-    --bg-3: #e7eaf0;
+    --bg-3: #f1f2f4;
     --bg-surface: #ffffff;
-    --bg-active: #dde3ec;
-    --border: #d7dbe2;
-    --border-strong: #bcc3cf;
-    --text: #161a21;
-    --text-dim: #525c6b;
-    --text-muted: #8a94a3;
+    --bg-active: #f1f2f4;
+    --border: #dcdce2;
+    --border-strong: #bfc3c9;
+    --text: #14161a;
+    --text-dim: #52585f;
+    --text-muted: #878d95;
     --accent: #e11d48;
     --accent-hover: #be123c;
-    --accent-dim: #ffd9e1;
+    --accent-dim: rgba(225, 29, 72, 0.1);
     --green: #1f9d57;
     --yellow: #b07d12;
     --red: #dc2626;
@@ -137,20 +141,20 @@
 /* Light palette. Inverts the neutral scale while keeping the rose accent,
    nudged slightly deeper for contrast on light surfaces. */
 :root[data-theme="light"] {
-  --bg-0: #eceef2;
-  --bg-1: #f6f7f9;
+  --bg-0: #e9eaec;
+  --bg-1: #f7f7f8;
   --bg-2: #ffffff;
-  --bg-3: #e7eaf0;
+  --bg-3: #f1f2f4;
   --bg-surface: #ffffff;
-  --bg-active: #dde3ec;
-  --border: #d7dbe2;
-  --border-strong: #bcc3cf;
-  --text: #161a21;
-  --text-dim: #525c6b;
-  --text-muted: #8a94a3;
+  --bg-active: #f1f2f4;
+  --border: #dcdce2;
+  --border-strong: #bfc3c9;
+  --text: #14161a;
+  --text-dim: #52585f;
+  --text-muted: #878d95;
   --accent: #e11d48;
   --accent-hover: #be123c;
-  --accent-dim: #ffd9e1;
+  --accent-dim: rgba(225, 29, 72, 0.1);
   --green: #1f9d57;
   --yellow: #b07d12;
   --red: #dc2626;

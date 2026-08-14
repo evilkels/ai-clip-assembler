@@ -21,7 +21,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [projectName]);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-shell="studio">
       <ProjectHeader />
       {/* Always-present grid row so the shell keeps its layout when empty. */}
       <div className="app-banners">

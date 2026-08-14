@@ -196,6 +196,13 @@ test('projects stay alphabetized after opening a recent project', async ({ page 
   await expect(rows).toHaveText(beforeOpen);
 });
 
+test('the selected project receives the studio active treatment', async ({ page }) => {
+  await openFolderProject(page);
+  const row = page.locator('.project-row-wrap').filter({ hasText: projectName });
+  await expect(row).toHaveAttribute('data-selected', 'true');
+  await expect(row).toHaveClass(/project-row-active/);
+});
+
 test('project cards expose labelled actions and locate only for missing folders', async ({ page }) => {
   const seededProjects = [
     { folderPath: '/projects/visible', lastOpenedAt: '2026-08-11T10:00:00Z', name: 'Visible Project', missing: false },

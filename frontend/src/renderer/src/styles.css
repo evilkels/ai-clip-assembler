@@ -791,6 +791,105 @@ a {
 .status-dot.online { background: var(--green); }
 .status-dot.offline { background: var(--red); }
 
+/* ---------- Studio primitives ---------- */
+
+.segmented-control {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+}
+
+.segmented-control-option {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.segmented-control-option:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg-3);
+}
+
+.segmented-control-option.active,
+.segmented-control-option[aria-pressed="true"] {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+.segmented-control-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.status-surface {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--status-color) 38%, var(--border));
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--status-color) 10%, var(--bg-1));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-color) 8%, transparent),
+    0 0 22px color-mix(in srgb, var(--status-color) 8%, transparent);
+}
+
+.status-surface-accent { --status-color: var(--accent); }
+.status-surface-success { --status-color: var(--green); }
+.status-surface-warning { --status-color: var(--yellow); }
+.status-surface-danger { --status-color: var(--red); }
+
+/* The shared shell keeps a deliberate 34px step rhythm so labels and their
+   progress markers remain scannable at the minimum window width. */
+.workflow-rail .step-link {
+  min-height: 34px;
+  padding-block: 5px;
+}
+
+.workflow-rail .step-link.active,
+.project-row-wrap.project-row-active {
+  background: var(--accent-dim);
+}
+
+.workflow-rail .step-link.active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.project-row-wrap.project-row-active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.project-header {
+  background: var(--bg-0);
+  padding-block: 10px;
+}
+
+.project-header-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.project-header-metadata,
+.statusbar,
+.sidebar-section-label,
+.sidebar-theme-label {
+  font-family: var(--font-mono);
+}
+
+.project-header-metadata {
+  font-size: var(--text-xs);
+  letter-spacing: 0.01em;
+}
+
+.statusbar {
+  min-height: 28px;
+}
+
 /* ---------- Page wrappers ---------- */
 
 .page {

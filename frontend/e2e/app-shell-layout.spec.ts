@@ -106,3 +106,29 @@ test('the layout survives a failing update check', async ({ page }) => {
     layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
   );
 });
+
+test('studio shell exposes an active workflow rail and themed surfaces', async ({ page }) => {
+  await installBridge(page, {
+    state: 'up-to-date',
+    currentVersion: '0.1.4',
+    latestVersion: '0.1.4',
+  });
+  await page.goto('/#/review');
+
+  const rail = page.locator('.workflow-rail');
+  await expect(rail).toBeVisible();
+  await expect(rail.getByRole('link', { name: /Review/ })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.statusbar')).toHaveAttribute('data-surface', 'status');
+
+  const themes = await page.evaluate(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', 'dark');
+    const dark = getComputedStyle(root).getPropertyValue('--bg-0').trim();
+    root.setAttribute('data-theme', 'light');
+    const light = getComputedStyle(root).getPropertyValue('--bg-0').trim();
+    return { dark, light };
+  });
+
+  expect(themes.dark).toBe('#08090b');
+  expect(themes.light).toBe('#e9eaec');
+});

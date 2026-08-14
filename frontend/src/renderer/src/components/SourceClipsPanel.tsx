@@ -1,31 +1,52 @@
 import { useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import type { ClipCandidate, ClipDecision, ClipGenerationStats } from '../types/clip';
+import { buildReviewClipRecords, type ReviewFilters, type ReviewViewMode } from '../lib/reviewView';
 import { ClipCard } from './ClipCard';
+import { ClipFilmstripItem } from './ClipFilmstripItem';
+import { ClipListRow } from './ClipListRow';
+import { ViewModeSwitcher } from './ViewModeSwitcher';
 
 interface LookGroup {
   key: string;
-  lead: ClipCandidate;
-  /** Other clips sharing this look group; empty when the clip has no group
-   *  (or is its group's only member) so it renders exactly like a flat list. */
-  siblings: ClipCandidate[];
+  lead: ReturnType<typeof buildReviewClipRecords>[number];
+  siblings: ReturnType<typeof buildReviewClipRecords>[number][];
 }
 
-/** Groups clips sharing a `look_group`, leading each group with the
- *  highest-scored member (the input is already sorted by score, so the first
- *  clip seen per group is the lead). Clips without a `look_group` — or the
- *  only member of one — get a group of size 1 and render with no extra
- *  chrome, matching today's flat list when nothing actually groups. */
-function groupByLook(clips: ClipCandidate[]): LookGroup[] {
-  const membersByKey = new Map<string, ClipCandidate[]>();
+interface SourceClipsPanelProps {
+  clips: ClipCandidate[];
+  totalCount: number;
+  projectId: string | null;
+  decisions: Record<string, ClipDecision>;
+  acceptedOrder: string[];
+  clipsByFile: Map<string, ClipCandidate[]>;
+  versionMembership: Map<string, string[]>;
+  generationStats: ClipGenerationStats | null;
+  loading: boolean;
+  error: string | null;
+  smoothnessThreshold: number;
+  onSmoothnessThresholdChange: (value: number) => void;
+  onInclude: (clipId: string) => void;
+  onExclude: (clipId: string) => void;
+}
+
+const VIEW_OPTIONS: Array<{ value: ReviewViewMode; label: string }> = [
+  { value: 'grid', label: 'Grid' },
+  { value: 'list', label: 'List' },
+  { value: 'filmstrip', label: 'Filmstrip' },
+];
+
+function groupByLook(records: ReturnType<typeof buildReviewClipRecords>): LookGroup[] {
+  const membersByKey = new Map<string, ReturnType<typeof buildReviewClipRecords>[number][]>();
   const order: string[] = [];
-  for (const clip of clips) {
-    const key = clip.look_group != null ? `look-${clip.look_group}` : `solo-${clip.clip_id}`;
+  for (const record of records) {
+    const key = record.clip.look_group != null
+      ? `look-${record.clip.look_group}`
+      : `solo-${record.clip.clip_id}`;
     const members = membersByKey.get(key);
-    if (members) {
-      members.push(clip);
-    } else {
-      membersByKey.set(key, [clip]);
+    if (members) members.push(record);
+    else {
+      membersByKey.set(key, [record]);
       order.push(key);
     }
   }
@@ -35,64 +56,138 @@ function groupByLook(clips: ClipCandidate[]): LookGroup[] {
   });
 }
 
-interface SourceClipsPanelProps {
-  clips: ClipCandidate[];
-  totalCount: number;
-  projectId: string | null;
-  decisions: Record<string, ClipDecision>;
-  draftPositions: Map<string, number>;
-  clipsByFile: Map<string, ClipCandidate[]>;
-  versionMembership: Map<string, string[]>;
-  generationStats: ClipGenerationStats | null;
-  loading: boolean;
-  error: string | null;
-  smoothnessThreshold: number;
-  onInclude: (clipId: string) => void;
-  onExclude: (clipId: string) => void;
-}
-
 export function SourceClipsPanel({
   clips,
   totalCount,
   projectId,
   decisions,
-  draftPositions,
+  acceptedOrder,
   clipsByFile,
   versionMembership,
   generationStats,
   loading,
   error,
   smoothnessThreshold,
+  onSmoothnessThresholdChange,
   onInclude,
   onExclude,
 }: SourceClipsPanelProps) {
   const [open, setOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ReviewViewMode>('grid');
+  const [minOverall, setMinOverall] = useState(0);
+  const [decisionFilter, setDecisionFilter] = useState<ReviewFilters['decision']>('all');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const totals = generationStats?.totals;
-  const rankByClipId = useMemo(
-    () => new Map(clips.map((clip, index) => [clip.clip_id, index + 1])),
-    [clips],
+  const records = useMemo(
+    () => buildReviewClipRecords(
+      clips,
+      decisions,
+      acceptedOrder,
+      versionMembership,
+      { minOverall, minSmoothness: smoothnessThreshold, decision: decisionFilter },
+    ),
+    [acceptedOrder, clips, decisions, decisionFilter, minOverall, smoothnessThreshold, versionMembership],
   );
-  const groups = useMemo(() => groupByLook(clips), [clips]);
+  const groups = useMemo(() => groupByLook(records), [records]);
+
   const toggleGroup = (key: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
+    setExpandedGroups((previous) => {
+      const next = new Set(previous);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
   };
 
+  const renderAction = (record: ReturnType<typeof buildReviewClipRecords>[number]) =>
+    record.timelinePosition !== undefined
+      ? () => onExclude(record.clip.clip_id)
+      : () => onInclude(record.clip.clip_id);
+
+  const renderGrid = () => (
+    <div className="review-grid" data-review-grid>
+      {groups.flatMap(({ key, lead, siblings: lookSiblings }) => {
+        const renderClip = (record: ReturnType<typeof buildReviewClipRecords>[number], similarLookCount: number) => {
+          const fileSiblings = clipsByFile.get(record.clip.file_id) ?? [];
+          const siblingRanges = fileSiblings
+            .filter((candidate) => candidate.clip_id !== record.clip.clip_id)
+            .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec }));
+          const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
+          return (
+            <ClipCard
+              key={record.clip.clip_id}
+              clip={record.clip}
+              rank={record.rank}
+              decision={record.decision}
+              draftPosition={record.timelinePosition}
+              versionLabels={record.versionLabels}
+              siblingRanges={siblingRanges}
+              fileClipIndex={sortedFileSiblings.findIndex((candidate) => candidate.clip_id === record.clip.clip_id) + 1}
+              fileClipCount={fileSiblings.length}
+              similarLookCount={similarLookCount}
+              similarLooksExpanded={expandedGroups.has(key)}
+              onToggleSimilarLooks={() => toggleGroup(key)}
+              mediaUrl={projectId ? buildVideoMediaUrl(projectId, record.clip.file_id) : undefined}
+              onToggleInclude={renderAction(record)}
+            />
+          );
+        };
+        const visible = [renderClip(lead, lookSiblings.length)];
+        if (lookSiblings.length > 0 && expandedGroups.has(key)) {
+          visible.push(...lookSiblings.map((record) => renderClip(record, 0)));
+        }
+        return visible;
+      })}
+    </div>
+  );
+
+  const renderList = () => (
+    <div className="review-list" data-review-list>
+      {records.map((record) => {
+        const fileSiblings = clipsByFile.get(record.clip.file_id) ?? [];
+        const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
+        return (
+          <ClipListRow
+            key={record.clip.clip_id}
+            clip={record.clip}
+            rank={record.rank}
+            decision={record.decision}
+            timelinePosition={record.timelinePosition}
+            versionLabels={record.versionLabels}
+            siblingRanges={fileSiblings
+              .filter((candidate) => candidate.clip_id !== record.clip.clip_id)
+              .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec }))}
+            fileClipIndex={sortedFileSiblings.findIndex((candidate) => candidate.clip_id === record.clip.clip_id) + 1}
+            fileClipCount={fileSiblings.length}
+            onToggleInclude={renderAction(record)}
+          />
+        );
+      })}
+    </div>
+  );
+
+  const renderFilmstrip = () => (
+    <div className="review-filmstrip" data-review-filmstrip>
+      {records.map((record) => (
+        <ClipFilmstripItem
+          key={record.clip.clip_id}
+          clip={record.clip}
+          rank={record.rank}
+          decision={record.decision}
+          timelinePosition={record.timelinePosition}
+          versionLabels={record.versionLabels}
+          onToggleInclude={renderAction(record)}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <details
       className="source-clips-panel"
       data-testid="source-clips-panel"
-      // Controlled open: React resets an uncontrolled `open` on re-render, so
-      // the panel used to collapse on any unrelated update (an SSE event, the
-      // display filter). The summary drives the state directly rather than
-      // relying on the browser's own toggle.
       open={open}
-      >
+    >
       <summary
         onClick={(event) => {
           event.preventDefault();
@@ -103,24 +198,68 @@ export function SourceClipsPanel({
         <span className="draft-summary">
           {totals
             ? `Generated ${totals.candidates_generated} → kept ${totals.candidates_kept} · scene cap on ${totals.scenes_at_cap}/${totals.scenes_total} scenes · video cap ${totals.max_candidates_per_video ?? '—'}`
-            : `${clips.length} shown · click to preview and pick clips`}
+            : `${records.length} shown · click to preview and pick clips`}
         </span>
       </summary>
-      {/* Closed details still mount children, so conditionally render to avoid N video streams. */}
       {open ? (
-        <div className="source-clips-content">
+        <div className="source-clips-content" data-review-browser data-view-mode={viewMode}>
+          <div className="review-browser-toolbar">
+            <ViewModeSwitcher
+              value={viewMode}
+              options={VIEW_OPTIONS}
+              onChange={setViewMode}
+              ariaLabel="Candidate Clip view"
+            />
+            <label className="review-filter-control">
+              Minimum Overall
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={0.5}
+                value={minOverall}
+                aria-label="Minimum Overall"
+                onChange={(event) => setMinOverall(Number(event.target.value))}
+              />
+            </label>
+            <label className="review-filter-control">
+              Minimum Smoothness
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={0.5}
+                value={smoothnessThreshold}
+                aria-label="Minimum Smoothness"
+                onChange={(event) => onSmoothnessThresholdChange(Number(event.target.value))}
+              />
+            </label>
+            <label className="review-filter-control">
+              Decision
+              <select
+                aria-label="Decision filter"
+                value={decisionFilter}
+                onChange={(event) => setDecisionFilter(event.target.value as ReviewFilters['decision'])}
+              >
+                <option value="all">All decisions</option>
+                <option value="included">Included</option>
+                <option value="excluded">Excluded</option>
+                <option value="undecided">Undecided</option>
+              </select>
+            </label>
+            <span className="draft-summary" data-review-count>
+              {records.length} of {clips.length} shown
+            </span>
+          </div>
           <p className="review-pipeline-helper">
-            Every usable clip found in your footage. Preview each one and “Add to working timeline”
-            to build your own edit. Removing a clip also keeps it out of the AI’s suggested cuts.
+            Every usable clip found in your footage. Include clips in the working Timeline or remove
+            them from it; the backend Timeline Document remains authoritative.
           </p>
           {totalCount > 0 ? (
             <details className="score-legend">
               <summary>How clips are scored</summary>
               <div className="score-legend-body">
-                <p>
-                  Combined scores blend technical quality with visual interest. Strong clips score
-                  at least 8, usable clips score 5–8, and weak clips score below 5.
-                </p>
+                <p>Combined scores blend technical quality with visual interest. Strong clips score at least 8, usable clips score 5–8, and weak clips score below 5.</p>
               </div>
             </details>
           ) : null}
@@ -128,64 +267,9 @@ export function SourceClipsPanel({
             <div className="empty-state">Loading candidates…</div>
           ) : error ? (
             <div className="empty-state">{error}</div>
-          ) : clips.length === 0 ? (
-            <div className="empty-state">
-              No clips above display filter {smoothnessThreshold}. Lower the filter to see more.
-            </div>
-          ) : (
-            <div className="review-grid">
-              {groups.flatMap(({ key, lead, siblings: lookSiblings }) => {
-                const renderClip = (clip: ClipCandidate, similarLookCount: number) => {
-                  const decision = decisions[clip.clip_id] ?? 'pending';
-                  const fileSiblings = clipsByFile.get(clip.file_id) ?? [];
-                  const siblingRanges: Array<{ start: number; end: number }> = [];
-                  for (const candidate of fileSiblings) {
-                    if (candidate.clip_id !== clip.clip_id) {
-                      siblingRanges.push({
-                        start: candidate.start_sec,
-                        end: candidate.end_sec,
-                      });
-                    }
-                  }
-                  return (
-                    <ClipCard
-                      key={clip.clip_id}
-                      clip={clip}
-                      rank={rankByClipId.get(clip.clip_id) ?? 0}
-                      decision={decision}
-                      draftPosition={draftPositions.get(clip.clip_id)}
-                      versionLabels={versionMembership.get(clip.clip_id)}
-                      siblingRanges={siblingRanges}
-                      fileClipIndex={
-                        // ES2022 target: toSorted() unavailable; spread keeps siblings immutable.
-                        // react-doctor-disable-next-line react-doctor/js-tosorted-immutable
-                        [...fileSiblings]
-                          .sort((a, b) => a.start_sec - b.start_sec)
-                          .findIndex((candidate) => candidate.clip_id === clip.clip_id) + 1
-                      }
-                      fileClipCount={fileSiblings.length}
-                      similarLookCount={similarLookCount}
-                      similarLooksExpanded={expandedGroups.has(key)}
-                      onToggleSimilarLooks={() => toggleGroup(key)}
-                      mediaUrl={
-                        projectId ? buildVideoMediaUrl(projectId, clip.file_id) : undefined
-                      }
-                      onToggleInclude={() =>
-                        draftPositions.has(clip.clip_id)
-                          ? onExclude(clip.clip_id)
-                          : onInclude(clip.clip_id)
-                      }
-                    />
-                  );
-                };
-                const cards = [renderClip(lead, lookSiblings.length)];
-                if (lookSiblings.length > 0 && expandedGroups.has(key)) {
-                  cards.push(...lookSiblings.map((sibling) => renderClip(sibling, 0)));
-                }
-                return cards;
-              })}
-            </div>
-          )}
+          ) : records.length === 0 ? (
+            <div className="empty-state">No clips match the current Review filters.</div>
+          ) : viewMode === 'grid' ? renderGrid() : viewMode === 'list' ? renderList() : renderFilmstrip()}
         </div>
       ) : null}
     </details>

@@ -19,13 +19,6 @@ const FORMAT_OPTIONS: Array<{ value: FormatName; label: string }> = [
   { value: 'long', label: 'Long' },
 ];
 
-function rankClips(clips: ClipCandidate[]): ClipCandidate[] {
-  // The project targets a pre-ES2023 TS lib, so toSorted() does not compile;
-  // spreading first keeps the prop immutable on the supported toolchain.
-  // react-doctor-disable-next-line react-doctor/js-tosorted-immutable
-  return [...clips].sort((a, b) => b.scores.overall - a.scores.overall);
-}
-
 export function ReviewPage() {
   const [versionToApply, setVersionToApply] = useState<Version | null>(null);
   const [refreshingVersions, setRefreshingVersions] = useState(false);
@@ -53,11 +46,6 @@ export function ReviewPage() {
   const conversation = useReviewConversation(projectId);
   const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 300, 240, 560);
 
-  const ranked = useMemo(() => rankClips(clips), [clips]);
-  const filtered = useMemo(
-    () => ranked.filter((clip) => clip.scores.smoothness >= smoothnessThreshold),
-    [ranked, smoothnessThreshold],
-  );
   const availableClipIds = useMemo(
     () => new Set(clips.map((clip) => clip.clip_id)),
     [clips],
@@ -80,10 +68,6 @@ export function ReviewPage() {
         ? buildVersionMembership(conversation.versionSet)
         : new Map<string, string[]>(),
     [conversation.versionSet, timelineSnapshot],
-  );
-  const draftPositions = useMemo(
-    () => new Map(acceptedOrder.map((id, index) => [id, index + 1])),
-    [acceptedOrder],
   );
   const clipsByFile = useMemo(() => {
     const result = new Map<string, ClipCandidate[]>();
@@ -158,7 +142,7 @@ export function ReviewPage() {
             />
           </div>
           <span className="draft-summary">
-            {filtered.length} of {ranked.length} shown
+            {clips.length} clips available
           </span>
         </div>
       </div>
@@ -230,17 +214,18 @@ export function ReviewPage() {
             )}
           </section>
           <SourceClipsPanel
-            clips={filtered}
+            clips={clips}
             totalCount={clips.length}
             projectId={projectId}
             decisions={decisions}
-            draftPositions={draftPositions}
+            acceptedOrder={acceptedOrder}
             clipsByFile={clipsByFile}
             versionMembership={versionMembership}
             generationStats={generationStats}
             loading={loading}
             error={error}
             smoothnessThreshold={smoothnessThreshold}
+            onSmoothnessThresholdChange={setSmoothnessThreshold}
             onInclude={include}
             onExclude={exclude}
           />

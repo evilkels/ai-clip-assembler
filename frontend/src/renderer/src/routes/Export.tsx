@@ -9,7 +9,12 @@ import {
 } from '../api/client';
 import { EmptyState } from '../components/EmptyState';
 import { StatusSurface } from '../components/StatusSurface';
-import { effectiveTimelineDuration, projectTimelineItems } from '../lib/timelineProjection';
+import {
+  effectiveTimelineDuration,
+  projectTimelineItems,
+  type TimelineProjectionItem,
+} from '../lib/timelineProjection';
+import type { ClipCandidate } from '../types/clip';
 
 const EXPORT_FORMATS: Array<{
   id: ExportFormat;
@@ -45,7 +50,43 @@ const EXPORT_FORMATS: Array<{
   },
 ];
 
-type DisplayExportResult = ExportResult & { effective_duration_sec: number };
+interface ExportPayload {
+  timeline: Array<{
+    order: number;
+    item_id: string;
+    source_clip_id: string;
+    file_id: string | null;
+    file_name: string;
+    start_sec: number;
+    end_sec: number;
+    speed: number;
+    transform: TimelineProjectionItem['transform'];
+  }>;
+}
+
+type DisplayExportResult = ExportResult & {
+  effective_duration_sec: number;
+  payload: ExportPayload;
+};
+
+function buildExportPayload(
+  items: TimelineProjectionItem[],
+  clipsById: Map<string, ClipCandidate>,
+): ExportPayload {
+  return {
+    timeline: items.map((item, index) => ({
+      order: index + 1,
+      item_id: item.itemId,
+      source_clip_id: item.sourceClipId,
+      file_id: clipsById.get(item.sourceClipId)?.file_id ?? null,
+      file_name: item.fileName,
+      start_sec: item.startSec,
+      end_sec: item.endSec,
+      speed: item.speed,
+      transform: item.transform,
+    })),
+  };
+}
 
 function formatDuration(seconds: number): string {
   return `${seconds.toFixed(1)}s`;
@@ -98,7 +139,11 @@ export function ExportPage() {
         // intentionally not recomputed when Timeline state changes afterwards.
         setExportResults((previous) => ({
           ...previous,
-          [format]: { ...result, effective_duration_sec: effectiveDuration },
+          [format]: {
+            ...result,
+            effective_duration_sec: effectiveDuration,
+            payload: buildExportPayload(projectedItems, clipsById),
+          },
         }));
       } catch (err) {
         setExportError(err instanceof Error ? err.message : String(err));
@@ -106,7 +151,7 @@ export function ExportPage() {
         setExporting(null);
       }
     },
-    [effectiveDuration, projectId],
+    [clipsById, effectiveDuration, projectedItems, projectId],
   );
 
   const copyPath = useCallback(async (path: string) => {
@@ -126,23 +171,6 @@ export function ExportPage() {
       setExportError(err instanceof Error ? err.message : String(err));
     }
   }, []);
-
-  const payload = {
-    timeline: projectedItems.map((item, index) => {
-      const clip = clipsById.get(item.sourceClipId);
-      return {
-        order: index + 1,
-        item_id: item.itemId,
-        source_clip_id: item.sourceClipId,
-        file_id: clip?.file_id ?? null,
-        file_name: item.fileName,
-        start_sec: item.startSec,
-        end_sec: item.endSec,
-        speed: item.speed,
-        transform: item.transform,
-      };
-    }),
-  };
 
   return (
     <div className="page export-page">
@@ -293,7 +321,7 @@ export function ExportPage() {
                   )}
                   <details className="export-payload-details">
                     <summary>Review export payload</summary>
-                    <pre data-testid="export-payload">{JSON.stringify(payload, null, 2)}</pre>
+                    <pre data-testid="export-payload">{JSON.stringify(result.payload, null, 2)}</pre>
                   </details>
                   </StatusSurface>
                 </div>

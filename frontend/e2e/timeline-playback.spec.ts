@@ -987,10 +987,16 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
   await expect(page.getByTestId('export-payload')).toContainText('speed');
   await expect(page.getByTestId('export-payload')).toContainText('transform');
 
+  const exportedPayload = await page.getByTestId('export-payload').textContent();
+  expect(JSON.parse(exportedPayload!).timeline).toHaveLength(2);
+
   await replaceWithItems(page, projectId, [{ offset: 0, duration: 6, speed: 1 }]);
   await expect(page.getByText('1 item in the Timeline · 6.0s total.')).toBeVisible();
   await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
   await expect(page.getByTestId('export-warning-edl')).toContainText(/flatten/i);
+  // The receipt describes the file that was written, not whatever the Timeline
+  // holds now: editing the Timeline afterwards must not rewrite the payload.
+  await expect(page.getByTestId('export-payload')).toHaveText(exportedPayload!);
   const warningColors = await page.evaluate(() => {
     const root = document.documentElement;
     const warning = document.querySelector<HTMLElement>('[data-testid="export-warning-edl"]')!;

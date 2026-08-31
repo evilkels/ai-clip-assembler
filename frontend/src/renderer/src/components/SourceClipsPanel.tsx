@@ -104,15 +104,26 @@ export function SourceClipsPanel({
       ? () => onExclude(record.clip.clip_id)
       : () => onInclude(record.clip.clip_id);
 
+  /** File-relative context for one Candidate Clip: the other candidates cut from
+   *  the same source file, and this clip's 1-based position among them. */
+  const fileContext = (clip: ClipCandidate) => {
+    const fileSiblings = clipsByFile.get(clip.file_id) ?? [];
+    const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
+    return {
+      siblingRanges: fileSiblings
+        .filter((candidate) => candidate.clip_id !== clip.clip_id)
+        .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec })),
+      fileClipIndex:
+        sortedFileSiblings.findIndex((candidate) => candidate.clip_id === clip.clip_id) + 1,
+      fileClipCount: fileSiblings.length,
+    };
+  };
+
   const renderGrid = () => (
     <div className="review-grid" data-review-grid>
       {groups.flatMap(({ key, lead, siblings: lookSiblings }) => {
         const renderClip = (record: ReturnType<typeof buildReviewClipRecords>[number], similarLookCount: number) => {
-          const fileSiblings = clipsByFile.get(record.clip.file_id) ?? [];
-          const siblingRanges = fileSiblings
-            .filter((candidate) => candidate.clip_id !== record.clip.clip_id)
-            .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec }));
-          const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
+          const { siblingRanges, fileClipIndex, fileClipCount } = fileContext(record.clip);
           return (
             <ClipCard
               key={record.clip.clip_id}
@@ -122,8 +133,8 @@ export function SourceClipsPanel({
               draftPosition={record.timelinePosition}
               versionLabels={record.versionLabels}
               siblingRanges={siblingRanges}
-              fileClipIndex={sortedFileSiblings.findIndex((candidate) => candidate.clip_id === record.clip.clip_id) + 1}
-              fileClipCount={fileSiblings.length}
+              fileClipIndex={fileClipIndex}
+              fileClipCount={fileClipCount}
               similarLookCount={similarLookCount}
               similarLooksExpanded={expandedGroups.has(key)}
               onToggleSimilarLooks={() => toggleGroup(key)}
@@ -144,8 +155,7 @@ export function SourceClipsPanel({
   const renderList = () => (
     <div className="review-list" data-review-list>
       {records.map((record) => {
-        const fileSiblings = clipsByFile.get(record.clip.file_id) ?? [];
-        const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
+        const { siblingRanges, fileClipIndex, fileClipCount } = fileContext(record.clip);
         return (
           <ClipListRow
             key={record.clip.clip_id}
@@ -154,11 +164,9 @@ export function SourceClipsPanel({
             decision={record.decision}
             timelinePosition={record.timelinePosition}
             versionLabels={record.versionLabels}
-            siblingRanges={fileSiblings
-              .filter((candidate) => candidate.clip_id !== record.clip.clip_id)
-              .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec }))}
-            fileClipIndex={sortedFileSiblings.findIndex((candidate) => candidate.clip_id === record.clip.clip_id) + 1}
-            fileClipCount={fileSiblings.length}
+            siblingRanges={siblingRanges}
+            fileClipIndex={fileClipIndex}
+            fileClipCount={fileClipCount}
             onToggleInclude={renderAction(record)}
           />
         );
@@ -168,17 +176,21 @@ export function SourceClipsPanel({
 
   const renderFilmstrip = () => (
     <div className="review-filmstrip" data-review-filmstrip>
-      {records.map((record) => (
-        <ClipFilmstripItem
-          key={record.clip.clip_id}
-          clip={record.clip}
-          rank={record.rank}
-          decision={record.decision}
-          timelinePosition={record.timelinePosition}
-          versionLabels={record.versionLabels}
-          onToggleInclude={renderAction(record)}
-        />
-      ))}
+      {records.map((record) => {
+        const { siblingRanges } = fileContext(record.clip);
+        return (
+          <ClipFilmstripItem
+            key={record.clip.clip_id}
+            clip={record.clip}
+            rank={record.rank}
+            decision={record.decision}
+            timelinePosition={record.timelinePosition}
+            versionLabels={record.versionLabels}
+            siblingRanges={siblingRanges}
+            onToggleInclude={renderAction(record)}
+          />
+        );
+      })}
     </div>
   );
 

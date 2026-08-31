@@ -1,8 +1,8 @@
-import type { CSSProperties } from 'react';
 import type { ClipCandidate, ClipDecision } from '../types/clip';
 import { formatClock } from '../lib/format';
-import { reviewFileAccent } from '../lib/reviewView';
+import { reviewFileAccentStyle } from '../lib/reviewView';
 import { ScoreChip } from './ScoreChip';
+import { SourceTrack, type Range } from './SourceTrack';
 
 interface ClipFilmstripItemProps {
   clip: ClipCandidate;
@@ -10,6 +10,8 @@ interface ClipFilmstripItemProps {
   decision: ClipDecision;
   timelinePosition?: number;
   versionLabels?: string[];
+  /** Other candidates cut from the same source file, drawn on the file track. */
+  siblingRanges?: Range[];
   onToggleInclude: () => void;
 }
 
@@ -19,11 +21,12 @@ export function ClipFilmstripItem({
   decision,
   timelinePosition,
   versionLabels = [],
+  siblingRanges = [],
   onToggleInclude,
 }: ClipFilmstripItemProps) {
-  const accent = reviewFileAccent(clip.file_id);
-  const style = { '--clip-accent': accent } as CSSProperties;
+  const style = reviewFileAccentStyle(clip.file_id);
   const included = timelinePosition !== undefined;
+  const sourceDuration = clip.source_duration_sec ?? null;
 
   return (
     <article
@@ -45,6 +48,16 @@ export function ClipFilmstripItem({
           <ScoreChip label="smooth" value={clip.scores.smoothness} />
           <ScoreChip label="combined" value={clip.scores.overall} />
         </div>
+        {sourceDuration && sourceDuration > 0 ? (
+          <SourceTrack
+            durationSec={sourceDuration}
+            startSec={clip.start_sec}
+            endSec={clip.end_sec}
+            playheadSec={clip.start_sec}
+            siblings={siblingRanges}
+            accent="var(--clip-accent)"
+          />
+        ) : null}
         {timelinePosition !== undefined ? <span className="clip-filmstrip-status">Timeline #{timelinePosition}</span> : null}
         {versionLabels.length > 0 ? <span className="clip-filmstrip-status">Proposed in {versionLabels.join('/')}</span> : null}
       </div>

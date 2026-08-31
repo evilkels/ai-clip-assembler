@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { ClipCandidate, ClipDecision } from '../types/clip';
 
 export type ReviewViewMode = 'grid' | 'list' | 'filmstrip';
@@ -71,6 +72,12 @@ export function buildReviewClipRecords(
 }
 
 /** A deterministic accent token for a source file, shared by all projections. */
+/** Inline style carrying a source file's accent to the `--clip-accent` custom
+ *  property every Candidate Clip view paints from. */
+export function reviewFileAccentStyle(fileId: string): CSSProperties {
+  return { '--clip-accent': reviewFileAccent(fileId) } as CSSProperties;
+}
+
 export function reviewFileAccent(fileId: string): string {
   let hash = 0;
   for (let index = 0; index < fileId.length; index += 1) {

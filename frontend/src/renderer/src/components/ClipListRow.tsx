@@ -1,7 +1,6 @@
-import type { CSSProperties } from 'react';
 import type { ClipDecision, ClipCandidate } from '../types/clip';
 import { formatClock } from '../lib/format';
-import { reviewFileAccent } from '../lib/reviewView';
+import { reviewFileAccentStyle } from '../lib/reviewView';
 import { ScoreChip } from './ScoreChip';
 import { SourceTrack, type Range } from './SourceTrack';
 
@@ -28,8 +27,7 @@ export function ClipListRow({
   fileClipCount,
   onToggleInclude,
 }: ClipListRowProps) {
-  const accent = reviewFileAccent(clip.file_id);
-  const style = { '--clip-accent': accent } as CSSProperties;
+  const style = reviewFileAccentStyle(clip.file_id);
   const duration = clip.end_sec - clip.start_sec;
   const sourceDuration = clip.source_duration_sec ?? null;
   const included = timelinePosition !== undefined;

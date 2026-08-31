@@ -1193,7 +1193,7 @@ a {
 .source-video-harness select {
   min-height: 30px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   padding: 0 8px;
   color: var(--text);
   background: var(--bg-1);
@@ -1903,7 +1903,7 @@ a {
   min-height: 30px;
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-lg);
   background: var(--bg-2);
 }
 
@@ -1937,7 +1937,7 @@ a {
   min-width: 120px;
   padding: 5px 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: var(--text);
   background: var(--bg-1);
 }
@@ -2005,7 +2005,8 @@ a {
   font-family: var(--font-mono);
 }
 
-.clip-list-row .source-track-wrap {
+.clip-list-row .source-track-wrap,
+.clip-filmstrip-item .source-track-wrap {
   padding: 6px 0 0;
 }
 

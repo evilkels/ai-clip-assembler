@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ClipCandidate, ClipDecision } from '../types/clip';
 import { verdictFor } from '../lib/scoring';
 import { formatClock } from '../lib/format';
@@ -8,7 +8,7 @@ import { SourceAudioBadge } from './SourceAudioBadge';
 import { sourceAudioState } from '../lib/sourceAudio';
 import { useReview } from '../state/ReviewContext';
 import { usePreviewAudio } from '../state/usePreviewAudio';
-import { reviewFileAccent } from '../lib/reviewView';
+import { reviewFileAccentStyle } from '../lib/reviewView';
 
 const EMPTY_RANGES: Range[] = [];
 const EMPTY_VERSION_LABELS: string[] = [];
@@ -67,8 +67,7 @@ export function ClipCard({
 }: Props) {
   const cls = ['clip-card', decision === 'included' ? 'included' : decision === 'excluded' ? 'excluded' : ''].join(' ');
   const verdict = verdictFor(clip.scores.overall);
-  const accent = reviewFileAccent(clip.file_id);
-  const accentStyle = { '--clip-accent': accent } as CSSProperties;
+  const accentStyle = reviewFileAccentStyle(clip.file_id);
   const hasSiblings = (fileClipCount ?? 1) > 1;
   const videoRef = useRef<HTMLVideoElement>(null);
   const { uploadedVideos } = useReview();

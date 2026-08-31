@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
 import {
+  isSourceVideoRunning,
   visibleSourceVideos,
   type SourceVideoFilters,
   type SourceVideoSort,
@@ -103,8 +104,7 @@ export function SourceVideoBrowser({
       {label}{sortArrow(sort, key)}
     </button>
   );
-  const isRunning = (video: UploadedVideo) =>
-    runningFileName ? video.file_name === runningFileName : /running|analyzing/i.test(video.status);
+  const isRunning = (video: UploadedVideo) => isSourceVideoRunning(video, runningFileName);
   const analysisLabel = (video: UploadedVideo) =>
     isRunning(video) ? 'Running' : analyzedIds.has(video.file_id) ? 'Analyzed' : 'Not analyzed';
   const sortDirection = (key: SourceVideoSortKey): 'ascending' | 'descending' | 'none' =>

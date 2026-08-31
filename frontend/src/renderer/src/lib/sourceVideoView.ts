@@ -10,6 +10,18 @@ export interface SourceVideoFilters {
   runningFileName?: string | null;
 }
 
+/**
+ * Analysis is running for exactly the source video the backend progress feed
+ * names. The uploaded-video record carries no analysis state of its own, so this
+ * is the only explicit signal — never infer it from `video.status` text.
+ */
+export function isSourceVideoRunning(
+  video: UploadedVideo,
+  runningFileName: string | null | undefined,
+): boolean {
+  return Boolean(runningFileName) && video.file_name === runningFileName;
+}
+
 export type SourceVideoSortKey = 'size' | 'date' | 'analyzed';
 
 export interface SourceVideoSort {
@@ -27,9 +39,7 @@ export function visibleSourceVideos(
   const filtered = videos.filter((video) => {
     const matchesQuery = !query || video.file_name.toLocaleLowerCase().includes(query);
     const analyzed = analyzedIds.has(video.file_id);
-    const running = filters.runningFileName
-      ? video.file_name === filters.runningFileName
-      : /running|analyzing/i.test(video.status);
+    const running = isSourceVideoRunning(video, filters.runningFileName);
     const matchesAnalysis =
       filters.analysis === 'all' ||
       (filters.analysis === 'analyzed' && analyzed) ||

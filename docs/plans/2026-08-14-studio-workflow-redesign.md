@@ -66,10 +66,27 @@ the repeated `--clip-accent` inline-style boilerplate is now
 
 ### Verification evidence
 
-Automated gate on the amended branch: lint PASS, typecheck PASS, main 69/69 PASS.
-Backend 404 passed/1 skipped and E2E 64/64 were green at `ed8a6d6`; the affected
-E2E suites were re-run after the Task 8 fixes. Human macOS/Electron and real-NLE
-checks remain pending and are never reported as automated proof.
+Full gate re-run on the amended branch after the Task 8 fixes, not carried over
+from `ed8a6d6`: lint PASS, typecheck PASS, main 69/69 PASS, backend 404 passed /
+1 skipped, E2E 64/64 PASS, build PASS.
+
+Human macOS/Electron and real-NLE checks remain pending and are never reported as
+automated proof.
+
+### Residual limitations after Task 8
+
+- **The export receipt is pinned to click time, not to a document revision.** If
+  the Timeline is edited while the export request or its overwrite prompt is in
+  flight, the backend can write a newer document than the receipt describes.
+  Closing this needs a revision pinned through the export call — a behaviour
+  change deliberately left out of a redesign branch.
+- **No row shows "Running" during the "Preparing analysis" window**, because the
+  backend's `starting` progress carries no file name. This is pre-existing, not
+  introduced by Task 8: uploaded videos always carry `status: "ready"`
+  (`backend/src/api.py:391,1421`), so the removed `/running|analyzing/` fallback
+  never matched them either.
+- Untested edges: duplicate source file names, in-flight edits during export,
+  and repeated exports across formats.
 
 ### Out of scope, still true
 

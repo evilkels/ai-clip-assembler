@@ -104,15 +104,20 @@ export function SourceClipsPanel({
       ? () => onExclude(record.clip.clip_id)
       : () => onInclude(record.clip.clip_id);
 
-  /** File-relative context for one Candidate Clip: the other candidates cut from
-   *  the same source file, and this clip's 1-based position among them. */
+  /** The other candidates cut from the same source file, as track ranges. */
+  const fileSiblingRanges = (clip: ClipCandidate) =>
+    (clipsByFile.get(clip.file_id) ?? [])
+      .filter((candidate) => candidate.clip_id !== clip.clip_id)
+      .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec }));
+
+  /** Sibling ranges plus this clip's 1-based position among its file's
+   *  candidates. Only for views that show the position; it sorts, so the
+   *  filmstrip uses `fileSiblingRanges` directly. */
   const fileContext = (clip: ClipCandidate) => {
     const fileSiblings = clipsByFile.get(clip.file_id) ?? [];
     const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
     return {
-      siblingRanges: fileSiblings
-        .filter((candidate) => candidate.clip_id !== clip.clip_id)
-        .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec })),
+      siblingRanges: fileSiblingRanges(clip),
       fileClipIndex:
         sortedFileSiblings.findIndex((candidate) => candidate.clip_id === clip.clip_id) + 1,
       fileClipCount: fileSiblings.length,
@@ -177,7 +182,6 @@ export function SourceClipsPanel({
   const renderFilmstrip = () => (
     <div className="review-filmstrip" data-review-filmstrip>
       {records.map((record) => {
-        const { siblingRanges } = fileContext(record.clip);
         return (
           <ClipFilmstripItem
             key={record.clip.clip_id}
@@ -186,7 +190,7 @@ export function SourceClipsPanel({
             decision={record.decision}
             timelinePosition={record.timelinePosition}
             versionLabels={record.versionLabels}
-            siblingRanges={siblingRanges}
+            siblingRanges={fileSiblingRanges(record.clip)}
             onToggleInclude={renderAction(record)}
           />
         );

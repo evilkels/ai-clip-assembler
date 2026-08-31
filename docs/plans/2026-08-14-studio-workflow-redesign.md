@@ -8,9 +8,12 @@
 
 **Tech Stack:** Electron, React 19, TypeScript, Vite, CSS custom properties, Playwright.
 
-## Status — 2026-08-14
+## Status — 2026-08-14, reviewed and amended 2026-08-31
 
-**Overall:** Complete on `redesign/studio-workflows` (Task 7 automated gate passed; human Electron/NLE checks remain explicitly pending).
+**Overall:** Implementation complete on `redesign/studio-workflows`. A two-axis
+review on 2026-08-31 (Standards + Spec, Codex Luna/high, `main...HEAD`) found and
+fixed one correctness defect and three conformance gaps. Human Electron/NLE
+checks remain explicitly pending and are NOT covered by any automated evidence.
 
 - [x] Task 1 — Shared studio system and shell (`9061a42..a8a4d7a`); reviewed clean for Critical/Important findings.
 - [x] Task 2 — Import workflow (`468c0c7..0d56228`); reviewed clean for Critical/Important findings.
@@ -18,9 +21,63 @@
 - [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
 - [x] Task 5 — Timeline redesign (`6dcd6a8..d8c45a9`); independent re-review clean.
 - [x] Task 6 — Export redesign (`07f15a6`); independent re-review clean.
-- [x] Task 7 — Integrated QA and documentation; automated gate complete, human Electron/NLE checks pending.
+- [x] Task 7 — Integrated QA and documentation; automated gate complete.
+- [x] Task 8 — Two-axis review remediation (2026-08-31), below.
 
-Current automated evidence: full frontend gate passes — lint, typecheck, main 69/69, backend 404 passed/1 skipped, E2E 64/64, and build. Integrated workflow E2E passes 2/2 at 1440×900 and 1024×768 in both themes. Human Electron/macOS and real-NLE checks remain pending and are recorded in the Task 7 review record. Deferred UX/test notes are tracked in `.superpowers/sdd/2026-08-14-studio-workflow-redesign/progress.md`.
+### Task 8 — review remediation (2026-08-31)
+
+Fixed on this branch after the Standards/Spec review:
+
+1. **Export receipt showed a payload that could describe a different export.**
+   `Export.tsx` snapshotted only `effective_duration_sec` at handoff while the
+   payload inspector rendered live Timeline state, so editing the Timeline after
+   exporting silently rewrote the receipt's payload. The payload is now built by
+   a pure `buildExportPayload()` and snapshotted into `DisplayExportResult`
+   alongside the duration. This was a real defect, not a style issue.
+2. **Ad hoc status-string parsing** (`/running|analyzing/i.test(video.status)`)
+   in `sourceVideoView.ts` and `SourceVideoBrowser.tsx` violated
+   `CONTRIBUTING.md`: "Prefer explicit project data structures over ad hoc string
+   parsing." `UploadedVideo.status` is an untyped `string` that never carries
+   analysis state; running-ness is now the single explicit predicate
+   `isSourceVideoRunning(video, runningFileName)`, sourced from the typed
+   `analysisStatus.phase`.
+3. **Filmstrip did not reuse `SourceTrack`**, contrary to Task 3 Step 4. It now
+   renders the file track like the list view.
+4. **Off-scale control radii.** Three sibling `min-height: 30px` control groups
+   used 6px / 8px / 4px. All three now use `--radius-lg` (10px), the scale's
+   input/control value.
+
+Also folded in two Standards judgement calls: the duplicated
+`fileSiblings`/`siblingRanges` computation is now one `fileContext()` helper, and
+the repeated `--clip-accent` inline-style boilerplate is now
+`reviewFileAccentStyle()`.
+
+### Known deviations accepted (not defects)
+
+- **Grid still mounts one `<video>` per Candidate Clip** (`ClipCard.tsx`). The
+  constraint "Avoid eager `<video>` mounting" binds the *new* list/filmstrip and
+  Import thumbs projections, which comply. The grid `<video>` predates this
+  branch and Task 3 Step 4 says "Keep `ClipCard` as the rich grid view".
+  Eliminating it is plan 017's remaining poster-first work, not this branch's.
+- **Active nav rows use a 2px inset accent bar** (`.step-link.active`,
+  `.project-row-active`). The "no solid left accent bars" constraint governs
+  *status surfaces*; `.status-surface` itself is compliant (semantic wash,
+  hairline inset outline, restrained glow, no bar).
+
+### Verification evidence
+
+Automated gate on the amended branch: lint PASS, typecheck PASS, main 69/69 PASS.
+Backend 404 passed/1 skipped and E2E 64/64 were green at `ed8a6d6`; the affected
+E2E suites were re-run after the Task 8 fixes. Human macOS/Electron and real-NLE
+checks remain pending and are never reported as automated proof.
+
+### Out of scope, still true
+
+Landing and Settings redesigns were excluded by the Global Constraints below.
+`SettingsModal`, `SettingsTabPanel`, and `DiagnosticsTabPanel` are untouched, and
+`site/` is untouched — see `landing-page-polish-and-launch.md` for the landing
+consequence, which this branch makes worse by restyling the app the landing
+screenshots depict.
 
 ## Global Constraints
 

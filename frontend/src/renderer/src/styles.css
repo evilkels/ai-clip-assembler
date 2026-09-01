@@ -577,7 +577,6 @@ a {
   background: var(--bg-2);
   color: var(--text);
   font-weight: 620;
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 /* ---------- Workflow steps (guided pipeline nav) ---------- */
@@ -725,11 +724,8 @@ a {
 .step-link.active {
   background: var(--bg-2);
   color: var(--text);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
-/* The row already carries the accent bar and fill, so the marker only needs
-   the accent colour — the extra glow ring made the active row shout. */
 .step-link.active .step-marker {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
@@ -866,6 +862,7 @@ a {
 .sidebar-collapsed .project-row-count,
 .sidebar-collapsed .project-row-actions,
 .sidebar-collapsed .step-body,
+.sidebar-collapsed .project-row-missing-note,
 .sidebar-collapsed .project-empty,
 .sidebar-collapsed .sidebar-error { display: none; }
 .project-row-initial { display: none; }
@@ -878,7 +875,7 @@ a {
 .sidebar-collapsed .sidebar-action-label { display: none; }
 .sidebar-collapsed .sidebar-action-icon { display: inline; font-size: 16px; }
 .sidebar-collapsed .workflow-steps { display: grid; justify-items: center; gap: 10px; }
-.sidebar-collapsed .step-link { padding: 0; background: transparent; box-shadow: none; }
+.sidebar-collapsed .step-link { padding: 0; background: transparent; }
 .sidebar-collapsed .step-marker { margin: 0; }
 .sidebar-collapsed .sidebar-footer { justify-items: center; }
 
@@ -4085,10 +4082,6 @@ a {
   width: 84px;
 }
 
-/* Active rows use a wash; no left-edge marker is used in the studio shell. */
-.workflow-rail .step-link.active,
-.project-row-wrap.project-row-active,
-.sidebar-collapsed .step-link.active { box-shadow: none; }
 .project-row-open { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .project-row-count,
 .step-count {

@@ -190,4 +190,14 @@ test('studio shell exposes counts, metadata, a real logo, and a collapsible rail
   await page.getByRole('button', { name: 'Collapse sidebar' }).click();
   await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
   await expect(page.locator('.app-shell')).toHaveAttribute('data-sidebar-collapsed', 'true');
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Diagnostics', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upload files instead', exact: true })).toBeVisible();
+  const collapsedRail = await page.locator('.sidebar').evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(collapsedRail.width).toBeLessThanOrEqual(64);
+  expect(collapsedRail.scrollWidth).toBeLessThanOrEqual(collapsedRail.clientWidth);
 });

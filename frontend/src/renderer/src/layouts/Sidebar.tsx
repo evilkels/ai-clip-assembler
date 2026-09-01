@@ -217,16 +217,16 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                   </div>
                 )}
                 {project.missing && editingFolderPath !== project.folderPath && (
-                  <div className="project-row-missing-note">
-                    <span className="project-state-chip missing">missing</span>
-                    <button
+                    <div className="project-row-missing-note">
+                      <span className="project-state-chip missing">missing</span>
+                      <button
                       type="button"
                       className="project-row-locate"
                       aria-label={`Locate ${displayName}`}
                       onClick={() => relocateRecent(project.folderPath)}
-                    >
-                      Locate folder
-                    </button>
+                      >
+                      <span className="sidebar-action-label">Locate folder</span>
+                      </button>
                   </div>
                 )}
               </div>
@@ -273,14 +273,15 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
       <div className="sidebar-footer">
         {!projectFolder && (
           <button className="sidebar-action" type="button" aria-label="Upload files instead" onClick={() => createUploadProject()} disabled={loading}>
-            Upload files instead
+            <span className="sidebar-action-icon" aria-hidden="true">↑</span>
+            <span className="sidebar-action-label">Upload files instead</span>
           </button>
         )}
-        <button className="sidebar-action" type="button" onClick={() => setSettingsTab('settings')}>
+        <button className="sidebar-action" type="button" aria-label="Settings" onClick={() => setSettingsTab('settings')}>
             <span className="sidebar-action-icon" aria-hidden="true">⚙</span>
             <span className="sidebar-action-label">Settings</span>
         </button>
-        <button className="sidebar-action" type="button" onClick={() => setSettingsTab('diagnostics')}>
+        <button className="sidebar-action" type="button" aria-label="Diagnostics" onClick={() => setSettingsTab('diagnostics')}>
           <span className="sidebar-action-icon" aria-hidden="true">◇</span>
           <span className="sidebar-action-label">Diagnostics</span>
         </button>

@@ -267,6 +267,18 @@ test('project cards expose labelled actions and locate only for missing folders'
   await expect(visibleRow.getByRole('button', { name: 'Rename Visible Project' })).toBeVisible();
   await expect(visibleRow.getByRole('button', { name: 'Remove Visible Project' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Diagnostics', exact: true })).toBeVisible();
+  const collapsed = await page.locator('.sidebar').evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(collapsed.width).toBeLessThanOrEqual(64);
+  expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth);
+  await expect(page.locator('.project-row-missing-note')).toHaveCSS('display', 'none');
+
   const buttonGeometry = await missingRow.getByRole('button').evaluateAll((buttons) =>
     buttons.map((button) => {
       const box = button.getBoundingClientRect();

@@ -6,6 +6,7 @@ import {
 import { SourceVideoBrowser } from '../components/SourceVideoBrowser';
 import { SourceVideoSelectionBar } from '../components/SourceVideoSelectionBar';
 import { StatusSurface } from '../components/StatusSurface';
+import { WorkflowHeader } from '../components/WorkflowHeader';
 import { useReview } from '../state/ReviewContext';
 import {
   analyzeProject,
@@ -368,24 +369,20 @@ export function ImportPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div className="page-header-text">
-          <h1>Import</h1>
-          <p>Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates.</p>
-        </div>
-      </div>
-      <div className="page-body">
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button type="button" className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
-            {openingFolder ? 'Opening…' : 'Create / Open Folder Project'}
-          </button>
-          {projectFolder && (
-            <button type="button" className="btn subtle" onClick={rescanOpenProject}>
-              Rescan Folder
+      <WorkflowHeader
+        title="Import"
+        step="Step 01 / 04"
+        description="Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates."
+        actions={(
+          <>
+            <button type="button" className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
+              {openingFolder ? 'Opening…' : 'Create / Open Folder Project'}
             </button>
-          )}
-        </div>
-
+            {projectFolder ? <button type="button" className="btn subtle" onClick={rescanOpenProject}>Rescan Folder</button> : null}
+          </>
+        )}
+      />
+      <div className="page-body">
         <input
           id="source-video-picker"
           ref={fileInputRef}

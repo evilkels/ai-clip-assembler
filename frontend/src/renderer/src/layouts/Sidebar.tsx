@@ -139,9 +139,9 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
         <img src={logoUrl} alt="" className="sidebar-brand-logo" width="32" height="32" />
         <span className="sidebar-brand-name">AI Clip Assembler</span>
       </div>
-      <button className="sidebar-new-project" type="button" onClick={openFolder} disabled={loading}>
+      <button className="sidebar-new-project" type="button" aria-label="Open Folder" onClick={openFolder} disabled={loading}>
         <span aria-hidden="true">+</span>
-        Open Folder
+        <span className="sidebar-action-label">Open Folder</span>
       </button>
 
       <div className="sidebar-section">
@@ -181,10 +181,11 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                         setError(err instanceof Error ? err.message : String(err));
                       })}
                     >
+                      <span className="project-row-initial" aria-hidden="true">{displayName.charAt(0).toUpperCase()}</span>
                       <span className="project-row-name">{displayName}</span>
-                      <span className="project-row-count" aria-label={`${active ? uploadedVideos.length : 0} clips`}>
-                        {active ? uploadedVideos.length : 0}
-                      </span>
+                      {active ? <span className="project-row-count" aria-label={`${uploadedVideos.length} source videos`}>
+                        {uploadedVideos.length} sources
+                      </span> : null}
                     </button>
                     <div className="project-row-actions">
                       <button
@@ -242,6 +243,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
             return (
               <li className="workflow-step" key={step.to}>
                 <NavLink
+                  aria-label={`${index + 1}. ${step.label}`}
                   className={({ isActive }) =>
                     `step-link${isActive ? ' active' : ''}${done ? ' done' : ''}`
                   }
@@ -257,7 +259,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                       {step.label}
                     </span>
                     <span className="step-hint">{step.hint}</span>
-                    <span className="step-count" aria-label={`${stepDone[step.to] ? 1 : 0} items`}>
+                    <span className="step-count" aria-label={step.to === '/import' ? `${uploadedVideos.length} source videos` : step.to === '/review' ? `${clips.length} clips` : step.to === '/timeline' ? `${timelineItems.length} timeline items` : `${acceptedCount} clips`}>
                       {step.to === '/import' ? uploadedVideos.length : step.to === '/review' ? clips.length : step.to === '/timeline' ? timelineItems.length : acceptedCount}
                     </span>
                   </span>
@@ -270,15 +272,17 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
 
       <div className="sidebar-footer">
         {!projectFolder && (
-          <button className="sidebar-action" type="button" onClick={() => createUploadProject()} disabled={loading}>
+          <button className="sidebar-action" type="button" aria-label="Upload files instead" onClick={() => createUploadProject()} disabled={loading}>
             Upload files instead
           </button>
         )}
         <button className="sidebar-action" type="button" onClick={() => setSettingsTab('settings')}>
-          Settings
+            <span className="sidebar-action-icon" aria-hidden="true">⚙</span>
+            <span className="sidebar-action-label">Settings</span>
         </button>
         <button className="sidebar-action" type="button" onClick={() => setSettingsTab('diagnostics')}>
-          Diagnostics
+          <span className="sidebar-action-icon" aria-hidden="true">◇</span>
+          <span className="sidebar-action-label">Diagnostics</span>
         </button>
         {error && <div className="sidebar-error">{error}</div>}
       </div>

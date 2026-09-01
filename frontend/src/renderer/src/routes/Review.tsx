@@ -6,6 +6,7 @@ import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { PreviewAudioControl } from '../components/PreviewAudioControl';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { StatusSurface } from '../components/StatusSurface';
+import { WorkflowHeader } from '../components/WorkflowHeader';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
 import { useReview } from '../state/ReviewContext';
@@ -115,12 +116,13 @@ export function ReviewPage() {
 
   return (
     <div className="page review-shell">
-      <div className="page-header">
-        <div>
-          <h1>Review</h1>
-          <p>Let the AI suggest a full cut, or pick clips yourself, then refine.</p>
-        </div>
-        <div className="controls">
+      <WorkflowHeader
+        title="Review"
+        step="Step 02 / 04"
+        description="Let the AI suggest a full cut, or pick clips yourself, then refine."
+        meta={<span className="draft-summary">{clips.length} clips available</span>}
+        actions={(
+          <div className="controls">
           <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
           <div className="control">
             <label htmlFor="smoothness">Display filter</label>
@@ -143,11 +145,9 @@ export function ReviewPage() {
               onChange={(event) => setSmoothnessThreshold(Number(event.target.value))}
             />
           </div>
-          <span className="draft-summary">
-            {clips.length} clips available
-          </span>
-        </div>
-      </div>
+          </div>
+        )}
+      />
 
       <div className="review-shell-body" data-testid="review-three-zone-layout">
         <aside className="review-spine" style={{ width: chatWidth }} data-testid="ask-ai-rail">

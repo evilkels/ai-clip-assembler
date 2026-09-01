@@ -334,7 +334,6 @@ async function assertShellGeometry(page: Page, fixture: VisualFixture): Promise<
     return { boxes, workspace, footer, viewport: { width: innerWidth, height: innerHeight } };
   }, { footerSelector: footerExpectation.selector });
   const box = (selector: string) => geometry.boxes[selector] as { left: number; right: number; top: number; bottom: number };
-  const sidebar = box('.sidebar');
   const header = box('[data-surface="project-header"]');
   const main = box('.main');
   const status = box('.statusbar');
@@ -345,7 +344,7 @@ async function assertShellGeometry(page: Page, fixture: VisualFixture): Promise<
   expect(status.bottom).toBe(geometry.viewport.height);
   if (footerExpectation.state === 'required') {
     expect(geometry.footer, `Missing required region: ${footerExpectation.selector}`).not.toBeNull();
-    expect(geometry.footer!.left).toBeGreaterThanOrEqual(sidebar.right - 1);
+    expect(geometry.footer!.left).toBeGreaterThanOrEqual(geometry.workspace.left - 1);
     expect(geometry.footer!.right).toBeLessThanOrEqual(geometry.viewport.width + 1);
   } else {
     expect(geometry.footer, `Unexpected pre-Task-2 region: ${footerExpectation.selector}`).toBeNull();

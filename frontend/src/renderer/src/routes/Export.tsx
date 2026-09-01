@@ -8,6 +8,7 @@ import {
   type ExportResult,
 } from '../api/client';
 import { EmptyState } from '../components/EmptyState';
+import { WorkflowHeader } from '../components/WorkflowHeader';
 import { StatusSurface } from '../components/StatusSurface';
 import {
   effectiveTimelineDuration,
@@ -174,18 +175,11 @@ export function ExportPage() {
 
   return (
     <div className="page export-page">
-      <div className="page-header export-page-header">
-        <div className="page-header-text">
-          <div className="export-title-row">
-            <h1>Export</h1>
-            <span className="export-step-label">step 04 / 04</span>
-          </div>
-          <p>
-            {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'} in the Timeline ·{' '}
-            {formatDuration(effectiveDuration)} total. Media paths stay relative to the project folder.
-          </p>
-        </div>
-        {Object.values(exportResults).some(Boolean) && (
+      <WorkflowHeader
+        title="Export"
+        step="Step 04 / 04"
+        description={`${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} in the Timeline · ${formatDuration(effectiveDuration)} total. Media paths stay relative to the project folder.`}
+        actions={Object.values(exportResults).some(Boolean) ? (
           <button
             type="button"
             className="btn subtle export-reveal-header"
@@ -197,8 +191,8 @@ export function ExportPage() {
           >
             Reveal in Finder
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="page-body export-page-body">
         {timelineItems.length === 0 ? (

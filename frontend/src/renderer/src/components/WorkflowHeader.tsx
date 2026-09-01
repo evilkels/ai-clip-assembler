@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 export type WorkflowHeaderProps = {
   title: string;
   step: string;
-  description?: string;
+  description?: ReactNode;
   actions?: ReactNode;
   meta?: ReactNode;
 };

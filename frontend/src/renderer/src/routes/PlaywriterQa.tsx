@@ -201,7 +201,16 @@ export function PlaywriterQaPage() {
           <Link className="btn" to="/export">Export</Link>
         </div>
         <div className="controls qa-fixture-links" aria-label="Visual fixture states">
-          {VISUAL_FIXTURES.map((name) => <Link className="btn subtle" key={name} to={`/playwriter?fixture=${name}`}>{name}</Link>)}
+          {VISUAL_FIXTURES.map((name, index) => (
+            <Link
+              className="btn subtle"
+              key={name}
+              aria-label={`Open visual fixture ${index + 1}`}
+              to={`/playwriter?fixture=${name}`}
+            >
+              Fixture {index + 1}
+            </Link>
+          ))}
         </div>
       </div>
     </div>

@@ -117,6 +117,7 @@ a {
 
 .app-workspace {
   display: grid;
+  position: relative;
   grid-template-columns: 232px 6px minmax(0, 1fr);
   min-height: 0;
 }
@@ -376,7 +377,6 @@ a {
 .project-row-wrap.active {
   --row-bg: var(--bg-active);
   background: var(--bg-active);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .project-row {
@@ -831,11 +831,11 @@ a {
   padding: 12px 24px;
   border-top: 1px solid var(--border);
   background: var(--bg-1);
-  margin-left: var(--sidebar-width, var(--shell-sidebar-width));
 }
 .workflow-footer-progress { display: flex; gap: 10px; flex: 0 0 auto; }
 .workflow-footer-progress-segment { width: 22px; height: 4px; border-radius: var(--radius-pill); background: var(--border-strong); }
-.workflow-footer-progress-segment.active { background: var(--accent); }
+.workflow-footer-progress-segment.active,
+.workflow-footer-progress-segment.complete { background: var(--accent); }
 .workflow-footer-copy { display: grid; gap: 3px; min-width: 0; }
 .workflow-footer-copy strong { font-size: var(--text-sm); font-weight: 650; }
 .workflow-footer-copy span { letter-spacing: 0.03em; text-transform: none; }
@@ -866,20 +866,21 @@ a {
 .sidebar-collapsed .project-row-count,
 .sidebar-collapsed .project-row-actions,
 .sidebar-collapsed .step-body,
-.sidebar-collapsed .sidebar-action,
 .sidebar-collapsed .project-empty,
 .sidebar-collapsed .sidebar-error { display: none; }
+.project-row-initial { display: none; }
+.sidebar-collapsed .project-row-initial { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font: 600 11px var(--font-mono); }
 .sidebar-collapsed .sidebar-brand { justify-content: center; border-bottom: 0; }
 .sidebar-collapsed .sidebar-new-project { width: 42px; margin-inline: auto; font-size: 0; }
 .sidebar-collapsed .sidebar-new-project > span { font-size: 18px; }
+.sidebar-collapsed .sidebar-action { display: flex; justify-content: center; width: 42px; padding-inline: 0; }
+.sidebar-action-icon { display: none; }
+.sidebar-collapsed .sidebar-action-label { display: none; }
+.sidebar-collapsed .sidebar-action-icon { display: inline; font-size: 16px; }
 .sidebar-collapsed .workflow-steps { display: grid; justify-items: center; gap: 10px; }
 .sidebar-collapsed .step-link { padding: 0; background: transparent; box-shadow: none; }
 .sidebar-collapsed .step-marker { margin: 0; }
 .sidebar-collapsed .sidebar-footer { justify-items: center; }
-
-/* Active rows use a wash; the former left-edge accent bar is intentionally removed. */
-.workflow-rail .step-link.active,
-.project-row-wrap.project-row-active { box-shadow: none; }
 
 @media (max-width: 720px) {
   .workflow-footer { align-items: flex-start; flex-wrap: wrap; gap: 10px 16px; }
@@ -949,14 +950,6 @@ a {
 .workflow-rail .step-link.active,
 .project-row-wrap.project-row-active {
   background: var(--accent-dim);
-}
-
-.workflow-rail .step-link.active {
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.project-row-wrap.project-row-active {
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .project-header {
@@ -4092,10 +4085,9 @@ a {
   width: 84px;
 }
 
-/* Final shell overrides: keep later route rules from reintroducing the old
-   active-edge marker or expanding collapsed labels. */
+/* Active rows use a wash; no left-edge marker is used in the studio shell. */
 .workflow-rail .step-link.active,
-.project-row-wrap.project-row-active { box-shadow: none; }
+.project-row-wrap.project-row-active,
 .sidebar-collapsed .step-link.active { box-shadow: none; }
 .project-row-open { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .project-row-count,

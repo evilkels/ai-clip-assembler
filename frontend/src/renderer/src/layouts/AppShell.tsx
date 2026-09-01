@@ -47,6 +47,7 @@ export function AppShell({ children }: AppShellProps) {
     switch (location.pathname) {
       case '/review':
         return {
+          currentStep: 2 as const,
           summary: `${acceptedCount} clips kept`,
           detail: `${clips.length} candidates · next: arrange & trim in Timeline`,
           secondaryActions: <Link className="btn subtle" to="/import">Back to Import</Link>,
@@ -54,6 +55,7 @@ export function AppShell({ children }: AppShellProps) {
         };
       case '/timeline':
         return {
+          currentStep: 3 as const,
           summary: `${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} · ${effectiveTimelineDuration(timelineItems).toFixed(1)}s`,
           detail: 'next: export FCPXML, Resolve XML or EDL',
           secondaryActions: <Link className="btn subtle" to="/review">Back to Review</Link>,
@@ -61,12 +63,14 @@ export function AppShell({ children }: AppShellProps) {
         };
       case '/export':
         return {
+          currentStep: 4 as const,
           summary: `${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} ready to export`,
           detail: 'Choose a format, then create your handoff',
           secondaryActions: <Link className="btn subtle" to="/timeline">Back to Timeline</Link>,
         };
       case '/import':
         return {
+          currentStep: 1 as const,
           summary: uploadedVideos.length > 0 ? `${uploadedVideos.length} sources loaded` : 'Import footage to begin',
           detail: 'next: pick the keepers in Review',
           secondaryActions: null,

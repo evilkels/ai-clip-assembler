@@ -8,6 +8,7 @@ import type { UpdateStatus } from '../src/shared/updateStatus';
  * These tests measure the geometry instead of only asserting visibility.
  */
 const STATUS_BAR_HEIGHT = 28;
+const WORKFLOW_FOOTER_MIN_HEIGHT = 64;
 
 async function installBridge(page: Page, status: UpdateStatus | null) {
   await page.addInitScript((config) => {
@@ -44,6 +45,7 @@ async function measure(page: Page) {
       bannerHeight: banners.getBoundingClientRect().height,
       workspaceTop: workspaceBox.top,
       workspaceHeight: workspaceBox.height,
+      footerHeight: document.querySelector('.workflow-footer')?.getBoundingClientRect().height ?? 0,
     };
   });
 }
@@ -66,8 +68,9 @@ test('status bar keeps its own row when there is no banner to show', async ({ pa
   // Flush with the bottom of the window, not pushed past it.
   expect(layout.barBottom).toBe(layout.viewportHeight);
   expect(layout.workspaceHeight).toBe(
-    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
+    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight - layout.footerHeight,
   );
+  expect(layout.footerHeight).toBeGreaterThanOrEqual(WORKFLOW_FOOTER_MIN_HEIGHT);
 });
 
 test('a visible banner takes its own row without displacing the status bar', async ({ page }) => {
@@ -88,7 +91,7 @@ test('a visible banner takes its own row without displacing the status bar', asy
   expect(layout.barHeight).toBe(STATUS_BAR_HEIGHT);
   expect(layout.barBottom).toBe(layout.viewportHeight);
   expect(layout.workspaceHeight).toBe(
-    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
+    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight - layout.footerHeight,
   );
 });
 
@@ -103,7 +106,7 @@ test('the layout survives a failing update check', async ({ page }) => {
   expect(layout.barHeight).toBe(STATUS_BAR_HEIGHT);
   expect(layout.barBottom).toBe(layout.viewportHeight);
   expect(layout.workspaceHeight).toBe(
-    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight,
+    layout.viewportHeight - STATUS_BAR_HEIGHT - layout.bannerHeight - layout.headerHeight - layout.footerHeight,
   );
 });
 
@@ -168,4 +171,23 @@ test('studio shell exposes an active workflow rail and themed surfaces', async (
 
   expect(themes.dark).toBe('#08090b');
   expect(themes.light).toBe('#e9eaec');
+});
+
+test('studio shell exposes counts, metadata, a real logo, and a collapsible rail', async ({ page }) => {
+  await installBridge(page, {
+    state: 'up-to-date',
+    currentVersion: '0.1.4',
+    latestVersion: '0.1.4',
+  });
+  await page.goto('/#/review');
+
+  await expect(page.locator('.workflow-footer')).toBeVisible();
+  await expect(page.locator('.project-row-count, .step-count').first()).toBeVisible();
+  await expect.poll(async () => page.locator('.sidebar-brand-logo').evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeVisible();
+  await expect(page.locator('.step-link.active')).not.toHaveCSS('box-shadow', /inset 2px 0/);
+
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  await expect(page.locator('.app-shell')).toHaveAttribute('data-sidebar-collapsed', 'true');
 });

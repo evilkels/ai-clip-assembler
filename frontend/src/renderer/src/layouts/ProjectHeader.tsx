@@ -4,7 +4,7 @@ import { currentProjectDisplayName } from '../lib/projectSort';
 import { useReview } from '../state/ReviewContext';
 
 export function ProjectHeader() {
-  const { projectFolder, projectName, recentProjects, renameRecent } = useReview();
+  const { projectFolder, projectName, recentProjects, renameRecent, uploadedVideos, clips, timelineItems } = useReview();
   const recentProject = recentProjects.find((project) => project.folderPath === projectFolder);
   const displayName = currentProjectDisplayName({ recentProject, projectName, projectFolder });
   const hasProject = Boolean(displayName || projectFolder);
@@ -43,6 +43,11 @@ export function ProjectHeader() {
           {projectFolder && (
             <span className="project-header-path project-header-metadata" title={projectFolder}>
               {projectFolder}
+            </span>
+          )}
+          {projectFolder && (
+            <span className="project-header-stats project-header-metadata" aria-label="Project totals">
+              {uploadedVideos.length} sources · {clips.length} clips · {timelineItems.length} items
             </span>
           )}
           {projectFolder && (

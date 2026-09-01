@@ -7,6 +7,10 @@ import { recentProjectDisplayName, sortRecentProjects } from '../lib/projectSort
 import { useReview } from '../state/ReviewContext';
 import { SettingsModal, type SettingsTab } from '../components/SettingsModal';
 
+// Keep the mark in Vite's asset graph so the development renderer and the
+// packaged Electron renderer resolve the same branded asset.
+const logoUrl = new URL('../../../../../assets/logo.png', import.meta.url).href;
+
 const ImportIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 3v12" />
@@ -70,7 +74,7 @@ const steps: WorkflowStep[] = [
   { to: '/export', label: 'Export', hint: 'Save your video', icon: ExportIcon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const {
     projectFolder,
     recentProjects,
@@ -81,6 +85,7 @@ export function Sidebar() {
     renameRecent,
     relocateRecent,
     uploadedVideos,
+    clips,
     acceptedCount,
     timelineItems,
   } = useReview();
@@ -129,9 +134,9 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sidebar" aria-label="Project sidebar">
+    <aside className={`sidebar${collapsed ? ' sidebar-collapsed' : ''}`} aria-label="Project sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
       <div className="sidebar-brand" aria-label="AI Clip Assembler">
-        <img src="./build/logo.png" alt="" className="sidebar-brand-logo" width="32" height="32" />
+        <img src={logoUrl} alt="" className="sidebar-brand-logo" width="32" height="32" />
         <span className="sidebar-brand-name">AI Clip Assembler</span>
       </div>
       <button className="sidebar-new-project" type="button" onClick={openFolder} disabled={loading}>
@@ -177,6 +182,9 @@ export function Sidebar() {
                       })}
                     >
                       <span className="project-row-name">{displayName}</span>
+                      <span className="project-row-count" aria-label={`${active ? uploadedVideos.length : 0} clips`}>
+                        {active ? uploadedVideos.length : 0}
+                      </span>
                     </button>
                     <div className="project-row-actions">
                       <button
@@ -249,6 +257,9 @@ export function Sidebar() {
                       {step.label}
                     </span>
                     <span className="step-hint">{step.hint}</span>
+                    <span className="step-count" aria-label={`${stepDone[step.to] ? 1 : 0} items`}>
+                      {step.to === '/import' ? uploadedVideos.length : step.to === '/review' ? clips.length : step.to === '/timeline' ? timelineItems.length : acceptedCount}
+                    </span>
                   </span>
                 </NavLink>
               </li>

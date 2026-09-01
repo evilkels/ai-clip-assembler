@@ -56,7 +56,7 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) 28px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto 28px;
   height: 100vh;
   min-width: 1024px;
   overflow: hidden;
@@ -794,6 +794,97 @@ a {
 }
 .status-dot.online { background: var(--green); }
 .status-dot.offline { background: var(--red); }
+
+/* ---------- Shared workflow chrome ---------- */
+.workflow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.workflow-header-copy { min-width: 0; }
+.workflow-header-title { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.workflow-header h1 { margin: 0; font-size: var(--text-xl); letter-spacing: -0.02em; }
+.workflow-header-step,
+.workflow-footer-copy span,
+.project-header-stats {
+  color: var(--text-muted);
+  font: 10px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.workflow-header-step { color: var(--accent); }
+.workflow-header p { margin: 4px 0 0; color: var(--text-dim); font-size: var(--text-sm); }
+.workflow-header-actions,
+.workflow-header-meta { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+
+.workflow-footer {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  min-height: var(--shell-footer-height);
+  padding: 12px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+  margin-left: var(--sidebar-width, var(--shell-sidebar-width));
+}
+.workflow-footer-progress { display: flex; gap: 10px; flex: 0 0 auto; }
+.workflow-footer-progress-segment { width: 22px; height: 4px; border-radius: var(--radius-pill); background: var(--border-strong); }
+.workflow-footer-progress-segment.active { background: var(--accent); }
+.workflow-footer-copy { display: grid; gap: 3px; min-width: 0; }
+.workflow-footer-copy strong { font-size: var(--text-sm); font-weight: 650; }
+.workflow-footer-copy span { letter-spacing: 0.03em; text-transform: none; }
+.workflow-footer-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; flex: 0 0 auto; }
+
+.sidebar-collapse-toggle {
+  position: absolute;
+  z-index: 8;
+  top: 22px;
+  left: calc(var(--shell-sidebar-width) - 14px);
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-1);
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+}
+.sidebar-collapse-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+.sidebar-is-collapsed .sidebar-collapse-toggle { left: calc(var(--shell-sidebar-collapsed-width) - 14px); }
+.sidebar-is-collapsed .sidebar { padding-inline: 10px; }
+.sidebar-collapsed .sidebar-brand-name,
+.sidebar-collapsed .sidebar-section-label,
+.sidebar-collapsed .project-row-name,
+.sidebar-collapsed .project-row-count,
+.sidebar-collapsed .project-row-actions,
+.sidebar-collapsed .step-body,
+.sidebar-collapsed .sidebar-action,
+.sidebar-collapsed .project-empty,
+.sidebar-collapsed .sidebar-error { display: none; }
+.sidebar-collapsed .sidebar-brand { justify-content: center; border-bottom: 0; }
+.sidebar-collapsed .sidebar-new-project { width: 42px; margin-inline: auto; font-size: 0; }
+.sidebar-collapsed .sidebar-new-project > span { font-size: 18px; }
+.sidebar-collapsed .workflow-steps { display: grid; justify-items: center; gap: 10px; }
+.sidebar-collapsed .step-link { padding: 0; background: transparent; box-shadow: none; }
+.sidebar-collapsed .step-marker { margin: 0; }
+.sidebar-collapsed .sidebar-footer { justify-items: center; }
+
+/* Active rows use a wash; the former left-edge accent bar is intentionally removed. */
+.workflow-rail .step-link.active,
+.project-row-wrap.project-row-active { box-shadow: none; }
+
+@media (max-width: 720px) {
+  .workflow-footer { align-items: flex-start; flex-wrap: wrap; gap: 10px 16px; }
+  .workflow-footer-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
+}
 
 /* ---------- Studio primitives ---------- */
 
@@ -3999,4 +4090,32 @@ a {
 
 .preview-audio-control input[type='range'] {
   width: 84px;
+}
+
+/* Final shell overrides: keep later route rules from reintroducing the old
+   active-edge marker or expanding collapsed labels. */
+.workflow-rail .step-link.active,
+.project-row-wrap.project-row-active { box-shadow: none; }
+.sidebar-collapsed .step-link.active { box-shadow: none; }
+.project-row-open { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.project-row-count,
+.step-count {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font: 10px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.step-link { position: relative; }
+.step-body { position: relative; padding-right: 24px; }
+.step-count { position: absolute; top: 1px; right: 0; }
+.project-header-stats {
+  flex: 0 1 auto;
+  max-width: 34%;
+  overflow: hidden;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
 }

@@ -48,6 +48,10 @@
   --duration-fast: 80ms;
   --duration-base: 160ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --shell-sidebar-width: 232px;
+  --shell-sidebar-collapsed-width: 64px;
+  --shell-footer-height: 68px;
 }
 
 /* Non-color tokens shared across every theme. */
@@ -73,6 +77,9 @@
   --duration-fast: 80ms;
   --duration-base: 160ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --shell-sidebar-width: 232px;
+  --shell-sidebar-collapsed-width: 64px;
+  --shell-footer-height: 68px;
 }
 
 /* Dark palette — the default. Applied when no theme is resolved yet or

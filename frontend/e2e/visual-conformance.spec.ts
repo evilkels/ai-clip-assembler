@@ -304,12 +304,12 @@ type FooterExpectation = {
 };
 
 const footerExpectations: Record<VisualFixture, FooterExpectation> = {
-  shell: { selector: '[data-testid="source-video-selection-bar"]', state: 'required' },
-  'import-analyzing': { selector: '[data-testid="source-video-selection-bar"]', state: 'required' },
-  'review-grid': { selector: '.workflow-footer', state: 'expected-missing' },
-  'review-list': { selector: '.workflow-footer', state: 'expected-missing' },
-  'timeline-selection': { selector: '.workflow-footer', state: 'expected-missing' },
-  'export-receipt': { selector: '.workflow-footer', state: 'expected-missing' },
+  shell: { selector: '.workflow-footer', state: 'required' },
+  'import-analyzing': { selector: '.workflow-footer', state: 'required' },
+  'review-grid': { selector: '.workflow-footer', state: 'required' },
+  'review-list': { selector: '.workflow-footer', state: 'required' },
+  'timeline-selection': { selector: '.workflow-footer', state: 'required' },
+  'export-receipt': { selector: '.workflow-footer', state: 'required' },
 };
 
 async function assertShellGeometry(page: Page, fixture: VisualFixture): Promise<void> {

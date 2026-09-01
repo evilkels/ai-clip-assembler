@@ -18,7 +18,7 @@ export function TimelineEditor({
   selectedId?: string | null;
   onSelectedItemChange?: (itemId: string | null) => void;
 } = {}) {
-  const { projectId, timelineItems, clips, applyTimelineOperation, undo, redo } = useReview();
+  const { projectId, timelineItems, clips, applyTimelineOperation } = useReview();
 
   if (!projectId) return null;
 
@@ -29,19 +29,12 @@ export function TimelineEditor({
   const selectedProjection = selectedItem ? projectionByItemId.get(selectedItem.item_id) : undefined;
 
   return (
-    <aside className="timeline-editor" aria-label="Timeline inspector" data-testid="timeline-editor">
-      <div className="timeline-editor-head">
-        <strong>Inspector</strong>
-        <span className="draft-summary">{timelineItems.length} item(s)</span>
-        <div className="timeline-editor-tools">
-          <button type="button" className="btn subtle" onClick={() => void undo()} data-testid="timeline-undo">
-            Undo
-          </button>
-          <button type="button" className="btn subtle" onClick={() => void redo()} data-testid="timeline-redo">
-            Redo
-          </button>
-        </div>
-      </div>
+    <aside
+      className="timeline-editor"
+      aria-label="Timeline inspector"
+      data-testid="timeline-editor"
+      data-timeline-item-rail="true"
+    >
       {selectedItem && selectedProjection ? (
         <div className="timeline-inspector" data-testid="timeline-inspector">
           <div className="timeline-inspector-heading">

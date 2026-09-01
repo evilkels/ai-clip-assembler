@@ -6,7 +6,7 @@ import { effectiveTimelineDuration } from '../lib/timelineProjection';
 import { WorkflowHeader } from '../components/WorkflowHeader';
 
 export function TimelinePage() {
-  const { timelineItems } = useReview();
+  const { timelineItems, undo, redo } = useReview();
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const totalDuration = effectiveTimelineDuration(timelineItems);
 
@@ -22,14 +22,22 @@ export function TimelinePage() {
         title="Timeline"
         step="Step 03 / 04"
         description="Reorder Timeline Items, trim source bounds, and scrub the speed-aware sequence before export."
-        meta={(
-          <span data-testid="timeline-summary" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-            {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'} ·{' '}
-            {totalDuration.toFixed(1)}s
-          </span>
+        actions={(
+          <div className="timeline-header-actions" data-testid="timeline-header-actions">
+            <button type="button" className="btn subtle" onClick={() => void undo()} data-testid="timeline-undo">
+              Undo
+            </button>
+            <button type="button" className="btn subtle" onClick={() => void redo()} data-testid="timeline-redo">
+              Redo
+            </button>
+            <span className="timeline-header-runtime" data-testid="timeline-summary">
+              {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'} ·{' '}
+              {totalDuration.toFixed(1)}s
+            </span>
+          </div>
         )}
       />
-      <div className="page-body timeline-page-body">
+      <div className="page-body timeline-page-body" data-testid="timeline-workspace">
         <Timeline selectedId={selectedItemId} onSelectedItemChange={setSelectedItemId} />
         <TimelineEditor selectedId={selectedItemId} onSelectedItemChange={setSelectedItemId} />
       </div>

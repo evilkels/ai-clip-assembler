@@ -602,11 +602,12 @@ export function Timeline({
   return (
     <div className="timeline" data-timeline-playing={playing ? 'true' : 'false'}>
       {previewSegment && (
-          <section
-            className="timeline-preview"
-            aria-label="Timeline video preview"
-            style={{ height: previewHeight }}
-          >
+        <section
+          className="timeline-preview"
+          aria-label="Timeline video preview"
+          data-testid="timeline-preview-stage"
+          style={{ height: previewHeight }}
+        >
           <ClipPreview
             {...previewProps}
             label={previewSegment.fileName}
@@ -633,13 +634,14 @@ export function Timeline({
           </div>
         </section>
       )}
-      <button
-        className="timeline-resize-handle"
-        type="button"
-        aria-label="Resize preview and timeline"
-        onPointerDown={startPreviewResize}
-      />
-      <div className="timeline-toolbar">
+      <section className="timeline-track-region" data-testid="timeline-track-region">
+        <button
+          className="timeline-resize-handle"
+          type="button"
+          aria-label="Resize preview and timeline"
+          onPointerDown={startPreviewResize}
+        />
+        <div className="timeline-toolbar">
         <div className="transport">
           <button type="button"
             className="btn subtle"
@@ -693,9 +695,9 @@ export function Timeline({
           </button>
           <span className="zoom-label">{pxPerSec} px/s</span>
         </div>
-      </div>
+        </div>
 
-      <div className="timeline-scroll" ref={scrollRef} onWheel={handleWheelZoom}>
+        <div className="timeline-scroll" ref={scrollRef} onWheel={handleWheelZoom}>
         <div
           className="timeline-track"
           ref={trackRef}
@@ -806,13 +808,13 @@ export function Timeline({
             onPointerDown={startScrub}
           />
         </div>
-      </div>
+        </div>
 
-      <p className="timeline-hint">
-        Drag clips to reorder · drag edges to trim · drag playhead to scrub · wheel to zoom · <kbd>J</kbd>/<kbd>K</kbd>/
-        <kbd>L</kbd> transport · <kbd>↑</kbd>/<kbd>↓</kbd> select · <kbd>Shift</kbd>+<kbd>←</kbd>/
-        <kbd>→</kbd> reorder · <kbd>⌫</kbd> remove · <kbd>+</kbd>/<kbd>−</kbd> zoom
-      </p>
+        <p className="timeline-hint">
+          <span>Drag to reorder · edges to trim · wheel to zoom</span>
+          <span className="timeline-keyboard-hint"><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> <kbd>⇧ ← →</kbd> <kbd>⌫</kbd></span>
+        </p>
+      </section>
     </div>
   );
 }

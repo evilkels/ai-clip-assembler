@@ -387,6 +387,51 @@ test.describe('deterministic visual fixture setup', () => {
   }
 });
 
+test('timeline workspace keeps the preview, track, inspector, header actions, and footer in their studio roles', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openFixtureRoute(page, 'timeline-selection', '/timeline');
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+
+  const workspace = page.getByTestId('timeline-workspace');
+  const preview = page.getByTestId('timeline-preview-stage');
+  const track = page.getByTestId('timeline-track-region');
+  const rail = page.locator('[data-timeline-item-rail]');
+
+  await expect(workspace).toBeVisible();
+  await expect(preview).toBeVisible();
+  await expect(track).toBeVisible();
+  await expect(rail).toBeVisible();
+  await expect(page.getByTestId('timeline-header-actions')).toContainText('Undo');
+  await expect(page.getByTestId('timeline-header-actions')).toContainText('Redo');
+  await expect(page.locator('.workflow-footer .workflow-footer-actions')).toContainText('Continue to Export');
+
+  const geometry = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing ${selector}`);
+      const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+      return { left, right, top, bottom, width, height };
+    };
+    return {
+      workspace: rect('[data-testid="timeline-workspace"]'),
+      preview: rect('[data-testid="timeline-preview-stage"]'),
+      track: rect('[data-testid="timeline-track-region"]'),
+      rail: rect('[data-timeline-item-rail]'),
+    };
+  });
+
+  expect(geometry.preview.width).toBeGreaterThan(geometry.rail.width);
+  expect(geometry.rail.width).toBeGreaterThanOrEqual(300);
+  expect(geometry.rail.width).toBeLessThanOrEqual(340);
+  expect(geometry.preview.left).toBeLessThan(geometry.rail.left);
+  expect(geometry.track.top).toBeGreaterThanOrEqual(geometry.preview.top);
+  expect(geometry.track.bottom).toBeLessThanOrEqual(geometry.workspace.bottom + 1);
+
+  await page.getByTestId('timeline-clip').first().click();
+  await expect(page.getByTestId('timeline-inspector')).toBeVisible();
+  await expect(page.getByTestId('timeline-item-row').first()).toHaveClass(/selected/);
+});
+
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 1024, height: 768 }]) {
   test.describe(`${viewport.width}x${viewport.height}`, () => {
     test.use({ viewport });

@@ -36,11 +36,11 @@ from the one users download. Verified specifics:
   (plan constraint: "no runtime dependency on a web-font CDN"), and a page whose
   headline promise is "local by default" third-party-loading fonts is a bad look
   independent of the redesign. Self-host when restyling.
-- **One factual copy bug, unrelated to the redesign.** `site/index.html:952` has
-  `alt="Import screen with three source videos analyzed"`, but `img/import.png`
-  visibly shows all three rows reading "— Not analyzed" and an "Analyze all 3"
-  button not yet pressed. Verified by inspecting the image. Fix the alt text
-  regardless of when screenshots get re-shot.
+- **One factual copy bug, unrelated to the redesign, was found in the retired
+  import screenshot.** Its alt text claimed that three source videos had been
+  analyzed, while the image showed all three rows reading "— Not analyzed" and
+  an "Analyze all 3" button not yet pressed. The obsolete screenshot has now
+  been removed; any replacement capture must use accurate alt text.
 - A landing redesign *was* supplied with the app design
   (`ai-clip-assembler-landing-desktop-1440.png`, `-mobile-390.png` in the
   gitignored design export) and has never been implemented. The reference

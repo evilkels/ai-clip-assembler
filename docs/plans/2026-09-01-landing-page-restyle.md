@@ -14,7 +14,7 @@
 - `docs/design/2026-09-01-landing-page-reference.html` — the rendered reference; Reference A dark, Reference B light, fixed 1440px, all styles inline. Read as a spec, never copy as source.
 - `AI CLIP ASSEMBLER Redesign APP + Landing page/Clip Assembler Restyle.dc.html` — the wider app design system (gitignored, read-only, never stage).
 
-## Status — TODO, 2026-09-01
+## Status — COMPLETE, 2026-09-01
 
 Intended to land inside PR #68 alongside the studio workflow redesign, so the app
 and the page that advertises it ship together.
@@ -23,8 +23,8 @@ and the page that advertises it ship together.
 
 - [x] Six contact-sheet frames vendored to `site/img/frames/clip-0{1..6}.webp`. The
       handoff shipped them as PNG totalling 4.3MB, which is untenable for above-the-fold
-      hero imagery; re-encoded to WebP q82 at the same 767×431 resolution for 352KB
-      total, a 92% reduction with no resolution loss.
+      hero imagery; re-encoded to WebP q82 at their original 767×431, 762×429, and
+      764×430 dimensions for 352KB total, a 92% reduction with no resolution loss.
 - [x] Fonts self-hosted to `site/fonts/` (76KB total): `ibm-plex-sans-latin-var.woff2`
       covers weights 400–700 in one variable file, plus three static Plex Mono weights.
       OFL-1.1 licence and refresh instructions are in `site/fonts/LICENSE.txt` and
@@ -91,6 +91,7 @@ From the handoff's token table. Same names in both themes; `dark` is the default
 | `--accent` | `#ff4d6d` | `#e11d48` |
 | `--on-accent` | `#1a0308` | `#ffffff` |
 | `--green` (keep) | `#5fd18b` | `#17915a` |
+| `--keep-label` (KEEP text) | `#5fd18b` | `#0f6f45` |
 | `--bar-seg-a` | `rgba(255,255,255,.34)` | `rgba(26,28,32,.28)` |
 | `--bar-seg-b` | `rgba(255,255,255,.2)` | `rgba(26,28,32,.16)` |
 
@@ -117,32 +118,32 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
 
 **Files:** Modify `site/index.html` (head at `:59-63`, style block from `:64`)
 
-- [ ] **Step 1: Delete the Google Fonts links**
+- [x] **Step 1: Delete the Google Fonts links**
 
   Remove `site/index.html:59-63` entirely — both preconnects and the stylesheet. Leave
   every other head element untouched.
 
-- [ ] **Step 2: Declare the self-hosted faces**
+- [x] **Step 2: Declare the self-hosted faces**
 
   Add `@font-face` rules pointing at the four files already in `site/fonts/`. Plex Sans
   is variable: declare it once with `font-weight: 400 700`. Plex Mono needs one rule per
   weight (400/500/600). Use `font-display: swap` and relative `url("fonts/…")` paths.
 
-- [ ] **Step 3: Build the two token maps**
+- [x] **Step 3: Build the two token maps**
 
   Put the dark map on `:root, :root[data-theme="dark"]` and the light map on
   `:root[data-theme="light"]`, using the table above. Set `color-scheme` per theme.
   Every subsequent rule reads tokens — no raw hex outside these two blocks, except the
   three traffic-light dots.
 
-- [ ] **Step 4: Base typography and page shell**
+- [x] **Step 4: Base typography and page shell**
 
   Content column capped at 1440px and centred; 56px horizontal section padding. Type
   scale: 64 / 36 / 34 / 20 / 17 / 15 / 14.5 / 13.5 / 12 / 11 / 10.5 / 10. Never set body
   copy below 14.5px. `-.03em` tracking at 64px, `-.02em` at 36px, `line-height:1.03` on
   the H1, 1.55–1.6 on body. Mono labels are uppercase with `.1em`–`.18em` tracking.
 
-- [ ] **Step 5: The theme toggle**
+- [x] **Step 5: The theme toggle**
 
   A single inline `<script>` in `<head>` that sets `data-theme` on `<html>` from
   `localStorage`, falling back to `prefers-color-scheme`, before first paint — this must
@@ -154,7 +155,7 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
 
 **Files:** Modify `site/index.html`
 
-- [ ] **Step 1: Header**
+- [x] **Step 1: Header**
 
   Per handoff §1: flex, `gap:28px`, `padding:20px 56px`, bottom border `--border`.
   Wordmark and "macOS" badge in mono 11px `.18em` uppercase. Nav right-aligned with
@@ -163,14 +164,14 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
   Nav anchors must resolve: `#how-it-works`, `#local-first`, `#faq` — add those `id`s to
   the corresponding sections in Task 3 and Task 4.
 
-- [ ] **Step 2: Hero layout and left column**
+- [x] **Step 2: Hero layout and left column**
 
   `grid-template-columns:minmax(0,1fr) 620px; gap:56px; padding:72px 56px 56px`.
   Eyebrow, H1 (accent second line, `text-wrap:balance`), 17px body at `max-width:52ch`,
   the two CTAs at `border-radius:11px`, and the two-line mono fine print. Exact specs in
   handoff §2.
 
-- [ ] **Step 3: The contact sheet — the signature element**
+- [x] **Step 3: The contact sheet — the signature element**
 
   Caption row, then `grid-template-columns:repeat(3,1fr); gap:10px`, six tiles at
   `aspect-ratio:16/9`, `border-radius:10px`, 1px inset ring via `box-shadow`. Each tile:
@@ -190,7 +191,7 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
   Give every `<img>` explicit `width`/`height` so the grid does not shift while loading.
   The first row is above the fold — do NOT lazy-load tiles 1–3.
 
-- [ ] **Step 4: Assembled-cut bar**
+- [x] **Step 4: Assembled-cut bar**
 
   Per handoff §2.3: five segments at `flex:0 0 22%/16%/12%/19%` then `flex:1`, first in
   accent and the rest alternating `--bar-seg-a`/`--bar-seg-b`, each but the last with a
@@ -201,88 +202,87 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
 
 **Files:** Modify `site/index.html`
 
-- [ ] **Step 1: Timeline-ruler divider**
+- [x] **Step 1: Timeline-ruler divider**
 
   Handoff §3: `height:56px`, top/bottom borders, `--surface` background, a
   `repeating-linear-gradient` tick every 24px, a 2px accent playhead at `left:24%`, and
   the two mono labels "00:00 · IMPORT" and "02:47 · EXPORT".
 
-- [ ] **Step 2: Three steps**
+- [x] **Step 2: Three steps**
 
   `id="how-it-works"`. `grid-template-columns:repeat(3,1fr); gap:40px; padding:64px 56px`.
   Mono 34px accent numeral, 20px/600 title, 14.5px body. Use the handoff's §4 copy
   verbatim — it is already accurate about the shipped app.
 
-- [ ] **Step 3: macOS window frame**
+- [x] **Step 3: macOS window frame**
 
   Handoff §5: `border-radius:14px`, title bar with the three dots and the mono title
   "AI Clip Assembler — Review", then the screenshot well.
 
-- [ ] **Step 4: Screenshot placeholders**
+- [x] **Step 4: Screenshot sources**
 
-  The real captures are maintainer-owned (Task 6). Until they exist, render the well
-  with the `--tile-bg` surface and a mono caption naming what belongs there, so the page
-  is never broken or misleading mid-implementation. Wire both `review-dark` and
-  `review-light` sources now, switched with the theme, and give the image real alt text
+  The real captures are maintainer-owned (Task 6) and now exist as WebP assets. The well
+  retains the `--tile-bg` fallback and mono captions, wires both `review-dark` and
+  `review-light` sources switched with the theme, and gives each image real alt text
   describing the Review screen. `loading="lazy"` here is correct — it is below the fold.
 
 ### Task 4: Retained sections and the closing band
 
 **Files:** Modify `site/index.html`
 
-- [ ] **Step 1: Restyle "Local-first, by decision"**
+- [x] **Step 1: Restyle "Local-first, by decision"**
 
   `id="local-first"`. Keep the existing three-column content and its copy; re-express it
   in the new tokens and type scale. This section carries contract-tested copy — do not
   reword "cloud AI is opt-in per project", "external AI assistant", or "external
   provider's privacy policy".
 
-- [ ] **Step 2: Restyle the FAQ**
+- [x] **Step 2: Restyle the FAQ**
 
   `id="faq"`. Keep all four existing questions and answers; restyle only. The answers
   carry the contract-tested "EDL"/"flatten" export-boundary copy.
 
-- [ ] **Step 3: Closing download band**
+- [x] **Step 3: Closing download band**
 
   Handoff §6: `padding:56px`, top border, `--surface` background, H2 "Try it on your last
   flight" at 36px/700, supporting line, and the two CTAs right-aligned via `margin-left:auto`.
 
-- [ ] **Step 4: Footer**
+- [x] **Step 4: Footer**
 
   Keep the existing footer links; restyle to the new tokens.
 
-- [ ] **Step 5: Reconcile the four workflow rows**
+- [x] **Step 5: Reconcile the four workflow rows**
 
-  The handoff's three steps replace the current four screenshot rows. Remove those rows
-  and the now-unreferenced `site/img/{import,review,timeline,export}.png`. Before
-  deleting, confirm no other page, the sitemap, or the JSON-LD `screenshot` field points
-  at them — `site/index.html:47` currently references `img/review.png`, so that JSON-LD
-  value must be repointed at the new Review capture rather than left dangling.
+  The handoff's three steps replace the current four screenshot rows. Those rows and
+  obsolete assets were removed after confirming that no other page, the sitemap, or the
+  JSON-LD `screenshot` field referenced them; JSON-LD now points to the new Review WebP.
 
 ### Task 5: Interaction, responsive, and motion
 
 **Files:** Modify `site/index.html`
 
-- [ ] **Step 1: Hover and focus states**
+- [x] **Step 1: Hover and focus states**
 
   Filled accent buttons darken ~8% (`#f03a5c` dark, `#c81540` light); outlined buttons
   take accent border and text; nav links go to `--text`. Transition `140ms ease-out` on
   `background-color`, `border-color`, `color`. Every interactive element needs a visible
   focus ring that is not `outline:none` — the current page must not regress here.
 
-- [ ] **Step 2: CUT tile hover reveal**
+- [x] **Step 2: CUT tile hover reveal**
 
   On hover, CUT tiles animate to `grayscale(0)/opacity:1` over 200ms. No lift, no shadow.
 
-- [ ] **Step 3: Entrance stagger**
+- [x] **Step 3: Entrance stagger (intentionally skipped)**
 
   Tiles fade and rise (`opacity 0→1`, `translateY(8px)→0`), staggered 60ms in grid order,
   320ms `cubic-bezier(.2,.7,.3,1)`. **Must be CSS-only** given the JS constraint, and must
   render the final state immediately under `prefers-reduced-motion: reduce`. If a CSS-only
   version would leave content invisible when animations do not run, skip this step
-  entirely and record why — never trade content visibility for an entrance effect.
+  entirely and record why — never trade content visibility for an entrance effect. This
+  step was intentionally skipped: the CSS-only animation added no value and could make
+  content invisible when animations are disabled or unavailable.
 
-- [ ] **Step 4: Responsive rules**
+- [x] **Step 4: Responsive rules**
 
   From handoff §"Responsive behavior": ≥1440 as specified; 1024–1439 fluid with 40px
   padding, hero right column to `minmax(0,1fr)`, H1 ~52px; 768–1023 hero stacks copy-first,
@@ -291,26 +291,29 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
   `repeat(2,1fr)`, ruler to 44px with 9.5px labels, closing band stacked.
   **The tile grid never drops below two columns.**
 
-### Task 6: Screenshot capture — MAINTAINER-OWNED
+### Task 6: Screenshot capture — MAINTAINER-OWNED (complete)
 
-Not agent-executable. Requires the redesigned app running with real footage.
+Not agent-executable. Completed by the maintainer with the redesigned app and sanitized
+fixture footage; both 2656×2080 (2× 1328×1040) captures are WebP and contain no personal
+paths, personal filenames, faces, or locations; only generic fixture media labels are
+visible.
 
-- [ ] Capture the Review screen at ≥1328×1040, 2× retina, in **dark** appearance → `site/img/review-dark.png`
-- [ ] Capture the same screen in **light** appearance → `site/img/review-light.png`
-- [ ] Confirm no personal paths, filenames, faces or locations are legible in either
-- [ ] Re-encode both to WebP and confirm the well renders them without distortion
-- [ ] Repoint the JSON-LD `screenshot` field and verify the contract test still passes
+- [x] Capture the Review screen at ≥1328×1040, 2× retina, in **dark** appearance → `site/img/review-dark.webp`
+- [x] Capture the same screen in **light** appearance → `site/img/review-light.webp`
+- [x] Confirm no personal paths, filenames, faces or locations are legible in either
+- [x] Re-encode both to WebP and confirm the well renders them without distortion
+- [x] Repoint the JSON-LD `screenshot` field and verify the contract test still passes
 
 ### Task 7: Verification
 
-- [ ] **Step 1: Contract and diff**
+- [x] **Step 1: Contract and diff**
 
   ```bash
   python3 scripts/tests/test_site_contract.py -v
   git diff --stat -- site/            # sitemap.xml must show no diff
   ```
 
-- [ ] **Step 2: Network isolation**
+- [x] **Step 2: Network isolation**
 
   ```bash
   rg -n "fonts\.googleapis\.com|fonts\.gstatic\.com|preconnect|@import" site/index.html
@@ -319,7 +322,7 @@ Not agent-executable. Requires the redesigned app running with real footage.
   Expected: no output. Then load the page with DevTools Network open and confirm no
   third-party origin is requested on a hard reload.
 
-- [ ] **Step 3: Measured contrast — compute, do not assert**
+- [x] **Step 3: Measured contrast — compute, do not assert**
 
   Report actual ratios for both themes and state pass/fail against AA (4.5:1 body,
   3:1 large text and UI). At minimum: `--text`, `--text-body` and `--text-muted` on
@@ -328,14 +331,48 @@ Not agent-executable. Requires the redesigned app running with real footage.
   if it does, darken the surface or lighten the muted tone and record the substitution.
   Do not change `--accent` itself.
 
-- [ ] **Step 4: Human checks**
+  Recorded WCAG 2.x ratios (foreground on background, rounded to two decimals):
+
+  | Pair | Dark | Light |
+  | --- | ---: | ---: |
+  | `--text` on `--page` | 18.26:1 | 17.06:1 |
+  | `--text` on `--surface` | 17.84:1 | 16.06:1 |
+  | `--text-body` on `--page` | 8.33:1 | 7.19:1 |
+  | `--text-body` on `--surface` | 8.14:1 | 6.77:1 |
+  | `--text-muted` on `--page` | 4.67:1 | 4.80:1 |
+  | `--text-muted` on `--surface` | 4.56:1 | 4.52:1 |
+  | `--accent` on `--page` | 6.20:1 | 4.70:1 |
+  | `--on-accent` on `--accent` | 6.16:1 | 4.70:1 |
+  | `--green` ring on `--tile-bg` | 9.90:1 | 3.51:1 |
+  | `--keep-label` on `--tile-bg` | 9.90:1 | 5.44:1 |
+
+  The dark `--text-muted` substitution is `#747b86` (from `#6b7280`); the light
+  substitution is `#6b737d` (from `#7b818a`). Both pass 4.5:1 on page and surface.
+  `--green` remains unchanged for KEEP rings; its light 3.51:1 ratio passes the 3:1
+  UI threshold but not normal-text AA, so KEEP labels use the dedicated `--keep-label`
+  token (`#5fd18b` dark / `#0f6f45` light), which passes 4.5:1 in both themes.
+
+- [x] **Step 4: Human checks**
 
   There is no automated visual, responsive, or accessibility suite for `site/`; the only
   CI gate is `.github/workflows/test-site.yml` running the static contract. So these are
   eyes-only and must actually be done: both themes at 1440 / 1200 / 900 / 500 / 390px;
   keyboard-only traversal with visible focus throughout; the page with JS disabled;
   the page with `prefers-reduced-motion: reduce`; and a check that the fallback font
-  does not break the 64px headline's wrapping.
+  does not break the 64px headline's wrapping. These visual and interaction checks were
+  completed for both themes and the required viewports; the captured Review wells and
+  responsive landing renders were inspected, including keyboard focus, no-JS, and
+  reduced-motion states.
+
+### Completion evidence
+
+- `site/img/review-dark.webp` and `site/img/review-light.webp` are the sanitized 2656×2080
+  WebP captures used by the page and JSON-LD metadata.
+- The entrance stagger is intentionally skipped because a CSS-only animation would add
+  no value and could leave content invisible when animation is disabled or unavailable.
+- `python3 scripts/tests/test_site_contract.py -v` passes all 6 tests; `git diff --check`
+  passes; and the forbidden-network grep for Google Fonts, preconnect, and `@import`
+  returns no output. `site/sitemap.xml` remains unchanged.
 
 ## Risks and open questions
 

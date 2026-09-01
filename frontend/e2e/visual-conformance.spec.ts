@@ -298,8 +298,29 @@ async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string
   }
 }
 
-async function assertShellGeometry(page: Page): Promise<void> {
-  const geometry = await page.evaluate(() => {
+type FooterExpectation = {
+  selector: string;
+  state: 'required' | 'expected-missing';
+};
+
+const footerExpectations: Record<VisualFixture, FooterExpectation> = {
+  shell: { selector: '[data-testid="source-video-selection-bar"]', state: 'required' },
+  'import-analyzing': { selector: '[data-testid="source-video-selection-bar"]', state: 'required' },
+  'review-grid': { selector: '.workflow-footer', state: 'expected-missing' },
+  'review-list': { selector: '.workflow-footer', state: 'expected-missing' },
+  'timeline-selection': { selector: '.workflow-footer', state: 'expected-missing' },
+  'export-receipt': { selector: '.workflow-footer', state: 'expected-missing' },
+};
+
+async function assertShellGeometry(page: Page, fixture: VisualFixture): Promise<void> {
+  const footerExpectation = footerExpectations[fixture];
+  const region = page.locator(footerExpectation.selector);
+  if (footerExpectation.state === 'required') {
+    await expect(region, `Missing required region: ${footerExpectation.selector}`).toBeVisible();
+  } else {
+    await expect(region, `Unexpected pre-Task-2 region: ${footerExpectation.selector}`).toHaveCount(0);
+  }
+  const geometry = await page.evaluate(({ footerSelector }) => {
     const selectors = ['.sidebar', '[data-surface="project-header"]', '.main', '.statusbar'];
     const boxes = Object.fromEntries(selectors.map((selector) => {
       const element = document.querySelector(selector);
@@ -308,10 +329,10 @@ async function assertShellGeometry(page: Page): Promise<void> {
       return [selector, { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
     }));
     const workspace = document.querySelector('.app-workspace')?.getBoundingClientRect();
-    const footer = document.querySelector('.workflow-footer, [data-surface="workflow-footer"], .source-video-selection-bar, .page-body, .review-shell-body, .timeline, .export-page-body')?.getBoundingClientRect();
-    if (!workspace || !footer) throw new Error('Missing workspace or workflow footer region');
+    const footer = document.querySelector(footerSelector)?.getBoundingClientRect() ?? null;
+    if (!workspace) throw new Error('Missing workspace region');
     return { boxes, workspace, footer, viewport: { width: innerWidth, height: innerHeight } };
-  });
+  }, { footerSelector: footerExpectation.selector });
   const box = (selector: string) => geometry.boxes[selector] as { left: number; right: number; top: number; bottom: number };
   const sidebar = box('.sidebar');
   const header = box('[data-surface="project-header"]');
@@ -322,8 +343,13 @@ async function assertShellGeometry(page: Page): Promise<void> {
   expect(main.right).toBeLessThanOrEqual(geometry.workspace.right);
   expect(status.right).toBeLessThanOrEqual(geometry.viewport.width);
   expect(status.bottom).toBe(geometry.viewport.height);
-  expect(geometry.footer.left).toBeGreaterThanOrEqual(sidebar.right - 1);
-  expect(geometry.footer.right).toBeLessThanOrEqual(geometry.viewport.width + 1);
+  if (footerExpectation.state === 'required') {
+    expect(geometry.footer, `Missing required region: ${footerExpectation.selector}`).not.toBeNull();
+    expect(geometry.footer!.left).toBeGreaterThanOrEqual(sidebar.right - 1);
+    expect(geometry.footer!.right).toBeLessThanOrEqual(geometry.viewport.width + 1);
+  } else {
+    expect(geometry.footer, `Unexpected pre-Task-2 region: ${footerExpectation.selector}`).toBeNull();
+  }
 }
 
 const fixtureRoutes: Array<{ fixture: VisualFixture; path: string }> = [
@@ -340,7 +366,7 @@ test.describe('deterministic visual fixture setup', () => {
     test(`${fixture} exposes fixed representative data`, async ({ page }) => {
       await openFixtureRoute(page, fixture, path);
       await expect(page.getByText(PROJECT_NAME, { exact: true }).first()).toBeVisible();
-      await assertShellGeometry(page);
+      await assertShellGeometry(page, fixture);
       if (fixture === 'import-analyzing') await expect(page.locator('[data-analysis-rail]')).toBeVisible();
       if (fixture.startsWith('review')) await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
       if (fixture === 'timeline-selection') await expect(page.getByTestId('timeline-inspector')).toBeVisible();
@@ -357,7 +383,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 1024, height: 76
         test(`${fixture} · ${theme}`, async ({ page }) => {
           await openFixtureRoute(page, fixture, path);
           await page.evaluate((nextTheme) => document.documentElement.setAttribute('data-theme', nextTheme), theme);
-          await assertShellGeometry(page);
+          await assertShellGeometry(page, fixture);
           await expect(page).toHaveScreenshot(`${fixture}-${viewport.width}x${viewport.height}-${theme}.png`, {
             animations: 'disabled',
             caret: 'hide',

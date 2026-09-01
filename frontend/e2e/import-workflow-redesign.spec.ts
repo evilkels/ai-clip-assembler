@@ -157,6 +157,24 @@ test('source browser switches views, filters filenames, and preserves selection 
 
 });
 
+test('Import exposes the literal workstation composition', async ({ page }) => {
+  await openImportFixture(page);
+
+  const workstation = page.locator('[data-import-workstation]');
+  await expect(workstation).toBeVisible();
+  await expect(workstation.locator('[data-source-aggregates]')).toContainText('3 files');
+  await expect(workstation.locator('[data-source-toolbar]')).toBeVisible();
+  await expect(workstation.locator('[data-selection-action-rail]')).toBeVisible();
+  await expect(workstation.locator('[data-analysis-dock]')).toBeVisible();
+  await expect(workstation.locator('[data-rules-region]')).toBeVisible();
+
+  const order = await workstation.locator('[data-source-video-browser]').evaluate((browser) =>
+    Array.from(browser.children).map((child) => child.getAttribute('data-region')),
+  );
+  expect(order).toEqual(['browser-head', 'source-toolbar', 'selection-action-rail', 'source-table']);
+  await expect(page.locator('.workflow-footer .workflow-footer-actions')).toBeVisible();
+});
+
 test('source browser offers analysis filters and column choices', async ({ page }) => {
   await openImportFixture(page);
 

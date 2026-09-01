@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
+import { SourceVideoSelectionBar } from './SourceVideoSelectionBar';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
 import {
   isSourceVideoRunning,
@@ -23,6 +24,12 @@ interface Props {
   onPreview: (video: UploadedVideo) => void;
   runningFileName?: string | null;
   disabled?: boolean;
+  analyzing?: boolean;
+  regenerating?: boolean;
+  canRegenerate?: boolean;
+  onAnalyze?: () => void;
+  onDeselectAll?: () => void;
+  harnessControl?: ReactNode;
 }
 
 type ColumnKey = 'duration' | 'fps' | 'resolution' | 'size' | 'date' | 'codec' | 'analysis';
@@ -60,6 +67,12 @@ export function SourceVideoBrowser({
   onPreview,
   runningFileName = null,
   disabled = false,
+  analyzing = false,
+  regenerating = false,
+  canRegenerate = false,
+  onAnalyze,
+  onDeselectAll,
+  harnessControl,
 }: Props) {
   const [viewMode, setViewMode] = useState<SourceVideoViewMode>('table');
   const [filters, setFilters] = useState<SourceVideoFilters>({ query: '', analysis: 'all' });
@@ -109,22 +122,20 @@ export function SourceVideoBrowser({
     isRunning(video) ? 'Running' : analyzedIds.has(video.file_id) ? 'Analyzed' : 'Not analyzed';
   const sortDirection = (key: SourceVideoSortKey): 'ascending' | 'descending' | 'none' =>
     sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  const aggregateBytes = videos.reduce((total, video) => total + (video.metadata?.size_bytes ?? 0), 0);
+  const aggregateDuration = videos.reduce((total, video) => total + (video.metadata?.duration_sec ?? 0), 0);
 
   return (
-    <section className="source-video-browser" aria-label="Source videos">
-      <div className="source-video-browser-head">
+    <section className="source-video-browser" data-source-video-browser aria-label="Source videos">
+      <div className="source-video-browser-head" data-region="browser-head">
         <div>
           <h2>Source videos</h2>
-          <p>Choose footage to analyze. Files stay local to this project.</p>
+          <p data-source-aggregates>
+            {videos.length} files · {formatBytes(aggregateBytes)} · {formatClock(aggregateDuration)} total runtime
+          </p>
         </div>
-        <ViewModeSwitcher
-          value={viewMode}
-          options={viewOptions}
-          onChange={setViewMode}
-          ariaLabel="Source video view"
-        />
       </div>
-      <div className="source-video-browser-tools">
+      <div className="source-video-browser-tools" data-source-toolbar data-region="source-toolbar">
         <label className="source-video-search">
           <span>Search</span>
           <input
@@ -168,11 +179,29 @@ export function SourceVideoBrowser({
             </div>
           ) : null}
         </div>
+        <ViewModeSwitcher
+          value={viewMode}
+          options={viewOptions}
+          onChange={setViewMode}
+          ariaLabel="Source video view"
+        />
+        <span className="source-video-browser-meta">
+          {visible.length} shown{filters.query || filters.analysis !== 'all' ? ` · filtered from ${videos.length}` : ''}
+        </span>
+        {harnessControl}
       </div>
-      <div className="source-video-browser-meta">
-        <span>{visible.length} shown</span>
-        {filters.query || filters.analysis !== 'all' ? <span>Filtered from {videos.length}</span> : null}
-      </div>
+      {onAnalyze ? (
+        <SourceVideoSelectionBar
+          selectedCount={selectedIds.length}
+          totalCount={videos.length}
+          analyzing={analyzing}
+          regenerating={regenerating}
+          canRegenerate={canRegenerate}
+          onAnalyze={onAnalyze}
+          onShowUnanalyzed={() => setFilters((current) => ({ ...current, analysis: 'unanalyzed' }))}
+          onDeselectAll={onDeselectAll}
+        />
+      ) : null}
 
       {viewMode === 'thumbs' ? (
         <div className="source-video-thumbs" data-view-mode="thumbs">
@@ -211,7 +240,7 @@ export function SourceVideoBrowser({
           })}
         </div>
       ) : (
-        <div className="source-videos-table-scroll" data-view-mode="table">
+        <div className="source-videos-table-scroll" data-view-mode="table" data-region="source-table">
           <table className="source-videos-table">
             <thead>
               <tr>

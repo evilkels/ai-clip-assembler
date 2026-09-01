@@ -4,7 +4,6 @@ import {
   preferencesFromGenerationStats,
 } from '../components/ClipGenerationPanel';
 import { SourceVideoBrowser } from '../components/SourceVideoBrowser';
-import { SourceVideoSelectionBar } from '../components/SourceVideoSelectionBar';
 import { StatusSurface } from '../components/StatusSurface';
 import { WorkflowHeader } from '../components/WorkflowHeader';
 import { useReview } from '../state/ReviewContext';
@@ -181,6 +180,10 @@ export function ImportPage() {
       const everythingSelected = uploadedVideos.every((v) => !prev.has(v.file_id));
       return everythingSelected ? new Set(uploadedVideos.map((v) => v.file_id)) : new Set();
     });
+  }, [uploadedVideos]);
+
+  const deselectAll = useCallback(() => {
+    setDeselected(new Set(uploadedVideos.map((video) => video.file_id)));
   }, [uploadedVideos]);
 
   useEffect(() => {
@@ -385,12 +388,12 @@ export function ImportPage() {
       <div className="page-body">
         <input
           id="source-video-picker"
+          className="source-video-picker"
           ref={fileInputRef}
           type="file"
           accept=".mp4,.mov,video/mp4,video/quicktime"
           multiple
           aria-label="Select MP4 or MOV files"
-          style={{ display: 'none' }}
           onChange={(e) => {
             if (e.target.files) handleFiles(e.target.files);
             e.target.value = '';
@@ -398,12 +401,12 @@ export function ImportPage() {
         />
         <button
           type="button"
-          className="drop-zone"
+          className={`drop-zone${hasVideos ? ' drop-zone-loaded' : ''}`}
           aria-controls="source-video-picker"
           onClick={triggerFilePicker}
           disabled={Boolean(projectFolder)}
         >
-          <p style={{ margin: 0 }}>
+          <p className="drop-zone-label">
             {uploading
               ? 'Uploading…'
               : hasVideos
@@ -415,9 +418,9 @@ export function ImportPage() {
         </button>
 
         {uploadErrors.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
+          <div className="upload-errors">
             {uploadErrors.map((e) => (
-              <p key={e} style={{ color: 'var(--text-error)', margin: '2px 0', fontSize: 12 }}>
+              <p key={e} className="upload-error">
                 {e}
               </p>
             ))}
@@ -425,7 +428,7 @@ export function ImportPage() {
         )}
 
         {hasVideos && (
-          <>
+          <div className="import-workstation" data-import-workstation>
             <SourceVideoBrowser
               videos={uploadedVideos}
               analyzedIds={analyzedIds}
@@ -438,113 +441,108 @@ export function ImportPage() {
               onPreview={(video) => setPreview({ fileId: video.file_id, fileName: video.file_name })}
               runningFileName={runningFileName}
               disabled={isAnalyzing}
-            />
-            <label className="source-video-harness">
-              Harness
-              <select
-                value={harnessId}
-                onChange={(event) => setHarnessId(event.target.value)}
-                disabled={isAnalyzing}
-              >
-                {harnesses.map((harness) => (
-                  <option key={harness.id} value={harness.id}>
-                    {harness.name}{HARNESS_HINTS[harness.id] ? ` (${HARNESS_HINTS[harness.id]})` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <SourceVideoSelectionBar
-              selectedCount={selectedCount}
-              totalCount={uploadedVideos.length}
               analyzing={isAnalyzing}
               regenerating={regenerating}
               canRegenerate={generationStats !== null}
               onAnalyze={handleAnalyze}
+              onDeselectAll={deselectAll}
+              harnessControl={(
+                <label className="source-video-harness">
+                  Harness
+                  <select
+                    value={harnessId}
+                    onChange={(event) => setHarnessId(event.target.value)}
+                    disabled={isAnalyzing}
+                  >
+                    {harnesses.map((harness) => (
+                      <option key={harness.id} value={harness.id}>
+                        {harness.name}{HARNESS_HINTS[harness.id] ? ` (${HARNESS_HINTS[harness.id]})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             />
-          </>
-        )}
 
-        {hasVideos && (
-          <ClipGenerationPanel
-            stats={generationStats}
-            preferences={generationPreferences}
-            onPreferencesChange={setGenerationPreferences}
-            disabled={isAnalyzing || regenerating}
-          />
-        )}
-
-        {isAnalyzing && (
-          <div className="analysis-progress" data-analysis-rail="true" data-tone="accent" aria-live="polite">
-            <StatusSurface tone="accent">
-            <div className="analysis-progress-header">
-              <div>
-                <div className="analysis-progress-title">
-                  {activeProgress.message ?? describeProgress(activeProgress) ?? 'Starting analysis'}
+            <div className="import-analysis-dock" data-analysis-dock>
+              {isAnalyzing && (
+                <div className="analysis-progress" data-analysis-rail="true" data-tone="accent" aria-live="polite">
+                  <StatusSurface tone="accent">
+                    <div className="analysis-progress-header">
+                      <div>
+                        <div className="analysis-progress-title">
+                          {activeProgress.message ?? describeProgress(activeProgress) ?? 'Starting analysis'}
+                        </div>
+                        <div className="analysis-progress-subtitle">
+                          {activeProgress.file_name ? `Current video: ${activeProgress.file_name}` : describeProgress(activeProgress) || 'Waiting for backend status'}
+                        </div>
+                      </div>
+                      <div className="analysis-progress-time">
+                        <span>{formatElapsed(activeProgress.elapsed_sec)} elapsed</span>
+                        {eta && <span>{eta}</span>}
+                      </div>
+                    </div>
+                    <progress
+                      className={`analysis-progress-bar ${activePercent === null ? 'indeterminate' : ''}`}
+                      value={activePercent ?? undefined}
+                      max={100}
+                      aria-label="Analysis progress"
+                    />
+                    <div className="analysis-phase-rail" aria-label="Analysis phases">
+                      {(['motion_analysis', 'frame_extraction', 'scene_detection', 'scoring_clips'] as const).map((step) => (
+                        <span key={step} className={activeProgress.step === step ? 'active' : ''}>
+                          {STEP_LABELS[step]}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="analysis-progress-meta">
+                      <span>{STEP_LABELS[activeProgress.step ?? ''] ?? activeProgress.step ?? 'Starting'}</span>
+                      {activeProgress.video_total ? (
+                        <span>
+                          Video {activeProgress.video_index ?? 0}/{activeProgress.video_total}
+                        </span>
+                      ) : null}
+                      {activeProgress.clip_total ? (
+                        <span>
+                          Pi clips {activeProgress.clip_index ?? 0}/{activeProgress.clip_total}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="analysis-progress-footer">
+                      <span>Running in the background — you can keep preparing your edit.</span>
+                      <button type="button" className="btn subtle" onClick={handleAbort} disabled={cancelling}>
+                        {cancelling ? 'Stopping…' : 'Abort'}
+                      </button>
+                    </div>
+                  </StatusSurface>
                 </div>
-                <div className="analysis-progress-subtitle">
-                  {activeProgress.file_name ? `Current video: ${activeProgress.file_name}` : describeProgress(activeProgress) || 'Waiting for backend status'}
-                </div>
-              </div>
-              <div className="analysis-progress-time">
-                <span>{formatElapsed(activeProgress.elapsed_sec)} elapsed</span>
-                {eta && <span>{eta}</span>}
-              </div>
+              )}
+              <div className="analysis-controls import-analysis-anchor" aria-hidden="true" />
+              <ClipGenerationPanel
+                stats={generationStats}
+                preferences={generationPreferences}
+                onPreferencesChange={setGenerationPreferences}
+                disabled={isAnalyzing || regenerating}
+              />
             </div>
-            <progress
-              className={`analysis-progress-bar ${activePercent === null ? 'indeterminate' : ''}`}
-              value={activePercent ?? undefined}
-              max={100}
-              aria-label="Analysis progress"
-            />
-            <div className="analysis-phase-rail" aria-label="Analysis phases">
-              {(['motion_analysis', 'frame_extraction', 'scene_detection', 'scoring_clips'] as const).map((step) => (
-                <span key={step} className={activeProgress.step === step ? 'active' : ''}>
-                  {STEP_LABELS[step]}
-                </span>
-              ))}
-            </div>
-            <div className="analysis-progress-meta">
-              <span>{STEP_LABELS[activeProgress.step ?? ''] ?? activeProgress.step ?? 'Starting'}</span>
-              {activeProgress.video_total ? (
-                <span>
-                  Video {activeProgress.video_index ?? 0}/{activeProgress.video_total}
-                </span>
-              ) : null}
-              {activeProgress.clip_total ? (
-                <span>
-                  Pi clips {activeProgress.clip_index ?? 0}/{activeProgress.clip_total}
-                </span>
-              ) : null}
-            </div>
-            <div className="analysis-progress-footer">
-              <span>Running in the background — you can keep preparing your edit.</span>
-              <button type="button" className="btn subtle" onClick={handleAbort} disabled={cancelling}>
-                {cancelling ? 'Stopping…' : 'Abort'}
-              </button>
-            </div>
-            </StatusSurface>
           </div>
         )}
 
         {hasError && (
-          <p style={{ color: 'var(--text-error)', marginTop: 12, fontSize: 13 }}>
+          <p className="import-status-error">
             {analysisStatus.error}
           </p>
         )}
 
         {isComplete && (
-          <div style={{ marginTop: 12 }}>
-            <p style={{ color: 'var(--text-success)', margin: 0, fontSize: 13 }}>
+          <div className="import-status-complete">
+            <p className="import-status-success">
               Analysis complete. Head to Review to see clip candidates.
             </p>
             {analysisStatus.notices?.map((notice) => (
               <p
                 key={notice.code}
-                style={{
-                  color: notice.level === 'warning' ? 'var(--color-warning)' : 'var(--text-muted)',
-                  margin: '6px 0 0',
-                  fontSize: 13,
-                }}
+                className={notice.level === 'warning' ? 'import-status-warning' : 'import-status-notice'}
               >
                 {notice.message}
               </p>
@@ -553,7 +551,7 @@ export function ImportPage() {
         )}
 
         {isCancelled && (
-          <p style={{ color: 'var(--text-muted)', marginTop: 12, fontSize: 13 }}>
+          <p className="import-status-cancelled">
             Analysis cancelled. Adjust your selection and analyze again when ready.
           </p>
         )}

@@ -53,6 +53,14 @@ export function ClipGenerationPanel({
   const [draft, setDraft] = useState<ClipGenerationPreferences>(effective);
   const current = preferences ?? draft;
   const invalidDurationRange = current.max_clip_duration_sec < current.min_clip_duration_sec;
+  const summaryRules = [
+    ['MIN', current.min_clip_duration_sec],
+    ['MAX', current.max_clip_duration_sec],
+    ['STEADY', current.smoothness_threshold],
+    ['TURN °/S', current.max_turn_rate_deg_per_sec],
+    ['PER SCENE', current.max_clips_per_scene],
+    ['PER VIDEO', current.max_candidates_per_video],
+  ] as const;
 
   useEffect(() => setDraft(effective), [effective]);
 
@@ -63,13 +71,19 @@ export function ClipGenerationPanel({
   };
 
   return (
-    <section className="clip-generation-panel">
+    <section className="clip-generation-panel" data-rules-region>
       <header className="clip-generation-header">
-        <strong>Advanced: how clips are found</strong>
-        <span className="draft-summary">
-          Change what counts as a usable clip, then re-scan — no re-import needed
-        </span>
+        <strong>How clips are found</strong>
+        <span className="draft-summary">6 rules</span>
       </header>
+      <div className="clip-generation-summary" aria-label="Current clip rules">
+        {summaryRules.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
       <div className="clip-generation-body">
         <p className="clip-generation-intro">
           These control how your footage is cut into the clips above — clip length limits, how

@@ -5,6 +5,8 @@ interface SourceVideoSelectionBarProps {
   regenerating?: boolean;
   canRegenerate: boolean;
   onAnalyze: () => void;
+  onShowUnanalyzed?: () => void;
+  onDeselectAll?: () => void;
 }
 
 export function SourceVideoSelectionBar({
@@ -14,6 +16,8 @@ export function SourceVideoSelectionBar({
   regenerating = false,
   canRegenerate,
   onAnalyze,
+  onShowUnanalyzed,
+  onDeselectAll,
 }: SourceVideoSelectionBarProps) {
   const label = analyzing
     ? 'Analyzing…'
@@ -28,12 +32,27 @@ export function SourceVideoSelectionBar({
             : `Analyze ${selectedCount} of ${totalCount}`;
 
   return (
-    <div className="analysis-controls source-video-selection-bar" data-testid="source-video-selection-bar">
+    <div
+      className="analysis-controls source-video-selection-bar"
+      data-testid="source-video-selection-bar"
+      data-selection-action-rail
+      data-region="selection-action-rail"
+    >
       <div className="source-video-selection-summary">
         <strong>{selectedCount} of {totalCount} selected</strong>
-        <span>Selection stays with each source video while you filter or sort.</span>
+        <span>{selectedCount === totalCount ? 'All source videos will be analyzed.' : `${selectedCount} of ${totalCount} source videos selected.`}</span>
       </div>
       <div className="source-video-selection-actions">
+        {onShowUnanalyzed ? (
+          <button type="button" className="btn subtle" onClick={onShowUnanalyzed}>
+            Unanalyzed only
+          </button>
+        ) : null}
+        {onDeselectAll ? (
+          <button type="button" className="btn subtle" onClick={onDeselectAll} disabled={selectedCount === 0}>
+            Deselect all
+          </button>
+        ) : null}
         <button
           type="button"
           className="btn primary"

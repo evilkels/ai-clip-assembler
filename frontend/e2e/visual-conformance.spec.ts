@@ -366,7 +366,16 @@ test.describe('deterministic visual fixture setup', () => {
       await openFixtureRoute(page, fixture, path);
       await expect(page.getByText(PROJECT_NAME, { exact: true }).first()).toBeVisible();
       await assertShellGeometry(page, fixture);
-      if (fixture === 'import-analyzing') await expect(page.locator('[data-analysis-rail]')).toBeVisible();
+      if (fixture === 'import-analyzing') {
+        await expect(page.locator('[data-analysis-rail]')).toBeVisible();
+        const workstation = page.locator('[data-import-workstation]');
+        await expect(workstation.locator('[data-source-aggregates]')).toContainText('4 files');
+        await expect(workstation.locator('[data-source-toolbar]')).toBeVisible();
+        await expect(workstation.locator('[data-selection-action-rail]')).toBeVisible();
+        await expect(workstation.locator('[data-analysis-dock]')).toBeVisible();
+        await expect(workstation.locator('[data-rules-region]')).toBeVisible();
+        await expect(page.locator('.workflow-footer .workflow-footer-actions')).toContainText('Continue to Review');
+      }
       if (fixture.startsWith('review')) await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
       if (fixture === 'timeline-selection') await expect(page.getByTestId('timeline-inspector')).toBeVisible();
       if (fixture === 'export-receipt') await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');

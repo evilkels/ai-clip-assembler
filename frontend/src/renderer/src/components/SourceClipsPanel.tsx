@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
 import type { ClipCandidate, ClipDecision, ClipGenerationStats } from '../types/clip';
 import { buildReviewClipRecords, type ReviewFilters, type ReviewViewMode } from '../lib/reviewView';
@@ -28,6 +28,7 @@ interface SourceClipsPanelProps {
   onSmoothnessThresholdChange: (value: number) => void;
   onInclude: (clipId: string) => void;
   onExclude: (clipId: string) => void;
+  onVisibleCountChange?: (visibleCount: number, totalCount: number) => void;
 }
 
 const VIEW_OPTIONS: Array<{ value: ReviewViewMode; label: string }> = [
@@ -71,6 +72,7 @@ export function SourceClipsPanel({
   onSmoothnessThresholdChange,
   onInclude,
   onExclude,
+  onVisibleCountChange,
 }: SourceClipsPanelProps) {
   const [viewMode, setViewMode] = useState<ReviewViewMode>('grid');
   const [minOverall, setMinOverall] = useState(0);
@@ -88,6 +90,9 @@ export function SourceClipsPanel({
     [acceptedOrder, clips, decisions, decisionFilter, minOverall, smoothnessThreshold, versionMembership],
   );
   const groups = useMemo(() => groupByLook(records), [records]);
+  useEffect(() => {
+    onVisibleCountChange?.(records.length, clips.length);
+  }, [clips.length, onVisibleCountChange, records.length]);
   // Candidate Clip positions are stable within each source file; compute the
   // ordering once so each rendered card only performs a lookup.
   const fileClipIndexes = useMemo(() => {
@@ -204,16 +209,12 @@ export function SourceClipsPanel({
   );
 
   return (
-    <details
+    <section
       className="source-clips-panel"
       data-testid="source-clips-panel"
       data-open="true"
-      open
     >
-      <summary
-        className="source-clips-head"
-        onClick={(event) => event.preventDefault()}
-      >
+      <header className="source-clips-head">
         <div className="source-clips-title">
           <h2>Your clips</h2>
           <span className="draft-summary">
@@ -231,7 +232,7 @@ export function SourceClipsPanel({
           />
           <span className="source-clips-sort">Sort <strong>Combined score</strong></span>
         </div>
-      </summary>
+      </header>
       <div className="source-clips-content" data-review-browser data-view-mode={viewMode}>
           <div className="review-browser-toolbar">
             <label className="review-filter-control">
@@ -295,6 +296,6 @@ export function SourceClipsPanel({
             <div className="empty-state">No clips match the current Review filters.</div>
           ) : viewMode === 'grid' ? renderGrid() : viewMode === 'list' ? renderList() : renderFilmstrip()}
       </div>
-    </details>
+    </section>
   );
 }

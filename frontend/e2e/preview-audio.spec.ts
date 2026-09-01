@@ -32,18 +32,11 @@ function ensureFixtureVideo(name: string, color: string, withAudio: boolean): st
 const audioFixture = () => ensureFixtureVideo('preview-stereo.mp4', 'gray', true);
 const silentFixture = () => ensureFixtureVideo('preview-silent.mp4', 'navy', false);
 
-/** Open the clips panel. The first click can land before React has attached
- * its handler, so retry until the panel actually reports open. */
+/** The Review workstation keeps the source browser visible from first paint. */
 async function openClipsPanel(page: Page) {
   const panel = page.getByTestId('source-clips-panel');
   await expect(panel).toBeVisible();
-  await expect
-    .poll(async () => {
-      if (await panel.evaluate((element) => (element as HTMLDetailsElement).open)) return true;
-      await panel.locator('> summary').click();
-      return panel.evaluate((element) => (element as HTMLDetailsElement).open);
-    })
-    .toBe(true);
+  await expect(panel).toHaveAttribute('data-open', 'true');
   await expect(page.locator('.clip-card').first()).toBeVisible();
 }
 

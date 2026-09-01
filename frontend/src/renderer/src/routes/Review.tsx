@@ -45,9 +45,13 @@ export function ReviewPage() {
     timelineSnapshot,
     uploadedVideos,
   } = useReview();
+  const [visibleClipCount, setVisibleClipCount] = useState(clips.length);
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
   const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 320, 240, 560);
+  const handleVisibleCountChange = useCallback((visibleCount: number) => {
+    setVisibleClipCount(visibleCount);
+  }, []);
 
   const availableClipIds = useMemo(
     () => new Set(clips.map((clip) => clip.clip_id)),
@@ -122,7 +126,7 @@ export function ReviewPage() {
         description="Let the AI suggest a full cut, or pick clips yourself, then refine."
         meta={(
           <span className="review-header-count">
-            <strong>{clips.length}</strong>
+            <strong data-testid="review-header-count">{visibleClipCount} / {clips.length}</strong>
             <span>shown</span>
           </span>
         )}
@@ -154,7 +158,11 @@ export function ReviewPage() {
         )}
       />
 
-      <div className="review-shell-body" data-testid="review-three-zone-layout">
+      <div
+        className="review-shell-body"
+        data-testid="review-three-zone-layout"
+        style={{ gridTemplateColumns: `${chatWidth}px 1px minmax(0, 1fr)` }}
+      >
         <aside className="review-spine" style={{ width: chatWidth }} data-testid="ask-ai-rail">
           <ReviewChatPanel key={projectId} conversation={conversation} />
         </aside>
@@ -234,6 +242,7 @@ export function ReviewPage() {
               onSmoothnessThresholdChange={setSmoothnessThreshold}
               onInclude={include}
               onExclude={exclude}
+              onVisibleCountChange={handleVisibleCountChange}
             />
           </section>
           <Link className="draft-summary" to="/import">

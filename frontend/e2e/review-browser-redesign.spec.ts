@@ -20,7 +20,7 @@ function fixtureVideo(): string {
 async function openClips(page: Page): Promise<void> {
   const panel = page.getByTestId('source-clips-panel');
   await expect(panel).toBeVisible();
-  await expect.poll(async () => panel.evaluate((element) => (element as HTMLDetailsElement).open)).toBe(true);
+  await expect(panel).toHaveAttribute('data-open', 'true');
 }
 
 async function setupReview(page: Page): Promise<void> {
@@ -226,6 +226,33 @@ test('renders the Review workstation with Your Clips visible from the first pain
   await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
   await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
   await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
+  await expect(page.getByTestId('source-clips-panel').locator('details, summary')).toHaveCount(0);
+});
+
+test('keeps the review workstation aligned while resizing Ask AI rail', async ({ page }) => {
+  await setupReview(page);
+  const separator = page.getByRole('separator', { name: 'Resize the Ask the AI panel' });
+  const geometry = () => page.evaluate(() => {
+    const rail = document.querySelector('[data-testid="ask-ai-rail"]')?.getBoundingClientRect();
+    const main = document.querySelector('.review-main')?.getBoundingClientRect();
+    const body = document.querySelector('.review-shell-body')?.getBoundingClientRect();
+    if (!rail || !main || !body) throw new Error('Missing Review geometry');
+    return { railWidth: rail.width, railRight: rail.right, mainLeft: main.left, bodyRight: body.right };
+  });
+  const initial = await geometry();
+  await separator.press('ArrowRight');
+  const middle = await geometry();
+  expect(middle.railWidth).toBeGreaterThan(initial.railWidth);
+  expect(middle.mainLeft).toBeCloseTo(middle.railRight + 1, 0);
+  for (let index = 0; index < 30; index += 1) await separator.press('ArrowRight');
+  const maximum = await geometry();
+  expect(maximum.railWidth).toBeGreaterThanOrEqual(540);
+  expect(maximum.mainLeft).toBeCloseTo(maximum.railRight + 1, 0);
+  expect(maximum.mainLeft).toBeLessThan(maximum.bodyRight);
+  for (let index = 0; index < 40; index += 1) await separator.press('ArrowLeft');
+  const minimum = await geometry();
+  expect(minimum.railWidth).toBeLessThanOrEqual(250);
+  expect(minimum.mainLeft).toBeCloseTo(minimum.railRight + 1, 0);
 });
 
 test('keeps Include and Remove tied to authoritative Timeline membership', async ({ page }) => {
@@ -245,8 +272,15 @@ test('projects seeded scores, decisions, Timeline membership, and Version labels
   const { timelineFile, timelineClipId } = await setupSeededReview(page);
   const browser = page.locator('[data-review-browser]');
 
-  await page.getByRole('button', { name: 'List' }).click();
   await page.getByLabel('Minimum Smoothness').fill('0');
+  await page.getByTestId('source-clips-panel').getByRole('button', { name: 'Grid' }).click();
+  await expect(browser).toHaveAttribute('data-view-mode', 'grid');
+  const combinedFills = await browser.locator('.clip-card .score-chip[data-score-label="combined"]')
+    .evaluateAll((chips) => chips.map((chip) => chip.getAttribute('data-score-fill')));
+  expect(combinedFills).toEqual(['95%', '80%', '70%', '30%']);
+  await expect(browser.locator('.clip-card .score-chip[data-score-label="combined"]').first())
+    .toHaveAttribute('aria-label', 'combined: 9.5 / 10');
+  await page.getByTestId('source-clips-panel').getByRole('button', { name: 'List' }).click();
   await page.getByLabel('Minimum Overall').fill('7');
   await expect(browser.locator('[data-review-clip]')).toHaveCount(3);
   expect(await browser.locator('[data-review-clip]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-review-clip')))).toEqual([
@@ -255,11 +289,13 @@ test('projects seeded scores, decisions, Timeline membership, and Version labels
   await expect(browser.locator('[data-review-clip="seed-high"]')).toHaveAttribute('data-rank', '1');
   await expect(browser.locator(`[data-review-clip="${timelineClipId}"]`)).toHaveAttribute('data-rank', '2');
   await expect(browser.locator('[data-review-clip="seed-mid"]')).toHaveAttribute('data-rank', '3');
+  await expect(page.getByTestId('review-header-count')).toContainText('3 / 4');
   await expect(browser.locator(`[data-review-clip="${timelineClipId}"]`)).toContainText('Proposed in A');
   await expect(browser.locator('[data-review-clip="seed-high"]')).toContainText('Proposed in A/B');
 
   await page.getByLabel('Minimum Overall').fill('8.5');
   await expect(browser.locator('[data-review-clip]')).toHaveCount(1);
+  await expect(page.getByTestId('review-header-count')).toContainText('1 / 4');
   await expect(browser.locator('[data-review-clip="seed-high"]')).toHaveAttribute('data-rank', '1');
 
   await page.getByLabel('Minimum Overall').fill('0');

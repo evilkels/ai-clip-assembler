@@ -262,9 +262,7 @@ async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string
   await expect(page.locator('.page')).toBeVisible();
   if (fixture.startsWith('review')) {
     const panel = page.getByTestId('source-clips-panel');
-    if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) {
-      await panel.locator('summary').click();
-    }
+    await expect(panel).toHaveAttribute('data-open', 'true');
   }
   if (fixture === 'review-list') {
     await page.getByRole('button', { name: 'List', exact: true }).click();

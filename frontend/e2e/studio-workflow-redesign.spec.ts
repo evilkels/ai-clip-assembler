@@ -94,9 +94,7 @@ async function openReviewClips(page: Page): Promise<void> {
   await page.goto('/#/review');
   const panel = page.getByTestId('source-clips-panel');
   await expect(panel).toBeVisible();
-  if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) {
-    await panel.locator('summary').click();
-  }
+  await expect(panel).toHaveAttribute('data-open', 'true');
   await expect(page.getByRole('group', { name: 'Candidate Clip view' })).toBeVisible();
 }
 

@@ -44,7 +44,7 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — launch/distribution backlog only; the 2026-08-31 landing-drift debt is now owned by the restyle plan below |
-| [landing-page-restyle](2026-09-01-landing-page-restyle.md) | TODO (2026-09-01) — dark "Contact Sheet" direction chosen; self-hosted fonts, app-token palette, re-captured dark screenshots; intended to land inside PR #68 |
+| [landing-page-restyle](2026-09-01-landing-page-restyle.md) | TODO (2026-09-01) — rewritten against the Claude Design landing handoff (`docs/design/`): contact-sheet hero, dark default + light toggle, self-hosted Plex, WebP frames vendored; one maintainer-owned Review capture remains; intended to land inside PR #68 |
 | [seo-plan](seo-plan.md) | IN PROGRESS — Search Console setup remains |
 | [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |

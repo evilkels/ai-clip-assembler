@@ -1208,6 +1208,7 @@ a {
 }
 
 .source-videos-table-scroll {
+  grid-column: 1 / -1;
   min-width: 0;
   max-width: 100%;
   overflow-x: auto;
@@ -1234,6 +1235,7 @@ a {
 
 .source-video-browser {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   margin-top: 22px;
   padding: 16px;
@@ -1254,6 +1256,7 @@ a {
 }
 
 .source-video-browser-head {
+  grid-column: 1;
   justify-content: space-between;
   gap: 16px;
 }
@@ -1273,10 +1276,13 @@ a {
 }
 
 .source-video-browser-tools {
+  grid-column: 2;
+  grid-row: 1;
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0;
   border-block: 1px solid var(--border);
+  border-block-color: transparent;
 }
 
 .source-video-browser-tools .view-mode-switcher {
@@ -1309,7 +1315,7 @@ a {
   background: var(--bg-1);
 }
 
-.source-video-search input { width: min(260px, 35vw); }
+.source-video-search input { width: min(150px, 18vw); }
 
 .source-video-search > span,
 .source-video-filter > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -1426,6 +1432,7 @@ a {
 .source-video-empty { padding: 24px; text-align: center; }
 
 .source-video-selection-bar {
+  grid-column: 1 / -1;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 12px;
@@ -1437,6 +1444,7 @@ a {
 
 .source-video-selection-summary { display: grid; gap: 1px; min-width: 0; }
 .source-video-selection-summary strong { font-size: var(--text-sm); }
+.source-video-selection-summary span { display: none; }
 .source-video-selection-actions { gap: 8px; flex: 0 0 auto; }
 .source-video-harness { margin-left: auto; width: fit-content; }
 
@@ -1493,6 +1501,12 @@ a {
   .clip-generation-rule + .clip-generation-rule { border-top: 1px solid var(--border); border-left: 0; }
   .source-video-selection-bar { align-items: flex-start; flex-direction: column; }
   .source-video-selection-actions { width: 100%; }
+}
+
+@media (max-width: 1100px) {
+  .source-video-browser { grid-template-columns: minmax(0, 1fr); }
+  .source-video-browser-tools { grid-column: 1; grid-row: auto; border-block-color: var(--border); }
+  .source-video-search input { width: min(220px, 35vw); }
 }
 
 .empty-state {
@@ -1773,11 +1787,6 @@ a {
   gap: 14px;
   flex-wrap: wrap;
   margin-top: 8px;
-}
-
-@keyframes analysis-progress-scan {
-  0% { transform: translateX(-120%); }
-  100% { transform: translateX(280%); }
 }
 
 /* ---------- Review board ---------- */
@@ -3730,6 +3739,10 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .analysis-progress-bar.indeterminate::-webkit-progress-bar {
+    animation: none;
+  }
+
   .review-chat-log {
     scroll-behavior: auto;
   }

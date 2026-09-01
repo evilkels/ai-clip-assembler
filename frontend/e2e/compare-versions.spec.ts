@@ -526,8 +526,8 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(page.locator(`[data-message-id="agent-${failedMessageId}"]`)).toBeVisible();
   await expect(failedBubble).not.toContainText('Sending');
 
-  await page.getByRole('link', { name: 'Timeline' }).click();
-  await page.getByRole('link', { name: 'Review' }).click();
+  await page.getByRole('link', { name: '3. Timeline', exact: true }).click();
+  await page.getByRole('link', { name: '2. Review', exact: true }).click();
   await expect(page.locator('[data-message-id="agent-opening"]')).toBeVisible();
   await expect(page.locator('[data-message-id="editor-direction"]')).toBeVisible();
   const sourcePanel = page.getByTestId('source-clips-panel');
@@ -579,7 +579,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
 
   // The adopted cut lands on the Working Timeline; verify it on the Timeline page
   // (the Review page no longer embeds a duplicate timeline strip).
-  await page.getByRole('link', { name: 'Timeline' }).click();
+  await page.getByRole('link', { name: '3. Timeline', exact: true }).click();
   // The adopted Version has four items over the same Candidate Clip; the
   // authoritative Timeline keeps them distinct instead of collapsing them.
   await expect(page.locator('.tl-clip')).toHaveCount(4, { timeout: 10_000 });

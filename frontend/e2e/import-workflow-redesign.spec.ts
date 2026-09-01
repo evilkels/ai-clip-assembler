@@ -207,6 +207,11 @@ test('analysis rail exposes abort, progress phases, and theme-aware accent surfa
     return { dark, light };
   });
   expect(colors.dark).not.toBe(colors.light);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const reducedMotionAnimation = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.analysis-progress-bar')!, '::-webkit-progress-bar').animationName,
+  );
+  expect(reducedMotionAnimation).toBe('none');
   await page.getByRole('button', { name: 'Abort' }).click();
 
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('running');

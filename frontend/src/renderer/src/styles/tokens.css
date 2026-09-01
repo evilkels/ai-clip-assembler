@@ -23,8 +23,8 @@
   --color-window-minimize: #ffbd2e;
   --color-window-zoom: #28c941;
 
-  --font-sans: "Plex Sans", "IBM Plex Sans", "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Plex Mono", "IBM Plex Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --font-sans: "IBM Plex Sans", "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
 
   --text-xs: 11px;
   --text-sm: 13px;
@@ -52,8 +52,8 @@
 
 /* Non-color tokens shared across every theme. */
 :root {
-  --font-sans: "Plex Sans", "IBM Plex Sans", "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Plex Mono", "IBM Plex Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --font-sans: "IBM Plex Sans", "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
   --text-xs: 11px;
   --text-sm: 13px;
   --text-md: 14px;

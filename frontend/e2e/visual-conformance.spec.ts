@@ -143,25 +143,6 @@ const analysisStatus = {
   updated_at: 1_755_000_012_000,
 };
 
-const analysisResult = {
-  project_id: PROJECT_ID,
-  harness_id: 'manual',
-  status: 'complete',
-  clips,
-  sequence: { source: 'draft', profile: 'cinematic_highlight', total_duration_sec: 13.2, clips: clips.map((clip) => clip.clip_id) },
-  recommendation: {
-    profile: 'cinematic_highlight' as const,
-    target_duration_sec: 15,
-    reason: 'Balanced reveal, movement, and close.',
-    format: 'medium' as const,
-  },
-  generation_stats: {
-    per_file: {},
-    totals: { candidates_generated: 4, candidates_kept: 4, scenes_total: 4, scenes_at_cap: 0, videos: 4 },
-    preferences: {},
-  },
-};
-
 function fixtureInHash(fixture: VisualFixture): string {
   return `/#/playwriter?fixture=${fixture}`;
 }
@@ -213,6 +194,10 @@ async function installFixtureBackend(page: Page, fixture: VisualFixture): Promis
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify(analysisStatus) });
       return;
     }
+    if (url.pathname === `/projects/${PROJECT_ID}/clips`) {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ clips }) });
+      return;
+    }
     if (url.pathname === '/harnesses') {
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ harnesses: [
         { id: 'manual', name: 'Manual / Rule-based', type: 'rule', enabled: true },
@@ -255,6 +240,10 @@ async function installFixtureBackend(page: Page, fixture: VisualFixture): Promis
       });
       return;
     }
+    if (url.pathname === '/') {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ version: '0.1.6' }) });
+      return;
+    }
     await route.fulfill({ status: 204, body: '' });
   });
 }
@@ -264,6 +253,7 @@ async function seedFixture(page: Page, fixture: VisualFixture): Promise<void> {
   await page.goto(fixtureInHash(fixture));
   await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
   await expect(page.getByTestId('qa-fixture-ready')).toHaveText(fixture);
+  await expect(page.getByTestId('qa-fixture-source-count')).toHaveText('4 fixed source videos');
 }
 
 async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string): Promise<void> {
@@ -279,12 +269,32 @@ async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string
   if (fixture === 'review-list') {
     await page.getByRole('button', { name: 'List', exact: true }).click();
   }
+  if (fixture === 'import-analyzing') {
+    await expect(page.locator('[data-analysis-rail]')).toBeVisible();
+    await expect(page.getByText('Scoring candidate clips', { exact: true })).toBeVisible();
+    await expect(page.getByRole('row')).toHaveCount(5);
+  }
+  if (fixture === 'review-grid') {
+    await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
+    await expect(page.locator('[data-review-grid]')).toBeVisible();
+    await expect(page.locator('[data-review-grid] .clip-card')).toHaveCount(4);
+  }
+  if (fixture === 'review-list') {
+    await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
+    await expect(page.locator('[data-review-list]')).toBeVisible();
+    await expect(page.locator('[data-review-list] > *')).toHaveCount(4);
+  }
   if (fixture === 'timeline-selection') {
+    await expect(page.getByTestId('timeline-items-table')).toBeVisible();
     await page.getByTestId('timeline-clip').first().click();
+    await expect(page.getByTestId('timeline-inspector')).toBeVisible();
+    await expect(page.getByTestId('timeline-summary')).toContainText('3 items');
   }
   if (fixture === 'export-receipt') {
     await page.getByTestId('export-selected').click();
     await expect(page.getByTestId('export-result-edl')).toBeVisible();
+    await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');
+    await expect(page.getByTestId('export-result-edl')).toContainText('/tmp/ai-clip-assembler/');
   }
 }
 

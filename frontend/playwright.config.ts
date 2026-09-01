@@ -16,6 +16,8 @@ export default defineConfig({
   },
   use: {
     baseURL: 'http://localhost:5173',
+    locale: 'en-US',
+    timezoneId: 'UTC',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
   },

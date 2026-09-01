@@ -49,18 +49,30 @@ from the one users download. Verified specifics:
   - **"Contact Sheet" (dark)** — scoring and kept-vs-cut is the hero.
   - **"Cutting Room" (light)** — the app screenshot is the hero.
 
-  **This is an open decision and blocks task 3 below.** The current page is
-  neither: it is the older light editorial treatment with no navigation and no
-  scored product proof above the fold.
+  **Decision made 2026-09-01: "Contact Sheet" (dark).** The landing converges on
+  the app's shipped dark token set rather than keeping an independent identity.
+  The owner also settled two things this plan had left open: fonts are
+  self-hosted WOFF2 (the Google Fonts CDN goes away entirely), and the four
+  workflow screenshots are re-captured from the redesigned app rather than
+  deferred. Execution now lives in
+  [2026-09-01-landing-page-restyle.md](2026-09-01-landing-page-restyle.md);
+  this file keeps only the launch/distribution backlog.
+
+  One correction to the note above: the design export keeps the *existing*
+  headline and body copy ("Headline and body copy kept from your current page"),
+  so this is a restyle, not a rewrite. The current page is the older light
+  editorial treatment with no navigation and no scored product proof above the
+  fold.
 
 ### Sequencing
 
-Do not re-shoot screenshots until `redesign/studio-workflows` merges, or they
-will be stale twice. Order: merge redesign → re-capture the four workflow shots
-and the social card from the built app → align `site/` tokens to the app system
-→ update copy for the new views. Screenshot capture is **maintainer-owned** (it
-needs real footage in a running build); token alignment and copy are
-agent-executable once the shots exist.
+Superseded 2026-09-01: the restyle now rides *inside* PR #68 rather than waiting
+for it to merge, so the shots are taken from the redesign branch build and are
+stale only once. Order: restyle `site/` against the app tokens → re-capture the
+four workflow shots and the social card from the branch build → fix alt text →
+responsive and contrast pass. Screenshot capture stays **maintainer-owned** (it
+needs real footage in a running build); everything else is agent-executable.
+See [2026-09-01-landing-page-restyle.md](2026-09-01-landing-page-restyle.md).
 
 
 

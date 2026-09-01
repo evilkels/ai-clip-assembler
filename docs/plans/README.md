@@ -43,7 +43,8 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | IN PROGRESS — Tasks 0, 1, 4 done; plan/spec reconciliation remains |
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
-| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — plus NEW 2026-08-31 debt: `site/` untouched by the studio redesign, so its palette and workflow screenshots now misrepresent the shipped app |
+| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — launch/distribution backlog only; the 2026-08-31 landing-drift debt is now owned by the restyle plan below |
+| [landing-page-restyle](2026-09-01-landing-page-restyle.md) | TODO (2026-09-01) — dark "Contact Sheet" direction chosen; self-hosted fonts, app-token palette, re-captured dark screenshots; intended to land inside PR #68 |
 | [seo-plan](seo-plan.md) | IN PROGRESS — Search Console setup remains |
 | [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |
@@ -52,7 +53,7 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [settings-page](done/settings-page.md) | DONE (2026-07-03) |
 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
 | [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
-| [studio-workflow-redesign](2026-08-14-studio-workflow-redesign.md) | DONE (2026-08-14), reviewed + amended 2026-08-31 (Task 8 fixed 1 defect + 3 conformance gaps); unmerged on `redesign/studio-workflows`; human Electron/NLE checks pending |
+| [studio-workflow-redesign](2026-08-14-studio-workflow-redesign.md) | DONE (2026-08-14), reviewed + amended 2026-08-31, Copilot PR review resolved 2026-09-01 (3 valid, 1 rejected with evidence); open as PR #68; human Electron/NLE checks pending |
 | [ui-polish-modern-shell](ui-polish-modern-shell.md) | SUPERSEDED for workflow routes by the studio redesign (2026-08-31); only Cmd-K palette, score verification, and Settings/Diagnostics remain |
 | [react-doctor-triage](react-doctor-triage.md) | Partial; citations now doubly stale — the studio redesign rewrote 16 renderer components. Re-run the tool before using it |
 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |

@@ -73,6 +73,42 @@ from `ed8a6d6`: lint PASS, typecheck PASS, main 69/69 PASS, backend 404 passed /
 Human macOS/Electron and real-NLE checks remain pending and are never reported as
 automated proof.
 
+### Task 9 — GitHub Copilot PR review on #68 (2026-09-01)
+
+Copilot left four inline comments on PR #68. Three were valid and fixed; one was
+rejected with evidence.
+
+- **Valid — `SourceVideoBrowser.tsx:79`.** The select-all checkbox derived its
+  indeterminate state from the *filtered* rows while `onToggleAll`
+  (`Import.tsx:177-183`) operates on every Source Video. Filtering away the only
+  deselected video made a partial selection read as no selection. Now derived
+  from the whole set.
+- **Valid — `SourceClipsPanel.tsx`.** The per-file candidate ordering was sorted
+  once per rendered card. Hoisted into a `useMemo` keyed on `clipsByFile`, so
+  render-time position lookup is O(1). Rendered output is unchanged.
+- **Valid — E2E fixtures.** A personal macOS home path appeared as mocked folder
+  data in `import-workflow-redesign.spec.ts`, `project-shell-regressions.spec.ts`
+  and `settings-connections.spec.ts`. Replaced with neutral paths; `/Users/` and
+  `/home/` no longer appear anywhere under `frontend/e2e`.
+- **Rejected — `Timeline.tsx:747,790`.** Copilot asked for `mousemove`/`mouseup`
+  to become `pointermove`/`pointerup` because "the trim handles should start on
+  pointer input". They do not: trim starts at `onMouseDown`, and the
+  `onPointerDown` on those handles only calls `stopPropagation`. The listener
+  pair already matches its initiating event, so there is no missed release. No
+  change made.
+
+One process note worth keeping: the first automated attempt at the checkbox fix
+appended its regression assertions to the *existing* "selection bar selects and
+deselects the complete source set" test, which broke that test's tail — from a
+filtered, indeterminate state, Playwright's `uncheck()` is a no-op because
+`checked` is already false, and `toggleAll` would select all rather than clear.
+The regression now lives in its own test
+(`import-workflow-redesign.spec.ts` — "the select-all checkbox reports partial
+selection hidden by the filter") and the original round-trip is untouched.
+
+**Verification:** lint, typecheck, `test:main` 69/69, and Playwright 65/65 all
+green on the amended tree (65, not 64 — this round added one test).
+
 ### Residual limitations after Task 8
 
 - **The export receipt is pinned to click time, not to a document revision.** If

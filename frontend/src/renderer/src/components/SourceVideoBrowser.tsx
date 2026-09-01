@@ -76,7 +76,7 @@ export function SourceVideoBrowser({
     [videos, analyzedIds, visibleFilters, sort],
   );
   const allSelected = videos.length > 0 && selectedIds.length === videos.length;
-  const someVisibleSelected = visible.some((video) => !deselected.has(video.file_id));
+  const someSelected = videos.some((video) => !deselected.has(video.file_id));
   const viewOptions = [
     { value: 'table' as const, label: 'Table' },
     { value: 'thumbs' as const, label: 'Thumbs' },
@@ -216,7 +216,7 @@ export function SourceVideoBrowser({
             <thead>
               <tr>
                 <th className="source-video-select-cell">
-                  <input type="checkbox" checked={allSelected} ref={(element) => { if (element) element.indeterminate = !allSelected && someVisibleSelected; }} onChange={onToggleAll} disabled={disabled} aria-label="Select all videos" />
+                  <input type="checkbox" checked={allSelected} ref={(element) => { if (element) element.indeterminate = !allSelected && someSelected; }} onChange={onToggleAll} disabled={disabled} aria-label="Select all videos" />
                 </th>
                 <th aria-label="Preview" />
                 <th>File</th>

@@ -89,6 +89,16 @@ export function SourceClipsPanel({
     [acceptedOrder, clips, decisions, decisionFilter, minOverall, smoothnessThreshold, versionMembership],
   );
   const groups = useMemo(() => groupByLook(records), [records]);
+  // Candidate Clip positions are stable within each source file; compute the
+  // ordering once so each rendered card only performs a lookup.
+  const fileClipIndexes = useMemo(() => {
+    const indexes = new Map<string, Map<string, number>>();
+    for (const [fileId, fileSiblings] of clipsByFile) {
+      const byStart = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
+      indexes.set(fileId, new Map(byStart.map((candidate, index) => [candidate.clip_id, index + 1])));
+    }
+    return indexes;
+  }, [clipsByFile]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((previous) => {
@@ -110,16 +120,12 @@ export function SourceClipsPanel({
       .filter((candidate) => candidate.clip_id !== clip.clip_id)
       .map((candidate) => ({ start: candidate.start_sec, end: candidate.end_sec }));
 
-  /** Sibling ranges plus this clip's 1-based position among its file's
-   *  candidates. Only for views that show the position; it sorts, so the
-   *  filmstrip uses `fileSiblingRanges` directly. */
+  /** Sibling ranges plus this clip's 1-based position among its file's candidates. */
   const fileContext = (clip: ClipCandidate) => {
     const fileSiblings = clipsByFile.get(clip.file_id) ?? [];
-    const sortedFileSiblings = [...fileSiblings].sort((a, b) => a.start_sec - b.start_sec);
     return {
       siblingRanges: fileSiblingRanges(clip),
-      fileClipIndex:
-        sortedFileSiblings.findIndex((candidate) => candidate.clip_id === clip.clip_id) + 1,
+      fileClipIndex: fileClipIndexes.get(clip.file_id)?.get(clip.clip_id) ?? 0,
       fileClipCount: fileSiblings.length,
     };
   };

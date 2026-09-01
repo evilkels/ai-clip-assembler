@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const folderPath = '/Users/elvijs/Projects/' + 'x'.repeat(1_400);
+const folderPath = '/tmp/' + 'x'.repeat(1_400);
 const projectName = 'Long Footage';
 const videos = Array.from({ length: 7 }, (_, index) => ({
   file_id: `video-${index + 1}`,

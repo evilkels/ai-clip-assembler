@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const folderPath = '/Users/elvijs/Projects/import-redesign';
+const folderPath = '/tmp/import-redesign';
 const videos = [
   ['shoreline', 'Shoreline sunrise.MP4', '2026-08-10T10:00:00Z'],
   ['valley', 'Valley pass.MOV', '2026-08-11T10:00:00Z'],
@@ -231,4 +231,20 @@ test('selection bar selects and deselects the complete source set', async ({ pag
   await expect(page.getByText('3 of 3 selected')).toBeVisible();
   await selectAll.uncheck();
   await expect(page.getByText('0 of 3 selected')).toBeVisible();
+});
+
+test('the select-all checkbox reports partial selection hidden by the filter', async ({ page }) => {
+  await openImportFixture(page);
+
+  // The header checkbox toggles every Source Video, not just the filtered rows,
+  // so its mixed state has to answer for the ones the filter is hiding too.
+  const selectAll = page.getByRole('checkbox', { name: 'Select all videos' });
+  await page.getByRole('searchbox', { name: 'Search source videos' }).fill('Shoreline');
+  await page.getByRole('checkbox', { name: 'Select Shoreline sunrise.MP4' }).uncheck();
+  await expect(page.getByText('2 of 3 selected')).toBeVisible();
+
+  await expect
+    .poll(() => selectAll.evaluate((element) => (element as HTMLInputElement).indeterminate))
+    .toBe(true);
+  await expect(selectAll).not.toBeChecked();
 });

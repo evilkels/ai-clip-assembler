@@ -224,14 +224,14 @@ export function ClipCard({
           )}
           <ScoreChip label="combined" value={clip.scores.overall} />
         </div>
-        <details className="clip-score-details">
-          <summary>Local technical scores</summary>
+        <div className="clip-score-details">
+          <span className="clip-score-details-label">Local technical scores</span>
           <div className="score-row">
             <ScoreChip label="sharp" value={clip.scores.sharpness} />
             <ScoreChip label="expose" value={clip.scores.exposure} />
             <ScoreChip label="contrast" value={clip.scores.contrast} />
           </div>
-        </details>
+        </div>
         <div className="clip-generation-why">{generationWhy(clip)}</div>
         {clip.reason && (
           <div className="clip-reason">

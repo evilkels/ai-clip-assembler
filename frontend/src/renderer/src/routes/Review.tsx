@@ -47,7 +47,7 @@ export function ReviewPage() {
   } = useReview();
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
-  const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 300, 240, 560);
+  const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 320, 240, 560);
 
   const availableClipIds = useMemo(
     () => new Set(clips.map((clip) => clip.clip_id)),
@@ -120,7 +120,12 @@ export function ReviewPage() {
         title="Review"
         step="Step 02 / 04"
         description="Let the AI suggest a full cut, or pick clips yourself, then refine."
-        meta={<span className="draft-summary">{clips.length} clips available</span>}
+        meta={(
+          <span className="review-header-count">
+            <strong>{clips.length}</strong>
+            <span>shown</span>
+          </span>
+        )}
         actions={(
           <div className="controls">
           <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
@@ -159,25 +164,21 @@ export function ReviewPage() {
             <div className="version-zone-head">
               <div>
                 <strong>Suggested cuts</strong>
+                <span className="version-zone-description">
+                  Complete edits the AI assembles from your clips. Preview one, then apply.
+                </span>
               </div>
-              <span className="draft-summary">
-                {refreshingVersions ? 'Updating…' : 'Full edits the AI proposes. Preview, then apply one.'}
-              </span>
+              <SegmentedControl<FormatName>
+                value={draftFormat ?? 'short'}
+                options={FORMAT_OPTIONS.map((option) => ({
+                  ...option,
+                  disabled: switchingFormat || !projectId,
+                }))}
+                onChange={(format) => void selectFormat(format)}
+                ariaLabel="Length format"
+                className="format-switcher"
+              />
             </div>
-            <p className="review-pipeline-helper">
-              Complete edits the AI assembles from your clips. Preview one and apply it to your
-              timeline, or build your own below by adding individual clips.
-            </p>
-            <SegmentedControl<FormatName>
-              value={draftFormat ?? 'short'}
-              options={FORMAT_OPTIONS.map((option) => ({
-                ...option,
-                disabled: switchingFormat || !projectId,
-              }))}
-              onChange={(format) => void selectFormat(format)}
-              ariaLabel="Length format"
-              className="format-switcher"
-            />
             {switchingFormat ? <span className="draft-summary">Rebuilding timeline…</span> : null}
             {formatError ? <span className="empty-state">{formatError}</span> : null}
             {versionSetIsStale ? (
@@ -187,6 +188,7 @@ export function ReviewPage() {
                   <button
                     type="button"
                     className="btn subtle"
+                    aria-label="Ask the AI to refresh suggestions"
                     onClick={() => {
                       setRefreshingVersions(true);
                       void conversation
@@ -195,7 +197,9 @@ export function ReviewPage() {
                     }}
                     disabled={conversation.busy}
                   >
-                    Ask the AI to refresh suggestions
+                    <span className="refresh-suggestions-label">
+                      {refreshingVersions ? 'Refreshing…' : 'Refresh suggestions'}
+                    </span>
                   </button>
                 </StatusSurface>
               </div>

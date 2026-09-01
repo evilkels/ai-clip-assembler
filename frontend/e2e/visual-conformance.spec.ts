@@ -376,7 +376,13 @@ test.describe('deterministic visual fixture setup', () => {
         await expect(workstation.locator('[data-rules-region]')).toBeVisible();
         await expect(page.locator('.workflow-footer .workflow-footer-actions')).toContainText('Continue to Review');
       }
-      if (fixture.startsWith('review')) await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
+      if (fixture.startsWith('review')) {
+        await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
+        await expect(page.getByTestId('ask-ai-rail')).toBeVisible();
+        await expect(page.getByTestId('suggested-versions-zone')).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
+        await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
+      }
       if (fixture === 'timeline-selection') await expect(page.getByTestId('timeline-inspector')).toBeVisible();
       if (fixture === 'export-receipt') await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');
     });

@@ -20,11 +20,7 @@ function fixtureVideo(): string {
 async function openClips(page: Page): Promise<void> {
   const panel = page.getByTestId('source-clips-panel');
   await expect(panel).toBeVisible();
-  await expect.poll(async () => {
-    if (await panel.evaluate((element) => (element as HTMLDetailsElement).open)) return true;
-    await panel.locator('> summary').click();
-    return panel.evaluate((element) => (element as HTMLDetailsElement).open);
-  }).toBe(true);
+  await expect.poll(async () => panel.evaluate((element) => (element as HTMLDetailsElement).open)).toBe(true);
 }
 
 async function setupReview(page: Page): Promise<void> {
@@ -218,6 +214,18 @@ test('switches Candidate Clip views, filters records, and avoids eager list medi
   await expect(browser.locator('[data-review-count]')).toContainText('shown');
   await page.getByRole('button', { name: 'Grid' }).click();
   await expect(browser.locator('.clip-card')).not.toHaveCount(0);
+});
+
+test('renders the Review workstation with Your Clips visible from the first paint', async ({ page }) => {
+  await setupReview(page);
+
+  await expect(page.getByTestId('ask-ai-rail')).toBeVisible();
+  await expect(page.getByTestId('review-chat-panel')).toBeVisible();
+  await expect(page.getByTestId('suggested-versions-zone')).toBeVisible();
+  await expect(page.getByTestId('version-gallery')).toBeVisible();
+  await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
+  await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
+  await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
 });
 
 test('keeps Include and Remove tied to authoritative Timeline membership', async ({ page }) => {

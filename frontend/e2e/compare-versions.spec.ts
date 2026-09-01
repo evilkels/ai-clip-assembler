@@ -341,7 +341,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   }
   const reviewThemeColors = await page.evaluate(() => {
     const root = document.documentElement;
-    const surface = document.querySelector('.version-zone');
+    const surface = document.querySelector('.review-main');
     const rail = document.querySelector('.review-chat');
     if (!surface || !rail) throw new Error('Review surfaces are missing');
     root.setAttribute('data-theme', 'dark');
@@ -367,16 +367,13 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
     await expect(button).toHaveCSS('white-space', 'nowrap');
     expect(await button.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
   }
-  await expect(
-    page.getByRole('strong').filter({ hasText: /^Browse your clips \(\d+\)$/ }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
   await expect(cards.nth(0)).toContainText('Current suggestion');
   await expect(cards.nth(2)).toContainText('Unavailable');
   await expect(cards.nth(2)).toContainText('MISSING.MOV');
   await expect(cards.nth(2).getByTestId('version-adopt')).toBeDisabled();
 
   const sourcePanelForState = page.getByTestId('source-clips-panel');
-  await sourcePanelForState.locator('summary').first().click();
   await expect(
     sourcePanelForState.getByText(/Every usable clip found in your footage/),
   ).toBeVisible();
@@ -492,7 +489,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   );
   await expect(agentMessage.getByTestId('proposal-card')).toBeVisible();
   await expect(editorMessage).toHaveCSS('text-align', 'right');
-  await expect(agentMessage).toHaveCSS('max-width', /^(82|100)%$/);
+  await expect(agentMessage).toHaveCSS('max-width', /^(82|86|100)%$/);
   expect(
     await agentMessage.evaluate(
       (node) => node.getBoundingClientRect().width <= (node.parentElement?.clientWidth ?? 0),
@@ -526,13 +523,32 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(page.locator(`[data-message-id="agent-${failedMessageId}"]`)).toBeVisible();
   await expect(failedBubble).not.toContainText('Sending');
 
+  // Review evidence is intentionally kept outside visual baselines. It gives
+  // the conformance pass a stable 1440×1400 dark workstation capture while
+  // leaving Playwright's approved snapshot set untouched.
+  const focusedCardCollapse = page.getByRole('button', { name: 'Collapse Punchy Social Cut' });
+  if (await focusedCardCollapse.count() > 0) await focusedCardCollapse.first().click();
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await page.locator('.review-main').evaluate((element) => element.scrollTo({ top: 0, left: 0 }));
+  await page.screenshot({
+    path: join(
+      process.cwd(),
+      '..',
+      '.superpowers',
+      'sdd',
+      '2026-09-01-literal-design-conformance',
+      'task-4-review-seeded-dark-1440x1400.png',
+    ),
+  });
+
   await page.getByRole('link', { name: '3. Timeline', exact: true }).click();
   await page.getByRole('link', { name: '2. Review', exact: true }).click();
   await expect(page.locator('[data-message-id="agent-opening"]')).toBeVisible();
   await expect(page.locator('[data-message-id="editor-direction"]')).toBeVisible();
   const sourcePanel = page.getByTestId('source-clips-panel');
-  await expect(sourcePanel).not.toHaveAttribute('open');
-  await expect(sourcePanel.locator('video')).toHaveCount(0);
+  await expect(sourcePanel).toHaveAttribute('data-open', 'true');
+  await expect(sourcePanel.locator('[data-review-browser]')).toBeVisible();
 
   await cards.first().getByTestId('version-adopt').click();
   const applyDialog = page.getByRole('dialog', {

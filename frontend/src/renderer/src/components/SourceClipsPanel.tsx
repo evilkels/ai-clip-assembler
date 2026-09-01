@@ -72,7 +72,6 @@ export function SourceClipsPanel({
   onInclude,
   onExclude,
 }: SourceClipsPanelProps) {
-  const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ReviewViewMode>('grid');
   const [minOverall, setMinOverall] = useState(0);
   const [decisionFilter, setDecisionFilter] = useState<ReviewFilters['decision']>('all');
@@ -208,30 +207,33 @@ export function SourceClipsPanel({
     <details
       className="source-clips-panel"
       data-testid="source-clips-panel"
-      open={open}
+      data-open="true"
+      open
     >
       <summary
-        onClick={(event) => {
-          event.preventDefault();
-          setOpen((previous) => !previous);
-        }}
+        className="source-clips-head"
+        onClick={(event) => event.preventDefault()}
       >
-        <strong>{open ? 'Hide' : 'Browse'} your clips ({totalCount})</strong>
-        <span className="draft-summary">
-          {totals
-            ? `Generated ${totals.candidates_generated} → kept ${totals.candidates_kept} · scene cap on ${totals.scenes_at_cap}/${totals.scenes_total} scenes · video cap ${totals.max_candidates_per_video ?? '—'}`
-            : `${records.length} shown · click to preview and pick clips`}
-        </span>
+        <div className="source-clips-title">
+          <h2>Your clips</h2>
+          <span className="draft-summary">
+            {totals
+              ? `Generated ${totals.candidates_generated} → kept ${totals.candidates_kept} · scene cap on ${totals.scenes_at_cap}/${totals.scenes_total} scenes · video cap ${totals.max_candidates_per_video ?? '—'}`
+              : `${records.length} shown · click to preview and pick clips`}
+          </span>
+        </div>
+        <div className="source-clips-tools">
+          <ViewModeSwitcher
+            value={viewMode}
+            options={VIEW_OPTIONS}
+            onChange={setViewMode}
+            ariaLabel="Candidate Clip view"
+          />
+          <span className="source-clips-sort">Sort <strong>Combined score</strong></span>
+        </div>
       </summary>
-      {open ? (
-        <div className="source-clips-content" data-review-browser data-view-mode={viewMode}>
+      <div className="source-clips-content" data-review-browser data-view-mode={viewMode}>
           <div className="review-browser-toolbar">
-            <ViewModeSwitcher
-              value={viewMode}
-              options={VIEW_OPTIONS}
-              onChange={setViewMode}
-              ariaLabel="Candidate Clip view"
-            />
             <label className="review-filter-control">
               Minimum Overall
               <input
@@ -278,12 +280,12 @@ export function SourceClipsPanel({
             them from it; the backend Timeline Document remains authoritative.
           </p>
           {totalCount > 0 ? (
-            <details className="score-legend">
-              <summary>How clips are scored</summary>
+            <div className="score-legend">
+              <span className="score-legend-label">How clips are scored</span>
               <div className="score-legend-body">
                 <p>Combined scores blend technical quality with visual interest. Strong clips score at least 8, usable clips score 5–8, and weak clips score below 5.</p>
               </div>
-            </details>
+            </div>
           ) : null}
           {loading ? (
             <div className="empty-state">Loading candidates…</div>
@@ -292,8 +294,7 @@ export function SourceClipsPanel({
           ) : records.length === 0 ? (
             <div className="empty-state">No clips match the current Review filters.</div>
           ) : viewMode === 'grid' ? renderGrid() : viewMode === 'list' ? renderList() : renderFilmstrip()}
-        </div>
-      ) : null}
+      </div>
     </details>
   );
 }

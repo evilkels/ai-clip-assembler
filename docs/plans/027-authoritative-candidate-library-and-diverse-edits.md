@@ -56,7 +56,8 @@ TypeScript, Playwright.
 
 **Files:**
 - Create: `backend/src/version_diversity.py`
-- Create: `backend/tests/test_version_diversity.py`
+- Update: `backend/tests/test_version_diversity.py` (already committed, parked
+  behind a `pytest.importorskip` guard that lifts itself once the module exists)
 
 **Interfaces:**
 - Consumes: Candidate Clip dictionaries with `clip_id`, `file_id`, `scene_id`,

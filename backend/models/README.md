@@ -7,8 +7,7 @@ repo; when absent, embeddings are skipped and clip diversity falls back to
 "every candidate is its own look group" (see `docs/plans/018-diverse-clip-generation.md`).
 
 **Selected model:** the vision tower of `google/siglip-base-patch16-224`
-(Apache-2.0, both code and weights — see `/tmp/plan018-claude-license-report.md`
-for the full redistribution analysis), pinned at HF revision
+(Apache-2.0, both code and weights), pinned at HF revision
 `7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed`. Apple MobileCLIP (research-only
 license) and OpenAI CLIP (ambiguous redistribution terms for the checkpoint)
 were both rejected.
@@ -22,6 +21,15 @@ were both rejected.
 - Export only the vision tower (no text tower/tokenizer) — `optimum-cli`
   does not support SigLIP; export directly with
   `transformers.SiglipVisionModel` + `torch.onnx.export`.
+
+**Redistribution record is missing.** This file previously cited
+`/tmp/plan018-claude-license-report.md` for the full redistribution analysis.
+That file was never committed and no longer exists, so the analysis behind
+bundling third-party weights cannot currently be produced. SigLIP's weights are
+Apache-2.0 and that is independently verifiable, so the conclusion is very
+likely sound — but re-derive the analysis and commit it under `docs/` before
+bundling, and link it from here instead of a temp path. Tracked as a blocker in
+`docs/plans/025-bundle-siglip-embedding-model.md`.
 
 **Packaging (not yet done):** do not commit the exported `.onnx` binary to
 git. Fetch it at DMG build time from a pinned, checksum-verified location,

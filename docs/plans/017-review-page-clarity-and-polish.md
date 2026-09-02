@@ -42,7 +42,12 @@ confusing smoothness controls, and excluded clips still entering AI proposals.
 
 ## Remaining work
 
-1. **Poster-first cards:** reuse sampled frame JPEGs, render `<img>`, and mount
+1. **Poster-first cards — MOVED 2026-09-02** to
+   [`029-review-clip-posters-and-playback.md`](029-review-clip-posters-and-playback.md),
+   which owns it along with the play-once preview default and carries the
+   missing-route prerequisite recorded below. Original text kept for context:
+
+   **Poster-first cards:** reuse sampled frame JPEGs, render `<img>`, and mount
    `<video>` only on first play. Then open Browse by default or virtualize it.
    This avoids the documented N×metadata-stream jank around 24 clips.
 

@@ -17,7 +17,7 @@ docs.
 
 ## Active
 
-16 plans. Statuses verified against the code on 2026-09-02, not taken from each
+17 plans. Statuses verified against the code on 2026-09-02, not taken from each
 plan's own header.
 
 | | Plan | What's left |
@@ -28,8 +28,9 @@ plan's own header.
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, Settings/Diagnostics styling, sidebar menu |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
+| 🔴 | [029](029-review-clip-posters-and-playback.md) | Poster-first cards, play-once previews, loop toggle |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 2 defects left: keyboard trim, project-switch reset |
-| 🟡 | [017](017-review-page-clarity-and-polish.md) | Poster-first cards; collapse the two smoothness controls |
+| 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
 | 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Preview, chat streaming and E2E await visual QA |
 | 🟡 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | Signing, notarization, clean-machine validation |
 | 🟡 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | Launch backlog + Search Console verification |

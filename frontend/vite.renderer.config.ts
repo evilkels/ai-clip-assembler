@@ -8,7 +8,13 @@ import { resolve } from 'node:path';
 export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   plugins: [react()],
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    // The shared brand assets live in the repository assets directory so the
+    // Electron packager and landing page can consume the same files. Allow
+    // only that directory in Vite's renderer asset graph during development.
+    fs: { allow: [resolve(__dirname), resolve(__dirname, '../assets')] },
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src/renderer/src'),

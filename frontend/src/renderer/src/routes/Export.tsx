@@ -3,37 +3,139 @@ import { useReview } from '../state/ReviewContext';
 import {
   exportTimeline,
   openInDaVinci,
+  revealExportFile,
   type ExportFormat,
   type ExportResult,
 } from '../api/client';
 import { EmptyState } from '../components/EmptyState';
+import { WorkflowHeader } from '../components/WorkflowHeader';
+import { StatusSurface } from '../components/StatusSurface';
+import {
+  effectiveTimelineDuration,
+  projectTimelineItems,
+  type TimelineProjectionItem,
+} from '../lib/timelineProjection';
+import type { ClipCandidate } from '../types/clip';
 
-const EXPORT_FORMATS: Array<{ id: ExportFormat; button: string; label: string }> = [
-  { id: 'resolve_xml', button: 'Export for DaVinci Resolve', label: 'DaVinci Resolve XML exported' },
-  { id: 'fcpxml', button: 'Export FCPXML', label: 'FCPXML exported' },
-  { id: 'edl', button: 'Export EDL', label: 'EDL exported' },
+const EXPORT_FORMATS: Array<{
+  id: ExportFormat;
+  kicker: string;
+  name: string;
+  note: string;
+  extension: string;
+  actionLabel: string;
+}> = [
+  {
+    id: 'resolve_xml',
+    kicker: 'Resolve',
+    name: 'DaVinci Resolve XML',
+    note: 'A timeline handoff for DaVinci Resolve with source links preserved.',
+    extension: '.xml',
+    actionLabel: 'Export for DaVinci Resolve',
+  },
+  {
+    id: 'fcpxml',
+    kicker: 'FCPXML',
+    name: 'Final Cut Pro XML',
+    note: 'An editable XML sequence for Final Cut Pro and compatible NLEs.',
+    extension: '.fcpxml',
+    actionLabel: 'Export FCPXML',
+  },
+  {
+    id: 'edl',
+    kicker: 'EDL',
+    name: 'CMX 3600 EDL',
+    note: 'A compact interchange list for editors that support flat EDL imports.',
+    extension: '.edl',
+    actionLabel: 'Export EDL',
+  },
 ];
 
-type DisplayExportResult = ExportResult & { effective_duration_sec: number };
+interface ExportPayload {
+  timeline: Array<{
+    order: number;
+    item_id: string;
+    source_clip_id: string;
+    file_id: string | null;
+    file_name: string;
+    start_sec: number;
+    end_sec: number;
+    speed: number;
+    transform: TimelineProjectionItem['transform'];
+  }>;
+}
+
+type DisplayExportResult = ExportResult & {
+  effective_duration_sec: number;
+  payload: ExportPayload;
+};
+
+function buildExportPayload(
+  items: TimelineProjectionItem[],
+  clipsById: Map<string, ClipCandidate>,
+): ExportPayload {
+  return {
+    timeline: items.map((item, index) => ({
+      order: index + 1,
+      item_id: item.itemId,
+      source_clip_id: item.sourceClipId,
+      file_id: clipsById.get(item.sourceClipId)?.file_id ?? null,
+      file_name: item.fileName,
+      start_sec: item.startSec,
+      end_sec: item.endSec,
+      speed: item.speed,
+      transform: item.transform,
+    })),
+  };
+}
+
+function formatDuration(seconds: number): string {
+  return `${seconds.toFixed(1)}s`;
+}
 
 export function ExportPage() {
   const { clips, timelineItems, projectId, projectFolder } = useReview();
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('edl');
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportResults, setExportResults] = useState<
     Partial<Record<ExportFormat, DisplayExportResult>>
   >({});
   const [exportError, setExportError] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   const clipsById = useMemo(() => new Map(clips.map((clip) => [clip.clip_id, clip])), [clips]);
-
-  const effectiveDuration = timelineItems.reduce(
-    (sum, item) => sum + (item.end_sec - item.start_sec) / item.speed,
-    0,
+  const effectiveDuration = effectiveTimelineDuration(timelineItems);
+  const projectedItems = useMemo(
+    () => projectTimelineItems(timelineItems, clips),
+    [clips, timelineItems],
   );
+  const sourceFileCount = new Set(
+    projectedItems.map((item) => clipsById.get(item.sourceClipId)?.file_id ?? item.sourceClipId),
+  ).size;
+  const speedRampCount = projectedItems.filter((item) => Math.abs(item.speed - 1) > Number.EPSILON).length;
+  const edlHasLossyChanges = projectedItems.some(
+    (item) =>
+      Math.abs(item.speed - 1) > Number.EPSILON ||
+      Math.abs(item.transform.scale - 1) > Number.EPSILON ||
+      Math.abs(item.transform.x) > Number.EPSILON ||
+      Math.abs(item.transform.y) > Number.EPSILON,
+  );
+  const selectedFormatConfig = EXPORT_FORMATS.find((format) => format.id === selectedFormat)!;
+  const handoffFiles = useMemo(() => {
+    const groups = new Map<string, { fileId: string; fileName: string; count: number }>();
+    for (const item of projectedItems) {
+      const fileId = clipsById.get(item.sourceClipId)?.file_id ?? item.sourceClipId;
+      const current = groups.get(fileId);
+      if (current) current.count += 1;
+      else groups.set(fileId, { fileId, fileName: item.fileName, count: 1 });
+    }
+    return Array.from(groups.values());
+  }, [clipsById, projectedItems]);
 
   const handleExport = useCallback(
     async (format: ExportFormat) => {
       if (!projectId) return;
+      setSelectedFormat(format);
       setExporting(format);
       setExportError(null);
 
@@ -48,9 +150,15 @@ export function ExportPage() {
           if (!overwrite) throw err;
           result = await exportTimeline(projectId, format, { overwrite: true });
         }
+        // Capture the authoritative projection at handoff time. The receipt is
+        // intentionally not recomputed when Timeline state changes afterwards.
         setExportResults((previous) => ({
           ...previous,
-          [format]: { ...result, effective_duration_sec: effectiveDuration },
+          [format]: {
+            ...result,
+            effective_duration_sec: effectiveDuration,
+            payload: buildExportPayload(projectedItems, clipsById),
+          },
         }));
       } catch (err) {
         setExportError(err instanceof Error ? err.message : String(err));
@@ -58,25 +166,49 @@ export function ExportPage() {
         setExporting(null);
       }
     },
-    [effectiveDuration, projectId],
+    [clipsById, effectiveDuration, projectedItems, projectId],
   );
 
-  const copyPath = useCallback((path: string) => {
-    navigator.clipboard.writeText(path).catch(() => {});
+  const copyPath = useCallback(async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopiedPath(path);
+    } catch {
+      setCopiedPath(null);
+    }
+  }, []);
+
+  const revealFile = useCallback(async (path: string) => {
+    setExportError(null);
+    try {
+      await revealExportFile(path);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : String(err));
+    }
   }, []);
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Export</h1>
-          <p>
-            {timelineItems.length} item{timelineItems.length === 1 ? '' : 's'} in the Timeline ·{' '}
-            {effectiveDuration.toFixed(1)}s total.
-          </p>
-        </div>
-      </div>
-      <div className="page-body">
+    <div className="page export-page">
+      <WorkflowHeader
+        title="Export"
+        step="Step 04 / 04"
+        description={`${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} in the Timeline · ${formatDuration(effectiveDuration)} total. Media paths stay relative to the project folder.`}
+        actions={Object.values(exportResults).some(Boolean) ? (
+          <button
+            type="button"
+            className="btn subtle export-reveal-header"
+            onClick={() => {
+              const result = exportResults[selectedFormat];
+              if (result) void revealFile(result.file_path);
+            }}
+            disabled={!exportResults[selectedFormat]}
+          >
+            Reveal in Finder
+          </button>
+        ) : undefined}
+      />
+
+      <div className="page-body export-page-body">
         {timelineItems.length === 0 ? (
           <EmptyState
             icon={
@@ -92,133 +224,144 @@ export function ExportPage() {
             actionTo="/review"
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {EXPORT_FORMATS.map((format) => (
+          <div className="export-workspace" data-testid="export-workspace">
+            <main className="export-main-column">
+              <section className="export-format-section" aria-labelledby="export-format-heading" data-testid="export-format-section">
+                <span id="export-format-heading" className="section-kicker">Choose a format</span>
+                <div className="export-format-cards" role="group" aria-label="Export format" data-testid="export-format-cards">
+                  {EXPORT_FORMATS.map((format) => {
+                    const selected = selectedFormat === format.id;
+                    return (
+                      <button
+                        type="button"
+                        key={format.id}
+                        className={`export-format-card${selected ? ' selected' : ''}`}
+                        data-testid={`export-format-card-${format.id}`}
+                        data-format={format.id}
+                        aria-pressed={selected}
+                        onClick={() => setSelectedFormat(format.id)}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+                          event.preventDefault();
+                          const index = EXPORT_FORMATS.findIndex((item) => item.id === format.id);
+                          const delta = event.key === 'ArrowRight' ? 1 : -1;
+                          const next = EXPORT_FORMATS[(index + delta + EXPORT_FORMATS.length) % EXPORT_FORMATS.length];
+                          setSelectedFormat(next.id);
+                          requestAnimationFrame(() => {
+                            document.querySelector<HTMLButtonElement>(
+                              `[data-testid="export-format-card-${next.id}"]`,
+                            )?.focus();
+                          });
+                        }}
+                      >
+                        <span className="export-format-kicker">{format.kicker}</span>
+                        <strong>{format.name}</strong>
+                        <span className="export-format-note">{format.note}</span>
+                        <span className="export-format-extension">{format.extension}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedFormat === 'edl' && edlHasLossyChanges && (
+                  <StatusSurface tone="warning" className="export-format-warning" data-testid="export-format-warning">
+                    <strong>EDL flattens Speed and Transform</strong>
+                    <span>Reapply retimes and digital moves in your NLE after handoff.</span>
+                  </StatusSurface>
+                )}
                 <button
-                  key={format.id}
                   type="button"
-                  className="btn primary"
-                  onClick={() => handleExport(format.id)}
+                  className="btn primary export-selected-action"
+                  data-testid="export-selected"
+                  onClick={() => void handleExport(selectedFormat)}
                   disabled={exporting !== null}
                 >
-                  {exporting === format.id ? 'Exporting…' : format.button}
+                  {exporting === selectedFormat ? 'Exporting…' : selectedFormatConfig.actionLabel}
                 </button>
-              ))}
-            </div>
+              </section>
 
-            {exportError && (
-              <p style={{ color: 'var(--text-error)', fontSize: 13 }}>{exportError}</p>
-            )}
+              {exportError && <p className="export-error" role="alert">{exportError}</p>}
 
-            {EXPORT_FORMATS.map((format) => {
-              const result = exportResults[format.id];
-              if (!result) return null;
-              return (
-              <div
-                key={format.id}
-                data-testid={`export-result-${format.id}`}
-                style={{
-                  background: 'var(--bg-1)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  padding: '8px 12px',
-                  fontSize: 12,
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{format.label}</div>
-                <div style={{ marginBottom: 4 }}>
-                  {result.clip_count} item{result.clip_count === 1 ? '' : 's'} ·{' '}
-                  {result.effective_duration_sec.toFixed(1)}s effective · backend{' '}
-                  {result.total_duration_sec.toFixed(1)}s ·{' '}
-                  {result.status}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <code style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {result.file_path}
-                  </code>
-                  <button
-                    type="button"
-                    className="btn subtle"
-                    onClick={() => copyPath(result.file_path)}
-                  >
-                    Copy
-                  </button>
-                  {format.id === 'resolve_xml' && (
-                    <button
-                      type="button"
-                      className="btn primary"
-                      onClick={async () => {
-                        setExportError(null);
-                        try {
-                          const opened = await openInDaVinci(result.file_path, projectFolder ?? undefined);
-                          if (!opened) {
-                            setExportError('Open the exported XML in DaVinci Resolve to import the draft.');
-                          }
-                        } catch (err) {
-                          setExportError(err instanceof Error ? err.message : String(err));
-                        }
-                      }}
-                    >
-                      Open in DaVinci Resolve
-                    </button>
-                  )}
-                </div>
-                {result.warnings.length > 0 && (
-                  <div
-                    role="status"
-                    data-testid={`export-warning-${format.id}`}
-                    style={{
-                      marginTop: 8,
-                      color: 'var(--text-warning)',
-                    }}
-                  >
-                    {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+              {EXPORT_FORMATS.map((format) => {
+                const result = exportResults[format.id];
+                if (!result) return null;
+                return (
+                  <div key={format.id} data-testid={`export-result-${format.id}`}>
+                    <StatusSurface tone="success" className="export-receipt">
+                    <div className="export-receipt-heading">
+                      <div className="export-receipt-title">
+                        <span className="export-receipt-kicker">Exported</span>
+                        <strong>{format.name} exported</strong>
+                      </div>
+                      <span className="export-receipt-meta">
+                        {result.clip_count} item{result.clip_count === 1 ? '' : 's'} ·{' '}
+                        {formatDuration(result.effective_duration_sec)} effective · just now
+                      </span>
+                    </div>
+                    <div className="export-receipt-path-row">
+                      <code className="export-receipt-path" title={result.file_path}>{result.file_path}</code>
+                      <button type="button" className="btn subtle" onClick={() => void copyPath(result.file_path)}>
+                        {copiedPath === result.file_path ? 'Copied' : 'Copy'}
+                      </button>
+                      <button type="button" className="btn subtle" onClick={() => void revealFile(result.file_path)}>
+                        Reveal
+                      </button>
+                      {format.id === 'resolve_xml' && (
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={async () => {
+                            setExportError(null);
+                            try {
+                              const opened = await openInDaVinci(result.file_path, projectFolder ?? undefined);
+                              if (!opened) {
+                                setExportError('Open the exported XML in DaVinci Resolve to import the draft.');
+                              }
+                            } catch (err) {
+                              setExportError(err instanceof Error ? err.message : String(err));
+                            }
+                          }}
+                      >
+                        Open in DaVinci Resolve
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
+                  <div className="export-receipt-detail">
+                    Backend report: {formatDuration(result.total_duration_sec)} · {result.status}
+                  </div>
+                  {result.warnings.length > 0 && (
+                    <div role="status" data-testid={`export-warning-${format.id}`} className="export-warning">
+                      {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                    </div>
+                  )}
+                  <details className="export-payload-details" data-testid={`export-payload-details-${format.id}`}>
+                    <summary>Review export payload</summary>
+                    <pre data-testid="export-payload">{JSON.stringify(result.payload, null, 2)}</pre>
+                  </details>
+                  </StatusSurface>
+                </div>
               );
             })}
+            </main>
 
-            <details style={{ fontSize: 12 }}>
-              <summary style={{ cursor: 'pointer', color: 'var(--text-muted)' }}>
-                Review export payload
-              </summary>
-              <pre
-                data-testid="export-payload"
-                style={{
-                  background: 'var(--bg-1)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  padding: 12,
-                  marginTop: 8,
-                  fontSize: 11,
-                  overflow: 'auto',
-                  maxHeight: 300,
-                }}
-              >
-                {JSON.stringify(
-                  {
-                    timeline: timelineItems.map((item, index) => {
-                      const clip = clipsById.get(item.source_clip_id);
-                      return {
-                        order: index + 1,
-                        item_id: item.item_id,
-                        source_clip_id: item.source_clip_id,
-                        file_id: clip?.file_id ?? null,
-                        file_name: clip?.file_name ?? item.source_clip_id,
-                        start_sec: item.start_sec,
-                        end_sec: item.end_sec,
-                        speed: item.speed,
-                        transform: item.transform,
-                      };
-                    }),
-                  },
-                  null,
-                  2,
-                )}
-              </pre>
-            </details>
+            <aside className="export-handoff-summary" aria-label="What you're handing off" data-testid="export-summary">
+              <span className="section-kicker">What you&apos;re handing off</span>
+              <div className="export-summary-stats">
+                <div><span>Timeline items</span><strong>{timelineItems.length}</strong></div>
+                <div><span>Effective runtime</span><strong>{formatDuration(effectiveDuration)}</strong></div>
+                <div><span>Source videos used</span><strong>{sourceFileCount}</strong></div>
+                <div><span>Speed ramps applied</span><strong>{speedRampCount}</strong></div>
+              </div>
+              <div className="export-summary-files">
+                <span className="section-kicker">Source files</span>
+                {handoffFiles.map(({ fileId, fileName, count }) => (
+                  <div className="export-summary-file" key={fileId}>
+                    <span className="export-summary-file-dot" aria-hidden="true" />
+                    <code title={fileName}>{fileName}</code>
+                    <span className="export-summary-file-count">{count}×</span>
+                  </div>
+                ))}
+              </div>
+            </aside>
           </div>
         )}
       </div>

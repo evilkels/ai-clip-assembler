@@ -17,6 +17,8 @@ Thanks for helping improve AI Clip Assembler. This project is an early local-fir
 3. Keep changes scoped to one problem.
 4. Do not commit private footage, generated media, credentials, `.env` files, or local project output.
 
+An approved plan may make a narrow exception for reviewed, deterministic visual-regression baselines required by that plan (for example, Playwright snapshots). Baselines must be reproducibly regenerable from repository sources and tooling, and reviewed as source changes. This exception does not permit runtime-generated media, private footage, credentials, `.env` files, or local project output.
+
 ## Development setup
 
 Follow [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md) for full setup.

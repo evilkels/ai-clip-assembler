@@ -48,7 +48,7 @@ test('analysis completes and review/timeline previews render playable videos', a
   });
 
   await page.goto('/#/review');
-  await page.getByTestId('source-clips-panel').locator('summary').click();
+  await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
   const reviewPreview = page.getByLabel(/Preview /).first();
   await expect(reviewPreview).toBeVisible();
   await expect

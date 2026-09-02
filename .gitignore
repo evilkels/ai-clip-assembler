@@ -198,3 +198,6 @@ frontend/skills/
 
 # Local implementation worktrees
 .worktrees/
+
+# Supplied design reference export (Claude Design). Read-only reference, never staged.
+AI CLIP ASSEMBLER Redesign APP + Landing page/

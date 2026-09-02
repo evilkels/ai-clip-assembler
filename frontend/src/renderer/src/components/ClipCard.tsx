@@ -8,6 +8,7 @@ import { SourceAudioBadge } from './SourceAudioBadge';
 import { sourceAudioState } from '../lib/sourceAudio';
 import { useReview } from '../state/ReviewContext';
 import { usePreviewAudio } from '../state/usePreviewAudio';
+import { reviewFileAccentStyle } from '../lib/reviewView';
 
 const EMPTY_RANGES: Range[] = [];
 const EMPTY_VERSION_LABELS: string[] = [];
@@ -34,16 +35,6 @@ interface Props {
   similarLooksExpanded?: boolean;
   onToggleSimilarLooks?: () => void;
   onToggleInclude: () => void;
-}
-
-/** Stable, evenly-spread colour per source file so cards from the same video
- *  share a recognisable accent. */
-function fileColor(fileId: string): string {
-  let hash = 0;
-  for (let i = 0; i < fileId.length; i += 1) {
-    hash = (hash * 31 + fileId.charCodeAt(i)) % 360;
-  }
-  return `hsl(${hash}, 70%, 62%)`;
 }
 
 function formatRange(start: number, end: number): string {
@@ -76,7 +67,7 @@ export function ClipCard({
 }: Props) {
   const cls = ['clip-card', decision === 'included' ? 'included' : decision === 'excluded' ? 'excluded' : ''].join(' ');
   const verdict = verdictFor(clip.scores.overall);
-  const accent = fileColor(clip.file_id);
+  const accentStyle = reviewFileAccentStyle(clip.file_id);
   const hasSiblings = (fileClipCount ?? 1) > 1;
   const videoRef = useRef<HTMLVideoElement>(null);
   const { uploadedVideos } = useReview();
@@ -133,7 +124,7 @@ export function ClipCard({
   };
 
   return (
-    <div className={cls}>
+    <div className={cls} style={accentStyle}>
       <div className="clip-thumb">
         <span className="clip-thumb-rank">#{rank}</span>
         {draftPosition !== undefined && (
@@ -188,17 +179,17 @@ export function ClipCard({
           endSec={clip.end_sec}
           playheadSec={playheadSec}
           siblings={siblingRanges}
-          accent={accent}
+          accent="var(--clip-accent)"
           onSeek={mediaUrl ? seekFromTrack : undefined}
         />
       )}
       <div className="clip-body">
         <div className="clip-source-row">
-          <span className="clip-file-dot" style={{ background: accent }} title="Source file" />
+          <span className="clip-file-dot" title="Source file" />
           <strong className="clip-source">{clip.file_name}</strong>
           <SourceAudioBadge hasAudio={sourceAudio.hasAudio} channels={sourceAudio.channels} />
           {hasSiblings && (
-            <span className="clip-file-group" style={{ borderColor: accent, color: accent }}>
+            <span className="clip-file-group">
               {fileClipIndex} of {fileClipCount} from this file
             </span>
           )}
@@ -233,14 +224,14 @@ export function ClipCard({
           )}
           <ScoreChip label="combined" value={clip.scores.overall} />
         </div>
-        <details className="clip-score-details">
-          <summary>Local technical scores</summary>
+        <div className="clip-score-details">
+          <span className="clip-score-details-label">Local technical scores</span>
           <div className="score-row">
             <ScoreChip label="sharp" value={clip.scores.sharpness} />
             <ScoreChip label="expose" value={clip.scores.exposure} />
             <ScoreChip label="contrast" value={clip.scores.contrast} />
           </div>
-        </details>
+        </div>
         <div className="clip-generation-why">{generationWhy(clip)}</div>
         {clip.reason && (
           <div className="clip-reason">

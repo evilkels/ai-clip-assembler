@@ -22,7 +22,7 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [014](done/014-extract-timeline-lifecycle-service.md) | Extract Timeline lifecycle service | DONE (2026-07-09) at `1c88a22` |
 | [015](done/015-record-core-architecture-decisions.md) | Record core architecture decisions as ADRs | DONE (2026-07-09) at `93b0d37` |
 | [016](016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | Steps 1–2 DONE; step 3 superseded by 018; step 4 TODO |
-| [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 DONE (2026-07-20); steps 2–6 TODO |
+| [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 DONE; item 5 DONE via studio redesign; items 1–4 TODO — item 2 (two smoothness controls) now worse, reconciled 2026-08-31 |
 | [018](done/018-diverse-clip-generation.md) | Diverse clip generation | DONE (2026-07-21) — code complete; model bundling split out to plan 025 |
 | [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — architecture debt after `ad62ed1` |
 | [020](done/020-authoritative-timeline-items.md) | Render and edit authoritative Timeline Items | DONE (2026-08-10) — first stacked branch |
@@ -43,7 +43,8 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | IN PROGRESS — Tasks 0, 1, 4 done; plan/spec reconciliation remains |
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
-| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — coding-agent and maintainer launch work separated |
+| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — launch/distribution backlog only; the 2026-08-31 landing-drift debt is now owned by the restyle plan below |
+| [landing-page-restyle](2026-09-01-landing-page-restyle.md) | IMPLEMENTED (2026-09-02) — literal review and fresh gate recorded in `docs/reviews/2026-09-01-literal-design-conformance.md`; packaged-app/NLE checks remain human-only |
 | [seo-plan](seo-plan.md) | IN PROGRESS — Search Console setup remains |
 | [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |
@@ -52,7 +53,8 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [settings-page](done/settings-page.md) | DONE (2026-07-03) |
 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
 | [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
-| [ui-polish-modern-shell](ui-polish-modern-shell.md) | BLOCKED on a decision — prescribes shadcn/Radix, none installed; shipped path is hand-authored tokens/CSS |
-| [react-doctor-triage](react-doctor-triage.md) | Partial; issues reduced 47→33, but all file/line citations are stale — re-run the tool first |
+| [studio-workflow-redesign](2026-08-14-studio-workflow-redesign.md) | IMPLEMENTED; literal app + landing conformance recorded 2026-09-02 in `docs/reviews/2026-09-01-literal-design-conformance.md`; open as PR #68; human packaged-app/NLE checks pending |
+| [ui-polish-modern-shell](ui-polish-modern-shell.md) | SUPERSEDED for workflow routes by the studio redesign (2026-08-31); only Cmd-K palette, score verification, and Settings/Diagnostics remain |
+| [react-doctor-triage](react-doctor-triage.md) | Partial; citations now doubly stale — the studio redesign rewrote 16 renderer components. Re-run the tool before using it |
 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |
 | [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE |

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const folderPath = '/Users/elvijs/Projects/' + 'x'.repeat(1_400);
+const folderPath = '/tmp/' + 'x'.repeat(1_400);
 const projectName = 'Long Footage';
 const videos = Array.from({ length: 7 }, (_, index) => ({
   file_id: `video-${index + 1}`,
@@ -80,7 +80,8 @@ async function openFolderProject(page: Page): Promise<void> {
   });
 
   await page.goto('/#/import');
-  await expect(page.getByText('7 source videos ready')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rescan Folder', exact: true })).toBeVisible();
+  await expect(page.locator('.drop-zone')).toHaveCount(0);
 }
 
 async function measureImportLayout(page: Page) {
@@ -196,6 +197,45 @@ test('projects stay alphabetized after opening a recent project', async ({ page 
   await expect(rows).toHaveText(beforeOpen);
 });
 
+test('the selected project receives the studio active treatment', async ({ page }) => {
+  await openFolderProject(page);
+  const row = page.locator('.project-row-wrap').filter({ hasText: projectName });
+  await expect(row).toHaveAttribute('data-selected', 'true');
+  await expect(row).toHaveClass(/project-row-active/);
+
+  const containment = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`Missing ${selector}`);
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    };
+    return {
+      sidebar: bounds('.sidebar'),
+      row: bounds('.project-row-wrap[data-selected="true"]'),
+      workspace: bounds('.app-workspace'),
+      main: bounds('.main'),
+      status: bounds('.statusbar'),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(containment.row.left).toBeGreaterThanOrEqual(containment.sidebar.left);
+  expect(containment.row.right).toBeLessThanOrEqual(containment.sidebar.right);
+  expect(containment.row.top).toBeGreaterThanOrEqual(containment.sidebar.top);
+  expect(containment.row.bottom).toBeLessThanOrEqual(containment.sidebar.bottom);
+  expect(containment.main.left).toBeGreaterThanOrEqual(containment.workspace.left);
+  expect(containment.main.right).toBeLessThanOrEqual(containment.workspace.right);
+  expect(containment.main.left).toBeGreaterThanOrEqual(containment.sidebar.right);
+  expect(containment.main.top).toBeGreaterThanOrEqual(containment.workspace.top);
+  expect(containment.main.bottom).toBeLessThanOrEqual(containment.workspace.bottom);
+  expect(containment.status.left).toBeGreaterThanOrEqual(0);
+  expect(containment.status.right).toBeLessThanOrEqual(containment.viewportWidth);
+  expect(containment.status.top).toBeGreaterThanOrEqual(0);
+  expect(containment.status.bottom).toBe(containment.viewportHeight);
+});
+
 test('project cards expose labelled actions and locate only for missing folders', async ({ page }) => {
   const seededProjects = [
     { folderPath: '/projects/visible', lastOpenedAt: '2026-08-11T10:00:00Z', name: 'Visible Project', missing: false },
@@ -227,6 +267,18 @@ test('project cards expose labelled actions and locate only for missing folders'
   await expect(visibleRow.getByRole('button', { name: 'Open Visible Project' })).toBeVisible();
   await expect(visibleRow.getByRole('button', { name: 'Rename Visible Project' })).toBeVisible();
   await expect(visibleRow.getByRole('button', { name: 'Remove Visible Project' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Diagnostics', exact: true })).toBeVisible();
+  const collapsed = await page.locator('.sidebar').evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(collapsed.width).toBeLessThanOrEqual(64);
+  expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth);
+  await expect(page.locator('.project-row-missing-note')).toHaveCSS('display', 'none');
 
   const buttonGeometry = await missingRow.getByRole('button').evaluateAll((buttons) =>
     buttons.map((button) => {

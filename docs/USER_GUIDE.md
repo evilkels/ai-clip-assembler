@@ -31,6 +31,14 @@ Four tabs, used left to right: **Import → Review → Timeline → Export**.
    detects scenes, builds candidates, and optionally adds Pi visual scoring.
 3. Continue when *“Analysis complete. Head to Review.”* appears.
 
+The Source videos browser has three views: **Table** for complete metadata and
+sorting, **Thumbs** for poster-style browsing, and **Compact** for a dense
+filename list. Search, filter by analysis state, choose visible columns, and
+select individual files or the whole batch without losing selection when the
+view is filtered. The analysis rail reports the active phase, current video,
+elapsed/remaining estimate, and Abort; analysis continues locally in the
+background.
+
 Analysis time scales with footage and harness; Pi makes a model call per clip.
 
 ### 2. Review
@@ -41,6 +49,11 @@ Candidates show metric chips and reasons. Adjust generation on Import; on
 Review, filter by smoothness, browse Look Groups, choose Short/Medium/Long,
 include/exclude clips, and reorder accepted clips. Excluded clips never enter
 AI proposals.
+
+Candidate Clips can be shown as **Grid** cards, a compact **List**, or a
+**Filmstrip**. All three views keep the same Include/Remove decisions and
+Timeline membership; List and Filmstrip use static poster surfaces so opening
+Review does not eagerly mount a video for every candidate.
 
 ### 3. Timeline
 
@@ -65,6 +78,10 @@ Reorder items, drag edges to trim, click to scrub, and zoom. Shortcuts:
 | `⌫` / `Delete` | Remove selected Timeline Item |
 | `+` / `−` | Zoom in / out |
 
+The studio Timeline has a selected-item Inspector alongside the track. Select
+an item to edit its source bounds, Speed, and Transform, split or remove it,
+and use the compact All items list to move between repeated placements.
+
 ### 4. Export
 
 ![Export screen](images/export.png)
@@ -80,6 +97,11 @@ duration, status, backend duration metadata, and warnings. EDL warns when Speed
 or Transform was flattened; FCPXML and Resolve XML carry those supported values.
 Existing-file exports ask for overwrite confirmation, and a Resolve XML result
 offers **Open in DaVinci Resolve**.
+
+Format cards make the handoff explicit. After export, the receipt preserves the
+export-time item count, effective runtime, backend report, warnings, generated
+path, and Copy/Reveal actions even if the Timeline changes afterward. EDL's
+speed/transform caveat remains visible in the handoff summary and receipt.
 
 ## Choosing an AI harness
 

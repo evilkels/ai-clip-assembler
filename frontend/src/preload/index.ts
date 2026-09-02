@@ -41,6 +41,8 @@ const bridge = {
   setWindowTitle: (projectName?: string) => ipcRenderer.invoke('window:set-title', projectName),
   openInDaVinci: (exportPath: string, sourceFolder?: string) =>
     ipcRenderer.invoke('davinci:open-handoff', exportPath, sourceFolder) as Promise<{ opened: boolean }>,
+  revealExportFile: (filePath: string) =>
+    ipcRenderer.invoke('export:reveal-file', filePath) as Promise<{ revealed: boolean }>,
   getReviewModelAccountStatus: () =>
     ipcRenderer.invoke('review-model-auth:status') as Promise<ReviewModelAccountStatus>,
   signInReviewModel: () =>

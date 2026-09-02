@@ -32,7 +32,7 @@ export function StatusBar() {
   }
 
   return (
-    <footer className="statusbar">
+    <footer className="statusbar" data-surface="status" data-tone={online ? 'success' : 'danger'}>
       <span title={online && version ? `Connected · v${version}` : undefined}>
         <span className={`status-dot ${online ? 'online' : 'offline'}`} />
         {statusText}

@@ -18,6 +18,28 @@ Record names, durations, codec, and expected behavior outside git.
 
 ## Acceptance checks
 
+### Studio workflow redesign browser gate
+
+The redesign's integrated browser acceptance uses the existing `/playwriter`
+QA route to create a real local upload project, upload a generated MP4 fixture,
+run the Manual Harness through FastAPI, then carry that project through
+**Import → Review → Timeline → Export**. It runs at **1440×900** and
+**1024×768**, switching the renderer between the approved dark and light
+themes at each workflow step.
+
+The gate verifies the three Import views (Table, Thumbs, Compact), the three
+Review views (Grid, List, Filmstrip), selected Timeline inspector state,
+successful EDL handoff receipt, accessible names/pressed states, keyboard
+focus-visible treatment, `L`/`K` transport and arrow-key scrubbing, and no
+horizontal overflow in each workflow page. This synthetic fixture proves the
+renderer/backend contract and layout containment; it does not prove editorial
+quality or an NLE import.
+
+```bash
+cd frontend
+npm run test:e2e -- studio-workflow-redesign.spec.ts
+```
+
 ### Project/import and scoring
 
 1. Start app; create a project; import H.264 MP4 and H.265 MOV.
@@ -95,13 +117,26 @@ cd ..
 backend/.venv/bin/python scripts/synthetic_e2e_qa.py
 ```
 
+For the redesign branch, run the complete frontend gate from `frontend/`:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test:main
+npm run test:backend
+npm run test:e2e
+npm run build
+```
+
 Also smoke a real drone MP4: Manual analysis produces a Candidate Clip and the
 Review Board renders it.
 
 The Plan 020 browser regression uses deterministic synthetic fixtures. It does
 not replace the real-footage, Final Cut Pro, or DaVinci Resolve checks below.
-The Plan 021 browser regression also uses synthetic fixtures and does not prove
-real-footage behavior or NLE import compatibility.
+The Plan 021 browser regression and the studio redesign browser gate use
+synthetic fixtures and do not prove real-footage behavior or NLE import
+compatibility. Human checks remain required for macOS/Electron presentation,
+real drone footage, Final Cut Pro, and DaVinci Resolve import.
 
 ## Risks
 

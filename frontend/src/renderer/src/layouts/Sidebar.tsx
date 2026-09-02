@@ -7,6 +7,10 @@ import { recentProjectDisplayName, sortRecentProjects } from '../lib/projectSort
 import { useReview } from '../state/ReviewContext';
 import { SettingsModal, type SettingsTab } from '../components/SettingsModal';
 
+// Keep the mark in Vite's asset graph so the development renderer and the
+// packaged Electron renderer resolve the same branded asset.
+const logoUrl = new URL('../../../../../assets/logo.png', import.meta.url).href;
+
 const ImportIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 3v12" />
@@ -70,7 +74,7 @@ const steps: WorkflowStep[] = [
   { to: '/export', label: 'Export', hint: 'Save your video', icon: ExportIcon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const {
     projectFolder,
     recentProjects,
@@ -81,6 +85,7 @@ export function Sidebar() {
     renameRecent,
     relocateRecent,
     uploadedVideos,
+    clips,
     acceptedCount,
     timelineItems,
   } = useReview();
@@ -129,14 +134,14 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sidebar" aria-label="Project sidebar">
+    <aside className={`sidebar${collapsed ? ' sidebar-collapsed' : ''}`} aria-label="Project sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
       <div className="sidebar-brand" aria-label="AI Clip Assembler">
-        <img src="./build/logo.png" alt="" className="sidebar-brand-logo" width="32" height="32" />
+        <img src={logoUrl} alt="" className="sidebar-brand-logo" width="32" height="32" />
         <span className="sidebar-brand-name">AI Clip Assembler</span>
       </div>
-      <button className="sidebar-new-project" type="button" onClick={openFolder} disabled={loading}>
+      <button className="sidebar-new-project" type="button" aria-label="Open Folder" onClick={openFolder} disabled={loading}>
         <span aria-hidden="true">+</span>
-        Open Folder
+        <span className="sidebar-action-label">Open Folder</span>
       </button>
 
       <div className="sidebar-section">
@@ -150,7 +155,8 @@ export function Sidebar() {
             const displayName = recentProjectDisplayName(project);
             return (
               <div
-                className={`project-row-wrap${active ? ' active' : ''}${project.missing ? ' missing' : ''}`}
+                className={`project-row-wrap${active ? ' active project-row-active' : ''}${project.missing ? ' missing' : ''}`}
+                data-selected={active ? 'true' : undefined}
                 key={project.folderPath}
               >
                 {editingFolderPath === project.folderPath ? (
@@ -175,7 +181,11 @@ export function Sidebar() {
                         setError(err instanceof Error ? err.message : String(err));
                       })}
                     >
+                      <span className="project-row-initial" aria-hidden="true">{displayName.charAt(0).toUpperCase()}</span>
                       <span className="project-row-name">{displayName}</span>
+                      {active ? <span className="project-row-count" aria-label={`${uploadedVideos.length} source videos`}>
+                        {uploadedVideos.length} sources
+                      </span> : null}
                     </button>
                     <div className="project-row-actions">
                       <button
@@ -207,16 +217,16 @@ export function Sidebar() {
                   </div>
                 )}
                 {project.missing && editingFolderPath !== project.folderPath && (
-                  <div className="project-row-missing-note">
-                    <span className="project-state-chip missing">missing</span>
-                    <button
+                    <div className="project-row-missing-note">
+                      <span className="project-state-chip missing">missing</span>
+                      <button
                       type="button"
                       className="project-row-locate"
                       aria-label={`Locate ${displayName}`}
                       onClick={() => relocateRecent(project.folderPath)}
-                    >
-                      Locate folder
-                    </button>
+                      >
+                      <span className="sidebar-action-label">Locate folder</span>
+                      </button>
                   </div>
                 )}
               </div>
@@ -225,7 +235,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="sidebar-section" aria-label="Workflow">
+      <nav className="sidebar-section workflow-rail" aria-label="Workflow">
         <div className="sidebar-section-label">Workflow</div>
         <ol className="workflow-steps">
           {steps.map((step, index) => {
@@ -233,6 +243,7 @@ export function Sidebar() {
             return (
               <li className="workflow-step" key={step.to}>
                 <NavLink
+                  aria-label={`${index + 1}. ${step.label}`}
                   className={({ isActive }) =>
                     `step-link${isActive ? ' active' : ''}${done ? ' done' : ''}`
                   }
@@ -248,6 +259,9 @@ export function Sidebar() {
                       {step.label}
                     </span>
                     <span className="step-hint">{step.hint}</span>
+                    <span className="step-count" aria-label={step.to === '/import' ? `${uploadedVideos.length} source videos` : step.to === '/review' ? `${clips.length} clips` : step.to === '/timeline' ? `${timelineItems.length} timeline items` : `${acceptedCount} clips`}>
+                      {step.to === '/import' ? uploadedVideos.length : step.to === '/review' ? clips.length : step.to === '/timeline' ? timelineItems.length : acceptedCount}
+                    </span>
                   </span>
                 </NavLink>
               </li>
@@ -258,15 +272,18 @@ export function Sidebar() {
 
       <div className="sidebar-footer">
         {!projectFolder && (
-          <button className="sidebar-action" type="button" onClick={() => createUploadProject()} disabled={loading}>
-            Upload files instead
+          <button className="sidebar-action" type="button" aria-label="Upload files instead" onClick={() => createUploadProject()} disabled={loading}>
+            <span className="sidebar-action-icon" aria-hidden="true">↑</span>
+            <span className="sidebar-action-label">Upload files instead</span>
           </button>
         )}
-        <button className="sidebar-action" type="button" onClick={() => setSettingsTab('settings')}>
-          Settings
+        <button className="sidebar-action" type="button" aria-label="Settings" onClick={() => setSettingsTab('settings')}>
+            <span className="sidebar-action-icon" aria-hidden="true">⚙</span>
+            <span className="sidebar-action-label">Settings</span>
         </button>
-        <button className="sidebar-action" type="button" onClick={() => setSettingsTab('diagnostics')}>
-          Diagnostics
+        <button className="sidebar-action" type="button" aria-label="Diagnostics" onClick={() => setSettingsTab('diagnostics')}>
+          <span className="sidebar-action-icon" aria-hidden="true">◇</span>
+          <span className="sidebar-action-label">Diagnostics</span>
         </button>
         {error && <div className="sidebar-error">{error}</div>}
       </div>

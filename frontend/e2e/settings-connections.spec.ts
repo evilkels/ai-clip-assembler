@@ -27,7 +27,7 @@ async function installDesktopBridge(
       {
         id: 'claude_desktop' as const,
         name: 'Claude Desktop',
-        configPath: '/Users/editor/Library/Application Support/Claude/claude_desktop_config.json',
+        configPath: '/tmp/claude/claude_desktop_config.json',
         installed: true,
         connected: false,
         needsRestart: false,
@@ -35,7 +35,7 @@ async function installDesktopBridge(
       {
         id: 'codex' as const,
         name: 'Codex',
-        configPath: '/Users/editor/.codex/config.toml',
+        configPath: '/tmp/codex/config.toml',
         installed: true,
         connected: true,
         needsRestart: true,

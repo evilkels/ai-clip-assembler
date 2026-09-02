@@ -25,6 +25,7 @@ import {
 } from './piExecutable';
 import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
 import { normalizeRecentProjectName } from './projectRecents';
+import { handleRevealExportFile } from './exportHandoff';
 import { installSingleInstanceGuard } from './singleInstance';
 import {
   createUpdateChecker,
@@ -233,6 +234,13 @@ function registerIpcHandlers(
     }
     if (sourceFolder) shell.showItemInFolder(sourceFolder);
     return { opened: true };
+  });
+
+  ipcMain.handle('export:reveal-file', async (event, filePath: unknown) => {
+    return handleRevealExportFile(event, filePath, {
+      assertSender: assertApplicationSender,
+      showItemInFolder: (path) => shell.showItemInFolder(path),
+    });
   });
 
   ipcMain.handle('mcp:detect-clients', async () => {

@@ -1,5 +1,13 @@
 # Technical SEO Foundation Implementation Plan
 
+> **CLOSED (2026-09-02).** Tasks 1-4 shipped and are enforced by the site
+> contract test. The one remaining item — maintainer-owned Search Console
+> verification and the query baseline — moved to
+> [`landing-page-polish-and-launch.md`](../landing-page-polish-and-launch.md).
+> Kept for the decision record: why no `meta keywords`, no FAQ schema, no
+> fabricated ratings, no `robots.txt`, and why the privacy and EDL claims were
+> reworded.
+
 **Status:** IN PROGRESS — Tasks 1-4 implemented on branch `seo` (2026-07-15). Task 5 (Google Search Console verification) is maintainer-owned and remains outstanding; shared-preview visual QA is also outstanding.
 
 **Goal:** Correct the landing page's public claims and add durable search, social-sharing, crawl-discovery, and verification foundations before investing in a larger content program.

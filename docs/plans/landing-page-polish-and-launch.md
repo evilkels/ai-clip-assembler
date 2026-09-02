@@ -55,7 +55,7 @@ from the one users download. Verified specifics:
   self-hosted WOFF2 (the Google Fonts CDN goes away entirely), and the four
   workflow screenshots are re-captured from the redesigned app rather than
   deferred. Execution now lives in
-  [2026-09-01-landing-page-restyle.md](2026-09-01-landing-page-restyle.md);
+  [2026-09-01-landing-page-restyle.md](done/2026-09-01-landing-page-restyle.md);
   this file keeps only the launch/distribution backlog.
 
   One correction to the note above: the design export keeps the *existing*
@@ -72,7 +72,7 @@ stale only once. Order: restyle `site/` against the app tokens → re-capture th
 four workflow shots and the social card from the branch build → fix alt text →
 responsive and contrast pass. Screenshot capture stays **maintainer-owned** (it
 needs real footage in a running build); everything else is agent-executable.
-See [2026-09-01-landing-page-restyle.md](2026-09-01-landing-page-restyle.md).
+See [2026-09-01-landing-page-restyle.md](done/2026-09-01-landing-page-restyle.md).
 
 
 
@@ -113,3 +113,26 @@ Console → one gated culling guide → one audience launch loop → measurement
 Five target users can download the current build, create an editable export
 from their footage, and explain its value without live support. Expand content
 only after the first 28-day review or meaningful impression sample.
+
+## Absorbed from the technical SEO plan (2026-09-02)
+
+Technical SEO shipped: the site contract harness, truthful metadata and
+structured data, the sitemap, corrected privacy and export copy, and the
+PR-time `test-site.yml` gate are all in place and enforced by
+`scripts/tests/test_site_contract.py` (7/7 green). The full rationale and the
+decisions taken — no `meta keywords`, no FAQ schema, no fabricated ratings, no
+`site/robots.txt` on a Project Pages subpath — are preserved in
+[`done/seo-plan.md`](done/seo-plan.md).
+
+One item remains, and it is maintainer-owned because it needs an authenticated
+Google account:
+
+- Verify the Search Console property, submit the sitemap, run the Rich Results
+  Test and URL Inspection, and capture a 28-day query baseline. Supply a real
+  verification file; do not commit a placeholder or guessed filename.
+- The 28-day measurement follow-up wants a dated GitHub issue ("Review landing
+  SEO after 28 days"). Creating it is an external-state change and needs
+  explicit authorization.
+
+`seo-content-pilot.md` stays a separate plan: it is gated on query evidence
+from this baseline plus human editorial input.

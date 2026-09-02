@@ -1,5 +1,11 @@
 # Plan 016: Fix edit creation — no duplicate clips, no unusable slivers, agent-influenced selection
 
+> **CLOSED (2026-09-02).** Steps 1-2 shipped and step 3 was superseded by plan
+> 018. The remaining step 4 (agent-influenced selection) moved to
+> [`027-authoritative-candidate-library-and-diverse-edits.md`](../027-authoritative-candidate-library-and-diverse-edits.md),
+> which owns the diversity policy any clip swap must obey. Kept for the
+> de-overlap history and the accepted tradeoffs recorded below.
+
 ## Status
 
 STEPS 1–2 DONE; STEP 3 SUPERSEDED by plan 018; STEP 4 TODO. Priority P1

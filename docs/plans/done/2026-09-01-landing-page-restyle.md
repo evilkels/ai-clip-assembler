@@ -19,7 +19,7 @@
 Intended to land inside PR #68 alongside the studio workflow redesign, so the app
 and the page that advertises it ship together. The final side-by-side review,
 fresh repository gate, and remaining human checks are recorded in
-[`docs/reviews/2026-09-01-literal-design-conformance.md`](../reviews/2026-09-01-literal-design-conformance.md).
+[`docs/reviews/2026-09-01-literal-design-conformance.md`](../../reviews/2026-09-01-literal-design-conformance.md).
 
 **Already done before implementation starts:**
 

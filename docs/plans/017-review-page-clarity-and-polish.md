@@ -47,12 +47,16 @@ confusing smoothness controls, and excluded clips still entering AI proposals.
    This avoids the documented N×metadata-stream jank around 24 clips.
 2. **One smoothness model:** remove the view-only filter or label it so clearly
    that it cannot be confused with the generation threshold.
-3. **Included means preferred:** pass included IDs into review generation and
-   bias deterministic versions and the prompt; excluded remains a hard veto.
-4. **Onboarding:** one dismissible, project-persisted explainer for Suggested
-   cuts, Candidate Clips, and Working Timeline using ubiquitous language.
-5. **Design-system adoption:** after the behavioral work, migrate the Review
-   shell using the separate modern-shell plan.
+Items 3 (included-means-preferred) and 4 (onboarding explainer) moved to
+[`027-authoritative-candidate-library-and-diverse-edits.md`](027-authoritative-candidate-library-and-diverse-edits.md)
+on 2026-09-02, since both depend on All Clips being the stated Candidate Clip
+authority. Item 5 (design-system adoption) is DONE — delivered by the studio
+redesign (`6d79c1b`), not by the retired modern-shell plan.
+
+What remains here is presentation-only. Verified still outstanding on
+2026-09-02: grid cards still mount `<video>` directly (`ClipCard.tsx:138-160`),
+and both smoothness controls are still present (`Review.tsx:137-155` and
+`SourceClipsPanel.tsx:250-260`).
 
 ## Verification and constraints
 

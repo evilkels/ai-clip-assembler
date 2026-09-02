@@ -1,5 +1,16 @@
 # Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
 
+Status: TODO · Priority P1 · Category correctness + clarity · Planned 2026-08-31
+Absorbed plan 016 step 4 and plan 017 items 3-4 on 2026-09-02.
+
+**Citation warning (2026-09-02):** the UI file:line references in the task
+bodies below predate the studio redesign (`6d79c1b`) and no longer locate the
+current code. The All Clips panel copy now lives around
+`SourceClipsPanel.tsx:219-282`. Re-derive every frontend coordinate before
+executing a task; the backend citations were re-verified and still hold
+(`review_agent.py:416-491,529-584` still accept repeated candidates, and no
+diversity module exists).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `subagent-driven-development` (recommended) or `executing-plans` to implement
 > this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -313,3 +324,37 @@ TypeScript, Playwright.
 - [ ] No Candidate Clip generation behavior or Working Timeline authority
   changes in this plan.
 - [ ] Full backend and frontend verification gates pass.
+
+## Absorbed scope
+
+### From plan 016, step 4 — agent-influenced selection
+
+Let the in-app review agent influence *selection*, not only trims: give it the
+candidate pool plus overlap and scene metadata, add an operation to swap a
+selected clip for a better non-overlapping candidate, and mirror the
+deterministic invariants in the prompt guidance.
+
+This belongs here because plan 027 already defines the diversity policy such a
+swap must obey. Plan 016's steps 1-2 shipped (de-overlap at draft time, and
+one-best-window per smooth run via plan 018); step 3 was superseded by 018.
+
+**Carried constraints from 016:** overlap means any intersection on the same
+`file_id`; deliberate overlap should become a knob rather than removing the
+guard. Any further de-overlap work must use cached frame scores only, never
+re-run ffmpeg, and must not change a `clip_id` (uuid5 of file plus range)
+where the top window is unchanged — that would break decision and version
+provenance (plan 009). Under-filling the duration budget (49s of a 50s target)
+is preferred over emitting a 1s stub.
+
+### From plan 017, items 3-4 — authority and onboarding
+
+- **Included means preferred:** pass included clip IDs into review generation
+  and bias both the deterministic Versions and the prompt; exclusion stays a
+  hard veto.
+- **Onboarding:** one dismissible, project-persisted explainer covering
+  Suggested cuts, Candidate Clips and the Working Timeline, using the
+  ubiquitous language from the domain model.
+
+These moved here because both depend on All Clips being the stated Candidate
+Clip authority, which is this plan's core goal. Plan 017 keeps its
+presentation-only remainder (poster-first cards, one smoothness model).

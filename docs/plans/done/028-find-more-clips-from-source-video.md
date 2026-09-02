@@ -1,5 +1,13 @@
 # Find More Clips From A Source Video Implementation Plan
 
+> **CLOSED AS SUPERSEDED (2026-09-02).** Absorbed into
+> [`019-clip-library-generation-and-expansion.md`](../019-clip-library-generation-and-expansion.md)
+> as Phase 2, because this work depends on plan 019's `generate_clip_library`
+> seam and pursuing it separately would create a second generation path.
+> **This file remains the authoritative step-level specification for that
+> phase** — it is filed here because it is closed as a standalone plan, not
+> because it is implemented. None of the work below has been done.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `subagent-driven-development` (recommended) or `executing-plans` to implement
 > this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

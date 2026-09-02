@@ -14,10 +14,12 @@
 - `docs/design/2026-09-01-landing-page-reference.html` — the rendered reference; Reference A dark, Reference B light, fixed 1440px, all styles inline. Read as a spec, never copy as source.
 - `AI CLIP ASSEMBLER Redesign APP + Landing page/Clip Assembler Restyle.dc.html` — the wider app design system (gitignored, read-only, never stage).
 
-## Status — COMPLETE, 2026-09-01
+## Status — IMPLEMENTED; literal conformance recorded 2026-09-02
 
 Intended to land inside PR #68 alongside the studio workflow redesign, so the app
-and the page that advertises it ship together.
+and the page that advertises it ship together. The final side-by-side review,
+fresh repository gate, and remaining human checks are recorded in
+[`docs/reviews/2026-09-01-literal-design-conformance.md`](../reviews/2026-09-01-literal-design-conformance.md).
 
 **Already done before implementation starts:**
 
@@ -366,11 +368,11 @@ visible.
 
 ### Completion evidence
 
-- `site/img/review-dark.webp` and `site/img/review-light.webp` are the sanitized 2656×2080
+- `site/img/review-dark.webp` and `site/img/review-light.webp` are the sanitized 2880×2080
   WebP captures used by the page and JSON-LD metadata.
 - The entrance stagger is intentionally skipped because a CSS-only animation would add
   no value and could leave content invisible when animation is disabled or unavailable.
-- `python3 scripts/tests/test_site_contract.py -v` passes all 6 tests; `git diff --check`
+- `python3 -m unittest scripts.tests.test_site_contract` passes all 6 tests; `git diff --check`
   passes; and the forbidden-network grep for Google Fonts, preconnect, and `@import`
   returns no output. `site/sitemap.xml` remains unchanged.
 

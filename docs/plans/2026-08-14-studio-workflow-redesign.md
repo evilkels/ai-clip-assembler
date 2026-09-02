@@ -8,12 +8,17 @@
 
 **Tech Stack:** Electron, React 19, TypeScript, Vite, CSS custom properties, Playwright.
 
-## Status — 2026-08-14, reviewed and amended 2026-08-31
+## Status — superseded by literal-conformance record (2026-09-02)
 
-**Overall:** Implementation complete on `redesign/studio-workflows`. A two-axis
-review on 2026-08-31 (Standards + Spec, Codex Luna/high, `main...HEAD`) found and
-fixed one correctness defect and three conformance gaps. Human Electron/NLE
-checks remain explicitly pending and are NOT covered by any automated evidence.
+**Workflow result:** The shared shell and four workflow implementations are
+complete on `redesign/studio-workflows`, including the 2026-08-31 two-axis
+review remediation and the 2026-09-01 Copilot review fixes. The app and landing
+page were subsequently brought to literal design conformance under
+[`2026-09-01-literal-design-conformance.md`](2026-09-01-literal-design-conformance.md);
+that plan and its review record are the release evidence for this branch. This
+document remains the implementation history and its earlier automated-gate
+claims must not be read as proof of literal conformance. Human packaged-app and
+real-NLE checks remain explicitly pending and are not covered by automation.
 
 - [x] Task 1 — Shared studio system and shell (`9061a42..a8a4d7a`); reviewed clean for Critical/Important findings.
 - [x] Task 2 — Import workflow (`468c0c7..0d56228`); reviewed clean for Critical/Important findings.
@@ -21,7 +26,7 @@ checks remain explicitly pending and are NOT covered by any automated evidence.
 - [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
 - [x] Task 5 — Timeline redesign (`6dcd6a8..d8c45a9`); independent re-review clean.
 - [x] Task 6 — Export redesign (`07f15a6`); independent re-review clean.
-- [x] Task 7 — Integrated QA and documentation; automated gate complete.
+- [x] Task 7 — Integrated QA baseline; final conformance gate is recorded by the literal-conformance plan.
 - [x] Task 8 — Two-axis review remediation (2026-08-31), below.
 
 ### Task 8 — review remediation (2026-08-31)
@@ -124,20 +129,19 @@ green on the amended tree (65, not 64 — this round added one test).
 - Untested edges: duplicate source file names, in-flight edits during export,
   and repeated exports across formats.
 
-### Out of scope, still true
+### Original scope boundary
 
-Landing and Settings redesigns were excluded by the Global Constraints below.
-`SettingsModal`, `SettingsTabPanel`, and `DiagnosticsTabPanel` are untouched, and
-`site/` is untouched — see `landing-page-polish-and-launch.md` for the landing
-consequence, which this branch makes worse by restyling the app the landing
-screenshots depict.
+The original workflow redesign excluded landing and Settings. The landing was
+later completed by the literal-conformance plan and now uses corrected Review
+captures. `SettingsModal`, `SettingsTabPanel`, and `DiagnosticsTabPanel` remain
+untouched and outside this branch's redesign scope.
 
 ## Global Constraints
 
 - Implement on the single branch `redesign/studio-workflows`.
 - Design source of truth: Claude Design project `e135e2f6-0c3f-444a-84e0-d269f4b59f4a`, file `Clip Assembler Restyle.dc.html`, reviewed 2026-08-14.
 - Local HTML reference: `AI CLIP ASSEMBLER Redesign APP + Landing page/Clip Assembler Restyle.dc.html`; use its workflow sections as the exact visual reference and do not stage or modify the supplied export.
-- Scope is the shared design system, shell, and Import/Review/Timeline/Export workflow pages. Landing and Settings redesigns are excluded.
+- Scope was the shared design system, shell, and Import/Review/Timeline/Export workflow pages. Landing was subsequently delivered by the literal-conformance plan; Settings remains excluded.
 - Preserve the Manual Harness as the local default and existing explicit per-project consent for provider-backed analysis.
 - Preserve the backend Timeline Document as the only export authority; all Timeline operations continue to address `item_id`.
 - Preserve existing chat, VersionSet staleness, proposal, and `replace_timeline` behavior.

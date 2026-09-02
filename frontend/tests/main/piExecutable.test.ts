@@ -67,14 +67,18 @@ test('probes the interactive login shell first so rc-file PATH edits are visible
 test('offers nvm bin directories newest-first among the fallback candidates', async () => {
   const candidates = await piExecutableCandidates('/Users/x', async (path: string) => {
     assert.equal(path, '/Users/x/.nvm/versions/node');
-    return ['v20.11.0', 'v24.15.0', 'v22.1.0'];
+    // v9 is deliberate: a lexicographic sort puts it first and passes a
+    // two-digit-only fixture, so the fixture has to contain a single-digit
+    // major for this test to discriminate at all.
+    return ['v20.11.0', 'v24.15.0', 'v9.0.0', 'v22.1.0'];
   });
 
   assert.ok(candidates.includes('/opt/homebrew/bin/pi'));
-  assert.deepEqual(candidates.slice(-3), [
+  assert.deepEqual(candidates.slice(-4), [
     '/Users/x/.nvm/versions/node/v24.15.0/bin/pi',
     '/Users/x/.nvm/versions/node/v22.1.0/bin/pi',
     '/Users/x/.nvm/versions/node/v20.11.0/bin/pi',
+    '/Users/x/.nvm/versions/node/v9.0.0/bin/pi',
   ]);
 });
 

@@ -82,8 +82,11 @@ export function DiagnosticsTabPanel() {
           <div className="diagnostics-guidance">
             <h4 className="diagnostics-guidance-title">How to fix this</h4>
             <ol className="diagnostics-guidance-steps">
-              {guidance.map((step) => (
-                <li key={step}>{step}</li>
+              {/* Ordered remediation steps: position is the identity, and the
+                  backend may legitimately repeat a string, so the index is the
+                  stable key here rather than the text. */}
+              {guidance.map((step, index) => (
+                <li key={index}>{step}</li>
               ))}
             </ol>
             <p className="settings-hint">

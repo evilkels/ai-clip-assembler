@@ -61,7 +61,12 @@ export async function piExecutableCandidates(
   const nvmVersions = join(home, '.nvm', 'versions', 'node');
   try {
     const versions = await readDirectory(nvmVersions);
-    for (const version of [...versions].sort().reverse()) {
+    // Numeric-aware compare: a plain lexicographic sort puts v9 above v24,
+    // which is the opposite of "newest first".
+    const newestFirst = [...versions].sort((a, b) =>
+      b.localeCompare(a, undefined, { numeric: true }),
+    );
+    for (const version of newestFirst) {
       candidates.push(join(nvmVersions, version, 'bin', 'pi'));
     }
   } catch {

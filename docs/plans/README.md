@@ -22,7 +22,7 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [014](done/014-extract-timeline-lifecycle-service.md) | Extract Timeline lifecycle service | DONE (2026-07-09) at `1c88a22` |
 | [015](done/015-record-core-architecture-decisions.md) | Record core architecture decisions as ADRs | DONE (2026-07-09) at `93b0d37` |
 | [016](016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | Steps 1–2 DONE; step 3 superseded by 018; step 4 TODO |
-| [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 DONE; item 5 DONE via studio redesign; items 1–4 TODO — item 2 (two smoothness controls) now worse, reconciled 2026-08-31 |
+| [017](017-review-page-clarity-and-polish.md) | Review-page clarity & polish | Step 1 and item 5 DONE (item 5 via the studio redesign); items 1–4 TODO — item 2 (two smoothness controls) still present at `Review.tsx:137-155` + `SourceClipsPanel.tsx:250-260` |
 | [018](done/018-diverse-clip-generation.md) | Diverse clip generation | DONE (2026-07-21) — code complete; model bundling split out to plan 025 |
 | [019](019-deepen-clip-generation-module.md) | Deepen clip generation behind one typed interface | TODO — architecture debt after `ad62ed1` |
 | [020](done/020-authoritative-timeline-items.md) | Render and edit authoritative Timeline Items | DONE (2026-08-10) — first stacked branch |
@@ -35,6 +35,20 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [027](027-authoritative-candidate-library-and-diverse-edits.md) | Make All Clips authoritative and diversify chat Versions | TODO — independent quick correctness/clarity plan |
 | [028](028-find-more-clips-from-source-video.md) | Find more Candidate Clips from one Source Video | TODO — depends on plan 019, then 027 terminology |
 
+## Release QA (human-only, not covered by CI)
+
+Implementation-complete is not release-complete. These checks need a person and
+real hardware, and are outstanding for v0.2.0:
+
+- Install and launch the packaged DMG on a clean Mac, past Gatekeeper (builds
+  are unsigned), with the bundled backend starting unaided.
+- Import, Review and Timeline against real footage and real input hardware.
+- Open Resolve XML, FCPXML and EDL in their target NLEs and verify relinking,
+  order, timing, speed, transform, receipts and overwrite behaviour. No
+  automated test covers this.
+- A keyboard-only pass over every route. Note that Timeline trim is currently a
+  keyboard dead end — see [react-doctor-triage](react-doctor-triage.md).
+
 ## Product plans
 
 | Plan | Status |
@@ -44,17 +58,17 @@ Single home for written plans; completed plans move to [`done/`](done/). Numbere
 | [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — launch/distribution backlog only; the 2026-08-31 landing-drift debt is now owned by the restyle plan below |
-| [landing-page-restyle](2026-09-01-landing-page-restyle.md) | IMPLEMENTED (2026-09-02) — literal review and fresh gate recorded in `docs/reviews/2026-09-01-literal-design-conformance.md`; packaged-app/NLE checks remain human-only |
-| [seo-plan](seo-plan.md) | IN PROGRESS — Search Console setup remains |
+| [landing-page-restyle](done/2026-09-01-landing-page-restyle.md) | DONE (2026-09-02) — shipped with the redesign in `6d79c1b`, released as v0.2.0 |
+| [seo-plan](seo-plan.md) | IN PROGRESS — Search Console verification is the only remaining item |
 | [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |
 | [project-folder-model](project-folder-model.md) | Automated QA complete; manual app QA pending |
-| [project-sidebar](project-sidebar.md) | Partial; rename + row redesign shipped via plan 022; collapse/resize/context-menu/keyboard nav deferred |
+| [project-sidebar](project-sidebar.md) | Partial; rename + row redesign shipped via plan 022, collapse + persisted resize shipped in the redesign (`AppShell.tsx`, `usePanelWidth.ts`); context-menu and keyboard nav deferred |
 | [settings-page](done/settings-page.md) | DONE (2026-07-03) |
 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
 | [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
-| [studio-workflow-redesign](2026-08-14-studio-workflow-redesign.md) | IMPLEMENTED; literal app + landing conformance recorded 2026-09-02 in `docs/reviews/2026-09-01-literal-design-conformance.md`; open as PR #68; human packaged-app/NLE checks pending |
-| [ui-polish-modern-shell](ui-polish-modern-shell.md) | SUPERSEDED for workflow routes by the studio redesign (2026-08-31); only Cmd-K palette, score verification, and Settings/Diagnostics remain |
-| [react-doctor-triage](react-doctor-triage.md) | Partial; citations now doubly stale — the studio redesign rewrote 16 renderer components. Re-run the tool before using it |
+| [studio-workflow-redesign](done/2026-08-14-studio-workflow-redesign.md) | DONE (2026-09-02) — merged as `6d79c1b`, released as v0.2.0; human packaged-app/real-NLE QA still outstanding (see Release QA below) |
+| [ui-polish-modern-shell](ui-polish-modern-shell.md) | SUPERSEDED — its shadcn/Radix migration was overtaken by hand-authored CSS in the redesign; only Cmd-K palette, score verification, and Settings/Diagnostics remain, pending a follow-up plan |
+| [react-doctor-triage](react-doctor-triage.md) | Partial; re-triaged 2026-09-02 against v0.2.0 — 94 findings, most are false positives; 3 confirmed defects listed in the plan |
 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |
 | [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE |

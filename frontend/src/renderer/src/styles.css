@@ -4522,6 +4522,35 @@ a {
   color: var(--red);
 }
 
+.diagnostics-guidance {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.diagnostics-guidance-title {
+  margin: 0 0 8px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.diagnostics-guidance-steps {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  /* Commands are embedded in the prose, so keep long paths from overflowing. */
+  overflow-wrap: anywhere;
+}
+
 .review-model-account {
   display: grid;
   gap: 10px;

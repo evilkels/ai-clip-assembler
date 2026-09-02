@@ -10,6 +10,7 @@ import {
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   cleanupStaleBackend,
@@ -20,7 +21,9 @@ import {
 } from './backendLifecycle';
 import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
 import {
-  PI_BIN_RESOLUTION_MARKER,
+  firstExecutableCandidate,
+  piExecutableCandidates,
+  PI_SHELL_PROBE_ARGUMENTS,
   resolvePiExecutableFromShellOutput,
 } from './piExecutable';
 import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
@@ -304,20 +307,31 @@ function resolveOptionalAssetPath(filename: string): string | undefined {
   return existsSync(assetPath) ? assetPath : undefined;
 }
 
-async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
-  if (process.env.PI_BIN) return process.env.PI_BIN;
-  if (process.platform !== 'darwin') return undefined;
-
+function probeShellForPiBin(args: readonly string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
-    const command = `printf '\\n${PI_BIN_RESOLUTION_MARKER}%s\\n' "$(whence -p pi 2>/dev/null)"`;
-    execFile('/bin/zsh', ['-lc', command], { timeout: 5000 }, (error, stdout) => {
-      if (error) {
+    // An interactive rc file can exit non-zero after still printing the marker,
+    // so the output is parsed whenever there is any, error or not.
+    execFile('/bin/zsh', [...args], { timeout: 5000 }, (error, stdout) => {
+      if (error && !stdout) {
         resolve(undefined);
         return;
       }
       void resolvePiExecutableFromShellOutput(stdout).then(resolve);
     });
   });
+}
+
+async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
+  if (process.env.PI_BIN) return process.env.PI_BIN;
+  if (process.platform !== 'darwin') return undefined;
+
+  for (const args of PI_SHELL_PROBE_ARGUMENTS) {
+    const probed = await probeShellForPiBin(args);
+    if (probed) return probed;
+  }
+  // Shells that refuse to cooperate (custom $SHELL, rc file that hangs) still
+  // leave the executable on disk, so fall back to the usual install locations.
+  return firstExecutableCandidate(await piExecutableCandidates(homedir()));
 }
 
 function buildPackagedBackendPath(piBin: string | undefined): string {

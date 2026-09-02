@@ -20,6 +20,7 @@ export function DiagnosticsTabPanel() {
   }, [run]);
 
   const review = data?.review_model;
+  const guidance = review?.guidance ?? [];
 
   return (
     <div className="settings-panel">
@@ -75,6 +76,21 @@ export function DiagnosticsTabPanel() {
               </div>
             )}
           </dl>
+        )}
+
+        {review && !running && !review.reachable && guidance.length > 0 && (
+          <div className="diagnostics-guidance">
+            <h4 className="diagnostics-guidance-title">How to fix this</h4>
+            <ol className="diagnostics-guidance-steps">
+              {guidance.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <p className="settings-hint">
+              Run the check again after each step. Steps that set an environment variable
+              only take effect once AI Clip Assembler is quit and reopened.
+            </p>
+          </div>
         )}
       </section>
 

@@ -839,6 +839,8 @@ export interface ReviewModelDiagnostic {
   reachable: boolean;
   elapsed_sec: number | null;
   detail: string;
+  /** Ordered remediation steps; empty when the model is reachable. */
+  guidance?: string[];
 }
 
 export interface Diagnostics {

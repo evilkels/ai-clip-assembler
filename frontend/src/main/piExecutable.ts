@@ -1,8 +1,23 @@
 import { constants } from 'node:fs';
-import { access, stat } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { access, readdir, stat } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 
 export const PI_BIN_RESOLUTION_MARKER = '__AI_CLIP_ASSEMBLER_PI_BIN__=';
+
+// `whence -p` skips shell functions and aliases, so the marker only ever
+// carries a real executable path.
+export const PI_SHELL_PROBE_COMMAND =
+  `printf '\\n${PI_BIN_RESOLUTION_MARKER}%s\\n' "$(whence -p pi 2>/dev/null)"`;
+
+// Finder and Dock launches start the app with a minimal PATH, so we ask the
+// user's shell where `pi` lives. Version managers (nvm, volta, asdf) export
+// their PATH entry from ~/.zshrc, which a *non-interactive* login shell never
+// sources — so the interactive login probe comes first, with the plain login
+// shell kept as a retry for setups whose interactive rc files fail or hang.
+export const PI_SHELL_PROBE_ARGUMENTS: readonly (readonly string[])[] = [
+  ['-lic', PI_SHELL_PROBE_COMMAND],
+  ['-lc', PI_SHELL_PROBE_COMMAND],
+];
 
 async function validateExecutableFile(candidate: string): Promise<void> {
   const candidateStat = await stat(candidate);
@@ -27,4 +42,45 @@ export async function resolvePiExecutableFromShellOutput(
   } catch {
     return undefined;
   }
+}
+
+/** Well-known install locations to try when the shell probe comes back empty. */
+export async function piExecutableCandidates(
+  home: string,
+  readDirectory: (path: string) => Promise<string[]> = readdir,
+): Promise<string[]> {
+  const candidates = [
+    join(home, '.local', 'bin', 'pi'),
+    '/opt/homebrew/bin/pi',
+    '/usr/local/bin/pi',
+    join(home, '.bun', 'bin', 'pi'),
+    join(home, '.volta', 'bin', 'pi'),
+  ];
+  // nvm keeps one bin directory per installed Node version and puts none of
+  // them on a GUI app's PATH. Newest version first so a current install wins.
+  const nvmVersions = join(home, '.nvm', 'versions', 'node');
+  try {
+    const versions = await readDirectory(nvmVersions);
+    for (const version of [...versions].sort().reverse()) {
+      candidates.push(join(nvmVersions, version, 'bin', 'pi'));
+    }
+  } catch {
+    // No nvm installation — nothing to add.
+  }
+  return candidates;
+}
+
+export async function firstExecutableCandidate(
+  candidates: readonly string[],
+  validateExecutable: (candidate: string) => Promise<void> = validateExecutableFile,
+): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    try {
+      await validateExecutable(candidate);
+      return candidate;
+    } catch {
+      // Keep looking.
+    }
+  }
+  return undefined;
 }

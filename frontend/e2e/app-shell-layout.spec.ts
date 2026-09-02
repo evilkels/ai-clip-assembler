@@ -183,6 +183,13 @@ test('studio shell exposes counts, metadata, a real logo, and a collapsible rail
 
   await expect(page.locator('.workflow-footer')).toBeVisible();
   await expect(page.locator('.project-row-count, .step-count').first()).toBeVisible();
+  const shellDimensions = await page.evaluate(() => ({
+    sidebar: document.querySelector<HTMLElement>('.sidebar')?.getBoundingClientRect().width ?? 0,
+    header: document.querySelector<HTMLElement>('.project-header')?.getBoundingClientRect().height ?? 0,
+  }));
+  expect(shellDimensions.sidebar).toBeGreaterThanOrEqual(260);
+  expect(shellDimensions.sidebar).toBeLessThanOrEqual(268);
+  expect(shellDimensions.header).toBeGreaterThanOrEqual(60);
   await expect.poll(async () => page.locator('.sidebar-brand-logo').evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeVisible();
   await expect(page.locator('.step-link.active')).not.toHaveCSS('box-shadow', /inset 2px 0/);

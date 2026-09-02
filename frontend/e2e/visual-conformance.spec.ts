@@ -198,6 +198,71 @@ async function installFixtureBackend(page: Page, fixture: VisualFixture): Promis
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ clips }) });
       return;
     }
+    if (url.pathname === `/projects/${PROJECT_ID}/review/session`) {
+      const versionItems = (clipIds: string[]) => clipIds.map((clipId) => {
+        const clip = clips.find((candidate) => candidate.clip_id === clipId);
+        if (!clip) throw new Error(`Missing visual fixture clip: ${clipId}`);
+        const timelineItem = timelineItems.find((item) => item.source_clip_id === clipId);
+        return {
+          source_clip_id: clip.clip_id,
+          file_id: clip.file_id,
+          file_name: clip.file_name,
+          start_sec: timelineItem?.start_sec ?? clip.start_sec,
+          end_sec: timelineItem?.end_sec ?? clip.end_sec,
+          speed: timelineItem?.speed ?? clip.suggested_speed ?? 1,
+          // Keep visual fixture media inside its poster frame; Timeline's
+          // non-identity transform remains covered by its own preview test.
+          transform: { scale: 1, x: 0, y: 0 },
+        };
+      });
+      const versionSet = {
+        version_set_id: 'visual-version-set',
+        created_at: '2026-08-11T10:04:00Z',
+        based_on_timeline_revision: 4,
+        based_on_sequence_fingerprint: 'visual-sequence-fingerprint',
+        based_on_review_context_fingerprint: 'visual-review-fingerprint',
+        versions: [
+          {
+            version_id: 'visual-version-a',
+            title: 'Coastal Reveal',
+            vibe: 'Balanced',
+            rationale: 'A clean coast-to-cliffs arc with a warm close.',
+            profile: 'cinematic_highlight',
+            total_duration_sec: 13.2,
+            items: versionItems(['visual-clip-01', 'visual-clip-02', 'visual-clip-04']),
+            sequence_fingerprint: 'visual-sequence-fingerprint',
+          },
+          {
+            version_id: 'visual-version-b',
+            title: 'Sunset Pass',
+            vibe: 'Punchy',
+            rationale: 'A quicker, brighter pass that lands on the horizon.',
+            profile: 'short_social',
+            total_duration_sec: 9.2,
+            items: versionItems(['visual-clip-02', 'visual-clip-03', 'visual-clip-04']),
+            sequence_fingerprint: 'visual-sequence-alt',
+          },
+        ],
+      };
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          schema_version: 1,
+          session_id: 'visual-review-session',
+          updated_at: '2026-08-11T10:04:00Z',
+          messages: [{
+            message_id: 'visual-review-message',
+            role: 'agent',
+            text: 'I prepared two directions from the selected footage.',
+            created_at: '2026-08-11T10:04:00Z',
+            reply_to_message_id: null,
+            proposal: null,
+            payload: { version_set: versionSet },
+          }],
+        }),
+      });
+      return;
+    }
     if (url.pathname === '/harnesses') {
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ harnesses: [
         { id: 'manual', name: 'Manual / Rule-based', type: 'rule', enabled: true },
@@ -248,6 +313,42 @@ async function installFixtureBackend(page: Page, fixture: VisualFixture): Promis
   });
 }
 
+async function assertMediaMaskBounds(page: Page, fixture: VisualFixture): Promise<void> {
+  const selector = fixture.startsWith('review')
+    ? '.version-player video'
+    : fixture === 'timeline-selection'
+      ? '[data-testid="timeline-preview-video"]'
+      : null;
+  if (!selector) return;
+  const geometry = await page.evaluate((mediaSelector) => {
+    const header = document.querySelector('[data-surface="project-header"]')?.getBoundingClientRect();
+    const main = document.querySelector('.main')?.getBoundingClientRect();
+    return Array.from(document.querySelectorAll<HTMLVideoElement>(mediaSelector), (element) => {
+      const rect = element.getBoundingClientRect();
+      const preview = element.closest('.clip-preview, .timeline-preview')?.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+        top: rect.top,
+        bottom: rect.bottom,
+        headerBottom: header?.bottom ?? 0,
+        mainTop: main?.top ?? 0,
+        mainBottom: main?.bottom ?? innerHeight,
+        inMain: Boolean(element.closest('.main')),
+        previewTop: preview?.top ?? 0,
+        previewBottom: preview?.bottom ?? 0,
+      };
+    }).filter((rect) => rect.width > 0 && rect.height > 0);
+  }, selector);
+  expect(geometry.length, `Expected deterministic media for ${fixture}`).toBeGreaterThan(0);
+  for (const rect of geometry) {
+    expect(rect.inMain, `${fixture} media mask must be scoped to the workflow pane`).toBe(true);
+    expect(rect.top, `${fixture} media mask must begin below the app header`).toBeGreaterThanOrEqual(rect.headerBottom);
+    expect(rect.top, `${fixture} media mask must stay inside its preview`).toBeGreaterThanOrEqual(rect.previewTop);
+    expect(rect.bottom, `${fixture} media mask must stay inside its preview`).toBeLessThanOrEqual(rect.previewBottom);
+  }
+}
+
 async function seedFixture(page: Page, fixture: VisualFixture): Promise<void> {
   await installFixtureBackend(page, fixture);
   await page.goto(fixtureInHash(fixture));
@@ -284,7 +385,10 @@ async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string
   }
   if (fixture === 'timeline-selection') {
     await expect(page.getByTestId('timeline-items-table')).toBeVisible();
-    await page.getByTestId('timeline-clip').first().click();
+    // At narrow widths the pinned preview/transport intentionally stays over
+    // the scrolled track; dispatch selection directly so the visual state is
+    // deterministic without changing the editor's normal hit targets.
+    await page.getByTestId('timeline-clip').first().dispatchEvent('pointerdown');
     await expect(page.getByTestId('timeline-inspector')).toBeVisible();
     await expect(page.getByTestId('timeline-summary')).toContainText('3 items');
   }
@@ -294,6 +398,14 @@ async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string
     await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');
     await expect(page.getByTestId('export-result-edl')).toContainText('/tmp/ai-clip-assembler/');
   }
+  // Keep every visual fixture at its deterministic top-of-pane position after
+  // interactions that may scroll an independently scrolling workflow region.
+  await page.evaluate(() => {
+    document.querySelectorAll<HTMLElement>('.main, .review-main, .timeline-page-body').forEach((element) => {
+      element.scrollTop = 0;
+      element.scrollLeft = 0;
+    });
+  });
 }
 
 type FooterExpectation = {
@@ -378,11 +490,20 @@ test.describe('deterministic visual fixture setup', () => {
         await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
         await expect(page.getByTestId('ask-ai-rail')).toBeVisible();
         await expect(page.getByTestId('suggested-versions-zone')).toBeVisible();
+        await expect(page.getByTestId('version-gallery')).toBeVisible();
+        await expect(page.getByTestId('version-card')).toHaveCount(2);
         await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
         await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
       }
       if (fixture === 'timeline-selection') await expect(page.getByTestId('timeline-inspector')).toBeVisible();
-      if (fixture === 'export-receipt') await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');
+      if (fixture === 'export-receipt') {
+        await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');
+        await expect(page.getByTestId('export-workspace')).toBeVisible();
+        await expect(page.getByTestId('export-format-cards').getByRole('button')).toHaveCount(3);
+        await expect(page.getByTestId('export-summary')).toContainText('Source files');
+        await expect(page.getByTestId('export-format-warning')).toContainText(/EDL.*flatten/i);
+        await expect(page.getByTestId('export-payload-details-edl')).toBeVisible();
+      }
     });
   }
 });
@@ -441,11 +562,47 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 1024, height: 76
           await openFixtureRoute(page, fixture, path);
           await page.evaluate((nextTheme) => document.documentElement.setAttribute('data-theme', nextTheme), theme);
           await assertShellGeometry(page, fixture);
+          if (fixture === 'timeline-selection' && viewport.width === 1024) {
+            const preview = page.getByTestId('timeline-preview-stage');
+            const transport = page.locator('.timeline-toolbar .transport');
+            await expect(preview).toBeVisible();
+            await expect(transport).toBeVisible();
+            const regions = await page.evaluate(() => {
+              const bounds = (selector: string) => {
+                const element = document.querySelector<HTMLElement>(selector);
+                if (!element) throw new Error(`Missing ${selector}`);
+                const rect = element.getBoundingClientRect();
+                return { top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+              };
+              return {
+                header: bounds('[data-surface="project-header"]'),
+                preview: bounds('[data-testid="timeline-preview-stage"]'),
+                transport: bounds('.timeline-toolbar .transport'),
+              };
+            });
+            expect(regions.preview.width).toBeGreaterThan(0);
+            expect(regions.preview.height).toBeGreaterThan(0);
+            expect(regions.preview.top).toBeGreaterThanOrEqual(regions.header.bottom);
+            expect(regions.transport.width).toBeGreaterThan(0);
+            expect(regions.transport.height).toBeGreaterThan(0);
+            expect(regions.transport.top).toBeGreaterThanOrEqual(regions.preview.bottom);
+          }
+          await assertMediaMaskBounds(page, fixture);
           await expect(page).toHaveScreenshot(`${fixture}-${viewport.width}x${viewport.height}-${theme}.png`, {
             animations: 'disabled',
             caret: 'hide',
             scale: 'css',
-            mask: [page.locator('video'), page.locator('[data-testid="qa-clock"]')],
+            maskColor: theme === 'dark' ? '#12151a' : '#f1f2f4',
+            mask: [
+              page.locator(
+                fixture.startsWith('review')
+                  ? '.version-player video'
+                  : fixture === 'timeline-selection'
+                    ? '[data-testid="timeline-preview-video"]'
+                    : '[data-testid="visual-fixture-video-never-match"]',
+              ),
+              page.locator('[data-testid="qa-clock"]'),
+            ],
           });
         });
       }

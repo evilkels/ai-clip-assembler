@@ -8,6 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
+  type CSSProperties,
 } from 'react';
 import { useReview } from '../state/ReviewContext';
 import { EmptyState } from './EmptyState';
@@ -606,7 +607,10 @@ export function Timeline({
           className="timeline-preview"
           aria-label="Timeline video preview"
           data-testid="timeline-preview-stage"
-          style={{ height: previewHeight }}
+          style={{
+            height: previewHeight,
+            '--timeline-preview-height': `${previewHeight}px`,
+          } as CSSProperties}
         >
           <ClipPreview
             {...previewProps}

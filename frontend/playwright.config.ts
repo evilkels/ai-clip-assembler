@@ -14,6 +14,10 @@ export default defineConfig({
   expect: {
     timeout: 20_000,
   },
+  // Keep baselines portable across the macOS/Linux CI runners. The project
+  // name distinguishes browser projects while the platform is intentionally
+  // excluded from the path.
+  snapshotPathTemplate: '{testDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}',
   use: {
     baseURL: 'http://localhost:5173',
     locale: 'en-US',

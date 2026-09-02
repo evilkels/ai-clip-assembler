@@ -112,11 +112,25 @@ export function ExportPage() {
   const sourceFileCount = new Set(
     projectedItems.map((item) => clipsById.get(item.sourceClipId)?.file_id ?? item.sourceClipId),
   ).size;
-  const repeatedItemCount = Math.max(
-    0,
-    projectedItems.length - new Set(projectedItems.map((item) => item.sourceClipId)).size,
+  const speedRampCount = projectedItems.filter((item) => Math.abs(item.speed - 1) > Number.EPSILON).length;
+  const edlHasLossyChanges = projectedItems.some(
+    (item) =>
+      Math.abs(item.speed - 1) > Number.EPSILON ||
+      Math.abs(item.transform.scale - 1) > Number.EPSILON ||
+      Math.abs(item.transform.x) > Number.EPSILON ||
+      Math.abs(item.transform.y) > Number.EPSILON,
   );
   const selectedFormatConfig = EXPORT_FORMATS.find((format) => format.id === selectedFormat)!;
+  const handoffFiles = useMemo(() => {
+    const groups = new Map<string, { fileId: string; fileName: string; count: number }>();
+    for (const item of projectedItems) {
+      const fileId = clipsById.get(item.sourceClipId)?.file_id ?? item.sourceClipId;
+      const current = groups.get(fileId);
+      if (current) current.count += 1;
+      else groups.set(fileId, { fileId, fileName: item.fileName, count: 1 });
+    }
+    return Array.from(groups.values());
+  }, [clipsById, projectedItems]);
 
   const handleExport = useCallback(
     async (format: ExportFormat) => {
@@ -210,11 +224,11 @@ export function ExportPage() {
             actionTo="/review"
           />
         ) : (
-          <div className="export-workspace">
+          <div className="export-workspace" data-testid="export-workspace">
             <main className="export-main-column">
-              <section className="export-format-section" aria-labelledby="export-format-heading">
+              <section className="export-format-section" aria-labelledby="export-format-heading" data-testid="export-format-section">
                 <span id="export-format-heading" className="section-kicker">Choose a format</span>
-                <div className="export-format-cards" role="group" aria-label="Export format">
+                <div className="export-format-cards" role="group" aria-label="Export format" data-testid="export-format-cards">
                   {EXPORT_FORMATS.map((format) => {
                     const selected = selectedFormat === format.id;
                     return (
@@ -248,6 +262,12 @@ export function ExportPage() {
                     );
                   })}
                 </div>
+                {selectedFormat === 'edl' && edlHasLossyChanges && (
+                  <StatusSurface tone="warning" className="export-format-warning" data-testid="export-format-warning">
+                    <strong>EDL flattens Speed and Transform</strong>
+                    <span>Reapply retimes and digital moves in your NLE after handoff.</span>
+                  </StatusSurface>
+                )}
                 <button
                   type="button"
                   className="btn primary export-selected-action"
@@ -313,7 +333,7 @@ export function ExportPage() {
                       {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
                     </div>
                   )}
-                  <details className="export-payload-details">
+                  <details className="export-payload-details" data-testid={`export-payload-details-${format.id}`}>
                     <summary>Review export payload</summary>
                     <pre data-testid="export-payload">{JSON.stringify(result.payload, null, 2)}</pre>
                   </details>
@@ -323,28 +343,22 @@ export function ExportPage() {
             })}
             </main>
 
-            <aside className="export-handoff-summary" aria-label="What you're handing off">
+            <aside className="export-handoff-summary" aria-label="What you're handing off" data-testid="export-summary">
               <span className="section-kicker">What you&apos;re handing off</span>
               <div className="export-summary-stats">
                 <div><span>Timeline items</span><strong>{timelineItems.length}</strong></div>
                 <div><span>Effective runtime</span><strong>{formatDuration(effectiveDuration)}</strong></div>
-                <div><span>Source files</span><strong>{sourceFileCount}</strong></div>
-                <div><span>Repeated items</span><strong>{repeatedItemCount}</strong></div>
-              </div>
-              <div className="export-summary-caveat">
-                <span className="section-kicker">Format note</span>
-                <p>
-                  {selectedFormat === 'edl'
-                    ? 'EDL is a flat interchange format; speed and transform metadata may be degraded.'
-                    : selectedFormat === 'resolve_xml'
-                      ? 'Resolve XML preserves the ordered Timeline placements and source links.'
-                      : 'FCPXML carries the ordered Timeline placements for Final Cut Pro.'}
-                </p>
+                <div><span>Source videos used</span><strong>{sourceFileCount}</strong></div>
+                <div><span>Speed ramps applied</span><strong>{speedRampCount}</strong></div>
               </div>
               <div className="export-summary-files">
                 <span className="section-kicker">Source files</span>
-                {Array.from(new Set(projectedItems.map((item) => item.fileName))).map((fileName) => (
-                  <code key={fileName} title={fileName}>{fileName}</code>
+                {handoffFiles.map(({ fileId, fileName, count }) => (
+                  <div className="export-summary-file" key={fileId}>
+                    <span className="export-summary-file-dot" aria-hidden="true" />
+                    <code title={fileName}>{fileName}</code>
+                    <span className="export-summary-file-count">{count}×</span>
+                  </div>
                 ))}
               </div>
             </aside>

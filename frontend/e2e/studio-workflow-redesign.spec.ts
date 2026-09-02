@@ -173,7 +173,21 @@ async function verifyWorkflowAtViewport(page: Page): Promise<void> {
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('qa-export-preview')).toHaveText('ready');
   await page.getByTestId('playwriter-qa-panel').getByRole('link', { name: 'Export' }).click();
+  await expect(page.locator('[data-surface="workflow-header"]')).toContainText('Step 04 / 04');
   await expect(page.getByRole('group', { name: 'Export format' })).toBeVisible();
+  const exportSummary = page.locator('.export-handoff-summary');
+  await expect(exportSummary).toContainText("What you're handing off");
+  await expect(exportSummary).toContainText('Timeline items');
+  await expect(exportSummary).toContainText('Effective runtime');
+  await expect(exportSummary).toContainText('Source videos used');
+  await expect(exportSummary).toContainText('Speed ramps applied');
+  await expect(exportSummary.locator('.export-summary-caveat')).toHaveCount(0);
+  // This fixture's authoritative Timeline has identity speed and transforms,
+  // so the EDL caveat is correctly absent. Non-identity edits keep the
+  // persistent warning visible (covered by the deterministic visual fixture).
+  await expect(exportSummary.locator('.export-summary-files')).toHaveCount(1);
+  await expect(page.getByTestId('export-format-warning')).toHaveCount(0);
+  await expect(page.locator('[data-surface="workflow-footer"]')).toContainText('ready to export');
   await assertTheme(page, 'dark');
   await assertTheme(page, 'light');
   await assertKeyboardFocus(page, page.getByTestId('export-format-card-edl'));
@@ -181,6 +195,9 @@ async function verifyWorkflowAtViewport(page: Page): Promise<void> {
   await page.getByTestId('export-selected').click();
   await expect(page.getByTestId('export-result-edl')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('export-result-edl')).toContainText('EDL exported');
+  await expect(page.getByTestId('export-result-edl').locator('.status-surface-success')).toBeVisible();
+  await expect(page.getByTestId('export-payload-details-edl')).toBeVisible();
+  await expect(page.getByTestId('export-result-edl').getByText('Review export payload')).toBeVisible();
   await assertNoWorkflowOverflow(page);
 
   // Keep the project ID read from the real QA fixture in the test's execution

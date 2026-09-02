@@ -118,7 +118,7 @@ a {
 .app-workspace {
   display: grid;
   position: relative;
-  grid-template-columns: 232px 6px minmax(0, 1fr);
+  grid-template-columns: 264px 6px minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -951,7 +951,7 @@ a {
 
 .project-header {
   background: var(--bg-0);
-  padding-block: 10px;
+  padding-block: 20px;
 }
 
 .project-header-name {
@@ -1129,6 +1129,21 @@ a {
   font-weight: 600;
 }
 
+.export-format-warning {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.export-format-warning strong {
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .export-format-kicker { color: var(--accent); }
 .export-format-note { color: var(--text-dim); font-size: 12px; line-height: 1.45; }
 .export-format-extension { color: var(--text-muted); font: 10.5px var(--font-mono); }
@@ -1194,7 +1209,10 @@ a {
 .export-summary-caveat,
 .export-summary-files { display: grid; gap: 6px; }
 .export-summary-caveat p { margin: 0; color: var(--text-dim); font-size: 12px; line-height: 1.45; }
-.export-summary-files code { overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; font: 11px var(--font-mono); }
+.export-summary-file { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--text-dim); font-size: 12px; }
+.export-summary-file-dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 2px; background: var(--accent); }
+.export-summary-file code { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--font-mono); }
+.export-summary-file-count { flex: 0 0 auto; color: var(--text-muted); font: 11px var(--font-mono); }
 
 @media (max-width: 900px) {
   .export-workspace { grid-template-columns: minmax(0, 1fr); }
@@ -4263,7 +4281,23 @@ a {
 @media (max-width: 1100px) {
   .timeline-page-body {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(420px, auto) minmax(360px, auto);
     overflow: auto;
+  }
+  .timeline-page-body > .timeline {
+    min-height: 420px;
+  }
+  /* Keep the preview context available while the editor below it scrolls. */
+  .timeline-preview {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .timeline-toolbar {
+    position: sticky;
+    top: calc(var(--timeline-preview-height, 220px) + 8px);
+    z-index: 3;
   }
   .timeline-editor {
     align-self: auto;

@@ -49,7 +49,7 @@
   --duration-base: 160ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --shell-sidebar-width: 232px;
+  --shell-sidebar-width: 264px;
   --shell-sidebar-collapsed-width: 64px;
   --shell-footer-height: 68px;
 }
@@ -77,7 +77,7 @@
   --duration-fast: 80ms;
   --duration-base: 160ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --shell-sidebar-width: 232px;
+  --shell-sidebar-width: 264px;
   --shell-sidebar-collapsed-width: 64px;
   --shell-footer-height: 68px;
 }

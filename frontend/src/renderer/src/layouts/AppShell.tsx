@@ -18,7 +18,7 @@ type AppShellProps = {
 export function AppShell({ children }: AppShellProps) {
   const { projectName, uploadedVideos, clips, acceptedCount, timelineItems } = useReview();
   const location = useLocation();
-  const [sidebarWidth, resizeSidebar] = usePanelWidth('sidebarWidth', 232, 180, 420);
+  const [sidebarWidth, resizeSidebar] = usePanelWidth('sidebarWidth', 264, 180, 420);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('sidebarCollapsed') === 'true';

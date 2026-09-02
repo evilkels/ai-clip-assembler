@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClipCandidate, ClipDecision } from '../types/clip';
+import { buildClipPosterUrl } from '../api/client';
 import { verdictFor } from '../lib/scoring';
 import { formatClock } from '../lib/format';
 import { ScoreChip } from './ScoreChip';
@@ -17,6 +18,7 @@ interface Props {
   clip: ClipCandidate;
   rank: number;
   decision: ClipDecision;
+  projectId: string | null;
   mediaUrl?: string;
   /** 1-based position in the current timeline, or undefined if not in the draft. */
   draftPosition?: number;
@@ -54,6 +56,7 @@ export function ClipCard({
   clip,
   rank,
   decision,
+  projectId,
   mediaUrl,
   draftPosition,
   versionLabels = EMPTY_VERSION_LABELS,
@@ -76,15 +79,51 @@ export function ClipCard({
   // A source known to have no audio stays silent whatever the preference says.
   const cardMuted = muted || sourceAudio.hasAudio === false;
   const [playing, setPlaying] = useState(false);
+  // The <video> is created only on first play; until then the card shows a
+  // poster, so a grid of candidates costs one small image each instead of a
+  // media element that opens and demuxes the source file.
+  const [activated, setActivated] = useState(false);
+  const [looping, setLooping] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
   // Seed-only: playhead starts at the clip's in-point, then moves independently
   // as the preview plays. Not state derived from the prop on every render.
   // react-doctor-disable-next-line react-doctor/no-derived-useState
   const [playheadSec, setPlayheadSec] = useState(clip.start_sec);
   const sourceDuration = clip.source_duration_sec ?? null;
+  const posterUrl: string | null =
+    projectId && !posterFailed
+      ? buildClipPosterUrl(projectId, clip.file_id, clip.start_sec * 1000)
+      : null;
+
+  const playVideo = useCallback(
+    (video: HTMLVideoElement) => {
+      video.play().catch(() => {
+        // Chromium refuses unmuted playback without a gesture; fall back to
+        // muted rather than leaving a dead play button, and say so in the UI.
+        if (video.muted) return;
+        video.muted = true;
+        setMuted(true);
+        video.play().catch(() => {});
+      });
+    },
+    [setMuted],
+  );
+
+  // The first press has no element yet: activate, then play once React has
+  // mounted the <video>.
+  useEffect(() => {
+    if (!activated) return;
+    const video = videoRef.current;
+    if (!video) return;
+    playVideo(video);
+  }, [activated, playVideo]);
 
   const togglePlay = () => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      setActivated(true);
+      return;
+    }
     if (playing) {
       video.pause();
       return;
@@ -135,40 +174,75 @@ export function ClipCard({
         {versionLabels.length > 0 ? (
           <span className="clip-thumb-proposed">Proposed in {versionLabels.join('/')}</span>
         ) : null}
-        {mediaUrl ? (
-          <>
-            <video
-              ref={videoRef}
-              src={`${mediaUrl}#t=${clip.start_sec.toFixed(3)}`}
-              preload="metadata"
-              muted={cardMuted}
-              playsInline
-              aria-label={`Preview ${clip.file_name}`}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onTimeUpdate={(event) => {
-                const video = event.currentTarget;
-                if (video.currentTime >= clip.end_sec) {
-                  video.currentTime = clip.start_sec;
-                }
-                setPlayheadSec(video.currentTime);
-              }}
-            >
-              {/* Source footage carries no caption track; declaring an empty
-                  one keeps the now-audible preview accessible. */}
-              <track kind="captions" />
-            </video>
-            <button
-              type="button"
-              className="clip-play-btn"
-              onClick={togglePlay}
-              aria-label={playing ? 'Pause preview' : 'Play clip'}
-            >
-              {playing ? '❚❚' : '▶'}
-            </button>
-          </>
+        {activated && mediaUrl ? (
+          <video
+            ref={videoRef}
+            src={`${mediaUrl}#t=${clip.start_sec.toFixed(3)}`}
+            preload="metadata"
+            muted={cardMuted}
+            playsInline
+            aria-label={`Preview ${clip.file_name}`}
+            data-end-sec={clip.end_sec}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onTimeUpdate={(event) => {
+              const video = event.currentTarget;
+              if (video.currentTime >= clip.end_sec) {
+                // Play once by default; the loop toggle opts back in.
+                if (!looping) video.pause();
+                video.currentTime = clip.start_sec;
+              }
+              setPlayheadSec(video.currentTime);
+            }}
+          >
+            {/* Source footage carries no caption track; declaring an empty
+                one keeps the now-audible preview accessible. */}
+            <track kind="captions" />
+          </video>
+        ) : posterUrl ? (
+          <img
+            src={posterUrl}
+            loading="lazy"
+            decoding="async"
+            alt={`Preview ${clip.file_name}`}
+            onError={() => setPosterFailed(true)}
+          />
         ) : (
           <span>Poster unavailable</span>
+        )}
+        {mediaUrl && (
+          <button
+            type="button"
+            className="clip-play-btn"
+            onClick={togglePlay}
+            aria-label={playing ? 'Pause preview' : 'Play clip'}
+          >
+            {playing ? '❚❚' : '▶'}
+          </button>
+        )}
+        {mediaUrl && (
+          <button
+            type="button"
+            className="clip-loop-btn"
+            onClick={() => setLooping((previous) => !previous)}
+            aria-label="Loop preview"
+            aria-pressed={looping}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m17 2 4 4-4 4" />
+              <path d="M3 11V9a3 3 0 0 1 3-3h15" />
+              <path d="m7 22-4-4 4-4" />
+              <path d="M21 13v2a3 3 0 0 1-3 3H3" />
+            </svg>
+          </button>
         )}
         <span className="clip-thumb-time">{(clip.end_sec - clip.start_sec).toFixed(1)}s</span>
       </div>

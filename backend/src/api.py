@@ -435,7 +435,9 @@ async def get_project_video_poster(
     return FileResponse(
         poster_path,
         media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        # Not immutable: re-analysis rewrites frames under the same
+        # timestamp names, and the poster URL for a clip does not change.
+        headers={"Cache-Control": "public, max-age=60"},
     )
 
 

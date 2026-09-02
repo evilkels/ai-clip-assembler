@@ -81,7 +81,11 @@ export function buildVideoMediaUrl(projectId: string, fileId: string): string {
 }
 
 export function buildClipPosterUrl(projectId: string, fileId: string, atMs: number): string {
-  return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/poster?at_ms=${atMs}`;
+  // Clip start times are frame timestamps, so atMs arrives as a float, but
+  // the route takes an integer millisecond. Round here or nearly every
+  // poster request 422s.
+  const at = Math.max(0, Math.round(atMs));
+  return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/poster?at_ms=${at}`;
 }
 
 export interface BackendStatus {

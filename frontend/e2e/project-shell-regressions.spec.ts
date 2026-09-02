@@ -80,7 +80,8 @@ async function openFolderProject(page: Page): Promise<void> {
   });
 
   await page.goto('/#/import');
-  await expect(page.getByText('7 source videos ready')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rescan Folder', exact: true })).toBeVisible();
+  await expect(page.locator('.drop-zone')).toHaveCount(0);
 }
 
 async function measureImportLayout(page: Page) {

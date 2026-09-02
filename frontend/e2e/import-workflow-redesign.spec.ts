@@ -129,7 +129,8 @@ async function openImportFixture(page: Page): Promise<void> {
   });
 
   await page.goto('/#/import');
-  await expect(page.getByText('3 source videos ready')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rescan Folder', exact: true })).toBeVisible();
+  await expect(page.locator('.drop-zone')).toHaveCount(0);
 }
 
 test('source browser switches views, filters filenames, and preserves selection identity', async ({ page }) => {

@@ -7,7 +7,7 @@ import type { UpdateStatus } from '../src/shared/updateStatus';
  * shifts every later row and makes the fixed status row inherit the `1fr` track.
  * These tests measure the geometry instead of only asserting visibility.
  */
-const STATUS_BAR_HEIGHT = 28;
+const STATUS_BAR_HEIGHT = 34;
 const WORKFLOW_FOOTER_MIN_HEIGHT = 64;
 
 async function installBridge(page: Page, status: UpdateStatus | null) {

@@ -2,7 +2,7 @@
 
 Status: re-triaged 2026-09-02 against v0.2.0 (`6d79c1b`) with react-doctor
 0.2.14. Every finding group below was read in the source before being
-classified. Three real defects remain; the large majority of the 94 findings
+classified. Two real defects remain (a third is fixed); the large majority of the 94 findings
 are false positives.
 
 **Goal:** Fix the defects react-doctor actually found, and stop treating its
@@ -27,13 +27,20 @@ finding here blocks a build.
 
 ## The three real defects
 
-1. **Stale "shown" count in the Review header.** `SourceClipsPanel` computes
-   the filtered `records` during render, then reports the count upward from a
-   `useEffect` (`SourceClipsPanel.tsx:93-95`). `Review` stores it in state and
-   renders it (`Review.tsx:48,127-131`), so the header count is one commit
-   behind every filter change. Existing E2E asserts the child's count, not the
-   header's (`review-browser-redesign.spec.ts:218-219`), which is why this was
-   never caught. Rules: `no-pass-data-to-parent`, `no-pass-live-state-to-parent`.
+1. ~~**Stale "shown" count in the Review header.**~~ **FIXED 2026-09-02.**
+   `SourceClipsPanel` computed the filtered records during render then reported
+   the count upward from a `useEffect`, and `Review` mirrored it into state, so
+   the header lagged one commit behind each filter change. Filtering now lives
+   in `Review`, which builds the records once and derives both the header count
+   and the browser rows from them during render. The effect, the mirrored state
+   and the `onVisibleCountChange` prop are gone, and the panel no longer needs
+   `decisions`, `acceptedOrder` or `versionMembership` at all.
+
+   Worth recording honestly: this was **not** user-visible. The staleness lasted
+   a single frame, and `review-browser-redesign.spec.ts:297,303` already
+   asserted the header count after filtering and passed, because Playwright
+   retries assertions. The value of the change is the removed state mirror and
+   the narrower component interface, not a bug users were hitting.
 
 2. **Timeline trim handles are a keyboard dead end.** The handles are
    non-focusable `<div>`s carrying pointer/mouse handlers with no keyboard

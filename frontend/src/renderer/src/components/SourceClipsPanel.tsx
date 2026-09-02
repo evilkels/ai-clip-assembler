@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { buildVideoMediaUrl } from '../api/client';
-import type { ClipCandidate, ClipDecision, ClipGenerationStats } from '../types/clip';
-import { buildReviewClipRecords, type ReviewFilters, type ReviewViewMode } from '../lib/reviewView';
+import type { ClipCandidate, ClipGenerationStats } from '../types/clip';
+import type { ReviewClipRecord, ReviewFilters, ReviewViewMode } from '../lib/reviewView';
 import { ClipCard } from './ClipCard';
 import { ClipFilmstripItem } from './ClipFilmstripItem';
 import { ClipListRow } from './ClipListRow';
@@ -9,18 +9,15 @@ import { ViewModeSwitcher } from './ViewModeSwitcher';
 
 interface LookGroup {
   key: string;
-  lead: ReturnType<typeof buildReviewClipRecords>[number];
-  siblings: ReturnType<typeof buildReviewClipRecords>[number][];
+  lead: ReviewClipRecord;
+  siblings: ReviewClipRecord[];
 }
 
 interface SourceClipsPanelProps {
   clips: ClipCandidate[];
   totalCount: number;
   projectId: string | null;
-  decisions: Record<string, ClipDecision>;
-  acceptedOrder: string[];
   clipsByFile: Map<string, ClipCandidate[]>;
-  versionMembership: Map<string, string[]>;
   generationStats: ClipGenerationStats | null;
   loading: boolean;
   error: string | null;
@@ -28,7 +25,14 @@ interface SourceClipsPanelProps {
   onSmoothnessThresholdChange: (value: number) => void;
   onInclude: (clipId: string) => void;
   onExclude: (clipId: string) => void;
-  onVisibleCountChange?: (visibleCount: number, totalCount: number) => void;
+  // Filtering is owned by the parent so the Review header count is derived
+  // during render from the same records rendered here, rather than mirrored
+  // back up through an effect.
+  records: ReviewClipRecord[];
+  minOverall: number;
+  onMinOverallChange: (value: number) => void;
+  decisionFilter: ReviewFilters['decision'];
+  onDecisionFilterChange: (value: ReviewFilters['decision']) => void;
 }
 
 const VIEW_OPTIONS: Array<{ value: ReviewViewMode; label: string }> = [
@@ -37,8 +41,8 @@ const VIEW_OPTIONS: Array<{ value: ReviewViewMode; label: string }> = [
   { value: 'filmstrip', label: 'Filmstrip' },
 ];
 
-function groupByLook(records: ReturnType<typeof buildReviewClipRecords>): LookGroup[] {
-  const membersByKey = new Map<string, ReturnType<typeof buildReviewClipRecords>[number][]>();
+function groupByLook(records: ReviewClipRecord[]): LookGroup[] {
+  const membersByKey = new Map<string, ReviewClipRecord[]>();
   const order: string[] = [];
   for (const record of records) {
     const key = record.clip.look_group != null
@@ -61,38 +65,24 @@ export function SourceClipsPanel({
   clips,
   totalCount,
   projectId,
-  decisions,
-  acceptedOrder,
   clipsByFile,
-  versionMembership,
   generationStats,
   loading,
   error,
   smoothnessThreshold,
+  records,
+  minOverall,
+  onMinOverallChange,
+  decisionFilter,
+  onDecisionFilterChange,
   onSmoothnessThresholdChange,
   onInclude,
   onExclude,
-  onVisibleCountChange,
 }: SourceClipsPanelProps) {
   const [viewMode, setViewMode] = useState<ReviewViewMode>('grid');
-  const [minOverall, setMinOverall] = useState(0);
-  const [decisionFilter, setDecisionFilter] = useState<ReviewFilters['decision']>('all');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const totals = generationStats?.totals;
-  const records = useMemo(
-    () => buildReviewClipRecords(
-      clips,
-      decisions,
-      acceptedOrder,
-      versionMembership,
-      { minOverall, minSmoothness: smoothnessThreshold, decision: decisionFilter },
-    ),
-    [acceptedOrder, clips, decisions, decisionFilter, minOverall, smoothnessThreshold, versionMembership],
-  );
   const groups = useMemo(() => groupByLook(records), [records]);
-  useEffect(() => {
-    onVisibleCountChange?.(records.length, clips.length);
-  }, [clips.length, onVisibleCountChange, records.length]);
   // Candidate Clip positions are stable within each source file; compute the
   // ordering once so each rendered card only performs a lookup.
   const fileClipIndexes = useMemo(() => {
@@ -113,7 +103,7 @@ export function SourceClipsPanel({
     });
   };
 
-  const renderAction = (record: ReturnType<typeof buildReviewClipRecords>[number]) =>
+  const renderAction = (record: ReviewClipRecord) =>
     record.timelinePosition !== undefined
       ? () => onExclude(record.clip.clip_id)
       : () => onInclude(record.clip.clip_id);
@@ -137,7 +127,7 @@ export function SourceClipsPanel({
   const renderGrid = () => (
     <div className="review-grid" data-review-grid>
       {groups.flatMap(({ key, lead, siblings: lookSiblings }) => {
-        const renderClip = (record: ReturnType<typeof buildReviewClipRecords>[number], similarLookCount: number) => {
+        const renderClip = (record: ReviewClipRecord, similarLookCount: number) => {
           const { siblingRanges, fileClipIndex, fileClipCount } = fileContext(record.clip);
           return (
             <ClipCard
@@ -244,7 +234,7 @@ export function SourceClipsPanel({
                 step={0.5}
                 value={minOverall}
                 aria-label="Minimum Overall"
-                onChange={(event) => setMinOverall(Number(event.target.value))}
+                onChange={(event) => onMinOverallChange(Number(event.target.value))}
               />
             </label>
             <label className="review-filter-control">
@@ -264,7 +254,7 @@ export function SourceClipsPanel({
               <select
                 aria-label="Decision filter"
                 value={decisionFilter}
-                onChange={(event) => setDecisionFilter(event.target.value as ReviewFilters['decision'])}
+                onChange={(event) => onDecisionFilterChange(event.target.value as ReviewFilters['decision'])}
               >
                 <option value="all">All decisions</option>
                 <option value="included">Included</option>

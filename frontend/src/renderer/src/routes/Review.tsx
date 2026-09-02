@@ -9,6 +9,7 @@ import { StatusSurface } from '../components/StatusSurface';
 import { WorkflowHeader } from '../components/WorkflowHeader';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
+import { buildReviewClipRecords, type ReviewFilters } from '../lib/reviewView';
 import { useReview } from '../state/ReviewContext';
 import { usePanelWidth } from '../hooks/usePanelWidth';
 import { useReviewConversation } from '../hooks/useReviewConversation';
@@ -45,14 +46,11 @@ export function ReviewPage() {
     timelineSnapshot,
     uploadedVideos,
   } = useReview();
-  const [visibleClipCount, setVisibleClipCount] = useState(clips.length);
+  const [minOverall, setMinOverall] = useState(0);
+  const [decisionFilter, setDecisionFilter] = useState<ReviewFilters['decision']>('all');
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
   const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 320, 240, 560);
-  const handleVisibleCountChange = useCallback((visibleCount: number) => {
-    setVisibleClipCount(visibleCount);
-  }, []);
-
   const availableClipIds = useMemo(
     () => new Set(clips.map((clip) => clip.clip_id)),
     [clips],
@@ -76,6 +74,18 @@ export function ReviewPage() {
         : new Map<string, string[]>(),
     [conversation.versionSet, timelineSnapshot],
   );
+  // The Review header count and the browser rows are the same list, so build
+  // it once here and derive both from it during render.
+  const reviewRecords = useMemo(
+    () =>
+      buildReviewClipRecords(clips, decisions, acceptedOrder, versionMembership, {
+        minOverall,
+        minSmoothness: smoothnessThreshold,
+        decision: decisionFilter,
+      }),
+    [acceptedOrder, clips, decisions, decisionFilter, minOverall, smoothnessThreshold, versionMembership],
+  );
+
   const clipsByFile = useMemo(() => {
     const result = new Map<string, ClipCandidate[]>();
     for (const clip of clips) {
@@ -126,7 +136,7 @@ export function ReviewPage() {
         description="Let the AI suggest a full cut, or pick clips yourself, then refine."
         meta={(
           <span className="review-header-count">
-            <strong data-testid="review-header-count">{visibleClipCount} / {clips.length}</strong>
+            <strong data-testid="review-header-count">{reviewRecords.length} / {clips.length}</strong>
             <span>shown</span>
           </span>
         )}
@@ -231,10 +241,7 @@ export function ReviewPage() {
               clips={clips}
               totalCount={clips.length}
               projectId={projectId}
-              decisions={decisions}
-              acceptedOrder={acceptedOrder}
               clipsByFile={clipsByFile}
-              versionMembership={versionMembership}
               generationStats={generationStats}
               loading={loading}
               error={error}
@@ -242,7 +249,11 @@ export function ReviewPage() {
               onSmoothnessThresholdChange={setSmoothnessThreshold}
               onInclude={include}
               onExclude={exclude}
-              onVisibleCountChange={handleVisibleCountChange}
+              records={reviewRecords}
+              minOverall={minOverall}
+              onMinOverallChange={setMinOverall}
+              decisionFilter={decisionFilter}
+              onDecisionFilterChange={setDecisionFilter}
             />
           </section>
           <Link className="draft-summary" to="/import">

@@ -45,12 +45,16 @@ plan's own header.
 Work that exists but is not on `main` yet. Listed so it is not lost — a pushed
 branch with no pull request is the easiest thing in this repo to forget.
 
-| | Branch | State | What it is |
+Everything outstanding is consolidated onto one branch, so there is a single
+thing to review and merge:
+
+| | Branch | State | What it carries |
 |---|---|---|---|
-| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Poster-first cards and play-once previews, plan 029 phases 1–3 |
-| 🟡 | `docs/tighten-025-017-prerequisites` | [PR #71](https://github.com/evilkels/ai-clip-assembler/pull/71) | Records the missing prerequisites in plans 017 and 025 |
-| 🟡 | `docs/plans-status-board` | [PR #70](https://github.com/evilkels/ai-clip-assembler/pull/70) | This README's status board |
-| 🔴 | `feat/027-version-diversity-test` | **pushed, no PR** | Rescues plan 027's orphaned Task 1 tests |
+| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Plan 029 phases 1–3 (poster-first cards, play-once previews), this status board, the plan 017/025 prerequisites, and plan 027's parked tests |
+
+Consolidated into it and closed unmerged: PR #70 (status board) and PR #71
+(plan prerequisites), which were already ancestors of this branch, and PR #73
+(`feat/027-version-diversity-test`), merged in explicitly.
 
 ### Parked tests — plan 027 Task 1
 

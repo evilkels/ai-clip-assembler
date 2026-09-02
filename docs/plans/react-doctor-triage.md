@@ -25,7 +25,7 @@ is not a useful health metric here, because two of the five *errors* are wrong:
 React Doctor runs only as a local pre-commit hook; it is not part of CI, so no
 finding here blocks a build.
 
-## The three real defects
+## The real defects
 
 1. ~~**Stale "shown" count in the Review header.**~~ **FIXED 2026-09-02.**
    `SourceClipsPanel` computed the filtered records during render then reported
@@ -97,15 +97,13 @@ Do not act on these; they describe intentional design:
 
 ## Batches
 
-1. **Tests first.** Assert the Review *header* count follows the filter, that
-   project switching clears the conversation, and that trim is reachable by
-   keyboard. These must fail before any fix lands.
+1. **Tests first.** Assert that project switching clears the conversation, and
+   that trim is reachable by keyboard. These must fail before any fix lands.
 2. **Safe mechanical fixes** (behavior-preserving): hoist `viewOptions` to
    module scope (`SourceVideoBrowser.tsx:93-97`), and move
    `preferencesFromGenerationStats` out of the component file to restore the
    Fast Refresh boundary (`ClipGenerationPanel.tsx:29-43`).
-3. **Fix the stale header count** — derive it from one owner instead of
-   pushing it up through an effect. Needs batch 1.
+3. ~~Fix the stale header count.~~ Done 2026-09-02.
 4. **Keyboard trim.** Product decision required: focusable handles with
    arrow-key increments, or an inspector-based trim path. Needs batch 1.
 5. **Project-reset refactor** in `useReviewConversation`, preserving the

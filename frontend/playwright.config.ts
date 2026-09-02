@@ -11,6 +11,11 @@ export default defineConfig({
   // silently green.
   retries: process.env.CI ? 2 : 0,
   timeout: 180_000,
+  // The suite bounds itself so a single wedged test cannot consume the whole
+  // job budget. 103 tests at the 180s per-test limit with two CI retries is
+  // ~15 hours in the worst case, which no runner timeout should have to absorb.
+  // Local full runs take 9-12 minutes and CI has done it in under 3.
+  globalTimeout: process.env.CI ? 20 * 60_000 : 30 * 60_000,
   expect: {
     timeout: 20_000,
     // Within a single platform the renders still jitter by up to ~27px of glyph

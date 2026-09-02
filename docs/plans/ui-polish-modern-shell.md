@@ -1,7 +1,20 @@
 # Plan: Modern professional UI shell
 
-Status: PARTIAL, **and its central library decision is now contradicted by what
-shipped** (reconciled 2026-08-13). `AppShell`, Sidebar, TitleBar, StatusBar,
+Status: SUPERSEDED for the workflow routes (reconciled 2026-08-31); the library
+decision it prescribes was settled against it by what shipped.
+
+**2026-08-31:** `2026-08-14-studio-workflow-redesign.md` delivered the shared
+design system, shell, and all four workflow routes (Import, Review, Timeline,
+Export) as hand-authored tokens/CSS — the opposite of the shadcn/Radix stack this
+plan prescribes, and still with none of those packages installed. The "component
+migration" and "style consolidation" work below is therefore done by other means;
+do not execute it as written. What genuinely remains and is not covered by the
+redesign: the Cmd-K palette, score verification, and the Settings/Diagnostics
+surfaces the redesign explicitly excluded. Either rewrite this plan around those
+three, or close it and fold them into new plans.
+
+Previous status (retained for history): PARTIAL, **and its central library
+decision is now contradicted by what shipped** (reconciled 2026-08-13). `AppShell`, Sidebar, TitleBar, StatusBar,
 tokens, and dark editor chrome shipped; component migration, Cmd-K palette,
 style consolidation, and score verification remain. Pairs with
 sidebar/settings/react-doctor plans.

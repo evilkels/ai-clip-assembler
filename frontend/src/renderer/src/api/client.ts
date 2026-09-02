@@ -60,6 +60,7 @@ declare global {
       relocateRecentProject?: (folderPath: string) => Promise<RecentProject[]>;
       setWindowTitle?: (projectName?: string) => Promise<void>;
       openInDaVinci?: (exportPath: string, sourceFolder?: string) => Promise<{ opened: boolean }>;
+      revealExportFile?: (filePath: string) => Promise<{ revealed: boolean }>;
       getReviewModelAccountStatus?: () => Promise<ReviewModelAccountStatus>;
       signInReviewModel?: () => Promise<ReviewModelAccountStatus>;
       cancelReviewModelSignIn?: () => Promise<ReviewModelAccountStatus>;
@@ -210,6 +211,13 @@ export async function setWindowTitle(projectName?: string): Promise<void> {
 export async function openInDaVinci(exportPath: string, sourceFolder?: string): Promise<boolean> {
   const result = await window.clipAssembler?.openInDaVinci?.(exportPath, sourceFolder);
   return result?.opened ?? false;
+}
+
+export async function revealExportFile(filePath: string): Promise<void> {
+  if (!window.clipAssembler?.revealExportFile) {
+    throw new Error('Reveal export file is only available in the desktop app');
+  }
+  await window.clipAssembler.revealExportFile(filePath);
 }
 
 const REVIEW_MODEL_DESKTOP_ERROR = 'Review model sign-in is only available in the desktop app';

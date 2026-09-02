@@ -1,0 +1,530 @@
+# Studio Workflow Redesign Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Apply the approved Claude Design studio system to the shared desktop shell and the Import, Review, Timeline, and Export workflows without changing backend authority or product behavior.
+
+**Architecture:** Keep `ReviewContext`, existing API contracts, and route controllers authoritative. Introduce focused presentational primitives and pure view-model helpers, then migrate one workflow at a time onto the shared tokens. The branch deliberately avoids a state-management rewrite: view modes, filtering, selection display, and layout remain renderer-local while timeline mutations and export stay backend-authoritative.
+
+**Tech Stack:** Electron, React 19, TypeScript, Vite, CSS custom properties, Playwright.
+
+## Status — superseded by literal-conformance record (2026-09-02)
+
+**Workflow result:** The shared shell and four workflow implementations are
+complete on `redesign/studio-workflows`, including the 2026-08-31 two-axis
+review remediation and the 2026-09-01 Copilot review fixes. The app and landing
+page were subsequently brought to literal design conformance under
+[`2026-09-01-literal-design-conformance.md`](2026-09-01-literal-design-conformance.md);
+that plan and its review record are the release evidence for this branch. This
+document remains the implementation history and its earlier automated-gate
+claims must not be read as proof of literal conformance. Human packaged-app and
+real-NLE checks remain explicitly pending and are not covered by automation.
+
+- [x] Task 1 — Shared studio system and shell (`9061a42..a8a4d7a`); reviewed clean for Critical/Important findings.
+- [x] Task 2 — Import workflow (`468c0c7..0d56228`); reviewed clean for Critical/Important findings.
+- [x] Task 3 — Candidate Clip browser (`cffdf6e..722d4cf`); independent re-review clean.
+- [x] Task 4 — Ask AI and Suggested Versions (`76d4fec`); independent review clean.
+- [x] Task 5 — Timeline redesign (`6dcd6a8..d8c45a9`); independent re-review clean.
+- [x] Task 6 — Export redesign (`07f15a6`); independent re-review clean.
+- [x] Task 7 — Integrated QA baseline; final conformance gate is recorded by the literal-conformance plan.
+- [x] Task 8 — Two-axis review remediation (2026-08-31), below.
+
+### Task 8 — review remediation (2026-08-31)
+
+Fixed on this branch after the Standards/Spec review:
+
+1. **Export receipt showed a payload that could describe a different export.**
+   `Export.tsx` snapshotted only `effective_duration_sec` at handoff while the
+   payload inspector rendered live Timeline state, so editing the Timeline after
+   exporting silently rewrote the receipt's payload. The payload is now built by
+   a pure `buildExportPayload()` and snapshotted into `DisplayExportResult`
+   alongside the duration. This was a real defect, not a style issue.
+2. **Ad hoc status-string parsing** (`/running|analyzing/i.test(video.status)`)
+   in `sourceVideoView.ts` and `SourceVideoBrowser.tsx` violated
+   `CONTRIBUTING.md`: "Prefer explicit project data structures over ad hoc string
+   parsing." `UploadedVideo.status` is an untyped `string` that never carries
+   analysis state; running-ness is now the single explicit predicate
+   `isSourceVideoRunning(video, runningFileName)`, sourced from the typed
+   `analysisStatus.phase`.
+3. **Filmstrip did not reuse `SourceTrack`**, contrary to Task 3 Step 4. It now
+   renders the file track like the list view.
+4. **Off-scale control radii.** Three sibling `min-height: 30px` control groups
+   used 6px / 8px / 4px. All three now use `--radius-lg` (10px), the scale's
+   input/control value.
+
+Also folded in two Standards judgement calls: the duplicated
+`fileSiblings`/`siblingRanges` computation is now one `fileContext()` helper, and
+the repeated `--clip-accent` inline-style boilerplate is now
+`reviewFileAccentStyle()`.
+
+### Known deviations accepted (not defects)
+
+- **Grid still mounts one `<video>` per Candidate Clip** (`ClipCard.tsx`). The
+  constraint "Avoid eager `<video>` mounting" binds the *new* list/filmstrip and
+  Import thumbs projections, which comply. The grid `<video>` predates this
+  branch and Task 3 Step 4 says "Keep `ClipCard` as the rich grid view".
+  Eliminating it is plan 017's remaining poster-first work, not this branch's.
+- **Active nav rows use a 2px inset accent bar** (`.step-link.active`,
+  `.project-row-active`). The "no solid left accent bars" constraint governs
+  *status surfaces*; `.status-surface` itself is compliant (semantic wash,
+  hairline inset outline, restrained glow, no bar).
+
+### Verification evidence
+
+Full gate re-run on the amended branch after the Task 8 fixes, not carried over
+from `ed8a6d6`: lint PASS, typecheck PASS, main 69/69 PASS, backend 404 passed /
+1 skipped, E2E 64/64 PASS, build PASS.
+
+Human macOS/Electron and real-NLE checks remain pending and are never reported as
+automated proof.
+
+### Task 9 — GitHub Copilot PR review on #68 (2026-09-01)
+
+Copilot left four inline comments on PR #68. Three were valid and fixed; one was
+rejected with evidence.
+
+- **Valid — `SourceVideoBrowser.tsx:79`.** The select-all checkbox derived its
+  indeterminate state from the *filtered* rows while `onToggleAll`
+  (`Import.tsx:177-183`) operates on every Source Video. Filtering away the only
+  deselected video made a partial selection read as no selection. Now derived
+  from the whole set.
+- **Valid — `SourceClipsPanel.tsx`.** The per-file candidate ordering was sorted
+  once per rendered card. Hoisted into a `useMemo` keyed on `clipsByFile`, so
+  render-time position lookup is O(1). Rendered output is unchanged.
+- **Valid — E2E fixtures.** A personal macOS home path appeared as mocked folder
+  data in `import-workflow-redesign.spec.ts`, `project-shell-regressions.spec.ts`
+  and `settings-connections.spec.ts`. Replaced with neutral paths; `/Users/` and
+  `/home/` no longer appear anywhere under `frontend/e2e`.
+- **Rejected — `Timeline.tsx:747,790`.** Copilot asked for `mousemove`/`mouseup`
+  to become `pointermove`/`pointerup` because "the trim handles should start on
+  pointer input". They do not: trim starts at `onMouseDown`, and the
+  `onPointerDown` on those handles only calls `stopPropagation`. The listener
+  pair already matches its initiating event, so there is no missed release. No
+  change made.
+
+One process note worth keeping: the first automated attempt at the checkbox fix
+appended its regression assertions to the *existing* "selection bar selects and
+deselects the complete source set" test, which broke that test's tail — from a
+filtered, indeterminate state, Playwright's `uncheck()` is a no-op because
+`checked` is already false, and `toggleAll` would select all rather than clear.
+The regression now lives in its own test
+(`import-workflow-redesign.spec.ts` — "the select-all checkbox reports partial
+selection hidden by the filter") and the original round-trip is untouched.
+
+**Verification:** lint, typecheck, `test:main` 69/69, and Playwright 65/65 all
+green on the amended tree (65, not 64 — this round added one test).
+
+### Residual limitations after Task 8
+
+- **The export receipt is pinned to click time, not to a document revision.** If
+  the Timeline is edited while the export request or its overwrite prompt is in
+  flight, the backend can write a newer document than the receipt describes.
+  Closing this needs a revision pinned through the export call — a behaviour
+  change deliberately left out of a redesign branch.
+- **No row shows "Running" during the "Preparing analysis" window**, because the
+  backend's `starting` progress carries no file name. This is pre-existing, not
+  introduced by Task 8: uploaded videos always carry `status: "ready"`
+  (`backend/src/api.py:391,1421`), so the removed `/running|analyzing/` fallback
+  never matched them either.
+- Untested edges: duplicate source file names, in-flight edits during export,
+  and repeated exports across formats.
+
+### Original scope boundary
+
+The original workflow redesign excluded landing and Settings. The landing was
+later completed by the literal-conformance plan and now uses corrected Review
+captures. `SettingsModal`, `SettingsTabPanel`, and `DiagnosticsTabPanel` remain
+untouched and outside this branch's redesign scope.
+
+## Global Constraints
+
+- Implement on the single branch `redesign/studio-workflows`.
+- Design source of truth: Claude Design project `e135e2f6-0c3f-444a-84e0-d269f4b59f4a`, file `Clip Assembler Restyle.dc.html`, reviewed 2026-08-14.
+- Local HTML reference: `AI CLIP ASSEMBLER Redesign APP + Landing page/Clip Assembler Restyle.dc.html`; use its workflow sections as the exact visual reference and do not stage or modify the supplied export.
+- Scope was the shared design system, shell, and Import/Review/Timeline/Export workflow pages. Landing was subsequently delivered by the literal-conformance plan; Settings remains excluded.
+- Preserve the Manual Harness as the local default and existing explicit per-project consent for provider-backed analysis.
+- Preserve the backend Timeline Document as the only export authority; all Timeline operations continue to address `item_id`.
+- Preserve existing chat, VersionSet staleness, proposal, and `replace_timeline` behavior.
+- Preserve system/light/dark theme preference and anti-FOUC behavior.
+- Use the approved dark palette: `#08090b`, `#0d0f12`, `#12151a`, `#171b21`, borders `#23272e`/`#343a43`, text `#f4f5f7`/`#a2a8b2`/`#6b7280`, accent `#ff4d6d`, success `#5fd18b`, warning `#e6b450`.
+- Use the approved light palette: `#e9eaec`, `#f7f7f8`, `#ffffff`, `#f1f2f4`, borders `#dcdce2`/`#bfc3c9`, text `#14161a`/`#52585f`/`#878d95`, accent `#e11d48`, success `#1f9d57`, warning `#b07d12`.
+- Use Plex Sans for interface copy and Plex Mono for timecodes, scores, counts, file metadata, and compact labels, with local/system fallbacks and no runtime dependency on a web-font CDN.
+- Use the shared radius scale: 6px chips, 8px rows/tiles, 10px inputs/controls, 14px cards/panels, and 999px pills.
+- Status surfaces use one family: semantic wash, hairline inset outline, and restrained glow. Do not add solid left accent bars.
+- Avoid eager `<video>` mounting for every Candidate Clip or Source Video.
+- No dependency upgrades, backend schema changes, cloud behavior changes, analytics, animation system, or broad component-library migration.
+
+---
+
+### Task 1: Shared studio tokens, primitives, and shell
+
+**Files:**
+- Modify: `frontend/src/renderer/src/styles/tokens.css`
+- Modify: `frontend/src/renderer/src/styles.css`
+- Modify: `frontend/src/renderer/src/layouts/AppShell.tsx`
+- Modify: `frontend/src/renderer/src/layouts/Sidebar.tsx`
+- Modify: `frontend/src/renderer/src/layouts/ProjectHeader.tsx`
+- Modify: `frontend/src/renderer/src/layouts/StatusBar.tsx`
+- Create: `frontend/src/renderer/src/components/SegmentedControl.tsx`
+- Create: `frontend/src/renderer/src/components/StatusSurface.tsx`
+- Create: `frontend/src/renderer/src/components/ViewModeSwitcher.tsx`
+- Modify: `frontend/e2e/app-shell-layout.spec.ts`
+- Modify: `frontend/e2e/project-shell-regressions.spec.ts`
+
+**Interfaces:**
+- Produces: `SegmentedControl<T extends string>({ value, options, onChange, ariaLabel })`.
+- Produces: `StatusSurface({ tone: 'accent' | 'success' | 'warning' | 'danger', className?, children })`.
+- Produces: `ViewModeSwitcher<T extends string>` as a labeled `SegmentedControl` specialization.
+- Preserves: all current Sidebar project actions, workflow routes, rename behavior, resize behavior, and Settings/Diagnostics entry points.
+
+- [x] **Step 1: Add failing shell and theme assertions**
+
+Extend the shell E2E suites to assert the workflow rail, active-step semantics, project selection, footer status, and both `data-theme="dark"` and `data-theme="light"` renders. Assert geometric containment rather than pixel snapshots.
+
+- [x] **Step 2: Run the focused tests and verify failure**
+
+Run: `npm run test:e2e -- app-shell-layout.spec.ts project-shell-regressions.spec.ts`
+
+Expected: FAIL on the new studio-system hooks/classes or theme assertions.
+
+- [x] **Step 3: Replace tokens and add primitives**
+
+Update the CSS variables to the approved palettes and geometry. Implement the three primitives as controlled, accessible components; options use `{ value: T; label: string; disabled?: boolean }` and buttons expose `aria-pressed`.
+
+- [x] **Step 4: Restyle the shared shell**
+
+Apply the design's 34px expanded workflow rail rhythm, accent-wash active project/step treatment, compact mono metadata, quieter project header, and status rail. Keep `AppShell`'s grid ownership and resize bounds unchanged.
+
+- [x] **Step 5: Verify shared shell behavior**
+
+Run: `npm run typecheck && npm run test:e2e -- app-shell-layout.spec.ts project-shell-regressions.spec.ts`
+
+Expected: PASS.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add frontend/src/renderer/src/styles frontend/src/renderer/src/components/SegmentedControl.tsx frontend/src/renderer/src/components/StatusSurface.tsx frontend/src/renderer/src/components/ViewModeSwitcher.tsx frontend/src/renderer/src/layouts frontend/e2e/app-shell-layout.spec.ts frontend/e2e/project-shell-regressions.spec.ts
+git commit -m "feat: add studio workflow design system"
+```
+
+### Task 2: Import source browser and docked analysis rail
+
+**Files:**
+- Modify: `frontend/src/renderer/src/routes/Import.tsx`
+- Modify: `frontend/src/renderer/src/components/ClipGenerationPanel.tsx`
+- Create: `frontend/src/renderer/src/components/SourceVideoBrowser.tsx`
+- Create: `frontend/src/renderer/src/components/SourceVideoSelectionBar.tsx`
+- Create: `frontend/src/renderer/src/lib/sourceVideoView.ts`
+- Create: `frontend/e2e/import-workflow-redesign.spec.ts`
+- Modify: `frontend/src/renderer/src/styles.css`
+
+**Interfaces:**
+- Produces: `SourceVideoViewMode = 'table' | 'thumbs' | 'compact'`.
+- Produces: `SourceVideoFilters { query: string; analysis: 'all' | 'analyzed' | 'unanalyzed' | 'running' }`.
+- Produces: `visibleSourceVideos(videos, analyzedIds, filters, sort): UploadedVideo[]` as a pure helper.
+- Consumes: current `uploadedVideos`, `deselected`, `selectedIds`, `toggleOne`, `toggleAll`, `handleAnalyze`, `handleAbort`, `analysisStatus`, and `ClipGenerationPreferences` from `ImportPage`.
+
+- [x] **Step 1: Write failing Import workflow tests**
+
+Cover Table/Thumbs/Compact switches, filename search, analysis filter, column chooser, visible row counts, per-row selection, select/deselect all, Analyze/Abort state, and light/dark analysis surfaces.
+
+- [x] **Step 2: Run the focused test and verify failure**
+
+Run: `npm run test:e2e -- import-workflow-redesign.spec.ts`
+
+Expected: FAIL because the new controls do not exist.
+
+- [x] **Step 3: Extract pure source-video projection and browser**
+
+Move table rendering out of `ImportPage`. Keep selection identity keyed by source-video ID across filtered views. Thumbs use a static placeholder/poster treatment; do not mount one playing video per card and do not introduce a backend thumbnail contract.
+
+- [x] **Step 4: Add view controls and selection bar**
+
+Use `ViewModeSwitcher`; add Search, Analysis filter, and Columns controls. The selection bar shows the full selected count and delegates to existing analysis handlers.
+
+- [x] **Step 5: Redesign analysis and generation controls**
+
+Render analysis progress in an accent `StatusSurface` with phase rail, current video, elapsed/ETA, Abort, and background-run copy. Flatten `ClipGenerationPanel` into one bordered panel with a divided three-column rule list instead of nested mini-cards.
+
+- [x] **Step 6: Verify Import and existing regressions**
+
+Run: `npm run typecheck && npm run test:e2e -- import-workflow-redesign.spec.ts project-shell-regressions.spec.ts compare-versions.spec.ts`
+
+Expected: PASS.
+
+- [x] **Step 7: Commit**
+
+```bash
+git add frontend/src/renderer/src/routes/Import.tsx frontend/src/renderer/src/components/ClipGenerationPanel.tsx frontend/src/renderer/src/components/SourceVideoBrowser.tsx frontend/src/renderer/src/components/SourceVideoSelectionBar.tsx frontend/src/renderer/src/lib/sourceVideoView.ts frontend/src/renderer/src/styles.css frontend/e2e/import-workflow-redesign.spec.ts
+git commit -m "feat: redesign the import workflow"
+```
+
+### Task 3: Review selectors and multi-view Candidate Clip browser
+
+**Files:**
+- Modify: `frontend/src/renderer/src/routes/Review.tsx`
+- Modify: `frontend/src/renderer/src/components/SourceClipsPanel.tsx`
+- Modify: `frontend/src/renderer/src/components/ClipCard.tsx`
+- Create: `frontend/src/renderer/src/components/ClipListRow.tsx`
+- Create: `frontend/src/renderer/src/components/ClipFilmstripItem.tsx`
+- Create: `frontend/src/renderer/src/lib/reviewView.ts`
+- Create: `frontend/e2e/review-browser-redesign.spec.ts`
+- Modify: `frontend/src/renderer/src/styles.css`
+
+**Interfaces:**
+- Produces: `ReviewViewMode = 'grid' | 'list' | 'filmstrip'`.
+- Produces: `ReviewFilters { minOverall: number; minSmoothness: number; decision: 'all' | 'included' | 'excluded' | 'undecided' }`.
+- Produces: `buildReviewClipRecords(clips, decisions, acceptedOrder, versionMembership, filters): ReviewClipRecord[]`.
+- Preserves: `ClipDecision`, Include/Remove actions, `acceptedOrder`, Version membership, `SourceTrack`, `ScoreChip`, and Candidate Clip identity.
+
+- [x] **Step 1: Add failing browser/filter tests**
+
+Test all three view modes, Overall/Smoothness/decision filters, stable rank ordering, Timeline membership, Include/Remove actions, and no eager video mounting in list/filmstrip modes.
+
+- [x] **Step 2: Run the focused test and verify failure**
+
+Run: `npm run test:e2e -- review-browser-redesign.spec.ts`
+
+Expected: FAIL because the new modes and filters do not exist.
+
+- [x] **Step 3: Extract pure Review view models**
+
+Centralize rank, filter, group, decision, Timeline position, and Version membership projections in `reviewView.ts`. Do not move authoritative state out of `ReviewContext`.
+
+- [x] **Step 4: Add the three Candidate Clip projections**
+
+Keep `ClipCard` as the rich grid view. Implement compact list and filmstrip projections that reuse `SourceTrack`, `ScoreChip`, file/time metadata, and the same action callbacks. Use CSS custom properties for per-file accents instead of theme-dependent inline colors.
+
+- [x] **Step 5: Add view/filter toolbar and score rails**
+
+Use `ViewModeSwitcher`. Compose existing score/timecode primitives and keep the score thresholds centralized in `ScoreChip.tsx`.
+
+- [x] **Step 6: Verify Review decisions and media behavior**
+
+Run: `npm run typecheck && npm run test:e2e -- review-browser-redesign.spec.ts preview-audio.spec.ts compare-versions.spec.ts`
+
+Expected: PASS.
+
+- [x] **Step 7: Commit**
+
+```bash
+git add frontend/src/renderer/src/routes/Review.tsx frontend/src/renderer/src/components/SourceClipsPanel.tsx frontend/src/renderer/src/components/ClipCard.tsx frontend/src/renderer/src/components/ClipListRow.tsx frontend/src/renderer/src/components/ClipFilmstripItem.tsx frontend/src/renderer/src/lib/reviewView.ts frontend/src/renderer/src/styles.css frontend/e2e/review-browser-redesign.spec.ts
+git commit -m "feat: add multi-view clip review"
+```
+
+### Task 4: Ask AI and Suggested Versions studio layout
+
+**Files:**
+- Modify: `frontend/src/renderer/src/routes/Review.tsx`
+- Modify: `frontend/src/renderer/src/components/ReviewChatPanel.tsx`
+- Modify: `frontend/src/renderer/src/components/VersionGallery.tsx`
+- Modify: `frontend/src/renderer/src/components/VersionCard.tsx`
+- Modify: `frontend/src/renderer/src/components/VersionPlayer.tsx`
+- Modify: `frontend/src/renderer/src/components/VersionScrubber.tsx`
+- Modify: `frontend/e2e/compare-versions.spec.ts`
+- Modify: `frontend/src/renderer/src/styles.css`
+
+**Interfaces:**
+- Consumes: unchanged `useReviewConversation`, `VersionSet`, `VersionDisplayState`, `replace_timeline`, `useSequencePlayer`, and stale refresh behavior.
+- Produces: the approved three-zone Review layout: Ask AI rail, Suggested cuts, and Candidate Clip browser.
+
+- [x] **Step 1: Add failing layout/state assertions**
+
+Extend the Version E2E suite for Ask AI rail containment, Short/Medium/Long selection, stale warning surface, non-mutating playback, out-of-date Apply state, and both themes.
+
+- [x] **Step 2: Run the focused test and verify failure**
+
+Run: `npm run test:e2e -- compare-versions.spec.ts`
+
+Expected: FAIL on the new layout/state hooks.
+
+- [x] **Step 3: Restyle Ask AI without changing its controller**
+
+Keep optimistic messages, retry, Proposal cards, resize persistence, and conversation API calls intact. Apply the compact studio rail and mono timestamps.
+
+- [x] **Step 4: Restyle Suggested Versions**
+
+Use two-column cards at normal desktop widths, preserve complete-Version preview and segmented scrubbing, and show stale/out-of-date state with the approved warning family. Buttons must not shrink below their labels.
+
+- [x] **Step 5: Verify complete Review workflow**
+
+Run: `npm run typecheck && npm run test:e2e -- compare-versions.spec.ts review-browser-redesign.spec.ts preview-audio.spec.ts`
+
+Expected: PASS.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add frontend/src/renderer/src/routes/Review.tsx frontend/src/renderer/src/components/ReviewChatPanel.tsx frontend/src/renderer/src/components/VersionGallery.tsx frontend/src/renderer/src/components/VersionCard.tsx frontend/src/renderer/src/components/VersionPlayer.tsx frontend/src/renderer/src/components/VersionScrubber.tsx frontend/src/renderer/src/styles.css frontend/e2e/compare-versions.spec.ts
+git commit -m "feat: restyle AI-assisted review"
+```
+
+### Task 5: Authoritative Timeline projection and studio editor
+
+**Files:**
+- Modify: `frontend/src/renderer/src/routes/Timeline.tsx`
+- Modify: `frontend/src/renderer/src/components/Timeline.tsx`
+- Modify: `frontend/src/renderer/src/components/TimelineEditor.tsx`
+- Modify: `frontend/src/renderer/src/components/TimelineItemRow.tsx`
+- Create: `frontend/src/renderer/src/lib/timelineProjection.ts`
+- Create: `frontend/tests/main/timelineProjection.test.ts`
+- Modify: `frontend/e2e/timeline-playback.spec.ts`
+- Modify: `frontend/src/renderer/src/styles.css`
+
+**Interfaces:**
+- Produces: `TimelineProjectionItem { itemId; sourceClipId; fileName; startSec; endSec; speed; durationSec; transform; missingSource }`.
+- Produces: `projectTimelineItems(items, clips): TimelineProjectionItem[]` and `effectiveTimelineDuration(items): number`.
+- Preserves: reorder, trim, split, remove, speed, transform, undo/redo, playback, keyboard transport, SSE reconciliation, repeated source clips, and `item_id` targeting.
+
+- [x] **Step 1: Write failing projection tests**
+
+Test repeated Candidate Clips, per-item bounds, speed-aware duration, transform passthrough, and missing-source fallback.
+
+- [x] **Step 2: Run and verify the unit test fails**
+
+Run: `npm run test:main -- timelineProjection.test.ts`
+
+Expected: FAIL because the helper does not exist.
+
+- [x] **Step 3: Implement and adopt the pure projection**
+
+Remove duplicated duration/projection calculations from Timeline and Export consumers. Keep item identity stable by `item_id`.
+
+- [x] **Step 4: Add failing Timeline presentation assertions**
+
+Extend `timeline-playback.spec.ts` for selected-item inspector/table, transport/ruler/playhead, repeated blocks, thumbnail fallback, and light/dark presentation.
+
+- [x] **Step 5: Implement the studio Timeline layout**
+
+Lift selected `item_id` to the route or a shared parent. Restyle clip blocks, ruler, transport, preview, and compact inspector/table. Use a lightweight static thumbnail/fallback treatment until a real thumbnail endpoint exists; do not add a backend contract in this branch.
+
+- [x] **Step 6: Verify Timeline behavior**
+
+Run: `npm run typecheck && npm run test:main && npm run test:e2e -- timeline-playback.spec.ts preview-audio.spec.ts`
+
+Expected: PASS.
+
+- [x] **Step 7: Commit**
+
+```bash
+git add frontend/src/renderer/src/routes/Timeline.tsx frontend/src/renderer/src/components/Timeline.tsx frontend/src/renderer/src/components/TimelineEditor.tsx frontend/src/renderer/src/components/TimelineItemRow.tsx frontend/src/renderer/src/lib/timelineProjection.ts frontend/tests/main/timelineProjection.test.ts frontend/src/renderer/src/styles.css frontend/e2e/timeline-playback.spec.ts
+git commit -m "feat: redesign the authoritative timeline"
+```
+
+### Task 6: Export format cards, receipt, and handoff actions
+
+**Files:**
+- Modify: `frontend/src/renderer/src/routes/Export.tsx`
+- Modify: `frontend/src/renderer/src/api/client.ts`
+- Modify: `frontend/src/preload/index.ts`
+- Modify: `frontend/src/main/index.ts`
+- Modify: `frontend/e2e/timeline-playback.spec.ts`
+- Modify: `frontend/src/renderer/src/styles.css`
+
+**Interfaces:**
+- Consumes: `ExportFormat`, complete `ExportResult`, and Task 5's `effectiveTimelineDuration`.
+- Produces: `revealExportFile(filePath: string): Promise<void>` through a guarded preload/main IPC handler backed by `shell.showItemInFolder`.
+- Preserves: overwrite confirmation, Resolve-specific Open action, export-time receipt metadata, EDL degradation warnings, and payload inspector.
+
+- [x] **Step 1: Add failing Export UI and IPC tests**
+
+Cover selectable Resolve/FCPXML/EDL cards, no pre-export Timeline write, complete receipt metadata, persistent warning, Copy feedback, Resolve Open, Reveal, non-wrapping actions, and path containment/ellipsis.
+
+- [x] **Step 2: Run the focused tests and verify failure**
+
+Run: `npm run test:e2e -- timeline-playback.spec.ts`
+
+Expected: FAIL on cards, receipt hooks, and Reveal.
+
+- [x] **Step 3: Add guarded Reveal IPC**
+
+Validate that the requested path is a non-empty absolute path before calling `shell.showItemInFolder`. Return a rejected promise on invalid input or shell failure; do not expose a generic shell command surface.
+
+- [x] **Step 4: Implement format cards and handoff summary**
+
+Use a controlled selected format. Export remains an explicit action and calls the existing endpoint once. The right-hand summary lists item count, effective runtime, source-file count, repeated items, and format caveats.
+
+- [x] **Step 5: Implement the success receipt**
+
+Render a success `StatusSurface` with `min-width: 0` on every grid/flex ancestor, ellipsized path, and `flex: 0 0 auto; white-space: nowrap` actions. Preserve the result's duration and warnings even if Timeline state later changes.
+
+- [x] **Step 6: Verify Export and main-process contracts**
+
+Run: `npm run typecheck && npm run test:main && npm run test:e2e -- timeline-playback.spec.ts`
+
+Expected: PASS.
+
+- [x] **Step 7: Commit**
+
+```bash
+git add frontend/src/renderer/src/routes/Export.tsx frontend/src/renderer/src/api/client.ts frontend/src/preload/index.ts frontend/src/main/index.ts frontend/src/renderer/src/styles.css frontend/e2e/timeline-playback.spec.ts
+git commit -m "feat: redesign export handoff"
+```
+
+### Task 7: Integrated visual QA, accessibility, and documentation
+
+**Files:**
+- Modify: `frontend/src/renderer/src/routes/PlaywriterQa.tsx`
+- Create: `frontend/e2e/studio-workflow-redesign.spec.ts`
+- Modify: `docs/QA.md`
+- Modify: `docs/USER_GUIDE.md`
+- Modify: `docs/ARCHITECTURE.md`
+- Modify: `docs/plans/README.md`
+- Create: `docs/reviews/2026-08-14-studio-workflow-redesign.html`
+
+**Interfaces:**
+- Consumes: the completed shared shell and four workflows.
+- Produces: one browser-driven acceptance path and a standalone review record.
+
+- [x] **Step 1: Add the integrated acceptance path**
+
+Drive Import → Review → Timeline → Export through the real renderer/backend QA route. Verify focus-visible controls, accessible names, keyboard transport, no horizontal workflow-page overflow, and both themes at 1440×900 and 1024×768.
+
+- [x] **Step 2: Run integrated E2E and fix only redesign regressions**
+
+Run: `npm run test:e2e -- studio-workflow-redesign.spec.ts`
+
+Expected: PASS after focused fixes.
+
+- [x] **Step 3: Update product and QA documentation**
+
+Document the three Import views, three Review views, selected Timeline inspector, Export receipt/actions, and the unchanged local-first/backend-authoritative behavior. Add the plan to `docs/plans/README.md` with ACTIVE status until final verification passes.
+
+- [x] **Step 4: Write the review record**
+
+Record scope, design source, screenshots reviewed, automated evidence, known limitations (no Settings redesign and no real thumbnail endpoint), commit identifiers, and any pending human real-footage/NLE checks.
+
+- [x] **Step 5: Run the full gate**
+
+Run:
+
+```bash
+cd frontend
+npm run lint
+npm run typecheck
+npm run test:main
+npm run test:backend
+npm run test:e2e
+npm run build
+```
+
+Evidence: lint PASS; typecheck PASS; main 69/69 PASS; backend 404 passed, 1 skipped, 3 existing deprecation warnings; E2E 64/64 PASS; build PASS. Human macOS/Electron and real-NLE checks are recorded separately and never reported as automated proof.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add frontend/src/renderer/src/routes/PlaywriterQa.tsx frontend/e2e/studio-workflow-redesign.spec.ts docs/QA.md docs/USER_GUIDE.md docs/ARCHITECTURE.md docs/plans/README.md docs/reviews/2026-08-14-studio-workflow-redesign.html
+git commit -m "docs: verify studio workflow redesign"
+```
+
+## Agent Execution Order
+
+1. Task 1 must land first because every workflow consumes its tokens/primitives.
+2. Tasks 2 and 3 may run in parallel after Task 1 if agents coordinate edits to `styles.css`; otherwise run sequentially.
+3. Task 4 follows Task 3 because both modify `Review.tsx` and Review layout CSS.
+4. Task 5 follows Task 1 and produces the projection consumed by Task 6.
+5. Task 6 follows Task 5.
+6. Task 7 runs only after Tasks 2–6 are integrated.
+
+Each implementation task receives a fresh Luna/high agent and a focused review before the next overlapping task starts. Agents must not broaden scope, update dependencies, or push the branch.

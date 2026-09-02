@@ -1,6 +1,6 @@
 # Plan 024: Source audio in exports
 
-Status: TODO · Priority P1 · Effort M · Risk HIGH · Category export correctness
+Status: DONE (2026-08-13) · Shipped in PR #65; user confirmed real-footage and Resolve QA showed no problems
 Depends on Plan 021 · Planned 2026-08-12
 
 ## Why and current evidence
@@ -392,14 +392,14 @@ fixtures remain valid; and the focused command exits 0.
   linked source audio for audio-bearing clips and must keep silent-source clips
   video-only. Keep EDL's explicit flattening/degradation warning language.
 
-- [ ] **Step 2: Run the exact Resolve check on a mixed real-footage project.**
+- [x] **Step 2: Run the exact Resolve check on a mixed real-footage project.**
   Use at least one `.MOV`/`.MP4` with a known stereo source waveform and one
   drone clip with no audio stream. In the app: create/open the folder project,
   analyze, accept at least one clip from each source, place them in a mixed
   timeline, set one audio-bearing clip to Speed 0.5 or 2.0, export Resolve XML,
   and retain the generated `exports/davinci/timeline.xml`.
 
-- [ ] **Step 3: Verify Resolve import.** In DaVinci Resolve, first import the
+- [x] **Step 3: Verify Resolve import.** In DaVinci Resolve, first import the
   real source files into the Media Pool and confirm their Audio badges and
   waveforms. Use `File > Import Timeline > Pre-generated Timeline` (wording may
   vary by Resolve version) and select `exports/davinci/timeline.xml`; choose
@@ -416,7 +416,7 @@ fixtures remain valid; and the focused command exits 0.
   - playback shows audio meters/waveform for the audio clips and genuine silence
     only for the no-audio source.
 
-- [ ] **Step 4: Verify portability and EDL separately.** Copy the project folder
+- [x] **Step 4: Verify portability and EDL separately.** Copy the project folder
   to another location, repeat XML import, and confirm zero relink prompts. Then
   import the EDL with source media available and confirm `AA/V` or `B` audio
   events appear for audio-bearing sources and `V` for the silent source. Record
@@ -454,7 +454,7 @@ fixtures remain valid; and the focused command exits 0.
   Confirm the API passes source metadata to EDL generation/warnings and that no
   writer manufactures audio for a source whose metadata says `has_audio=False`.
 
-- [ ] Record focused-test output and the manual Resolve result before marking
+- [x] Record focused-test output and the manual Resolve result before marking
   this plan done. Automated XML validity is not evidence that Resolve imported
   linked audio.
 

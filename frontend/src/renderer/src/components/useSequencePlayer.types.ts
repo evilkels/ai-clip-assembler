@@ -10,6 +10,8 @@ export interface UseSequencePlayerArgs {
   projectId: string | null;
   segments: SequenceSegment[];
   loop?: boolean;
+  /** Skip segments without a playable source when driving media playback. */
+  skipUnavailable?: boolean;
   onProgress?: (index: number, sourceTimeSec: number) => void;
 }
 

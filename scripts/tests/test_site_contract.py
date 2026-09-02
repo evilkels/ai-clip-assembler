@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import re
+import sys
 import unittest
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
-from site_contract import (
+# CI runs this file as a script (`python3 scripts/tests/test_site_contract.py`),
+# which puts this directory on sys.path rather than the repo root, so the
+# package-qualified import below would not resolve. Docs run it as
+# `python3 -m unittest scripts.tests.test_site_contract`, where it does. Add the
+# repo root so both invocations work.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.tests.site_contract import (
     BASE,
     SITE,
     discover_pages,
@@ -82,6 +92,26 @@ class StaticSiteContractTest(unittest.TestCase):
         self.assertIn("external provider's privacy policy", lower)
         self.assertIn("edl", lower)
         self.assertIn("flatten", lower)
+
+    def test_download_menus_expose_current_release_assets_for_both_architectures(self) -> None:
+        home = self.parsed[SITE / "index.html"]
+        assets = {
+            "Apple Silicon": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.2.0/AI.Clip.Assembler-0.2.0-arm64.dmg",
+            "Intel": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.2.0/AI.Clip.Assembler-0.2.0-x64.dmg",
+        }
+        menus = re.findall(
+            r'<details class="download-menu">(.*?)</details>',
+            home.html,
+            flags=re.DOTALL,
+        )
+
+        self.assertEqual(len(menus), 3)
+        for asset_url in assets.values():
+            self.assertEqual(home.html.count(asset_url), 3)
+        for menu in menus:
+            for label, asset_url in assets.items():
+                self.assertIn(f'href="{asset_url}"', menu)
+                self.assertIn(label, menu)
 
     def test_sitemap_and_public_pages_are_the_same_set(self) -> None:
         root = ET.parse(SITE / "sitemap.xml").getroot()

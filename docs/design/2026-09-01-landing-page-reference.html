@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<!-- Vendored design reference from the Claude Design landing-page handoff (2026-09-01).
+     Read as a SPEC, not as source: every style is inline at a fixed 1440px width and
+     there is no responsive behaviour. Reference A is dark, Reference B is light.
+     Image paths were repointed at site/img/frames/*.webp so this opens in place.
+     The prose spec lives beside it in 2026-09-01-landing-page-handoff.md. -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Clip Assembler — landing page reference (dark + light)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#e9eaee; font-family:'IBM Plex Sans',system-ui,sans-serif; }
+  .sheet { display:flex; flex-direction:column; gap:48px; padding:48px; }
+  .cap { font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#5b6068; }
+  a { color:#e11d48; text-decoration:none; }
+  a:hover { color:#a1102f; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="cap">Reference A · landing page, dark theme (primary direction)</div>
+<div style="width:1440px;background:#08090b;color:#f4f5f7;border:1px solid #000;box-shadow:0 24px 60px rgba(8,9,11,.45);overflow:hidden">
+        <header style="display:flex;align-items:center;gap:28px;padding:20px 56px;border-bottom:1px solid #1c2027">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase">AI Clip Assembler</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#6b7280">macOS</span>
+          <nav style="margin-left:auto;display:flex;align-items:center;gap:26px;font-size:13.5px;color:#a2a8b2">
+            <span>How it works</span><span>Local-first</span><span>FAQ</span><span>GitHub</span>
+            <span style="padding:8px 16px;border:1px solid #ff4d6d;border-radius:8px;color:#ff4d6d;font-weight:600">Download</span>
+          </nav>
+        </header>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 620px;gap:56px;padding:72px 56px 56px;align-items:center">
+          <div style="display:grid;gap:26px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#ff4d6d">Local-first editor · free &amp; open source</span>
+            <h1 style="margin:0;font-size:64px;line-height:1.03;letter-spacing:-.03em;font-weight:700;text-wrap:balance">Turn hours of drone footage<br><span style="color:#ff4d6d">into a cut worth keeping.</span></h1>
+            <p style="margin:0;max-width:52ch;font-size:17px;line-height:1.55;color:#a2a8b2">AI Clip Assembler is a free, local-first macOS app that scores raw footage for sharpness, motion stability, and exposure, then exports an editable FCPXML, DaVinci Resolve XML, or EDL timeline.</p>
+            <div style="display:flex;align-items:center;gap:14px">
+              <span style="padding:15px 26px;border-radius:11px;background:#ff4d6d;color:#1a0308;font-size:15px;font-weight:600">Download for macOS</span>
+              <span style="padding:15px 26px;border-radius:11px;border:1px solid #343a43;color:#f4f5f7;font-size:15px">See how it works</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b7280;line-height:1.5">Apple Silicon &amp; Intel<br>no Python, no terminal</span>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#6b7280">
+              <span>Scoring pass · 1 folder · 16 candidates</span><span style="color:#5fd18b">11 kept</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d1116;box-shadow:inset 0 0 0 1px #5fd18b">
+                <img src="../../site/img/frames/clip-05.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(8,9,11,.55) 0%,rgba(8,9,11,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5fd18b">9.1 KEEP</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d1116;box-shadow:inset 0 0 0 1px #5fd18b">
+                <img src="../../site/img/frames/clip-02.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(8,9,11,.55) 0%,rgba(8,9,11,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5fd18b">8.6 KEEP</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d1116;box-shadow:inset 0 0 0 1px #23272e">
+                <img src="../../site/img/frames/clip-01.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(.85);opacity:.45">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(8,9,11,.55) 0%,rgba(8,9,11,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#ff4d6d">4.2 CUT</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d1116;box-shadow:inset 0 0 0 1px #23272e">
+                <img src="../../site/img/frames/clip-03.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(.85);opacity:.45">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(8,9,11,.55) 0%,rgba(8,9,11,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#ff4d6d">3.8 CUT</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d1116;box-shadow:inset 0 0 0 1px #5fd18b">
+                <img src="../../site/img/frames/clip-04.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(8,9,11,.55) 0%,rgba(8,9,11,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5fd18b">8.2 KEEP</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d1116;box-shadow:inset 0 0 0 1px #ff4d6d">
+                <img src="../../site/img/frames/clip-06.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(8,9,11,.55) 0%,rgba(8,9,11,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#ff4d6d">FINAL WIDE</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #23272e;border-radius:10px;background:#0d0f12">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280">Assembled cut</span>
+              <span style="flex:1;display:flex;height:10px;border-radius:3px;overflow:hidden">
+                <span style="flex:0 0 22%;background:#ff4d6d;border-right:1px solid #0d0f12"></span>
+                <span style="flex:0 0 16%;background:rgba(255,255,255,.34);border-right:1px solid #0d0f12"></span>
+                <span style="flex:0 0 12%;background:rgba(255,255,255,.2);border-right:1px solid #0d0f12"></span>
+                <span style="flex:0 0 19%;background:rgba(255,255,255,.34);border-right:1px solid #0d0f12"></span>
+                <span style="flex:1;background:rgba(255,255,255,.2)"></span>
+              </span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a2a8b2;font-variant-numeric:tabular-nums">0:23.0</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-end;height:56px;border-top:1px solid #1c2027;border-bottom:1px solid #1c2027;background:#0b0d10;padding:0 56px;gap:0;position:relative">
+          <span style="position:absolute;left:56px;right:56px;bottom:0;height:26px;background:repeating-linear-gradient(90deg,#23272e 0 1px,transparent 1px 24px)"></span>
+          <span style="position:absolute;left:24%;top:8px;bottom:0;width:2px;background:#ff4d6d"></span>
+          <span style="position:relative;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#6b7280;padding-bottom:30px">00:00 · IMPORT</span>
+          <span style="position:relative;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#6b7280;padding-bottom:30px">02:47 · EXPORT</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:40px;padding:64px 56px">
+          <div style="display:grid;gap:10px;align-content:start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;color:#ff4d6d">01</span>
+            <strong style="font-size:20px;font-weight:600">Drop in the raw files</strong>
+            <p style="margin:0;color:#a2a8b2;font-size:14.5px;line-height:1.6">Point it at a folder of MP4/MOV files. Each video is probed for duration, frame rate, and codec, then analyzed for stable, interesting moments — scene by scene, on your own hardware.</p>
+          </div>
+          <div style="display:grid;gap:10px;align-content:start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;color:#ff4d6d">02</span>
+            <strong style="font-size:20px;font-weight:600">Review clips. Build a montage.</strong>
+            <p style="margin:0;color:#a2a8b2;font-size:14.5px;line-height:1.6">Every candidate arrives with scores and a reason. Include the keepers, exclude the rest, then ask the optional AI agent for editable versions and apply one to the Timeline.</p>
+          </div>
+          <div style="display:grid;gap:10px;align-content:start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;color:#ff4d6d">03</span>
+            <strong style="font-size:20px;font-weight:600">Hand off, don't lock in</strong>
+            <p style="margin:0;color:#a2a8b2;font-size:14.5px;line-height:1.6">Export a real, editable timeline — DaVinci Resolve XML, Final Cut Pro FCPXML, or plain EDL — with media paths that survive moving the project folder.</p>
+          </div>
+        </div>
+
+        <div style="padding:0 56px 64px">
+          <div style="border:1px solid #23272e;border-radius:14px;overflow:hidden;background:#0d0f12">
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #23272e">
+              <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span>
+              <span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span>
+              <span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+              <span style="margin-left:14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b7280">AI Clip Assembler — Review</span>
+            </div>
+            <div style="position:relative;width:100%;height:520px">
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#101318;color:#6b7280;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase" data-asset="review-dark.png">app screenshot — review, dark</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:32px;padding:56px;border-top:1px solid #1c2027;background:#0b0d10">
+          <div style="display:grid;gap:8px">
+            <h2 style="margin:0;font-size:36px;letter-spacing:-.02em;font-weight:700">Try it on your last flight</h2>
+            <p style="margin:0;color:#a2a8b2;font-size:15px">Free and open source. Drop in a folder of clips and see what it finds.</p>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+            <span style="padding:15px 26px;border-radius:11px;background:#ff4d6d;color:#1a0308;font-size:15px;font-weight:600">Download for macOS</span>
+            <span style="padding:15px 26px;border-radius:11px;border:1px solid #343a43;color:#f4f5f7;font-size:15px">View on GitHub</span>
+          </div>
+        </div>
+      </div>
+    
+  <div class="cap">Reference B · landing page, light theme (same layout, light tokens)</div>
+<div style="width:1440px;background:#ffffff;color:#1a1c20;border:1px solid #dcdfe4;box-shadow:0 24px 60px rgba(26,28,32,.13);overflow:hidden">
+        <header style="display:flex;align-items:center;gap:28px;padding:20px 56px;border-bottom:1px solid #e4e7eb">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase">AI Clip Assembler</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7b818a">macOS</span>
+          <nav style="margin-left:auto;display:flex;align-items:center;gap:26px;font-size:13.5px;color:#52585f">
+            <span>How it works</span><span>Local-first</span><span>FAQ</span><span>GitHub</span>
+            <span style="padding:8px 16px;border:1px solid #e11d48;border-radius:8px;color:#e11d48;font-weight:600">Download</span>
+          </nav>
+        </header>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 620px;gap:56px;padding:72px 56px 56px;align-items:center">
+          <div style="display:grid;gap:26px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#e11d48">Local-first editor · free &amp; open source</span>
+            <h1 style="margin:0;font-size:64px;line-height:1.03;letter-spacing:-.03em;font-weight:700;text-wrap:balance">Turn hours of drone footage<br><span style="color:#e11d48">into a cut worth keeping.</span></h1>
+            <p style="margin:0;max-width:52ch;font-size:17px;line-height:1.55;color:#52585f">AI Clip Assembler is a free, local-first macOS app that scores raw footage for sharpness, motion stability, and exposure, then exports an editable FCPXML, DaVinci Resolve XML, or EDL timeline.</p>
+            <div style="display:flex;align-items:center;gap:14px">
+              <span style="padding:15px 26px;border-radius:11px;background:#e11d48;color:#ffffff;font-size:15px;font-weight:600">Download for macOS</span>
+              <span style="padding:15px 26px;border-radius:11px;border:1px solid #cfd3da;color:#1a1c20;font-size:15px">See how it works</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7b818a;line-height:1.5">Apple Silicon &amp; Intel<br>no Python, no terminal</span>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#7b818a">
+              <span>Scoring pass · 1 folder · 16 candidates</span><span style="color:#17915a">11 kept</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#eef0f3;box-shadow:inset 0 0 0 1px #17915a">
+                <img src="../../site/img/frames/clip-05.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.78) 0%,rgba(255,255,255,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#17915a">9.1 KEEP</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#eef0f3;box-shadow:inset 0 0 0 1px #17915a">
+                <img src="../../site/img/frames/clip-02.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.78) 0%,rgba(255,255,255,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#17915a">8.6 KEEP</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#eef0f3;box-shadow:inset 0 0 0 1px #dfe2e6">
+                <img src="../../site/img/frames/clip-01.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(.85);opacity:.45">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.78) 0%,rgba(255,255,255,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e11d48">4.2 CUT</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#eef0f3;box-shadow:inset 0 0 0 1px #dfe2e6">
+                <img src="../../site/img/frames/clip-03.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(.85);opacity:.45">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.78) 0%,rgba(255,255,255,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e11d48">3.8 CUT</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#eef0f3;box-shadow:inset 0 0 0 1px #17915a">
+                <img src="../../site/img/frames/clip-04.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.78) 0%,rgba(255,255,255,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#17915a">8.2 KEEP</span>
+              </div>
+              <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#eef0f3;box-shadow:inset 0 0 0 1px #e11d48">
+                <img src="../../site/img/frames/clip-06.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,.78) 0%,rgba(255,255,255,0) 45%)"></span>
+                <span style="position:absolute;top:8px;left:9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e11d48">FINAL WIDE</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #dfe2e6;border-radius:10px;background:#fbfbfc">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#7b818a">Assembled cut</span>
+              <span style="flex:1;display:flex;height:10px;border-radius:3px;overflow:hidden">
+                <span style="flex:0 0 22%;background:#e11d48;border-right:1px solid #fbfbfc"></span>
+                <span style="flex:0 0 16%;background:rgba(26,28,32,.28);border-right:1px solid #fbfbfc"></span>
+                <span style="flex:0 0 12%;background:rgba(26,28,32,.16);border-right:1px solid #fbfbfc"></span>
+                <span style="flex:0 0 19%;background:rgba(26,28,32,.28);border-right:1px solid #fbfbfc"></span>
+                <span style="flex:1;background:rgba(26,28,32,.16)"></span>
+              </span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#52585f;font-variant-numeric:tabular-nums">0:23.0</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-end;height:56px;border-top:1px solid #e4e7eb;border-bottom:1px solid #e4e7eb;background:#f7f8fa;padding:0 56px;gap:0;position:relative">
+          <span style="position:absolute;left:56px;right:56px;bottom:0;height:26px;background:repeating-linear-gradient(90deg,#dfe2e6 0 1px,transparent 1px 24px)"></span>
+          <span style="position:absolute;left:24%;top:8px;bottom:0;width:2px;background:#e11d48"></span>
+          <span style="position:relative;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#7b818a;padding-bottom:30px">00:00 · IMPORT</span>
+          <span style="position:relative;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#7b818a;padding-bottom:30px">02:47 · EXPORT</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:40px;padding:64px 56px">
+          <div style="display:grid;gap:10px;align-content:start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;color:#e11d48">01</span>
+            <strong style="font-size:20px;font-weight:600">Drop in the raw files</strong>
+            <p style="margin:0;color:#52585f;font-size:14.5px;line-height:1.6">Point it at a folder of MP4/MOV files. Each video is probed for duration, frame rate, and codec, then analyzed for stable, interesting moments — scene by scene, on your own hardware.</p>
+          </div>
+          <div style="display:grid;gap:10px;align-content:start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;color:#e11d48">02</span>
+            <strong style="font-size:20px;font-weight:600">Review clips. Build a montage.</strong>
+            <p style="margin:0;color:#52585f;font-size:14.5px;line-height:1.6">Every candidate arrives with scores and a reason. Include the keepers, exclude the rest, then ask the optional AI agent for editable versions and apply one to the Timeline.</p>
+          </div>
+          <div style="display:grid;gap:10px;align-content:start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;color:#e11d48">03</span>
+            <strong style="font-size:20px;font-weight:600">Hand off, don't lock in</strong>
+            <p style="margin:0;color:#52585f;font-size:14.5px;line-height:1.6">Export a real, editable timeline — DaVinci Resolve XML, Final Cut Pro FCPXML, or plain EDL — with media paths that survive moving the project folder.</p>
+          </div>
+        </div>
+
+        <div style="padding:0 56px 64px">
+          <div style="border:1px solid #dfe2e6;border-radius:14px;overflow:hidden;background:#fbfbfc">
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #dfe2e6">
+              <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span>
+              <span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span>
+              <span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+              <span style="margin-left:14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7b818a">AI Clip Assembler — Review (light)</span>
+            </div>
+            <div style="position:relative;width:100%;height:520px">
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#eef0f3;color:#7b818a;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase" data-asset="review-light.png">app screenshot — review, light</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:32px;padding:56px;border-top:1px solid #e4e7eb;background:#f7f8fa">
+          <div style="display:grid;gap:8px">
+            <h2 style="margin:0;font-size:36px;letter-spacing:-.02em;font-weight:700">Try it on your last flight</h2>
+            <p style="margin:0;color:#52585f;font-size:15px">Free and open source. Drop in a folder of clips and see what it finds.</p>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+            <span style="padding:15px 26px;border-radius:11px;background:#e11d48;color:#ffffff;font-size:15px;font-weight:600">Download for macOS</span>
+            <span style="padding:15px 26px;border-radius:11px;border:1px solid #cfd3da;color:#1a1c20;font-size:15px">View on GitHub</span>
+          </div>
+        </div>
+      </div>
+    
+</div>
+</body>
+</html>

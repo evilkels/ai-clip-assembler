@@ -245,7 +245,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await page.getByLabel('Harness').selectOption('manual');
   const generationPanel = page.locator('.analysis-controls + .clip-generation-panel');
   await expect(generationPanel).toBeVisible();
-  await generationPanel.locator('summary').click();
   const generationLabels = [
     'Shortest clip (s)',
     'Longest clip (s)',
@@ -271,9 +270,6 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   const regenerateButton = page.getByRole('button', { name: 'Regenerate clips' });
   await expect(regenerateButton).toBeEnabled();
   const cachedGenerationPanel = page.locator('.analysis-controls + .clip-generation-panel');
-  if ((await cachedGenerationPanel.getAttribute('open')) === null) {
-    await cachedGenerationPanel.locator('summary').click();
-  }
   await cachedGenerationPanel.getByLabel('Max clips per video', { exact: true }).fill('12');
   page.once('dialog', async (dialog) => {
     expect(dialog.message()).toContain('resets manual');
@@ -313,16 +309,71 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   }
   await expect(page.getByText('Ask the AI', { exact: true })).toBeVisible();
   await expect(page.getByText('Suggested cuts', { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole('strong').filter({ hasText: /^Browse your clips \(\d+\)$/ }),
-  ).toBeVisible();
+  await expect(page.getByTestId('review-three-zone-layout')).toBeVisible();
+  await expect(page.getByTestId('ask-ai-rail')).toBeVisible();
+  await expect(page.getByTestId('suggested-versions-zone')).toBeVisible();
+  await expect(page.getByTestId('candidate-browser-zone')).toBeVisible();
+
+  const reviewZones = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const node = document.querySelector(selector);
+      if (!node) throw new Error(`Missing ${selector}`);
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    };
+    return {
+      body: bounds('.review-shell-body'),
+      rail: bounds('[data-testid="ask-ai-rail"]'),
+      main: bounds('.review-main'),
+      suggested: bounds('[data-testid="suggested-versions-zone"]'),
+      candidates: bounds('[data-testid="candidate-browser-zone"]'),
+    };
+  });
+  for (const child of [reviewZones.rail, reviewZones.main]) {
+    expect(child.left).toBeGreaterThanOrEqual(reviewZones.body.left);
+    expect(child.right).toBeLessThanOrEqual(reviewZones.body.right);
+    expect(child.top).toBeGreaterThanOrEqual(reviewZones.body.top);
+    expect(child.bottom).toBeLessThanOrEqual(reviewZones.body.bottom);
+  }
+  for (const child of [reviewZones.suggested, reviewZones.candidates]) {
+    expect(child.left).toBeGreaterThanOrEqual(reviewZones.main.left);
+    expect(child.right).toBeLessThanOrEqual(reviewZones.main.right);
+  }
+  const reviewThemeColors = await page.evaluate(() => {
+    const root = document.documentElement;
+    const surface = document.querySelector('.review-main');
+    const rail = document.querySelector('.review-chat');
+    if (!surface || !rail) throw new Error('Review surfaces are missing');
+    root.setAttribute('data-theme', 'dark');
+    const dark = {
+      surface: getComputedStyle(surface).backgroundColor,
+      rail: getComputedStyle(rail).backgroundColor,
+    };
+    root.setAttribute('data-theme', 'light');
+    const light = {
+      surface: getComputedStyle(surface).backgroundColor,
+      rail: getComputedStyle(rail).backgroundColor,
+    };
+    root.setAttribute('data-theme', 'dark');
+    return { dark, light };
+  });
+  expect(reviewThemeColors.dark.surface).not.toBe(reviewThemeColors.light.surface);
+  expect(reviewThemeColors.dark.rail).not.toBe(reviewThemeColors.light.rail);
+
+  const formatGroup = page.getByRole('group', { name: 'Length format' });
+  for (const format of ['Short', 'Medium', 'Long']) {
+    const button = formatGroup.getByRole('button', { name: format, exact: true });
+    await expect(button).toHaveAttribute('aria-pressed', format === 'Short' ? 'true' : 'false');
+    await expect(button).toHaveCSS('white-space', 'nowrap');
+    expect(await button.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  }
+  await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
   await expect(cards.nth(0)).toContainText('Current suggestion');
   await expect(cards.nth(2)).toContainText('Unavailable');
   await expect(cards.nth(2)).toContainText('MISSING.MOV');
   await expect(cards.nth(2).getByTestId('version-adopt')).toBeDisabled();
 
   const sourcePanelForState = page.getByTestId('source-clips-panel');
-  await sourcePanelForState.locator('summary').first().click();
   await expect(
     sourcePanelForState.getByText(/Every usable clip found in your footage/),
   ).toBeVisible();
@@ -339,6 +390,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(
     page.getByText('Your video or clip choices changed since these suggestions were made.'),
   ).toBeVisible();
+  await expect(page.getByTestId('version-stale-warning')).toHaveAttribute('data-tone', 'warning');
   await expect(sourcePanelForState.getByText(/Proposed in/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Ask the AI to refresh suggestions' }).click();
   await expect(
@@ -413,8 +465,14 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   // Exclusive playback: starting one Version pauses the previously active one.
   const firstPlay = cards.nth(0).locator('.version-player-play');
   const secondPlay = cards.nth(1).locator('.version-player-play');
+  const revisionBeforePlayback = await page.request.get(`${projectApiBase}/timeline/document`);
+  expect(revisionBeforePlayback.ok(), await revisionBeforePlayback.text()).toBe(true);
+  const revisionBeforePlaybackValue = (await revisionBeforePlayback.json()).document.revision;
   await firstPlay.click();
   await expect(firstPlay).toHaveAttribute('aria-label', /^Pause/);
+  await page.waitForTimeout(100);
+  const revisionAfterPlayback = await page.request.get(`${projectApiBase}/timeline/document`);
+  expect((await revisionAfterPlayback.json()).document.revision).toBe(revisionBeforePlaybackValue);
   await secondPlay.click();
   await expect(secondPlay).toHaveAttribute('aria-label', /^Pause/);
   await expect(firstPlay).toHaveAttribute('aria-label', /^Play/);
@@ -431,7 +489,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   );
   await expect(agentMessage.getByTestId('proposal-card')).toBeVisible();
   await expect(editorMessage).toHaveCSS('text-align', 'right');
-  await expect(agentMessage).toHaveCSS('max-width', /^(82|100)%$/);
+  await expect(agentMessage).toHaveCSS('max-width', /^(82|86|100)%$/);
   expect(
     await agentMessage.evaluate(
       (node) => node.getBoundingClientRect().width <= (node.parentElement?.clientWidth ?? 0),
@@ -465,13 +523,32 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(page.locator(`[data-message-id="agent-${failedMessageId}"]`)).toBeVisible();
   await expect(failedBubble).not.toContainText('Sending');
 
-  await page.getByRole('link', { name: 'Timeline' }).click();
-  await page.getByRole('link', { name: 'Review' }).click();
+  // Review evidence is intentionally kept outside visual baselines. It gives
+  // the conformance pass a stable 1440×1400 dark workstation capture while
+  // leaving Playwright's approved snapshot set untouched.
+  const focusedCardCollapse = page.getByRole('button', { name: 'Collapse Punchy Social Cut' });
+  if (await focusedCardCollapse.count() > 0) await focusedCardCollapse.first().click();
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await page.locator('.review-main').evaluate((element) => element.scrollTo({ top: 0, left: 0 }));
+  await page.screenshot({
+    path: join(
+      process.cwd(),
+      '..',
+      '.superpowers',
+      'sdd',
+      '2026-09-01-literal-design-conformance',
+      'task-4-review-seeded-dark-1440x1400.png',
+    ),
+  });
+
+  await page.getByRole('link', { name: '3. Timeline', exact: true }).click();
+  await page.getByRole('link', { name: '2. Review', exact: true }).click();
   await expect(page.locator('[data-message-id="agent-opening"]')).toBeVisible();
   await expect(page.locator('[data-message-id="editor-direction"]')).toBeVisible();
   const sourcePanel = page.getByTestId('source-clips-panel');
-  await expect(sourcePanel).not.toHaveAttribute('open');
-  await expect(sourcePanel.locator('video')).toHaveCount(0);
+  await expect(sourcePanel).toHaveAttribute('data-open', 'true');
+  await expect(sourcePanel.locator('[data-review-browser]')).toBeVisible();
 
   await cards.first().getByTestId('version-adopt').click();
   const applyDialog = page.getByRole('dialog', {
@@ -496,6 +573,8 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   await expect(applyDialog.getByRole('alert')).toContainText(
     'Working Timeline changed while this comparison was open.',
   );
+  await expect(applyDialog).toHaveAttribute('data-state', 'conflict');
+  await expect(applyDialog.getByRole('button', { name: 'Apply to working timeline' })).toBeDisabled();
   await expect(cards).toHaveCount(3);
 
   await applyDialog.getByRole('button', { name: 'Cancel' }).click();
@@ -516,7 +595,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
 
   // The adopted cut lands on the Working Timeline; verify it on the Timeline page
   // (the Review page no longer embeds a duplicate timeline strip).
-  await page.getByRole('link', { name: 'Timeline' }).click();
+  await page.getByRole('link', { name: '3. Timeline', exact: true }).click();
   // The adopted Version has four items over the same Candidate Clip; the
   // authoritative Timeline keeps them distinct instead of collapsing them.
   await expect(page.locator('.tl-clip')).toHaveCount(4, { timeout: 10_000 });

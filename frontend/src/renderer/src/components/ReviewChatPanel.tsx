@@ -44,7 +44,12 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
   }, [messages, busy, error]);
 
   return (
-    <aside className="review-chat" aria-label="Ask the AI" data-testid="review-chat-panel">
+    <aside
+      className="review-chat"
+      aria-label="Ask the AI"
+      data-testid="review-chat-panel"
+      data-review-chat-surface
+    >
       <div className="review-chat-head">
         <div>
           <strong>Ask the AI</strong>

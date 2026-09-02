@@ -1,8 +1,29 @@
 # Plan 017: Review-page clarity and polish
 
-Status: Step 1 DONE (2026-07-20); Steps 2–6 TODO. Priority P1, effort M
-(L with design-system adoption), risk LOW/MED. Planned at `6fc6c6d`; depends
-on plans 012, 016, and `ui-polish-modern-shell.md`.
+Status: Step 1 DONE (2026-07-20). Remaining item 5 (design-system adoption)
+DONE via `2026-08-14-studio-workflow-redesign.md`; items 1–4 still TODO, and
+item 2 got *worse* — see "Reconciled 2026-08-31" below. Priority P1, effort M,
+risk LOW/MED. Planned at `6fc6c6d`; depends on plans 012 and 016.
+
+## Reconciled 2026-08-31 against `redesign/studio-workflows`
+
+- **Item 5 (design-system adoption) is delivered.** The studio redesign restyled
+  the Review shell (Tasks 3 and 4) onto shared tokens and added Grid/List/
+  Filmstrip Candidate Clip views. This supersedes the pointer to
+  `ui-polish-modern-shell.md`, which never executed as written.
+- **Item 1 (poster-first cards) is partially delivered.** The new List and
+  Filmstrip views mount no `<video>`, so a user can now browse many clips
+  without the N×metadata-stream jank. `ClipCard` (Grid) still mounts one
+  `<video>` per card, so the original defect survives in the default view. The
+  remaining work is narrower than when written: poster-first `ClipCard` only.
+- **Item 2 (one smoothness model) is now more urgent, not less.** The redesign
+  added a *second* view-only smoothness control (`ReviewFilters.minSmoothness`
+  in `lib/reviewView.ts`) alongside the existing generation
+  `smoothness_threshold` in `ClipGenerationPanel.tsx`. That is exactly the
+  two-confusable-controls problem this item exists to remove, now shipped in a
+  more prominent toolbar. Resolve before further Review work.
+- **Items 3 and 4 are untouched** by the redesign; they are behavioural and
+  remain exactly as written.
 
 ## Goal and diagnosis
 

@@ -1,6 +1,6 @@
 # Plan 026: Hear source audio in the app
 
-Status: TODO · Priority P2 · Effort S · Risk MED · Category preview fidelity
+Status: DONE (2026-08-13) · Shipped in PR #65; user confirmed real-footage QA showed no problems
 Depends on Plan 024 · Planned 2026-08-13
 
 ## Why and current evidence
@@ -163,11 +163,11 @@ the two agree, and the state is keyboard reachable and announced.
   npm run build
   ```
 
-- [ ] Manual pass with real footage: a phone clip is audible in Review at the
+- [x] Manual pass with real footage: a phone clip is audible in Review at the
   chosen volume; a drone clip plays silently with no error; a retimed clip is
   time-stretched, not chipmunked; muting persists across a reload; and playing
   a mixed timeline does not stall at the first segment boundary.
-- [ ] Record the segment-boundary click. Swapping the element source between
+- [x] Record the segment-boundary click. Swapping the element source between
   segments produces an audible discontinuity. This plan accepts it; a volume
   ramp at segment start is the follow-up if it proves distracting in real use.
 

@@ -40,7 +40,7 @@ function ensureFixtureVideo(name: string, color: string): string {
 async function setupTimeline(
   page: Page,
   files: string[],
-  options: { omitAnalyzedClips?: boolean } = {},
+  options: { omitAnalyzedClips?: boolean; clipVisibility?: 'all' | 'first' | 'none' } = {},
 ) {
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
@@ -58,11 +58,19 @@ async function setupTimeline(
     ).toBeVisible();
   }
 
-  if (options.omitAnalyzedClips) {
+  if (options.omitAnalyzedClips || options.clipVisibility) {
     await page.route('**/projects/*/analyze', async (route) => {
       const response = await route.fetch();
       const body = await response.json();
-      await route.fulfill({ response, json: { ...body, clips: [] } });
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          clips: options.omitAnalyzedClips || options.clipVisibility === 'none'
+            ? []
+            : body.clips.slice(0, 1),
+        },
+      });
     });
   }
   await page.getByLabel('Harness').selectOption('manual');
@@ -72,7 +80,7 @@ async function setupTimeline(
   });
 
   let projectId: string | undefined;
-  if (options.omitAnalyzedClips) {
+  if (options.omitAnalyzedClips || options.clipVisibility === 'none') {
     await page.goto('/#/playwriter');
     projectId = (await page.getByTestId('qa-project-id').textContent())?.trim();
     expect(projectId).toBeTruthy();
@@ -85,9 +93,24 @@ async function setupTimeline(
       { data: { operation: 'include', args: { clip_id: sourceClip.clip_id } } },
     );
     expect(includeResponse.ok()).toBe(true);
+  } else if (options.clipVisibility) {
+    await page.goto('/#/playwriter');
+    projectId = (await page.getByTestId('qa-project-id').textContent())?.trim();
+    expect(projectId).toBeTruthy();
+    const clipsResponse = await page.request.get(
+      `http://127.0.0.1:8000/projects/${projectId}/clips`,
+    );
+    const sourceClips = (await clipsResponse.json()).clips as Array<{ clip_id: string }>;
+    for (const clip of sourceClips) {
+      const includeResponse = await page.request.post(
+        `http://127.0.0.1:8000/projects/${projectId}/timeline/op`,
+        { data: { operation: 'include', args: { clip_id: clip.clip_id } } },
+      );
+      expect(includeResponse.ok()).toBe(true);
+    }
   } else {
     await page.goto('/#/review');
-    await page.getByTestId('source-clips-panel').locator('summary').click();
+    await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
     await expect(page.getByLabel(/Preview /).first()).toBeVisible();
     // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
     const includeButton = page.getByRole('button', { name: 'Include', exact: true });
@@ -103,7 +126,7 @@ async function setupTimeline(
 
   await page.goto('/#/timeline');
   const video = page.getByTestId('timeline-preview-video');
-  if (options.omitAnalyzedClips) {
+  if (options.omitAnalyzedClips || options.clipVisibility === 'none') {
     await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
   } else {
     await expect(video).toBeVisible({ timeout: 15_000 });
@@ -170,6 +193,66 @@ async function replaceWithRepeatedItems(page: Page, projectId: string) {
   ]);
 }
 
+async function replaceWithMixedMissingItems(page: Page, projectId: string) {
+  const snapshot = await page.request.get(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/document`,
+  );
+  const items = (await snapshot.json()).document.items as Array<{
+    source_clip_id: string;
+    start_sec: number;
+  }>;
+  expect(items.length).toBeGreaterThanOrEqual(2);
+  const clips = (await page.request
+    .get(`http://127.0.0.1:8000/projects/${projectId}/clips`)
+    .then((response) => response.json())).clips as Array<{ clip_id: string }>;
+  const validSource = items.find((item) => item.source_clip_id === clips[0]?.clip_id);
+  const missingSource = items.find((item) => item.source_clip_id !== clips[0]?.clip_id);
+  expect(validSource).toBeTruthy();
+  expect(missingSource).toBeTruthy();
+  const response = await page.request.post(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/op`,
+    {
+      data: {
+        operation: 'replace_timeline',
+        args: {
+          items: [
+            {
+              source_clip_id: missingSource!.source_clip_id,
+              start_sec: missingSource!.start_sec,
+              end_sec: missingSource!.start_sec + 2,
+              speed: 1,
+              transform: { scale: 1, x: 0, y: 0 },
+            },
+            {
+              source_clip_id: validSource!.source_clip_id,
+              start_sec: validSource!.start_sec,
+              end_sec: validSource!.start_sec + 2,
+              speed: 1,
+              transform: { scale: 1, x: 0, y: 0 },
+            },
+          ],
+        },
+      },
+    },
+  );
+  expect(response.ok()).toBe(true);
+  const resultItems = (await response.json()).document.items as Array<{
+    item_id: string;
+    source_clip_id: string;
+  }>;
+  const missingItem = resultItems.find((item) => item.source_clip_id === missingSource!.source_clip_id);
+  expect(missingItem).toBeTruthy();
+  const reorderResponse = await page.request.post(
+    `http://127.0.0.1:8000/projects/${projectId}/timeline/op`,
+    { data: { operation: 'reorder', args: { item_id: missingItem!.item_id, to_index: 0 } } },
+  );
+  expect(reorderResponse.ok()).toBe(true);
+  return (await reorderResponse.json()).document.items as Array<{
+    item_id: string;
+    source_clip_id: string;
+  }>;
+}
+
 async function postTimelineOperation(
   page: Page,
   projectId: string,
@@ -194,7 +277,7 @@ test('timeline preview has no native controls; review cards use poster videos', 
   await expect(timelineVideo).not.toHaveAttribute('controls');
 
   await page.goto('/#/review');
-  await page.getByTestId('source-clips-panel').locator('summary').click();
+  await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
   const reviewVideo = page.getByLabel(/Preview /).first();
   await expect(reviewVideo).toBeVisible();
   await expect(reviewVideo).not.toHaveAttribute('controls');
@@ -239,6 +322,242 @@ test('renders repeated Candidate Clips as distinct authoritative Timeline Items'
   await expect(page.locator(`[data-timeline-item-id="${items[0].item_id}"]`)).toBeVisible();
   await expect(page.locator(`[data-timeline-item-id="${items[1].item_id}"]`)).toBeVisible();
   await expect(page.getByTestId('timeline-summary')).toContainText('2 items · 4.0s');
+});
+
+test('studio Timeline selects an item and exposes its authoritative inspector', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const second = page.locator(`[data-timeline-item-id="${items[1].item_id}"]`);
+
+  await expect(page.locator('.timeline-item-row')).toHaveCount(2);
+  const firstRow = page.locator(`[data-timeline-editor-item-id="${items[0].item_id}"]`);
+  const firstSelect = firstRow.getByRole('button', { name: /Select/ });
+  await firstSelect.focus();
+  await page.keyboard.press('Enter');
+  await expect(firstSelect).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('timeline-inspector')).toContainText(items[0].item_id);
+
+  await second.click();
+  await expect(page.getByTestId('timeline-inspector')).toContainText('seq-fixture-a.mp4');
+  await expect(page.getByTestId('timeline-inspector')).toContainText(items[1].item_id);
+  await expect(page.locator('.timeline-item-row.selected')).toHaveAttribute(
+    'data-timeline-editor-item-id',
+    items[1].item_id,
+  );
+  await expect(page.locator('.timeline-ruler')).toBeVisible();
+  await expect(page.locator('.timeline-playhead')).toBeVisible();
+  await expect(page.getByTestId('transport-play')).toBeVisible();
+  await expect(page.locator('.tl-clip-thumb')).toHaveCount(2);
+  await expect(page.locator('.tl-clip video')).toHaveCount(0);
+  const workspaceGeometry = await page.evaluate(() => {
+    const workspace = document.querySelector<HTMLElement>('.timeline-page-body');
+    const timeline = document.querySelector<HTMLElement>('.timeline');
+    const inspector = document.querySelector<HTMLElement>('.timeline-editor');
+    const workspaceBox = workspace?.getBoundingClientRect();
+    const timelineBox = timeline?.getBoundingClientRect();
+    const inspectorBox = inspector?.getBoundingClientRect();
+    return {
+      twoColumns: Boolean(
+        workspaceBox && timelineBox && inspectorBox && timelineBox.right <= inspectorBox.left,
+      ),
+      inspectorWidth: inspectorBox?.width ?? 0,
+      noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    };
+  });
+  expect(workspaceGeometry.twoColumns).toBe(true);
+  expect(workspaceGeometry.inspectorWidth).toBeGreaterThanOrEqual(300);
+  expect(workspaceGeometry.noHorizontalOverflow).toBe(true);
+  const themeColors = await page.evaluate(() => {
+    const selectors = [
+      '.timeline-track',
+      '.tl-clip',
+      '.timeline-toolbar',
+      '.timeline-ruler',
+      '.timeline-editor',
+      '.timeline-inspector',
+    ];
+    const read = () => selectors.map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return { selector, background: style.backgroundColor, border: style.borderColor };
+    });
+    const root = document.documentElement;
+    root.setAttribute('data-theme', 'dark');
+    const dark = read();
+    root.setAttribute('data-theme', 'light');
+    const light = read();
+    return { dark, light };
+  });
+  expect(themeColors.dark).toHaveLength(6);
+  expect(themeColors.light).toHaveLength(6);
+  expect(themeColors.dark).not.toEqual(themeColors.light);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(page.getByTestId('timeline-inspector')).toBeVisible();
+  const responsiveGeometry = await page.evaluate(() => ({
+    noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    columns: getComputedStyle(document.querySelector<HTMLElement>('.timeline-page-body')!).gridTemplateColumns,
+  }));
+  expect(responsiveGeometry.noHorizontalOverflow).toBe(true);
+  expect(responsiveGeometry.columns.split(' ').length).toBe(1);
+});
+
+test('refreshes inspector fields when selection and authoritative Timeline state change', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithItems(page, projectId, [
+    { offset: 0, duration: 1.5, speed: 1, transform: { scale: 1.1, x: 0, y: 0 } },
+    { offset: 2, duration: 3, speed: 1.75, transform: { scale: 1.6, x: 0, y: 0 } },
+  ]);
+  await expect(page.locator('.timeline-item-row')).toHaveCount(2);
+
+  const inspector = page.getByTestId('timeline-inspector');
+  const selectItem = async (itemId: string) => {
+    await page
+      .locator(`[data-timeline-editor-item-id="${itemId}"]`)
+      .getByRole('button', { name: /Select/ })
+      .click();
+  };
+
+  await selectItem(items[1].item_id);
+  await expect(inspector.getByTestId('item-start')).toHaveValue('2');
+  await expect(inspector.getByTestId('item-end')).toHaveValue('5');
+  await expect(inspector.getByTestId('item-speed')).toHaveValue('1.75');
+  await expect(inspector.getByTestId('item-zoom')).toHaveValue('1.6');
+
+  await selectItem(items[0].item_id);
+  await expect(inspector.getByTestId('item-start')).toHaveValue('0');
+  await expect(inspector.getByTestId('item-end')).toHaveValue('1.5');
+  await expect(inspector.getByTestId('item-speed')).toHaveValue('1');
+  await expect(inspector.getByTestId('item-zoom')).toHaveValue('1.1');
+
+  await postTimelineOperation(page, projectId, 'set_speed', { item_id: items[0].item_id, speed: 2.5 });
+  await expect(inspector.getByTestId('item-speed')).toHaveValue('2.5');
+});
+
+test('Timeline playback skips a missing placement and advances to the next valid item', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA(), fixtureB()], {
+    clipVisibility: 'first',
+  });
+  const items = await replaceWithMixedMissingItems(page, projectId);
+
+  await expect(page.locator('.tl-clip')).toHaveCount(2);
+  await expect(page.locator('.tl-clip').first()).toHaveAttribute('data-timeline-missing-source', 'true');
+  await expect(page.locator('.tl-clip').nth(1)).toHaveAttribute('data-timeline-missing-source', 'false');
+  await page.getByTestId('transport-play').click();
+  await expect(page.getByTestId('timeline-preview-current-clip')).toHaveAttribute(
+    'data-timeline-active-item-id',
+    items[1].item_id,
+  );
+  await expect(page.getByTestId('timeline-preview-video')).toBeVisible();
+});
+
+test('Timeline with only missing placements stops safely without a media clock', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()], { clipVisibility: 'none' });
+  await replaceWithRepeatedItems(page, projectId);
+
+  await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
+  await page.getByTestId('transport-play').click();
+  await expect(page.locator('.timeline')).toHaveAttribute('data-timeline-playing', 'false');
+  await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
+});
+
+test('Timeline editor mutations target item_id and reconcile undo redo and reorder', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const operations: Array<{ operation: string; args: Record<string, unknown> }> = [];
+  page.on('request', (request) => {
+    if (
+      request.url().endsWith(`/projects/${projectId}/timeline/op`) &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as { operation: string; args: Record<string, unknown> };
+      operations.push(body);
+    }
+  });
+
+  const secondRow = page.locator('.timeline-item-row').nth(1);
+  await secondRow.getByRole('button', { name: /Select/ }).click();
+  const inspector = page.getByTestId('timeline-inspector');
+  const speed = inspector.getByTestId('item-speed');
+  await speed.fill('2');
+  await speed.blur();
+  await expect.poll(() => operations.at(-1)).toMatchObject({
+    operation: 'set_speed',
+    args: { item_id: items[1].item_id, speed: 2 },
+  });
+
+  const zoom = inspector.getByTestId('item-zoom');
+  await zoom.fill('1.4');
+  await zoom.blur();
+  await expect.poll(() => operations.at(-1)).toMatchObject({
+    operation: 'set_transform',
+    args: { item_id: items[1].item_id },
+  });
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items.find((item: { item_id: string }) => item.item_id === items[1].item_id);
+  }).toMatchObject({ speed: 2, transform: { scale: 1.4 } });
+
+  await page.locator(`[data-timeline-item-id="${items[1].item_id}"]`).click();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect.poll(() => operations.at(-1)).toMatchObject({
+    operation: 'reorder',
+    args: { item_id: items[1].item_id, to_index: 0 },
+  });
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items[0].item_id;
+  }).toBe(items[1].item_id);
+
+  await page.getByTestId('timeline-inspector').getByTestId('item-split').click();
+  await expect.poll(() => operations.at(-1)).toMatchObject({
+    operation: 'split_item',
+    args: { item_id: items[1].item_id },
+  });
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items.length;
+  }).toBe(3);
+
+  await page.getByTestId('timeline-undo').click();
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items.length;
+  }).toBe(2);
+  await page.getByTestId('timeline-redo').click();
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items.length;
+  }).toBe(3);
+  const postSplitSnapshot = await page.request
+    .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+    .then((response) => response.json());
+  const postSplitItemId = postSplitSnapshot.document.items[0].item_id as string;
+  await page
+    .locator(`[data-timeline-editor-item-id="${postSplitItemId}"]`)
+    .getByRole('button', { name: /Select/ })
+    .click();
+  await page.getByTestId('timeline-inspector-remove').click();
+  await expect.poll(() => operations.at(-1)).toMatchObject({
+    operation: 'remove_item',
+    args: { item_id: postSplitItemId },
+  });
+  await expect.poll(async () => {
+    const document = await page.request
+      .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
+      .then((response) => response.json());
+    return document.document.items.some((item: { item_id: string }) => item.item_id === postSplitItemId);
+  }).toBe(false);
 });
 
 test('keeps the active Timeline Item through live reorder and removal', async ({ page }) => {
@@ -385,6 +704,11 @@ test('retains an authoritative Timeline Item when Candidate Clip metadata is sta
   await expect(page.locator(`[data-timeline-item-id="${sourceItem.item_id}"] .tl-clip-name`)).toHaveText(
     sourceItem.source_clip_id,
   );
+  await expect(page.locator(`.tl-clip[data-timeline-item-id="${sourceItem.item_id}"]`)).toHaveAttribute(
+    'data-timeline-missing-source',
+    'true',
+  );
+  await expect(page.locator('.tl-clip-thumb')).toHaveText('×');
   await expect(page.getByTestId('timeline-preview-video-missing')).toBeVisible();
 });
 
@@ -534,13 +858,96 @@ test('playhead drags continuously and wheel zoom changes timeline scale', async 
 });
 
 test('Resolve export exposes an Open in DaVinci handoff', async ({ page }) => {
+  await page.addInitScript(() => {
+    const calls: Array<{ method: string; args: string[] }> = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (value: string) => calls.push({ method: 'copy', args: [value] }) },
+    });
+    (window as unknown as { __exportHandoffCalls: typeof calls }).__exportHandoffCalls = calls;
+    (window as unknown as { __revealFails?: boolean }).__revealFails = false;
+    (window as unknown as { clipAssembler: unknown }).clipAssembler = {
+      backendUrl: 'http://127.0.0.1:8000',
+      platform: 'linux',
+      revealExportFile: async (filePath: string) => {
+        if ((window as unknown as { __revealFails?: boolean }).__revealFails) {
+          throw new Error('Reveal failed in test');
+        }
+        calls.push({ method: 'reveal', args: [filePath] });
+        return { revealed: true };
+      },
+      openInDaVinci: async (filePath: string, sourceFolder?: string) => {
+        calls.push({ method: 'open', args: [filePath, sourceFolder ?? ''] });
+        return { opened: true };
+      },
+    };
+  });
   await setupTimeline(page, [fixtureA()]);
+  await page.route('**/projects/*/export?*', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({ response, json: { ...body, file_path: '/tmp/resolve-handoff.xml' } });
+  });
   await page.goto('/#/export');
 
-  await page.getByRole('button', { name: 'Export for DaVinci Resolve' }).click();
+  await page.getByTestId('export-format-card-resolve_xml').click();
+  await page.getByTestId('export-selected').click();
 
   await expect(page.getByText('DaVinci Resolve XML exported')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open in DaVinci Resolve' })).toBeVisible();
+  const receipt = page.getByTestId('export-result-resolve_xml');
+  await receipt.getByRole('button', { name: 'Copy' }).click();
+  await expect(receipt.getByRole('button', { name: 'Copied' })).toBeVisible();
+  await receipt.getByRole('button', { name: 'Reveal' }).click();
+  await receipt.getByRole('button', { name: 'Open in DaVinci Resolve' }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as {
+    __exportHandoffCalls: Array<{ method: string; args: string[] }>;
+  }).__exportHandoffCalls.map((call) => call.method))).toEqual(['copy', 'reveal', 'open']);
+  const handoffPaths = await page.evaluate(() => (window as unknown as {
+    __exportHandoffCalls: Array<{ method: string; args: string[] }>;
+  }).__exportHandoffCalls.slice(1).map((call) => call.args[0]));
+  expect(handoffPaths).toHaveLength(2);
+  expect(handoffPaths[0]).toMatch(/^\//);
+  expect(handoffPaths[1]).toMatch(/^\//);
+  await page.evaluate(() => {
+    (window as unknown as { __revealFails: boolean }).__revealFails = true;
+  });
+  await receipt.getByRole('button', { name: 'Reveal' }).click();
+  await expect(page.getByRole('alert')).toContainText('Reveal failed in test');
+});
+
+test('export format cards control one explicit handoff and keep receipt actions contained', async ({ page }) => {
+  await setupTimeline(page, [fixtureA()]);
+  await page.goto('/#/export');
+
+  const cards = page.locator('[data-testid^="export-format-card-"]');
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator('.export-format-cards .btn')).toHaveCount(0);
+  await expect(page.getByTestId('export-format-card-edl')).toHaveAttribute('aria-pressed', 'true');
+
+  const edlCard = page.getByTestId('export-format-card-edl');
+  await edlCard.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('export-format-card-fcpxml')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('export-format-card-fcpxml')).toBeFocused();
+  await expect(page.getByTestId('export-selected')).toHaveText('Export FCPXML');
+
+  await page.getByTestId('export-selected').click();
+  const receipt = page.getByTestId('export-result-fcpxml');
+  await expect(receipt).toContainText('Final Cut Pro XML exported');
+  await expect(receipt.getByRole('button', { name: 'Copy' })).toBeVisible();
+  await expect(receipt.getByRole('button', { name: 'Reveal' })).toBeVisible();
+  await expect(receipt.locator('.export-receipt-path')).toHaveAttribute('title', /.+/);
+  await expect
+    .poll(() => receipt.locator('.export-receipt-path-row').evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true);
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect.poll(() => page.evaluate(() => ({
+    noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    actionsFit: Array.from(document.querySelectorAll<HTMLElement>('.export-receipt .btn')).every((button) =>
+      button.scrollWidth <= button.clientWidth && getComputedStyle(button).whiteSpace === 'nowrap'),
+  }))).toEqual({ noHorizontalOverflow: true, actionsFit: true });
 });
 
 test('export reads the authoritative Timeline without a legacy write', async ({ page }) => {
@@ -550,6 +957,7 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
     .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
     .then((response) => response.json());
   const legacyWrites: string[] = [];
+  let exportRequests = 0;
   page.on('request', (request) => {
     if (
       request.url().endsWith(`/projects/${projectId}/timeline`) &&
@@ -557,15 +965,19 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
     ) {
       legacyWrites.push(request.method());
     }
+    if (request.url().includes(`/projects/${projectId}/export?`) && request.method() === 'POST') {
+      exportRequests += 1;
+    }
   });
 
   await page.goto('/#/export');
-  await page.getByRole('button', { name: 'Export EDL' }).click();
+  await page.getByTestId('export-selected').click();
 
   const after = await page.request
     .get(`http://127.0.0.1:8000/projects/${projectId}/timeline/document`)
     .then((response) => response.json());
   expect(legacyWrites).toEqual([]);
+  expect(exportRequests).toBe(1);
   expect(after.document).toEqual(before.document);
   await expect(page.getByTestId('export-result-edl')).toContainText('2 items');
   await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
@@ -575,7 +987,61 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
   await expect(page.getByTestId('export-payload')).toContainText('speed');
   await expect(page.getByTestId('export-payload')).toContainText('transform');
 
+  const exportedPayload = await page.getByTestId('export-payload').textContent();
+  expect(JSON.parse(exportedPayload!).timeline).toHaveLength(2);
+
   await replaceWithItems(page, projectId, [{ offset: 0, duration: 6, speed: 1 }]);
   await expect(page.getByText('1 item in the Timeline · 6.0s total.')).toBeVisible();
   await expect(page.getByTestId('export-result-edl')).toContainText('4.0s effective');
+  await expect(page.getByTestId('export-warning-edl')).toContainText(/flatten/i);
+  // The receipt describes the file that was written, not whatever the Timeline
+  // holds now: editing the Timeline afterwards must not rewrite the payload.
+  await expect(page.getByTestId('export-payload')).toHaveText(exportedPayload!);
+  const warningColors = await page.evaluate(() => {
+    const root = document.documentElement;
+    const warning = document.querySelector<HTMLElement>('[data-testid="export-warning-edl"]')!;
+    root.setAttribute('data-theme', 'dark');
+    const dark = getComputedStyle(warning).color;
+    root.setAttribute('data-theme', 'light');
+    const light = getComputedStyle(warning).color;
+    return { dark, light };
+  });
+  expect(warningColors.dark).not.toBe('');
+  expect(warningColors.light).not.toBe('');
+});
+
+test('export asks before overwrite and retries exactly once', async ({ page }) => {
+  await setupTimeline(page, [fixtureA()]);
+  let exportRequests = 0;
+  await page.route('**/projects/*/export?*', async (route) => {
+    exportRequests += 1;
+    if (exportRequests === 1) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Export already exists' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        project_id: 'overwrite-test',
+        format: 'edl',
+        status: 'exported',
+        file_path: '/tmp/overwrite-test.edl',
+        clip_count: 1,
+        total_duration_sec: 8,
+        warnings: ['EDL flatten warning'],
+      }),
+    });
+  });
+  await page.goto('/#/export');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByTestId('export-selected').click();
+
+  await expect(page.getByTestId('export-result-edl')).toContainText('overwrite-test.edl');
+  await expect(page.getByTestId('export-warning-edl')).toContainText('EDL flatten warning');
+  expect(exportRequests).toBe(2);
 });

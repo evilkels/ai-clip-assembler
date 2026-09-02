@@ -53,6 +53,14 @@ export function ClipGenerationPanel({
   const [draft, setDraft] = useState<ClipGenerationPreferences>(effective);
   const current = preferences ?? draft;
   const invalidDurationRange = current.max_clip_duration_sec < current.min_clip_duration_sec;
+  const summaryRules = [
+    ['MIN', current.min_clip_duration_sec],
+    ['MAX', current.max_clip_duration_sec],
+    ['STEADY', current.smoothness_threshold],
+    ['TURN °/S', current.max_turn_rate_deg_per_sec],
+    ['PER SCENE', current.max_clips_per_scene],
+    ['PER VIDEO', current.max_candidates_per_video],
+  ] as const;
 
   useEffect(() => setDraft(effective), [effective]);
 
@@ -63,99 +71,65 @@ export function ClipGenerationPanel({
   };
 
   return (
-    <details className="clip-generation-panel">
-      <summary>
-        <strong>Advanced: how clips are found</strong>
-        <span className="draft-summary">
-          Change what counts as a usable clip, then re-scan — no re-import needed
-        </span>
-      </summary>
+    <section className="clip-generation-panel" data-rules-region>
+      <header className="clip-generation-header">
+        <strong>How clips are found</strong>
+        <span className="draft-summary">6 rules</span>
+      </header>
+      <div className="clip-generation-summary" aria-label="Current clip rules">
+        {summaryRules.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
       <div className="clip-generation-body">
         <p className="clip-generation-intro">
           These control how your footage is cut into the clips above — clip length limits, how
           steady a shot must be, and how many clips to keep per scene and per video. The defaults
           suit most drone footage; adjust only if you want more, fewer, or longer clips.
         </p>
-        <div className="clip-generation-controls">
-          <label>
-            Shortest clip (s)
-            <span className="clip-generation-help">Discard usable moments shorter than this.</span>
-            <input
-              aria-label="Shortest clip (s)"
-              type="number"
-              min={0.5}
-              step={0.5}
-              disabled={disabled}
-              value={current.min_clip_duration_sec}
-              onChange={(event) => update('min_clip_duration_sec', Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Longest clip (s)
-            <span className="clip-generation-help">Split longer usable moments into shorter clips.</span>
-            <input
-              aria-label="Longest clip (s)"
-              type="number"
-              min={1}
-              step={0.5}
-              disabled={disabled}
-              value={current.max_clip_duration_sec}
-              onChange={(event) => update('max_clip_duration_sec', Number(event.target.value))}
-            />
-          </label>
-          <label>
-            How steady (0–10)
-            <span className="clip-generation-help">Keep footage at or above this Smoothness Score.</span>
-            <input
-              aria-label="How steady (0–10)"
-              type="number"
-              min={0}
-              max={10}
-              step={0.5}
-              disabled={disabled}
-              value={current.smoothness_threshold}
-              onChange={(event) => update('smoothness_threshold', Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Max camera turn (°/s)
-            <span className="clip-generation-help">Reject moments where the camera turns faster.</span>
-            <input
-              aria-label="Max camera turn (°/s)"
-              type="number"
-              min={0}
-              step={1}
-              disabled={disabled}
-              value={current.max_turn_rate_deg_per_sec}
-              onChange={(event) => update('max_turn_rate_deg_per_sec', Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Max clips per scene
-            <span className="clip-generation-help">Limit how many Candidate Clips one Scene can keep.</span>
-            <input
-              aria-label="Max clips per scene"
-              type="number"
-              min={1}
-              step={1}
-              disabled={disabled}
-              value={current.max_clips_per_scene}
-              onChange={(event) => update('max_clips_per_scene', Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Max clips per video
-            <span className="clip-generation-help">Limit how many Candidate Clips one Source Video can keep.</span>
-            <input
-              aria-label="Max clips per video"
-              type="number"
-              min={1}
-              step={1}
-              disabled={disabled}
-              value={current.max_candidates_per_video}
-              onChange={(event) => update('max_candidates_per_video', Number(event.target.value))}
-            />
-          </label>
+        <div className="clip-generation-rules">
+          <div className="clip-generation-rule">
+            <strong>Clip length</strong>
+            <label>
+              Shortest clip (s)
+              <span className="clip-generation-help">Discard usable moments shorter than this.</span>
+              <input aria-label="Shortest clip (s)" type="number" min={0.5} step={0.5} disabled={disabled} value={current.min_clip_duration_sec} onChange={(event) => update('min_clip_duration_sec', Number(event.target.value))} />
+            </label>
+            <label>
+              Longest clip (s)
+              <span className="clip-generation-help">Split longer usable moments into shorter clips.</span>
+              <input aria-label="Longest clip (s)" type="number" min={1} step={0.5} disabled={disabled} value={current.max_clip_duration_sec} onChange={(event) => update('max_clip_duration_sec', Number(event.target.value))} />
+            </label>
+          </div>
+          <div className="clip-generation-rule">
+            <strong>Camera quality</strong>
+            <label>
+              How steady (0–10)
+              <span className="clip-generation-help">Keep footage at or above this Smoothness Score.</span>
+              <input aria-label="How steady (0–10)" type="number" min={0} max={10} step={0.5} disabled={disabled} value={current.smoothness_threshold} onChange={(event) => update('smoothness_threshold', Number(event.target.value))} />
+            </label>
+            <label>
+              Max camera turn (°/s)
+              <span className="clip-generation-help">Reject moments where the camera turns faster.</span>
+              <input aria-label="Max camera turn (°/s)" type="number" min={0} step={1} disabled={disabled} value={current.max_turn_rate_deg_per_sec} onChange={(event) => update('max_turn_rate_deg_per_sec', Number(event.target.value))} />
+            </label>
+          </div>
+          <div className="clip-generation-rule">
+            <strong>Candidate limits</strong>
+            <label>
+              Max clips per scene
+              <span className="clip-generation-help">Limit how many Candidate Clips one Scene can keep.</span>
+              <input aria-label="Max clips per scene" type="number" min={1} step={1} disabled={disabled} value={current.max_clips_per_scene} onChange={(event) => update('max_clips_per_scene', Number(event.target.value))} />
+            </label>
+            <label>
+              Max clips per video
+              <span className="clip-generation-help">Limit how many Candidate Clips one Source Video can keep.</span>
+              <input aria-label="Max clips per video" type="number" min={1} step={1} disabled={disabled} value={current.max_candidates_per_video} onChange={(event) => update('max_candidates_per_video', Number(event.target.value))} />
+            </label>
+          </div>
         </div>
         {invalidDurationRange ? (
           <span className="clip-generation-warning">
@@ -163,6 +137,6 @@ export function ClipGenerationPanel({
           </span>
         ) : null}
       </div>
-    </details>
+    </section>
   );
 }

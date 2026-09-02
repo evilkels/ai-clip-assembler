@@ -32,6 +32,8 @@ export function VersionGallery({
     <div
       className={`version-gallery${expandedId ? ' has-focus' : ''}`}
       data-testid="version-gallery"
+      data-version-count={versions.length}
+      aria-label="Suggested cut versions"
     >
       {versions.map((version) => {
         const displayState = versionSet && snapshot

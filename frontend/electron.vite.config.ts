@@ -31,6 +31,9 @@ export default defineConfig({
     plugins: [react()],
     server: {
       port: 5173,
+      // Keep the dev renderer's imported brand assets on the same Vite
+      // pipeline as production builds, limited to the shared assets folder.
+      fs: { allow: [resolve(__dirname), resolve(__dirname, '../assets')] },
     },
   },
 });

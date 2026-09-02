@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Studio workflow redesign review — 2026-08-14</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.55 system-ui, -apple-system, sans-serif; color: #14161a; background: #f7f7f8; }
+    body { max-width: 900px; margin: 0 auto; padding: 48px 24px 72px; }
+    h1 { line-height: 1.15; }
+    h2 { margin-top: 2.25rem; border-bottom: 1px solid #dcdce2; padding-bottom: .35rem; }
+    code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; background: #e9eaec; padding: .1em .35em; border-radius: 4px; }
+    .status { display: inline-block; padding: .25rem .6rem; border: 1px solid #1f9d57; border-radius: 999px; color: #176b3c; background: #e8f7ee; font-weight: 650; }
+    .notice { padding: 14px 16px; border: 1px solid #dcdce2; border-radius: 10px; background: #fff; }
+    li { margin: .35rem 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="status">Automated renderer review recorded</p>
+    <h1>Studio workflow redesign</h1>
+    <p>Review record · 2026-08-14 · branch <code>redesign/studio-workflows</code></p>
+  </header>
+
+  <h2>Scope</h2>
+  <p>This review covers the shared studio shell and the four redesigned workflow
+    pages: Import, Review, Timeline, and Export. Landing and Settings are out
+    of scope. Backend authority, Manual Harness defaults, project consent, chat
+    and VersionSet behavior, Timeline <code>item_id</code> operations, and
+    export contracts remain unchanged.</p>
+
+  <h2>Design source and visual checks</h2>
+  <p>The source of truth was the approved Claude Design project
+    <code>e135e2f6-0c3f-444a-84e0-d269f4b59f4a</code>, file
+    <code>Clip Assembler Restyle.dc.html</code>, reviewed 2026-08-14. The local
+    exact reference reviewed was
+    <code>AI CLIP ASSEMBLER Redesign APP + Landing page/Clip Assembler Restyle.dc.html</code>.
+    That supplied directory was not modified or staged.</p>
+  <p><strong>Screenshots reviewed:</strong> the local reference's Import, Review,
+    Timeline, and Export workflow captures, including its light/dark surface
+    variants and compact 1024-width composition. The automated gate records
+    DOM geometry and theme tokens rather than claiming screenshot pixel parity.</p>
+  <ul>
+    <li>Import: Table, Thumbs, Compact, selection bar, analysis status rail, and three-column rule panel.</li>
+    <li>Review: Ask AI rail, Suggested cuts zone, Candidate Clip Grid/List/Filmstrip, and stale warning family.</li>
+    <li>Timeline: preview/transport/ruler/track plus selected-item Inspector and repeated item rows.</li>
+    <li>Export: Resolve XML/FCPXML/EDL cards, handoff summary, warning surfaces, and export receipt/actions.</li>
+  </ul>
+
+  <h2>Automated evidence</h2>
+  <div class="notice">
+    <p><strong>Integrated acceptance:</strong> <code>npm run test:e2e -- studio-workflow-redesign.spec.ts</code> — 2/2 passed.</p>
+    <p>The test uses the existing <code>/playwriter</code> QA route, real FastAPI
+      project/upload/analyze/timeline/export endpoints, and a generated local
+      MP4 fixture. It completes Import → Review → Timeline → Export at
+      1440×900 and 1024×768, switches dark/light tokens on each page, checks
+      accessible names and pressed states, keyboard focus-visible styling,
+      arrow-key scrubbing plus L/K transport, and page/main horizontal
+      containment.</p>
+    <p>Deferred Task 1 geometry was resolved by restoring the explicit
+      <code>main.left &gt;= sidebar.right</code> guard. Task 2 remains native
+      checkbox selection: a whole-row click would reintroduce nested
+      interactive semantics, so no semantic row affordance was added.</p>
+  </div>
+
+  <h2>Known limitations and human checks</h2>
+  <ul>
+    <li>Settings and landing-page redesigns are intentionally excluded.</li>
+    <li>Candidate/source thumbnails are static poster treatments; no thumbnail backend endpoint was added.</li>
+    <li>Automated tests use synthetic footage and cannot establish editorial quality, long-source timing, or codec breadth.</li>
+    <li>Human Electron/macOS checks remain pending: native window presentation, real drone footage, and accessibility inspection in the packaged app.</li>
+    <li>Human NLE checks remain pending: import Resolve XML, FCPXML, and EDL in DaVinci Resolve/Final Cut Pro and verify relink, timing, order, speed, transform, and orientation.</li>
+  </ul>
+
+  <h2>Commit trail</h2>
+  <ul>
+    <li><code>9061a42</code> shared studio system</li>
+    <li><code>468c0c7</code> Import workflow</li>
+    <li><code>cffdf6e</code> / <code>722d4cf</code> Candidate Clip browser</li>
+    <li><code>76d4fec</code> Ask AI and Suggested Versions</li>
+    <li><code>6dcd6a8</code> / <code>d8c45a9</code> Timeline redesign</li>
+    <li><code>07f15a6</code> Export handoff</li>
+    <li>This record and the integrated QA changes are delivered by the commit titled <code>docs: verify studio workflow redesign</code>.</li>
+  </ul>
+</body>
+</html>

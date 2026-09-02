@@ -13,11 +13,17 @@ export default defineConfig({
   timeout: 180_000,
   expect: {
     timeout: 20_000,
+    // Within a single platform the renders still jitter by up to ~27px of glyph
+    // antialiasing between runs. A real layout regression moves thousands of
+    // pixels, so this absorbs the noise without hiding a genuine change.
+    toHaveScreenshot: { maxDiffPixels: 150 },
   },
-  // Keep baselines portable across the macOS/Linux CI runners. The project
-  // name distinguishes browser projects while the platform is intentionally
-  // excluded from the path.
-  snapshotPathTemplate: '{testDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}',
+  // Baselines are stored per platform. Screenshots are not portable across
+  // macOS and Linux: the same layout renders with different font rasterization,
+  // which is 14k-18k differing pixels on a 1440x1000 shot -- far more than any
+  // useful tolerance. Both sets are committed so `npm run test:e2e` is green on
+  // a macOS dev machine and on the Linux CI runner.
+  snapshotPathTemplate: '{testDir}/{testFileName}-snapshots/{arg}-{projectName}-{platform}{ext}',
   use: {
     baseURL: 'http://localhost:5173',
     locale: 'en-US',

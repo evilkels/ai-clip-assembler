@@ -1,8 +1,17 @@
 from __future__ import annotations
 
 import re
+import sys
 import unittest
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
+# CI runs this file as a script (`python3 scripts/tests/test_site_contract.py`),
+# which puts this directory on sys.path rather than the repo root, so the
+# package-qualified import below would not resolve. Docs run it as
+# `python3 -m unittest scripts.tests.test_site_contract`, where it does. Add the
+# repo root so both invocations work.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.tests.site_contract import (
     BASE,

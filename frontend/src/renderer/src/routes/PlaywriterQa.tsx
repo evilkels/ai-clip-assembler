@@ -20,7 +20,7 @@ const VISUAL_FIXTURES: VisualFixture[] = [
   'timeline-selection',
   'export-receipt',
 ];
-const VISUAL_PROJECT_FOLDER = '/tmp/ai-clip-assembler/ESTEPONA_03-05-26';
+const VISUAL_PROJECT_FOLDER = '/tmp/clip-assembler-demo/project';
 
 function readVisualFixture(): VisualFixture | null {
   const query = window.location.hash.split('?')[1];

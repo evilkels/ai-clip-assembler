@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 import xml.etree.ElementTree as ET
 
-from site_contract import (
+from scripts.tests.site_contract import (
     BASE,
     SITE,
     discover_pages,

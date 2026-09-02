@@ -64,7 +64,7 @@ export function PlaywriterQaPage() {
       if (fixture === 'import-analyzing') {
         setAnalysisStatus({
           phase: 'analyzing', harness_id: 'manual', step: 'scoring_clips', video_index: 2,
-          video_total: 4, file_name: 'estepone-cliffs-02.mp4', clip_index: 3, clip_total: 4,
+          video_total: 4, file_name: 'source-02.mp4', clip_index: 3, clip_total: 4,
           message: 'Scoring candidate clips', elapsed_sec: 12,
           started_at: 1_755_000_000_000, updated_at: 1_755_000_012_000,
         });

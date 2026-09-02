@@ -96,8 +96,8 @@ class StaticSiteContractTest(unittest.TestCase):
     def test_download_menus_expose_current_release_assets_for_both_architectures(self) -> None:
         home = self.parsed[SITE / "index.html"]
         assets = {
-            "Apple Silicon": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-arm64.dmg",
-            "Intel": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-x64.dmg",
+            "Apple Silicon": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.2.0/AI.Clip.Assembler-0.2.0-arm64.dmg",
+            "Intel": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.2.0/AI.Clip.Assembler-0.2.0-x64.dmg",
         }
         menus = re.findall(
             r'<details class="download-menu">(.*?)</details>',

@@ -268,6 +268,7 @@
     }
 
     .site-nav a,
+    .site-nav .download-menu > summary,
     .theme-toggle {
       transition: background-color 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
     }
@@ -278,6 +279,20 @@
 
     .site-nav a:hover {
       color: var(--text);
+    }
+
+    .download-menu {
+      position: relative;
+    }
+
+    .download-menu > summary {
+      display: inline-block;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .download-menu > summary::-webkit-details-marker {
+      display: none;
     }
 
     .download-link {
@@ -291,6 +306,51 @@
     .download-link:hover {
       border-color: var(--accent-hover);
       color: var(--accent-hover) !important;
+    }
+
+    .download-options {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 2;
+      display: grid;
+      min-width: 190px;
+      gap: 4px;
+      padding: 8px;
+      border: 1px solid var(--border-button);
+      border-radius: 10px;
+      background: var(--surface-raised);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+    }
+
+    .site-nav .download-options {
+      right: 0;
+      left: auto;
+    }
+
+    .download-option {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.4;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .download-option:hover {
+      background: var(--surface);
+      color: var(--accent);
+    }
+
+    .download-option small {
+      color: var(--text-muted);
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10px;
     }
 
     .theme-toggle {
@@ -1051,8 +1111,17 @@
         <a href="#local-first">Local-first</a>
         <a href="#faq">FAQ</a>
         <a href="https://github.com/evilkels/ai-clip-assembler" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a class="download-link" href="https://github.com/evilkels/ai-clip-assembler/releases" target="_blank"
-          rel="noopener noreferrer">Download</a>
+        <details class="download-menu">
+          <summary class="download-link" aria-label="Choose a macOS download">Download</summary>
+          <div class="download-options">
+            <a class="download-option"
+              href="https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-arm64.dmg"
+              target="_blank" rel="noopener noreferrer">Apple Silicon <small>arm64</small></a>
+            <a class="download-option"
+              href="https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-x64.dmg"
+              target="_blank" rel="noopener noreferrer">Intel <small>x64</small></a>
+          </div>
+        </details>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light theme"
           aria-pressed="false">Light theme</button>
       </nav>
@@ -1068,8 +1137,17 @@
             and exposure, then exports an editable FCPXML, DaVinci Resolve XML, or EDL timeline.
           </p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/evilkels/ai-clip-assembler/releases" target="_blank"
-              rel="noopener noreferrer">Download for macOS</a>
+            <details class="download-menu">
+              <summary class="button button-primary" aria-label="Choose a macOS download">Download for macOS</summary>
+              <div class="download-options">
+                <a class="download-option"
+                  href="https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-arm64.dmg"
+                  target="_blank" rel="noopener noreferrer">Apple Silicon <small>arm64</small></a>
+                <a class="download-option"
+                  href="https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-x64.dmg"
+                  target="_blank" rel="noopener noreferrer">Intel <small>x64</small></a>
+              </div>
+            </details>
             <a class="button button-secondary" href="#how-it-works">See how it works</a>
             <span class="fine-print">Apple Silicon &amp; Intel<br />no Python, no terminal</span>
           </div>
@@ -1224,8 +1302,17 @@
           <p class="closing-note">Apple Silicon &amp; Intel · local by default · cloud AI is opt-in per project</p>
         </div>
         <div class="closing-actions">
-          <a class="button button-primary" href="https://github.com/evilkels/ai-clip-assembler/releases" target="_blank"
-            rel="noopener noreferrer">Download for macOS</a>
+          <details class="download-menu">
+            <summary class="button button-primary" aria-label="Choose a macOS download">Download for macOS</summary>
+            <div class="download-options">
+              <a class="download-option"
+                href="https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-arm64.dmg"
+                target="_blank" rel="noopener noreferrer">Apple Silicon <small>arm64</small></a>
+              <a class="download-option"
+                href="https://github.com/evilkels/ai-clip-assembler/releases/download/v0.1.6/AI.Clip.Assembler-0.1.6-x64.dmg"
+                target="_blank" rel="noopener noreferrer">Intel <small>x64</small></a>
+            </div>
+          </details>
           <a class="button button-secondary" href="https://github.com/evilkels/ai-clip-assembler" target="_blank"
             rel="noopener noreferrer">View on GitHub</a>
         </div>

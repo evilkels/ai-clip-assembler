@@ -39,6 +39,42 @@ provenance.
   it must not change clip identity or break decision/version provenance
   (plan 009).
 
+## Blockers found 2026-09-02 — resolve before starting
+
+Three prerequisites are missing. The first is a maintainer decision and blocks
+the plan outright; the other two are small but would each stop an executor.
+
+1. **No hosting location exists for the artifact.** Step 3 says to fetch the
+   `.onnx` "from the pinned location", and `backend/models/README.md` says the
+   same, but no such location has been chosen or provisioned. This is the
+   plan's own escape hatch ("hosting the artifact requires a distribution
+   channel nobody owns") and it is now the live blocker. Options worth weighing:
+   attach the `.onnx` to a GitHub Release of this repo and fetch by tag; fetch
+   from Hugging Face at the pinned revision at build time; or accept a
+   first-run download, which the graceful-degradation invariant currently
+   forbids. Decide this before any export work, because it determines whether
+   step 3 is a checksum verification or a whole distribution channel.
+
+2. **The export environment does not exist.** Step 1 needs
+   `transformers.SiglipVisionModel` and `torch.onnx.export`, but
+   `backend/requirements.txt` pins only `onnxruntime==1.19.2` (plus `numpy` and
+   `pillow`) — neither `torch` nor `transformers` is available anywhere in the
+   repo. Do **not** add them to `backend/requirements.txt`: torch would inflate
+   the packaged backend by hundreds of megabytes for a one-off export. Give the
+   export script its own requirements file and its own throwaway venv, and say
+   so in the script's header.
+
+3. **The license analysis backing this decision is gone.**
+   `backend/models/README.md` cites `/tmp/plan018-claude-license-report.md` for
+   "the full redistribution analysis". That file no longer exists and was never
+   committed — `git log -S` finds it only in session checkpoints, not in repo
+   history. The *conclusion* is probably sound, since SigLIP's weights are
+   Apache-2.0 and that is publicly verifiable, but right now a redistribution
+   decision rests on a citation that cannot be produced. Re-derive the analysis
+   and commit it under `docs/` before bundling third-party weights, and update
+   the README to point at the committed copy rather than a temp path. Fold this
+   into step 4's attribution work.
+
 ## Execution steps
 
 1. **Export, reproducibly.** Add a committed export script (not a one-off shell

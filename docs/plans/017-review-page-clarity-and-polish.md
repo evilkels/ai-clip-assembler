@@ -45,6 +45,37 @@ confusing smoothness controls, and excluded clips still entering AI proposals.
 1. **Poster-first cards:** reuse sampled frame JPEGs, render `<img>`, and mount
    `<video>` only on first play. Then open Browse by default or virtualize it.
    This avoids the documented N×metadata-stream jank around 24 clips.
+
+   **Missing prerequisite (found 2026-09-02).** "Reuse sampled frame JPEGs"
+   reads as though the frames are already reachable from the renderer. They are
+   not. The only media route is
+   `GET /projects/{project_id}/videos/{file_id}/media` (`api.py:398`); nothing
+   serves the sample frames, and there is no `StaticFiles` mount. The one
+   existing consumer, `mcp_frame_paths` (`api.py:979-1005`), returns **local
+   filesystem paths** for an agent to open directly, not URLs. So this item
+   needs a delivery mechanism decided and built first — either a new HTTP
+   poster route mirroring the media route's shape, or a preload/IPC read via
+   `window.clipAssembler`. Pick one deliberately; the rest of the renderer
+   fetches media over HTTP (`api/client.ts`, `buildVideoMediaUrl`), so the
+   route is the more consistent choice and keeps the browser cache working.
+
+   The frames themselves do exist after analysis. Layout, from
+   `mcp_frame_paths` and `analysis_service.py:226`:
+   `samples_dir(project_id)/{file_id}/{file_id}_{milliseconds}.jpg`, sorted by
+   the trailing millisecond stamp, skipping any stem containing `raw`. Choosing
+   the frame nearest a clip's `start_sec` gives a poster with no new FFmpeg work.
+
+   **Scale correction.** The plan's "around 24 clips" is the observed threshold,
+   not the expected load. `max_candidates_per_video` defaults to 30
+   (`clip_assembly.py:19`), so an 8-file drone session yields up to ~240 cards,
+   each a `<video preload="metadata">` (`ClipCard.tsx:139-142`) — roughly ten
+   times past where the jank was already noticeable, against a local server
+   that Chromium limits to ~6 concurrent connections per origin.
+
+   **Workaround available today:** the List and Filmstrip views mount no
+   `<video>` at all, so switching away from the default Grid avoids this
+   entirely without any code change. Grid is the default
+   (`SourceClipsPanel.tsx:82`).
 2. **One smoothness model:** remove the view-only filter or label it so clearly
    that it cannot be confused with the generation threshold.
 Items 3 (included-means-preferred) and 4 (onboarding explainer) moved to

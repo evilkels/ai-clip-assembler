@@ -514,11 +514,11 @@ test.describe('deterministic visual fixture setup', () => {
       await expect(page.getByText(PROJECT_NAME, { exact: true }).first()).toBeVisible();
       const projectSummary = page.locator('.project-header-stats');
       if (fixture === 'shell' || fixture === 'import-analyzing') {
-        await expect(projectSummary).toHaveText(/^\d+ sources · .+$/);
+        await expect(projectSummary).toHaveText('4 sources · 2.1 GB');
       } else if (fixture.startsWith('review')) {
-        await expect(projectSummary).toHaveText(/^\d+ clips · \d+ kept$/);
+        await expect(projectSummary).toHaveText('4 clips · 3 kept');
       } else {
-        await expect(projectSummary).toHaveText(/^\d+ items · \d+\.\ds$/);
+        await expect(projectSummary).toHaveText('3 items · 14.3s');
       }
       await assertShellGeometry(page, fixture);
       if (fixture === 'import-analyzing') {

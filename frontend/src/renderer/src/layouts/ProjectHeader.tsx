@@ -1,13 +1,35 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ProjectRenameEditor } from '../components/ProjectRenameEditor';
+import { effectiveTimelineDuration } from '../lib/timelineProjection';
+import { formatBytes } from '../lib/format';
 import { currentProjectDisplayName } from '../lib/projectSort';
 import { useReview } from '../state/ReviewContext';
 
 export function ProjectHeader() {
-  const { projectFolder, projectName, recentProjects, renameRecent, uploadedVideos, clips, timelineItems } = useReview();
+  const { projectFolder, projectName, recentProjects, renameRecent, uploadedVideos, clips, acceptedCount, timelineItems } = useReview();
+  const location = useLocation();
   const recentProject = recentProjects.find((project) => project.folderPath === projectFolder);
   const displayName = currentProjectDisplayName({ recentProject, projectName, projectFolder });
   const hasProject = Boolean(displayName || projectFolder);
+  const projectMetadata = useMemo(() => {
+    const sourceBytes = uploadedVideos.reduce(
+      (total, video) => total + (video.metadata?.size_bytes ?? 0),
+      0,
+    );
+    const runtime = effectiveTimelineDuration(timelineItems).toFixed(1);
+    switch (location.pathname) {
+      case '/import':
+        return `${uploadedVideos.length} sources · ${formatBytes(sourceBytes)}`;
+      case '/review':
+        return `${clips.length} clips · ${acceptedCount} kept`;
+      case '/timeline':
+      case '/export':
+        return `${timelineItems.length} items · ${runtime}s`;
+      default:
+        return `${uploadedVideos.length} sources`;
+    }
+  }, [acceptedCount, clips.length, location.pathname, timelineItems, uploadedVideos]);
   const [editing, setEditing] = useState(false);
   const renameTrigger = useRef<HTMLButtonElement>(null);
   const focusAfterClose = useRef(false);
@@ -46,8 +68,8 @@ export function ProjectHeader() {
             </span>
           )}
           {projectFolder && (
-            <span className="project-header-stats project-header-metadata" aria-label="Project totals">
-              {uploadedVideos.length} sources · {clips.length} clips · {timelineItems.length} items
+            <span className="project-header-stats project-header-metadata" aria-label="Project summary">
+              {projectMetadata}
             </span>
           )}
           {projectFolder && (

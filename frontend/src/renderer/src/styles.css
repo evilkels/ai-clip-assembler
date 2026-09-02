@@ -56,7 +56,7 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto 28px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto 34px;
   height: 100vh;
   min-width: 1024px;
   overflow: hidden;
@@ -65,9 +65,10 @@ a {
 
 .project-header {
   min-width: 0;
+  min-height: 60px;
   display: flex;
   align-items: center;
-  padding: var(--space-3) var(--space-4);
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-1);
 }
@@ -76,7 +77,7 @@ a {
   min-width: 0;
   display: flex;
   align-items: baseline;
-  gap: var(--space-3);
+  gap: 20px;
   width: 100%;
 }
 
@@ -222,47 +223,48 @@ a {
 .sidebar {
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
-  padding: var(--space-3);
+  padding: 18px 16px;
   display: grid;
   grid-template-rows: auto auto auto 1fr auto;
-  gap: 14px;
+  gap: 22px;
   min-height: 0;
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 4px;
+  gap: 12px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
 
 .sidebar-brand-logo {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   display: block;
 }
 
 .sidebar-brand-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
   letter-spacing: 0.01em;
   line-height: 1.2;
 }
 
 .sidebar-new-project {
-  height: 30px;
+  height: 38px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--bg-3);
   color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  font-weight: 650;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
   -webkit-text-fill-color: var(--text);
 }
 
@@ -275,11 +277,11 @@ a {
 }
 
 .sidebar-section-label {
-  margin: var(--space-2) 0;
+  margin: 0 0 10px;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -293,7 +295,7 @@ a {
 .route-link,
 .sidebar-action {
   min-width: 0;
-  min-height: 30px;
+  min-height: 34px;
   border-radius: var(--radius-md);
   color: var(--text-dim);
   font-size: var(--text-sm);
@@ -389,8 +391,8 @@ a {
 .project-row-open {
   min-width: 0;
   flex: 1 1 auto;
-  min-height: 26px;
-  padding: 0 var(--space-2);
+  min-height: 34px;
+  padding: 9px 10px;
   border-radius: var(--radius-sm);
   text-align: left;
 }
@@ -597,14 +599,14 @@ a {
    as a single top-to-bottom journey. Anchored to the row rather than the
    marker: a percentage height on the marker resolves against the marker's own
    24px box, which collapses the line to a stub. Top/bottom offsets are the
-   marker's position inside .step-link (6px padding + 24px marker) and the
-   reach into the next row (2px list gap + 6px padding). */
+   marker's position inside .step-link (9px padding + 26px marker) and the
+   reach into the next row (2px list gap + 9px padding). */
 .workflow-step:not(:last-child)::after {
   content: '';
   position: absolute;
-  left: 20px;
-  top: 30px;
-  bottom: -8px;
+  left: 23px;
+  top: 37px;
+  bottom: -6px;
   transform: translateX(-50%);
   width: 2px;
   border-radius: 2px;
@@ -613,11 +615,11 @@ a {
 
 .step-link {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: var(--radius-md);
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: var(--radius-lg);
   color: var(--text-dim);
   transition: background var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out);
@@ -630,9 +632,9 @@ a {
 
 .step-marker {
   position: relative;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   border: 1.5px solid var(--border-strong);
   background: var(--bg-2);
   display: grid;
@@ -754,7 +756,7 @@ a {
 
 .sidebar-footer {
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: 14px;
 }
 
 .main {
@@ -847,7 +849,7 @@ a {
   height: 26px;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   background: var(--bg-1);
   color: var(--text-dim);
   font-size: 18px;
@@ -855,7 +857,7 @@ a {
 }
 .sidebar-collapse-toggle:hover { color: var(--text); border-color: var(--border-strong); }
 .sidebar-is-collapsed .sidebar-collapse-toggle { left: calc(var(--shell-sidebar-collapsed-width) - 14px); }
-.sidebar-is-collapsed .sidebar { padding-inline: 10px; }
+.sidebar-is-collapsed .sidebar { padding: 18px 8px; }
 .sidebar-collapsed .sidebar-brand-name,
 .sidebar-collapsed .sidebar-section-label,
 .sidebar-collapsed .project-row-name,
@@ -865,8 +867,8 @@ a {
 .sidebar-collapsed .project-row-missing-note,
 .sidebar-collapsed .project-empty,
 .sidebar-collapsed .sidebar-error { display: none; }
-.project-row-initial { display: none; }
-.sidebar-collapsed .project-row-initial { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font: 600 11px var(--font-mono); }
+.project-row-initial { display: grid; place-items: center; width: 6px; height: 6px; border-radius: 2px; background: var(--border-strong); color: transparent; font: 600 11px var(--font-mono); }
+.sidebar-collapsed .project-row-initial { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-dim); color: var(--accent); }
 .sidebar-collapsed .sidebar-brand { justify-content: center; border-bottom: 0; }
 .sidebar-collapsed .sidebar-new-project { width: 42px; margin-inline: auto; font-size: 0; }
 .sidebar-collapsed .sidebar-new-project > span { font-size: 18px; }
@@ -941,7 +943,7 @@ a {
    progress markers remain scannable at the minimum window width. */
 .workflow-rail .step-link {
   min-height: 34px;
-  padding-block: 5px;
+  padding-block: 9px;
 }
 
 .workflow-rail .step-link.active,
@@ -950,8 +952,8 @@ a {
 }
 
 .project-header {
-  background: var(--bg-0);
-  padding-block: 20px;
+  background: var(--bg-1);
+  padding: 16px 24px;
 }
 
 .project-header-name {
@@ -972,7 +974,7 @@ a {
 }
 
 .statusbar {
-  min-height: 28px;
+  min-height: 34px;
 }
 
 /* The shell status rail is the compact variant of StatusSurface: the same
@@ -4616,7 +4618,7 @@ a {
   flex: 0 1 auto;
   max-width: 34%;
   overflow: hidden;
-  padding: 6px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   text-overflow: ellipsis;

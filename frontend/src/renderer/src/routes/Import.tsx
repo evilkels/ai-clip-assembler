@@ -399,23 +399,22 @@ export function ImportPage() {
             e.target.value = '';
           }}
         />
-        <button
-          type="button"
-          className={`drop-zone${hasVideos ? ' drop-zone-loaded' : ''}`}
-          aria-controls="source-video-picker"
-          onClick={triggerFilePicker}
-          disabled={Boolean(projectFolder)}
-        >
-          <p className="drop-zone-label">
-            {uploading
-              ? 'Uploading…'
-              : hasVideos
-                ? `${uploadedVideos.length} source video${uploadedVideos.length === 1 ? '' : 's'} ready — click to add more`
-                : projectFolder
-                  ? 'Add videos to the folder, then rescan'
+        {!projectFolder && (
+          <button
+            type="button"
+            className={`drop-zone${hasVideos ? ' drop-zone-loaded' : ''}`}
+            aria-controls="source-video-picker"
+            onClick={triggerFilePicker}
+          >
+            <p className="drop-zone-label">
+              {uploading
+                ? 'Uploading…'
+                : hasVideos
+                  ? `${uploadedVideos.length} source video${uploadedVideos.length === 1 ? '' : 's'} ready — click to add more`
                   : 'Click to select MP4/MOV files'}
-          </p>
-        </button>
+            </p>
+          </button>
+        )}
 
         {uploadErrors.length > 0 && (
           <div className="upload-errors">

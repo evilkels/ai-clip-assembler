@@ -219,8 +219,8 @@ async function installFixtureBackend(page: Page, fixture: VisualFixture): Promis
         version_set_id: 'visual-version-set',
         created_at: '2026-08-11T10:04:00Z',
         based_on_timeline_revision: 4,
-        based_on_sequence_fingerprint: 'visual-sequence-fingerprint',
-        based_on_review_context_fingerprint: 'visual-review-fingerprint',
+        based_on_sequence_fingerprint: 'visual-stale-sequence-fingerprint',
+        based_on_review_context_fingerprint: 'visual-stale-review-fingerprint',
         versions: [
           {
             version_id: 'visual-version-a',
@@ -230,7 +230,7 @@ async function installFixtureBackend(page: Page, fixture: VisualFixture): Promis
             profile: 'cinematic_highlight',
             total_duration_sec: 13.2,
             items: versionItems(['visual-clip-01', 'visual-clip-02', 'visual-clip-04']),
-            sequence_fingerprint: 'visual-sequence-fingerprint',
+            sequence_fingerprint: 'visual-version-a-fingerprint',
           },
           {
             version_id: 'visual-version-b',
@@ -445,6 +445,43 @@ async function assertShellGeometry(page: Page, fixture: VisualFixture): Promise<
   }, { footerSelector: footerExpectation.selector });
   const box = (selector: string) => geometry.boxes[selector] as { left: number; right: number; top: number; bottom: number };
   const header = box('[data-surface="project-header"]');
+  const shellMetrics = await page.evaluate(() => {
+    const headerElement = document.querySelector<HTMLElement>('[data-surface="project-header"]');
+    const rail = document.querySelector<HTMLElement>('.sidebar');
+    const openFolder = document.querySelector<HTMLElement>('.sidebar-new-project');
+    const marker = document.querySelector<HTMLElement>('.step-marker');
+    const status = document.querySelector<HTMLElement>('.statusbar');
+    if (!headerElement || !rail || !openFolder || !marker || !status) {
+      throw new Error('Missing shell metric element');
+    }
+    const headerStyle = getComputedStyle(headerElement);
+    const railStyle = getComputedStyle(rail);
+    const markerStyle = getComputedStyle(marker);
+    return {
+      headerPaddingTop: parseFloat(headerStyle.paddingTop),
+      headerPaddingLeft: parseFloat(headerStyle.paddingLeft),
+      headerBackground: headerStyle.backgroundColor,
+      railPaddingTop: parseFloat(railStyle.paddingTop),
+      railPaddingLeft: parseFloat(railStyle.paddingLeft),
+      openFolderHeight: openFolder.getBoundingClientRect().height,
+      markerWidth: marker.getBoundingClientRect().width,
+      markerHeight: marker.getBoundingClientRect().height,
+      markerRadius: parseFloat(markerStyle.borderTopLeftRadius),
+      statusHeight: status.getBoundingClientRect().height,
+    };
+  });
+  expect(shellMetrics.headerPaddingTop).toBe(16);
+  expect(shellMetrics.headerPaddingLeft).toBe(24);
+  expect(shellMetrics.headerBackground).not.toBe('rgba(0, 0, 0, 0)');
+  expect(header.bottom - header.top).toBeGreaterThanOrEqual(56);
+  expect(header.bottom - header.top).toBeLessThanOrEqual(64);
+  expect(shellMetrics.railPaddingTop).toBe(18);
+  expect(shellMetrics.railPaddingLeft).toBe(16);
+  expect(shellMetrics.openFolderHeight).toBe(38);
+  expect(shellMetrics.markerWidth).toBe(26);
+  expect(shellMetrics.markerHeight).toBe(26);
+  expect(shellMetrics.markerRadius).toBe(8);
+  expect(shellMetrics.statusHeight).toBe(34);
   const main = box('.main');
   const status = box('.statusbar');
   expect(header.left).toBeGreaterThanOrEqual(0);
@@ -475,6 +512,14 @@ test.describe('deterministic visual fixture setup', () => {
     test(`${fixture} exposes fixed representative data`, async ({ page }) => {
       await openFixtureRoute(page, fixture, path);
       await expect(page.getByText(PROJECT_NAME, { exact: true }).first()).toBeVisible();
+      const projectSummary = page.locator('.project-header-stats');
+      if (fixture === 'shell' || fixture === 'import-analyzing') {
+        await expect(projectSummary).toHaveText(/^\d+ sources · .+$/);
+      } else if (fixture.startsWith('review')) {
+        await expect(projectSummary).toHaveText(/^\d+ clips · \d+ kept$/);
+      } else {
+        await expect(projectSummary).toHaveText(/^\d+ items · \d+\.\ds$/);
+      }
       await assertShellGeometry(page, fixture);
       if (fixture === 'import-analyzing') {
         await expect(page.locator('[data-analysis-rail]')).toBeVisible();
@@ -492,6 +537,7 @@ test.describe('deterministic visual fixture setup', () => {
         await expect(page.getByTestId('suggested-versions-zone')).toBeVisible();
         await expect(page.getByTestId('version-gallery')).toBeVisible();
         await expect(page.getByTestId('version-card')).toHaveCount(2);
+        await expect(page.getByTestId('version-stale-warning')).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
         await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
       }

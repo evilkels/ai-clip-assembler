@@ -3,6 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+test.afterEach(async ({ page }) => {
+  // Let in-flight route.fetch handlers finish before Playwright tears down the page.
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
 function fixtureVideo(): string {
   const directory = join(process.cwd(), 'e2e', '.fixtures');
   const file = join(directory, 'review-browser-fixture.mp4');

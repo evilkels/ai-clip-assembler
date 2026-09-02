@@ -28,7 +28,7 @@ plan's own header.
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, Settings/Diagnostics styling, sidebar menu |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
-| 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped; confirm frames persist on real footage |
+| 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 2 defects left: keyboard trim, project-switch reset |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
 | 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Preview, chat streaming and E2E await visual QA |
@@ -39,6 +39,31 @@ plan's own header.
 | 🟡 | [project-folder-model](project-folder-model.md) | Manual folder-portability QA |
 | 🟡 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | Architecture and security documentation |
 | 🟢 | [project-sidebar](project-sidebar.md) | Nothing — archive candidate |
+
+## In flight
+
+Work that exists but is not on `main` yet. Listed so it is not lost — a pushed
+branch with no pull request is the easiest thing in this repo to forget.
+
+| | Branch | State | What it is |
+|---|---|---|---|
+| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Poster-first cards and play-once previews, plan 029 phases 1–3 |
+| 🟡 | `docs/tighten-025-017-prerequisites` | [PR #71](https://github.com/evilkels/ai-clip-assembler/pull/71) | Records the missing prerequisites in plans 017 and 025 |
+| 🟡 | `docs/plans-status-board` | [PR #70](https://github.com/evilkels/ai-clip-assembler/pull/70) | This README's status board |
+| 🔴 | `feat/027-version-diversity-test` | **pushed, no PR** | Rescues plan 027's orphaned Task 1 tests |
+
+### Parked tests — plan 027 Task 1
+
+`backend/tests/test_version_diversity.py` was written test-first in an
+abandoned 027 worktree and never committed; the module it imports
+(`src.version_diversity`) was never written on any branch, so the file was one
+`git clean` from being lost. It now lives on `feat/027-version-diversity-test`
+behind a module-level `pytest.importorskip`, so the assertions **skip while the
+module is missing and start running the moment it lands** — there is no guard
+to remember to remove. Plan 027 Task 1 points at the existing file rather than
+asking for a new one.
+
+Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
 
 ## Release QA — v0.2.0
 

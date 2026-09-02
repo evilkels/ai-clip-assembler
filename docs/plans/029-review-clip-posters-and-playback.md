@@ -1,6 +1,6 @@
 # Plan 029: Poster-first Candidate Clip cards and play-once previews
 
-Status: PHASES 1-3 DONE (2026-09-03) · Priority P1 · Effort M · Risk LOW · Category performance + UX
+Status: PHASES 1-3 DONE (2026-09-03) · PHASE 5 TODO · Priority P1 · Effort M · Risk LOW · Category performance + UX
 Written against `9ee7ee4`, 2026-09-02. Absorbs item 1 of
 [`017-review-page-clarity-and-polish.md`](017-review-page-clarity-and-polish.md),
 which now keeps only its smoothness-controls item.
@@ -196,6 +196,60 @@ changed a model — stop and report.
   resolves any finding cited there. Update `docs/plans/README.md`: this plan
   moves to `done/`, and 017's row should list only its smoothness item.
 
+## Phase 5 — Write posters during analysis (decided 2026-09-03)
+
+Phases 1-3 resolve a poster at **request** time: the route scans the sampled
+frames for a Source Video and serves the one nearest `at_ms`. That works, but it
+is the wrong place for the work, and it is the direct cause of three problems
+already recorded below and in the review of PR #72:
+
+- Every poster request re-sorts, re-resolves and re-stats every sampled frame
+  for that source, so many cards from one long video repeat the same traversal.
+- The poster is only ever *approximately* the clip's first frame, because the
+  nearest sample is on the analysis sampling grid, not the clip boundary.
+- The renderer has to send a millisecond offset, which is a float in the domain
+  (`clip.start_sec` is a frame timestamp) but an integer in the route — the
+  mismatch that made nearly every poster 422 before it was fixed by rounding.
+
+**Decision:** a Candidate Clip's poster becomes a real artifact produced when
+the clip is analysed, not something derived per request.
+
+- [ ] **Step 5.1 — Write a poster per Candidate Clip during analysis.**
+      After clip assembly, persist one poster for each Candidate Clip from the
+      already-sampled frame nearest that clip's `start_sec`. This must be a copy
+      of an existing sample — **no new FFmpeg work**, which is the same
+      constraint plan 017 carried. Suggested location:
+      `<project work dir>/posters/{clip_id}.jpg`, beside `samples/`.
+
+- [ ] **Step 5.2 — Regenerate posters on re-derive.**
+      Re-deriving clips from cached Frame Scores produces different ranges, and
+      `clip_id` is a uuid5 of file plus range, so the ids change and stale
+      posters would accumulate. Rewrite the poster set whenever the Candidate
+      Clip library is rebuilt, and remove posters whose `clip_id` is no longer
+      in the library.
+
+- [ ] **Step 5.3 — Serve posters by `clip_id`.**
+      Add the clip-scoped route and prefer it. Keep the existing
+      file-plus-`at_ms` route as a fallback so projects analysed before this
+      change still show posters instead of regressing to the placeholder;
+      remove it only once no supported project predates Phase 5.
+
+- [ ] **Step 5.4 — Simplify the client.**
+      With a `clip_id` route the renderer no longer sends a timestamp at all,
+      so `buildClipPosterUrl`'s rounding guard and the float/integer mismatch
+      disappear rather than being defended against.
+
+- [ ] **Step 5.5 — Cover the artifact, not just the endpoint.**
+      Assert that analysing a project writes exactly one poster per Candidate
+      Clip, that re-deriving replaces them, and that a poster is a readable
+      JPEG. The Phase 1-3 tests prove the renderer contract with mocked
+      responses; they cannot prove that posters exist in a real analysis, which
+      is precisely the gap recorded in "Open question" below.
+
+**This phase closes the open question.** Once posters are written by analysis,
+"do sampled frames exist for this project?" stops being a question the UI can
+get a surprising answer to.
+
 ## Corrections to this plan, found while executing
 
 - **The loop control keeps a stable accessible name.** This plan originally
@@ -223,11 +277,9 @@ change. Decide them separately rather than growing this plan:
   previews their way through a long library rebuilds the very cost this plan
   removes. Fixing it needs a policy decision: a single active clip lifted into
   `SourceClipsPanel`, or returning to the poster when playback ends.
-- **Each poster request rescans every frame for that source.**
-  `timestamped_frame_paths` sorts, resolves and stats every matching JPEG on
-  each request (`api.py`), so many cards from one long source repeat the same
-  traversal. Worth caching the index per `{projectId, fileId}` with
-  invalidation on re-analysis.
+- ~~Each poster request rescans every frame for that source.~~ **Now owned by
+  Phase 5**, which removes the per-request scan entirely rather than caching
+  around it.
 
 ## Open question to settle before calling this shipped
 

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
@@ -418,6 +418,24 @@ async def get_project_video_media(
         filename=video["file_name"],
         content_disposition_type="inline",
         headers={"Accept-Ranges": "bytes"},
+    )
+
+
+@app.get("/projects/{project_id}/videos/{file_id}/poster")
+async def get_project_video_poster(
+    project_id: str,
+    file_id: str,
+    at_ms: int = Query(..., ge=0),
+):
+    video = registered_video(project_id, file_id)
+    frame_paths = timestamped_frame_paths(project_id, video["file_id"])
+    if not frame_paths:
+        raise HTTPException(status_code=404, detail="Poster frame not found")
+    _timestamp, poster_path = min(frame_paths, key=lambda item: abs(item[0] - at_ms))
+    return FileResponse(
+        poster_path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
     )
 
 
@@ -976,19 +994,15 @@ def _mcp_get_controller(project_id: str) -> TimelineController:
     return get_timeline_controller(project_id)
 
 
-def mcp_frame_paths(project_id: str, clip_id: str) -> list:
-    """Local frame JPEG paths for a candidate clip, for an agent to read
-    directly (the same `@path` images `pi_cli_harness` attaches)."""
-    project = projects.get(project_id) or {}
-    clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
-    if clip is None:
+def timestamped_frame_paths(project_id: str, file_id: str) -> list[tuple[int, Path]]:
+    """Return safe, non-raw sampled frame paths with their millisecond timestamps."""
+    if Path(file_id).name != file_id:
         return []
-    file_id = clip.get("file_id")
-    base = samples_dir(project_id) / str(file_id)
-    if not base.exists():
+    samples_root = samples_dir(project_id).resolve()
+    base = (samples_root / file_id).resolve()
+    if base.parent != samples_root or not base.is_dir():
         return []
-    start_ms = float(clip.get("start_sec", 0.0)) * 1000
-    end_ms = float(clip.get("end_sec", 0.0)) * 1000
+
     paths = []
     for path in sorted(base.glob(f"{file_id}_*.jpg")):
         stem = path.stem
@@ -998,6 +1012,25 @@ def mcp_frame_paths(project_id: str, clip_id: str) -> list:
             milliseconds = int(stem.rsplit("_", 1)[1])
         except (ValueError, IndexError):
             continue
+        resolved = path.resolve()
+        if resolved.parent != base or not resolved.is_file():
+            continue
+        paths.append((milliseconds, resolved))
+    return paths
+
+
+def mcp_frame_paths(project_id: str, clip_id: str) -> list:
+    """Local frame JPEG paths for a candidate clip, for an agent to read
+    directly (the same `@path` images `pi_cli_harness` attaches)."""
+    project = projects.get(project_id) or {}
+    clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
+    if clip is None:
+        return []
+    file_id = clip.get("file_id")
+    start_ms = float(clip.get("start_sec", 0.0)) * 1000
+    end_ms = float(clip.get("end_sec", 0.0)) * 1000
+    paths = []
+    for milliseconds, path in timestamped_frame_paths(project_id, str(file_id)):
         if start_ms <= milliseconds <= end_ms:
             paths.append(str(path))
     return paths

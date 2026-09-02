@@ -80,6 +80,10 @@ export function buildVideoMediaUrl(projectId: string, fileId: string): string {
   return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/media`;
 }
 
+export function buildClipPosterUrl(projectId: string, fileId: string, atMs: number): string {
+  return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/poster?at_ms=${atMs}`;
+}
+
 export interface BackendStatus {
   online: boolean;
   version?: string;

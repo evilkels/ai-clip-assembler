@@ -812,6 +812,73 @@ def test_project_video_media_returns_folder_project_file(tmp_path):
     assert response.headers["content-type"].startswith("video/mp4")
 
 
+def test_project_video_poster_returns_nearest_sampled_frame(tmp_path):
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+    sample_dir = api.samples_dir(project_id) / "DJI_0042.MP4"
+    sample_dir.mkdir()
+    (sample_dir / "DJI_0042.MP4_000000.jpg").write_bytes(b"first jpeg")
+    (sample_dir / "DJI_0042.MP4_001000.jpg").write_bytes(b"second jpeg")
+    (sample_dir / "DJI_0042.MP4_raw_000500.jpg").write_bytes(b"raw jpeg")
+
+    response = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/poster",
+        params={"at_ms": 760},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/jpeg")
+    assert response.content == b"second jpeg"
+    assert "max-age" in response.headers["cache-control"]
+
+
+def test_project_video_poster_returns_404_without_samples_or_for_unknown_resources(tmp_path):
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+
+    missing_samples = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/poster",
+        params={"at_ms": 0},
+    )
+    unknown_file = client.get(
+        f"/projects/{project_id}/videos/missing.MP4/poster",
+        params={"at_ms": 0},
+    )
+    unknown_project = client.get(
+        "/projects/missing/videos/DJI_0042.MP4/poster",
+        params={"at_ms": 0},
+    )
+
+    assert missing_samples.status_code == 404
+    assert unknown_file.status_code == 404
+    assert unknown_project.status_code == 404
+
+
+@pytest.mark.parametrize("at_ms", [-1, "not-a-number"])
+def test_project_video_poster_rejects_invalid_timestamp(tmp_path, at_ms):
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+
+    response = client.get(
+        f"/projects/{project_id}/videos/DJI_0042.MP4/poster",
+        params={"at_ms": at_ms},
+    )
+
+    assert response.status_code == 422
+
+
+def test_project_video_poster_cannot_traverse_outside_samples(tmp_path):
+    client, project_id, _source_video = create_folder_project_with_video(tmp_path)
+    outside = tmp_path / "etc" / "passwd"
+    outside.parent.mkdir()
+    outside.write_bytes(b"outside samples")
+
+    response = client.get(
+        f"/projects/{project_id}/videos/{quote('../../etc/passwd', safe='')}/poster",
+        params={"at_ms": 0},
+    )
+
+    assert response.status_code == 404
+    assert response.content != outside.read_bytes()
+
+
 def test_project_video_media_supports_byte_range_requests(tmp_path):
     client, project_id, _source_video = create_folder_project_with_video(tmp_path)
 

@@ -1,5 +1,13 @@
 # Plan: Modern professional UI shell
 
+> **CLOSED AS SUPERSEDED (2026-09-02).** This plan prescribed a shadcn/ui and
+> Radix migration; the studio redesign (`6d79c1b`, v0.2.0) delivered the same
+> visual goals with hand-authored CSS and design tokens instead, so the
+> migration will not happen. Its three surviving items — Cmd-K palette, score
+> verification, and the Settings/Diagnostics surfaces — moved to
+> [`shell-followups.md`](../shell-followups.md). Kept for the component-library
+> evaluation and the rejected-approach record.
+
 Status: SUPERSEDED for the workflow routes (reconciled 2026-08-31); the library
 decision it prescribes was settled against it by what shipped.
 

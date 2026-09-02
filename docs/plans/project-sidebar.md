@@ -39,9 +39,12 @@ folder, falling back silently if it's missing.
 
 ## Remaining (deferred pending visual QA), migration, open questions
 
-Remaining: `Cmd-B` collapsed/expanded rail + persisted resizable width;
-replacing inline Locate/Remove buttons with a context-menu interaction;
-keyboard-nav/a11y verification (react-doctor rules). Superseded above:
+Remaining: none owned here as of 2026-09-02. The `Cmd-B` collapsed rail and
+persisted resizable width **shipped** in the studio redesign (`AppShell.tsx`,
+`hooks/usePanelWidth.ts`, asserted by
+`project-shell-regressions.spec.ts:268-273`). The context-menu interaction and
+the keyboard-nav/a11y verification moved to
+[`shell-followups.md`](shell-followups.md). Superseded above:
 recents-label rename and alphabetical, card-style project rows shipped in
 [plan 022](done/022-project-shell-header-and-sidebar.md), so the "Rename ...
 deferred to v2" line no longer holds; `lastOpenedAt` is still written but no

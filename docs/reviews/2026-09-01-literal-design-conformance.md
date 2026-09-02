@@ -48,7 +48,7 @@ The built renderer was launched without a dev server, connected through CDP, the
 npm run build
 env -u ELECTRON_RUN_AS_NODE ./node_modules/.bin/electron out/main/index.js --remote-debugging-port=9231 --user-data-dir=/tmp/clip-assembler-electron-task7
 agent-browser --session electron-neutral connect 9231
-agent-browser --session electron-neutral open file:///Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/redesign-studio-workflows/frontend/out/renderer/index.html#/playwriter?fixture=review-grid
+agent-browser --session electron-neutral open file:///path/to/worktree/frontend/out/renderer/index.html#/playwriter?fixture=review-grid
 ~~~
 
 CDP metrics were width=1440, height=1040, deviceScaleFactor=2, mobile=false; the renderer reported innerWidth=1440, innerHeight=1040, and devicePixelRatio=2. Both logical crops are 1440×1040 and both physical captures are 2880×2080, with no debug labels or overlays. The built smoke pass imported/analyzed all four neutral sources, opened Review, and captured both themes successfully.
@@ -83,7 +83,7 @@ Commands were run on this tree after the implementation commits. Counts are from
 | npx playwright test visual-conformance.spec.ts --update-snapshots (from frontend/) | PASS; 31 passed |
 | npx playwright test visual-conformance.spec.ts (repeat, from frontend/) | PASS; 31 passed, 0 failed |
 | npm run build (from frontend/) | PASS; typecheck, asset staging, Electron/Vite production build, and asset copy |
-| python3 -m unittest scripts.tests.test_site_contract (repo root) | PASS; 6 tests, OK |
+| python3 -m unittest scripts.tests.test_site_contract (repo root) | PASS; 7 tests, OK |
 
 The earlier Task 6 run recorded one configured-flaky Review fixture route race (route.fetch after page close): 99 passed, 1 flaky, 0 failed, with the retry passing. The fresh full run above exercised 100 tests and had no flaky result.
 
@@ -107,6 +107,12 @@ ca0480a fix(ui): refine review workstation conformance
 6b11c47 feat(site): finish landing with redesigned app captures
 d697d86 fix(site): sanitize and recapture review screenshots
 28662ec fix(site): sanitize review fixture filenames
+8a5ab9a test(e2e): synchronize review route teardown
+6244883 fix(site): link downloads to release assets
+81c332a fix(ui): align final shell and visual fixtures
+8bb3bc9 test(ui): align shell conformance assertions
+8134589 fix(site): keep download menu flat
+721f8b5 test(ui): pin visual fixture summaries
 ~~~
 
 The two-axis Standards/Spec review and Copilot review findings are recorded in the conformance reports and implementation plan. Valid findings fixed include the export payload snapshot, explicit analysis-running predicate, SourceTrack reuse, control radii, filtered select-all state, per-file ordering, and neutral E2E fixture paths. The pointer trim comment was rejected with evidence: trim is initiated by onMouseDown, while onPointerDown only stops propagation, so the matching mousemove/mouseup listener pair is intentional.
@@ -130,4 +136,4 @@ The receipt is pinned to the Timeline projection at export click time, not to a 
 
 git diff main...HEAD was reviewed for the implementation and documentation scope. frontend/package-lock.json remains the user's pre-existing unstaged modification and is intentionally excluded from this documentation commit. The Claude Design export remains ignored and untouched. The conformance plan and spec are added at their intended paths under docs/plans/ and docs/specs/.
 
-The parent agent owns the external handoff: this task does not push the branch, edit PR #68, or claim that GitHub checks have started.
+The branch and PR handoff were completed after this record was refreshed; GitHub CI status is tracked on PR #68.

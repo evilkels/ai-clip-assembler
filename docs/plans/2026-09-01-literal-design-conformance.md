@@ -34,30 +34,30 @@
 - Produces: deterministic QA states addressable by route and query/fixture state.
 - Produces: canonical screenshots for shell, Import analyzing, Review grid/list, Timeline selection, and Export receipt.
 
-- [ ] **Step 1: Add deterministic QA fixtures for each required state**
+- [x] **Step 1: Add deterministic QA fixtures for each required state**
 
   Expose fixed project names, media metadata, analysis progress, candidates,
   Timeline Items, export receipt, and theme through the existing Playwriter QA
   route. Keep timestamps and video frames fixed or mask them in assertions.
 
-- [ ] **Step 2: Write the visual test matrix**
+- [x] **Step 2: Write the visual test matrix**
 
   Use `expect(page).toHaveScreenshot()` at 1440x1000 and 1024x768 in light and
   dark. Add region geometry assertions for sidebar, project header, workspace,
   workflow footer, and status bar. The first run must fail against the current UI.
 
-- [ ] **Step 3: Save design-reference captures outside the baseline directory**
+- [x] **Step 3: Save design-reference captures outside the baseline directory**
 
   Capture the corresponding `#1d`, `#1b`, `#3a`, and `#3b` export regions and
   record them in the review workspace. Do not turn current-app screenshots into
   accepted baselines.
 
-- [ ] **Step 4: Run the focused gate**
+- [x] **Step 4: Run the focused gate**
 
   Run: `cd frontend && npm run test:e2e -- visual-conformance.spec.ts`
   Expected: functional fixture setup passes and visual assertions fail with useful diffs.
 
-- [ ] **Step 5: Commit the harness without accepting divergent baselines**
+- [x] **Step 5: Commit the harness without accepting divergent baselines**
 
   Commit: `test(ui): add literal design conformance harness`
 
@@ -81,12 +81,12 @@
 - Produces: `WorkflowFooter({ summary, detail, secondaryActions, primaryAction })`.
 - Preserves: all current sidebar resizing, project actions, navigation, rename, theme, settings, diagnostics, and status behavior.
 
-- [ ] **Step 1: Extend failing shell assertions** for rail collapse, counts, metadata, workflow footer placement, logo rendering, and absence of the active left bar.
-- [ ] **Step 2: Implement shell structure** matching the export at 1440px while retaining the current resize bounds and adding an explicit collapsed state.
-- [ ] **Step 3: Add shared workflow chrome** and migrate route wrappers without changing route actions.
-- [ ] **Step 4: Consolidate shell CSS** so later legacy rules cannot override tokens, typography, or layout; replace inline route-chrome styles.
-- [ ] **Step 5: Verify** with `npm run typecheck`, the two shell suites, and shell visual comparisons in both themes and sizes.
-- [ ] **Step 6: Commit** as `feat(ui): rebuild studio shell from design`.
+- [x] **Step 1: Extend failing shell assertions** for rail collapse, counts, metadata, workflow footer placement, logo rendering, and absence of the active left bar.
+- [x] **Step 2: Implement shell structure** matching the export at 1440px while retaining the current resize bounds and adding an explicit collapsed state.
+- [x] **Step 3: Add shared workflow chrome** and migrate route wrappers without changing route actions.
+- [x] **Step 4: Consolidate shell CSS** so later legacy rules cannot override tokens, typography, or layout; replace inline route-chrome styles.
+- [x] **Step 5: Verify** with `npm run typecheck`, the two shell suites, and shell visual comparisons in both themes and sizes.
+- [x] **Step 6: Commit** as `feat(ui): rebuild studio shell from design`.
 
 ### Task 3: Import workstation conformance
 
@@ -103,12 +103,12 @@
 - Consumes: `WorkflowHeader` and `WorkflowFooter` from Task 2.
 - Preserves: existing source filtering, sorting, view modes, columns, selection identity, analysis handlers, abort, harness, and navigation.
 
-- [ ] **Step 1: Add failing structural assertions** for source aggregates, compact toolbar, selected action rail, docked analysis/rules composition, and footer actions.
-- [ ] **Step 2: Recompose Import** in the prototype's order and hierarchy; move actions to their designed surfaces without duplicating handlers.
-- [ ] **Step 3: Remove conflicting legacy analysis rules** and inline layout declarations, including the later cascade that constrains `.analysis-progress` to the old narrow panel.
-- [ ] **Step 4: Verify** Import behavior at both current functional viewports and literal visual parity at canonical sizes/themes.
-- [ ] **Step 5: Independent visual review** against export `#1d`; fix Important or higher deviations before proceeding.
-- [ ] **Step 6: Commit** as `feat(ui): match import workstation design`.
+- [x] **Step 1: Add failing structural assertions** for source aggregates, compact toolbar, selected action rail, docked analysis/rules composition, and footer actions.
+- [x] **Step 2: Recompose Import** in the prototype's order and hierarchy; move actions to their designed surfaces without duplicating handlers.
+- [x] **Step 3: Remove conflicting legacy analysis rules** and inline layout declarations, including the later cascade that constrains `.analysis-progress` to the old narrow panel.
+- [x] **Step 4: Verify** Import behavior at both current functional viewports and literal visual parity at canonical sizes/themes.
+- [x] **Step 5: Independent visual review** against export `#1d`; fix Important or higher deviations before proceeding.
+- [x] **Step 6: Commit** as `feat(ui): match import workstation design`.
 
 ### Task 4: Review workstation conformance
 
@@ -126,12 +126,12 @@
 - Consumes: Task 2 workflow chrome.
 - Preserves: Candidate Clip decisions, view/filter state, source context, chat, version generation/comparison/application, and stale-state rules.
 
-- [ ] **Step 1: Add failing assertions** that Your Clips is initially visible and that the Ask AI, versions, and clip browser regions occupy the designed workstation.
-- [ ] **Step 2: Remove the collapsed-by-default disclosure composition** and match the `#1b` toolbar, card/row density, score treatment, source tracks, and footer.
-- [ ] **Step 3: Recompose AI and version surfaces** without changing their domain behavior or asynchronous states.
-- [ ] **Step 4: Verify** both existing Review suites and visual comparisons for grid/list in both themes.
-- [ ] **Step 5: Independent visual review** against export `#1b`; fix Important or higher deviations.
-- [ ] **Step 6: Commit** as `feat(ui): match review workstation design`.
+- [x] **Step 1: Add failing assertions** that Your Clips is initially visible and that the Ask AI, versions, and clip browser regions occupy the designed workstation.
+- [x] **Step 2: Remove the collapsed-by-default disclosure composition** and match the `#1b` toolbar, card/row density, score treatment, source tracks, and footer.
+- [x] **Step 3: Recompose AI and version surfaces** without changing their domain behavior or asynchronous states.
+- [x] **Step 4: Verify** both existing Review suites and visual comparisons for grid/list in both themes.
+- [x] **Step 5: Independent visual review** against export `#1b`; fix Important or higher deviations.
+- [x] **Step 6: Commit** as `feat(ui): match review workstation design`.
 
 ### Task 5: Timeline workspace conformance
 
@@ -149,12 +149,12 @@
 - Consumes: Task 2 workflow chrome.
 - Preserves: every mutation by `item_id`, playback, selection, trim, reorder, removal, undo/redo, speed, transform, and keyboard guards.
 
-- [ ] **Step 1: Add failing workspace assertions** for preview/timeline/inspector proportions, header actions, selection, and workflow footer.
-- [ ] **Step 2: Recompose the route** into the `#3a` preview-and-track workspace plus right inspector/item rail, reusing current controllers.
-- [ ] **Step 3: Consolidate timeline CSS** to remove nested legacy card geometry that conflicts with the edge-to-edge workspace.
-- [ ] **Step 4: Run all Timeline functional suites** and both visual themes/sizes.
-- [ ] **Step 5: Independent identity and visual reviews**; reject any change that weakens Timeline Document authority or visibly diverges from `#3a`.
-- [ ] **Step 6: Commit** as `feat(ui): match timeline workspace design`.
+- [x] **Step 1: Add failing workspace assertions** for preview/timeline/inspector proportions, header actions, selection, and workflow footer.
+- [x] **Step 2: Recompose the route** into the `#3a` preview-and-track workspace plus right inspector/item rail, reusing current controllers.
+- [x] **Step 3: Consolidate timeline CSS** to remove nested legacy card geometry that conflicts with the edge-to-edge workspace.
+- [x] **Step 4: Run all Timeline functional suites** and both visual themes/sizes.
+- [x] **Step 5: Independent identity and visual reviews**; reject any change that weakens Timeline Document authority or visibly diverges from `#3a`.
+- [x] **Step 6: Commit** as `feat(ui): match timeline workspace design`.
 
 ### Task 6: Export conformance and application-wide cleanup
 
@@ -207,7 +207,6 @@
 - [x] **Step 2: Record side-by-side review findings**, accepted responsive adaptations, Electron smoke evidence, screenshot provenance, and any remaining human-only checks.
 - [x] **Step 3: Run the complete repository verification gate** and record exact counts/output, not inherited results.
 - [x] **Step 4: Review `git diff main...HEAD` and `git status`**, ensuring the design export and unrelated package-lock modification are not staged.
-- [ ] **Step 5: Commit documentation**, push the branch, update PR #68, and confirm checks start.
+- [x] **Step 5: Commit documentation**, push the branch, update PR #68, and confirm checks start.
 
-Step 5 is intentionally left for the parent agent: this task commits only the
-documentation, and must not push or mutate PR #68.
+Completed by the parent agent during final handoff.

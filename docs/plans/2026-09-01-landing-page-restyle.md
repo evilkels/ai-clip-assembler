@@ -296,7 +296,7 @@ Everything else in `frontend/src/renderer/src/styles/tokens.css:82-106` matches.
 ### Task 6: Screenshot capture — MAINTAINER-OWNED (complete)
 
 Not agent-executable. Completed by the maintainer with the redesigned app and sanitized
-fixture footage; both 2656×2080 (2× 1328×1040) captures are WebP and contain no personal
+fixture footage; both 2880×2080 (2× 1440×1040) captures are WebP and contain no personal
 paths, personal filenames, faces, or locations; only generic fixture media labels are
 visible.
 

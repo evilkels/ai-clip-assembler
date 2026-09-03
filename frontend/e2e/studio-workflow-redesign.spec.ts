@@ -86,7 +86,7 @@ async function openImportFromQa(page: Page): Promise<void> {
 
 async function completeAnalysis(page: Page): Promise<void> {
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
 }
 

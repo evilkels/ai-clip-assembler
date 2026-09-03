@@ -18,6 +18,7 @@ import {
   type AnalysisProgress,
   type HarnessInfo,
 } from '../api/client';
+import { usePublishGateActions, type GateActions } from '../state/StepGateContext';
 import type { ClipGenerationPreferences } from '../types/clip';
 import type { SourceVideoSort, SourceVideoSortKey } from '../lib/sourceVideoView';
 
@@ -360,6 +361,16 @@ export function ImportPage() {
     }
   }, [openProjectFolder]);
 
+  /**
+   * The blocked bar names "how steady" as the threshold to loosen, so send the
+   * editor to that control rather than just to the panel that contains it.
+   */
+  const handleLoosenRules = useCallback(() => {
+    const region = document.querySelector<HTMLElement>('[data-rules-region]');
+    region?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    region?.querySelector<HTMLInputElement>('input[aria-label="How steady (0\u201310)"]')?.focus();
+  }, []);
+
   const isAnalyzing = analysisStatus.phase === 'analyzing';
   const isComplete = analysisStatus.phase === 'complete';
   const hasError = analysisStatus.phase === 'error';
@@ -369,6 +380,31 @@ export function ImportPage() {
   const runningFileName = isAnalyzing ? activeProgress.file_name ?? null : null;
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
   const eta = estimatedRemaining(activeProgress, activePercent);
+
+  // Import owns every action that can unblock step 01, so it publishes them to
+  // the shell's action bar instead of the bar reaching back into this route.
+  const gateActions = useMemo<GateActions>(
+    () => ({
+      'open-folder': {
+        label: openingFolder ? 'Opening…' : 'Open Folder',
+        run: handleOpenFolder,
+        inert: openingFolder,
+      },
+      analyze: {
+        label:
+          selectedCount > 0
+            ? `Analyze ${selectedCount} video${selectedCount === 1 ? '' : 's'}`
+            : 'Select videos to analyze',
+        run: handleAnalyze,
+        // Named but inert with nothing selected, so the bar still says what
+        // would unblock the step.
+        inert: selectedCount === 0 || isAnalyzing,
+      },
+      'loosen-rules': { label: 'Loosen rules and re-scan', run: handleLoosenRules },
+    }),
+    [openingFolder, handleOpenFolder, selectedCount, handleAnalyze, isAnalyzing, handleLoosenRules],
+  );
+  usePublishGateActions(gateActions);
 
   return (
     <div className="page">

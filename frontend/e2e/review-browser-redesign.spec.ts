@@ -38,7 +38,7 @@ async function setupReview(page: Page): Promise<void> {
   await input.setInputFiles(fixtureVideo());
   await expect(page.getByText(/1 source video ready/)).toBeVisible();
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
   await page.goto('/#/review');
   await openClips(page);
@@ -118,7 +118,7 @@ async function setupSeededReview(page: Page): Promise<{ timelineFile: string; ti
     await route.fulfill({ response, json: body });
   });
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
 
   await page.route('**/projects/*/clips', async (route) => {

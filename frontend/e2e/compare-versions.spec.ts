@@ -258,7 +258,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   }
   await expect(generationPanel.locator('.clip-generation-help')).toHaveCount(6);
   await generationPanel.getByLabel('Shortest clip (s)', { exact: true }).fill('4');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({
     timeout: 180_000,
   });

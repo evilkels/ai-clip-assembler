@@ -17,7 +17,7 @@ docs.
 
 ## Active
 
-18 plans. Statuses verified against the code on 2026-09-02, not taken from each
+19 plans. Statuses verified against the code on 2026-09-03, not taken from each
 plan's own header.
 
 | | Plan | What's left |
@@ -29,6 +29,7 @@ plan's own header.
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, Settings/Diagnostics styling, sidebar menu |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
 | 🔴 | [030](030-truthful-ai-usage.md) | Selected vs Effective Harness; decouple the Review Agent; surface fallback |
+| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; buttons, Settings `AI assistance`, harness popover, token deltas |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 2 defects left: keyboard trim, project-switch reset |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
@@ -51,11 +52,21 @@ thing to review and merge:
 
 | | Branch | State | What it carries |
 |---|---|---|---|
-| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Plan 029 phases 1–3 (poster-first cards, play-once previews), this status board, the plan 017/025 prerequisites, and plan 027's parked tests |
+| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Plan 029 phases 1–3 (poster-first cards, play-once previews), plan 031 Phase 1 (step gating), this status board, the plan 017/025 prerequisites, and plan 027's parked tests |
 
 Consolidated into it and closed unmerged: PR #70 (status board) and PR #71
 (plan prerequisites), which were already ancestors of this branch, and PR #73
 (`feat/027-version-diversity-test`), merged in explicitly.
+
+### Fixed on the branch 2026-09-03
+
+Plan 029's poster-first cards turned 23 Playwright tests red and PR #72's CI
+with them. Three specs waited on a `<video>` in Review that a resting card no
+longer mounts; they now assert the poster and activate the card first. Behind
+them was a real defect, not just stale tests: `ClipCard`'s audio effect keyed on
+`[cardMuted, volume]`, so it never re-ran on the render that brings the element
+into existence and an unmuted preview played at full volume whatever the slider
+said. Fixed in `04c1bdb`.
 
 ### Parked tests — plan 027 Task 1
 

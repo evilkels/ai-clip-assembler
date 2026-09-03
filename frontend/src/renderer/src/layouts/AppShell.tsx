@@ -8,16 +8,34 @@ import { usePanelWidth } from '../hooks/usePanelWidth';
 import { Sidebar } from './Sidebar';
 import { ProjectHeader } from './ProjectHeader';
 import { StatusBar } from './StatusBar';
-import { WorkflowFooter } from '../components/WorkflowFooter';
+import { WorkflowFooter, type WorkflowFooterProps } from '../components/WorkflowFooter';
 import { effectiveTimelineDuration } from '../lib/timelineProjection';
+import { useGateActions } from '../state/StepGateContext';
+import {
+  importGate,
+  reviewGate,
+  ridingWarning,
+  thresholdSummary,
+  timelineGate,
+  type StepGate,
+} from '../lib/stepGate';
 
 type AppShellProps = {
   children: ReactNode;
 };
 
 export function AppShell({ children }: AppShellProps) {
-  const { projectName, uploadedVideos, clips, acceptedCount, timelineItems } = useReview();
+  const {
+    projectName,
+    uploadedVideos,
+    clips,
+    acceptedCount,
+    timelineItems,
+    analysisStatus,
+    generationStats,
+  } = useReview();
   const location = useLocation();
+  const gateActions = useGateActions();
   const [sidebarWidth, resizeSidebar] = usePanelWidth('sidebarWidth', 264, 180, 420);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -43,39 +61,91 @@ export function AppShell({ children }: AppShellProps) {
     });
   };
 
-  const footer = (() => {
+  /**
+   * Render the action that unblocks a blocked step as the bar's one solid
+   * accent. A route-owned action reaches us through StepGateContext; a step
+   * back the shell can navigate itself.
+   */
+  const unblockNode = (gate: StepGate) => {
+    if (gate.unblockTo) {
+      return (
+        <Link className="btn primary" to={gate.unblockTo.to}>
+          {gate.unblockTo.label}
+        </Link>
+      );
+    }
+    const action = gate.unblock ? gateActions[gate.unblock] : undefined;
+    if (!action) return null;
+    return (
+      <button type="button" className="btn primary" onClick={action.run} disabled={action.inert}>
+        {action.label}
+      </button>
+    );
+  };
+
+  /** Compose the gate into the props the footer renders. */
+  const gated = (gate: StepGate, props: WorkflowFooterProps): WorkflowFooterProps =>
+    gate.allowed
+      ? props
+      : {
+          ...props,
+          blockedReason: gate.reason,
+          unblock: unblockNode(gate),
+          // The unblock replaces the step-back secondary rather than sitting
+          // beside a second copy of it.
+          secondaryActions: gate.unblockTo ? null : props.secondaryActions,
+        };
+
+  const footer = ((): WorkflowFooterProps | null => {
     switch (location.pathname) {
-      case '/review':
-        return {
-          currentStep: 2 as const,
+      case '/review': {
+        const gate = reviewGate(acceptedCount);
+        return gated(gate, {
+          currentStep: 2,
           summary: `${acceptedCount} clips kept`,
           detail: `${clips.length} candidates · next: arrange & trim in Timeline`,
           secondaryActions: <Link className="btn subtle" to="/import">Back to Import</Link>,
-          primaryAction: <Link className="btn primary" to="/timeline">Continue to Timeline →</Link>,
-        };
-      case '/timeline':
-        return {
-          currentStep: 3 as const,
+          primary: { label: 'Continue to Timeline →', to: '/timeline' },
+        });
+      }
+      case '/timeline': {
+        const gate = timelineGate(timelineItems.length);
+        return gated(gate, {
+          currentStep: 3,
           summary: `${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} · ${effectiveTimelineDuration(timelineItems).toFixed(1)}s`,
           detail: 'next: export FCPXML, Resolve XML or EDL',
           secondaryActions: <Link className="btn subtle" to="/review">Back to Review</Link>,
-          primaryAction: <Link className="btn primary" to="/export">Continue to Export →</Link>,
-        };
+          primary: { label: 'Continue to Export →', to: '/export' },
+        });
+      }
       case '/export':
         return {
-          currentStep: 4 as const,
+          currentStep: 4,
           summary: `${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} ready to export`,
           detail: 'Choose a format, then create your handoff',
           secondaryActions: <Link className="btn subtle" to="/timeline">Back to Timeline</Link>,
         };
-      case '/import':
-        return {
-          currentStep: 1 as const,
+      case '/import': {
+        const phase = analysisStatus.phase;
+        const gate = importGate({
+          sourceCount: uploadedVideos.length,
+          clipCount: clips.length,
+          phase,
+        });
+        const warning = gate.allowed ? ridingWarning(analysisStatus.notices) : null;
+        const thresholds = gate.unblock === 'loosen-rules' ? thresholdSummary(generationStats) : null;
+        return gated(gate, {
+          currentStep: 1,
           summary: uploadedVideos.length > 0 ? `${uploadedVideos.length} sources loaded` : 'Import footage to begin',
-          detail: 'next: pick the keepers in Review',
+          detail: warning?.message ?? thresholds ?? 'next: pick the keepers in Review',
+          detailTone: warning ? 'warning' : 'muted',
+          // Partial results are usable, so the step stays crossable while the
+          // rest of the analysis is still running.
+          hint: phase === 'analyzing' ? 'Runs in background' : undefined,
           secondaryActions: null,
-          primaryAction: <Link className="btn primary" to="/review">Continue to Review →</Link>,
-        };
+          primary: { label: 'Continue to Review →', to: '/review' },
+        });
+      }
       default:
         return null;
     }

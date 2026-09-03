@@ -100,6 +100,9 @@
   --accent: #ff4d6d;
   --accent-hover: #ff6b85;
   --accent-dim: rgba(255, 77, 109, 0.12);
+  /* Label on a solid accent fill. Near-black on the rose accent in dark,
+     white on the deeper rose in light. */
+  --accent-ink: #1a0308;
   --green: #5fd18b;
   --yellow: #e6b450;
   --red: #f0443a;
@@ -134,6 +137,7 @@
     --accent: #e11d48;
     --accent-hover: #be123c;
     --accent-dim: rgba(225, 29, 72, 0.1);
+    --accent-ink: #ffffff;
     --green: #1f9d57;
     --yellow: #b07d12;
     --red: #dc2626;
@@ -162,6 +166,7 @@
   --accent: #e11d48;
   --accent-hover: #be123c;
   --accent-dim: rgba(225, 29, 72, 0.1);
+  --accent-ink: #ffffff;
   --green: #1f9d57;
   --yellow: #b07d12;
   --red: #dc2626;

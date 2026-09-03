@@ -32,6 +32,7 @@ import {
   TimelineRevisionConflictError,
   undoTimeline,
   updateCloudAiConsent,
+  updateSelectedHarness,
   type TimelineDocument,
   type TimelineItem,
   type TimelineSnapshot,
@@ -46,6 +47,7 @@ import type {
   ClipGenerationPreferenceUpdate,
   ClipGenerationStats,
   FormatName,
+  HarnessUsageMetadata,
   RecentProject,
   Trim,
   UploadedVideo,
@@ -56,6 +58,8 @@ interface ReviewState {
   projectName: string | null;
   projectFolder: string | null;
   cloudAiConsent: boolean;
+  selectedHarness: string;
+  setSelectedHarness: (harness: string) => void;
   recentProjects: RecentProject[];
   uploadedVideos: UploadedVideo[];
   analysisStatus: AnalysisStatus;
@@ -97,6 +101,7 @@ interface ReviewState {
   applyAnalysisResult: (result: AnalysisResult) => void;
   recommendation: AssemblyRecommendation | null;
   generationStats: ClipGenerationStats | null;
+  harnessMetadata: HarnessUsageMetadata | null;
   draftFormat: FormatName | null;
   regenerateDraft: (
     params: { format: FormatName } | { profile: AssemblyProfile; targetDurationSec: number },
@@ -127,6 +132,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectName, setProjectName] = useState<string | null>(null);
   const [projectFolder, setProjectFolder] = useState<string | null>(null);
   const [cloudAiConsent, setCloudAiConsentState] = useState(false);
+  const [selectedHarness, setSelectedHarnessState] = useState('manual');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [uploadedVideos, setUploadedVideos] = useState<UploadedVideo[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({ phase: 'idle' });
@@ -143,6 +149,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [targetDuration, setTargetDuration] = useState(120);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
   const [generationStats, setGenerationStats] = useState<ClipGenerationStats | null>(null);
+  const [harnessMetadata, setHarnessMetadata] = useState<HarnessUsageMetadata | null>(null);
   const [draftFormat, setDraftFormat] = useState<FormatName | null>(null);
 
   // The latest authoritative document, kept in a ref so operation handlers can
@@ -286,6 +293,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setError(null);
     setRecommendation(null);
     setGenerationStats(null);
+    setHarnessMetadata(null);
     setProfile('cinematic_highlight');
     setTargetDuration(120);
     setDraftFormat(null);
@@ -310,6 +318,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setProjectName('Upload Project');
       setProjectFolder(null);
       setCloudAiConsentState(false);
+      setSelectedHarnessState('manual');
       setUploadedVideos([]);
       resetProjectSession();
     } finally {
@@ -329,6 +338,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setProjectName(result.project.name);
         setProjectFolder(result.project_folder);
         setCloudAiConsentState(result.project.cloud_ai_consent);
+        setSelectedHarnessState(result.project.harness || 'manual');
         setUploadedVideos(result.videos);
         resetProjectSession();
         setGenerationStats(result.generation_stats ?? null);
@@ -371,6 +381,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setProjectName(result.project.name);
       setProjectFolder(result.project_folder);
       setCloudAiConsentState(result.project.cloud_ai_consent);
+      setSelectedHarnessState(result.project.harness || 'manual');
       setUploadedVideos(result.videos);
       resetProjectSession();
       setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
@@ -398,6 +409,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setClips(result.clips);
       setRecommendation(result.recommendation);
       setGenerationStats(result.generation_stats ?? null);
+      setHarnessMetadata(result.metadata ?? null);
+      if (result.selected_harness) setSelectedHarnessState(result.selected_harness);
       setProfile(result.recommendation.profile);
       setTargetDuration(result.recommendation.target_duration_sec);
       setDraftFormat(result.recommendation.format ?? null);
@@ -579,12 +592,26 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     [projectId],
   );
 
+  const selectHarness = useCallback(
+    (harness: string) => {
+      if (harness === selectedHarness) return;
+      setSelectedHarnessState(harness);
+      if (!projectId) return;
+      void updateSelectedHarness(projectId, harness).catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : 'Unable to save Selected Harness');
+      });
+    },
+    [projectId, selectedHarness],
+  );
+
   const value = useMemo<ReviewState>(
     () => ({
       projectId,
       projectName,
       projectFolder,
       cloudAiConsent,
+      selectedHarness,
+      setSelectedHarness: selectHarness,
       recentProjects,
       uploadedVideos,
       analysisStatus,
@@ -619,6 +646,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       applyAnalysisResult,
       recommendation,
       generationStats,
+      harnessMetadata,
       draftFormat,
       regenerateDraft,
       rederiveClips,
@@ -637,6 +665,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       projectName,
       projectFolder,
       cloudAiConsent,
+      selectedHarness,
       recentProjects,
       uploadedVideos,
       analysisStatus,
@@ -652,6 +681,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       profile,
       targetDuration,
       generationStats,
+      harnessMetadata,
       selectProfile,
       selectTargetDuration,
       include,
@@ -665,6 +695,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       undo,
       redo,
       setCloudAiConsent,
+      selectHarness,
       applyAnalysisResult,
       recommendation,
       draftFormat,

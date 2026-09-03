@@ -89,6 +89,8 @@ export function ImportPage() {
     projectId,
     projectFolder,
     cloudAiConsent,
+    selectedHarness,
+    setSelectedHarness,
     uploadedVideos,
     clips,
     generationStats,
@@ -110,7 +112,6 @@ export function ImportPage() {
     { id: 'manual', name: 'Manual / Rule-based', type: 'rule', enabled: true },
     { id: 'pi_agent', name: 'Pi Agent', type: 'agent', enabled: true },
   ]);
-  const [harnessId, setHarnessId] = useState('manual');
   const [generationPreferences, setGenerationPreferences] =
     useState<ClipGenerationPreferences>(() => preferencesFromGenerationStats(generationStats));
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
@@ -242,7 +243,7 @@ export function ImportPage() {
     if (selectedCount === 0 && !shouldRederive) return;
     if (shouldRederive) {
       const confirmed = window.confirm(
-        'Regenerating clips resets manual include/exclude choices, order, trims, and the working timeline.',
+        'Regenerating clips discards AI enhancement and returns the Candidate Clip library to the Manual Harness. It also resets include/exclude choices, order, trims, and the working timeline.',
       );
       if (!confirmed) return;
       setRegenerating(true);
@@ -263,7 +264,7 @@ export function ImportPage() {
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
-      if (harnessId === 'pi_agent' && !cloudAiConsent) {
+      if (selectedHarness === 'pi_agent' && !cloudAiConsent) {
         const consented = window.confirm(
           [
             'Pi Agent can send sampled frames or clip metadata to the cloud provider configured for the Pi CLI.',
@@ -277,7 +278,7 @@ export function ImportPage() {
         await setCloudAiConsent(true);
       }
       const result = await analyzeProject(projectId, {
-        harness_id: harnessId,
+        harness_id: selectedHarness,
         file_ids: selectedIds,
         preferences: generationPreferences,
       });
@@ -296,7 +297,7 @@ export function ImportPage() {
     }
   }, [
     projectId,
-    harnessId,
+    selectedHarness,
     cloudAiConsent,
     selectedIds,
     selectedCount,
@@ -485,8 +486,8 @@ export function ImportPage() {
                 <label className="source-video-harness">
                   Harness
                   <select
-                    value={harnessId}
-                    onChange={(event) => setHarnessId(event.target.value)}
+                    value={selectedHarness}
+                    onChange={(event) => setSelectedHarness(event.target.value)}
                     disabled={isAnalyzing}
                   >
                     {harnesses.map((harness) => (

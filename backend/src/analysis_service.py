@@ -330,6 +330,7 @@ def run_analysis_pipeline(
             video_metadata["used_ai"] = used_ai
             video_metadata["model_used"] = result.metadata.get("model_used")
             video_metadata["file_id"] = video["file_id"]
+            video_metadata["file_name"] = video["file_name"]
             if result.metadata.get("warning"):
                 video_metadata["warning"] = result.metadata["warning"]
             if result.metadata.get("scoring_seconds_per_clip"):

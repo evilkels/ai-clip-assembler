@@ -50,6 +50,7 @@ from .motion_analysis import (
 )
 from .models import TimelineDocument
 from .project_store import (
+    DEFAULT_HARNESS_ID,
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
     ProjectFolderNotWritableError,
@@ -210,6 +211,10 @@ class CloudAiConsentRequest(BaseModel):
     consented: bool
 
 
+class SelectedHarnessRequest(BaseModel):
+    harness_id: Literal["manual", "pi_agent"]
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "version": APP_VERSION}
@@ -225,6 +230,8 @@ async def create_project():
         "clips": [],
         "timeline": None,
         "cloud_ai_consent": False,
+        "selected_harness": DEFAULT_HARNESS_ID,
+        "harness_id": None,
     }
     _proposal_store.configure_project(project_id)
     return {"project_id": project_id}
@@ -263,6 +270,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "clips": clips,
         "timeline": timeline,
         "cloud_ai_consent": manifest.cloud_ai_consent,
+        "selected_harness": manifest.harness,
         "harness_id": restored.get("harness_id") if restored else None,
         "frame_scores": frame_scores,
         "generation_stats": generation_stats,
@@ -275,6 +283,8 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "videos": videos,
         "clips": clips,
         "timeline": timeline,
+        "selected_harness": manifest.harness,
+        "effective_harness": restored.get("harness_id") if restored else None,
         "generation_stats": generation_stats,
     }
 
@@ -303,6 +313,37 @@ async def update_cloud_ai_consent(project_id: str, request: CloudAiConsentReques
         "project_id": project_id,
         "cloud_ai_consent": request.consented,
         "project": project.get("project"),
+    }
+
+
+def persist_selected_harness(project_id: str, harness_id: str) -> None:
+    """Record the Editor's Selected Harness without changing the Effective one."""
+    project = projects[project_id]
+    folder = project.get("project_folder")
+    if folder:
+        manifest = create_or_open_folder_project(Path(folder))
+        updated = manifest.model_copy(update={"harness": harness_id})
+        write_project_manifest(Path(folder), updated)
+        project["project"] = updated.model_dump()
+    project["selected_harness"] = harness_id
+
+
+@app.put("/projects/{project_id}/selected-harness")
+async def update_selected_harness(project_id: str, request: SelectedHarnessRequest):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        persist_selected_harness(project_id, request.harness_id)
+    except ProjectStoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (FileNotFoundError, NotADirectoryError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "project_id": project_id,
+        "selected_harness": request.harness_id,
+        "project": projects[project_id].get("project"),
     }
 
 
@@ -489,6 +530,15 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     if request.file_ids is not None and not selected:
         raise HTTPException(status_code=400, detail="No source videos selected for analysis")
 
+    try:
+        persist_selected_harness(project_id, request.harness_id)
+    except ProjectStoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (FileNotFoundError, NotADirectoryError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     _analysis_cancel[project_id] = threading.Event()
     projects[project_id]["analysis_progress"] = {}
     set_analysis_progress(
@@ -537,6 +587,16 @@ def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
 
 def is_cloud_harness(harness_id: str) -> bool:
     return harness_id == "pi_agent"
+
+
+def effective_harness_id(harness_id: str, per_video_metadata: list[dict]) -> str:
+    """Return the harness that actually produced the current Candidate Clips."""
+    if harness_id == "pi_agent" and any(
+        metadata.get("warning") or metadata.get("used_ai") is False
+        for metadata in per_video_metadata
+    ):
+        return DEFAULT_HARNESS_ID
+    return harness_id
 
 
 @app.post("/projects/{project_id}/analyze/cancel")
@@ -603,14 +663,19 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
     finalized = _finalize_clip_set(
         project_id,
         per_file_results,
-        harness_id=request.harness_id,
+        effective_harness_id=effective_harness_id(
+            request.harness_id, pipeline.per_video_metadata
+        ),
         preserve_manual_timeline=True,
     )
     ranked_clips = finalized["clips"]
+    effective_harness = projects[project_id]["harness_id"]
     logger.info("Analyze complete: %d clip(s) across %d video(s)", len(ranked_clips), total_videos)
     response = {
         "project_id": project_id,
         "harness_id": request.harness_id,
+        "selected_harness": request.harness_id,
+        "effective_harness": effective_harness,
         "status": "complete",
         "clips": ranked_clips,
         "sequence": finalized["timeline"],
@@ -635,12 +700,16 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         any_fallback = any(v.get("warning") for v in pipeline.per_video_metadata)
         if any_fallback or not all_ai:
             harness_metadata["used_ai"] = any_ai
-            fallback_videos = [
-                v["file_id"] for v in pipeline.per_video_metadata if v.get("warning")
+            fallback_details = [
+                f"{video.get('file_name', video['file_id'])} ({video['file_id']}): "
+                f"{video.get('warning', 'fallback')}"
+                for video in pipeline.per_video_metadata
+                if video.get("warning")
             ]
             harness_metadata["warning"] = (
-                f"pi harness fallback for video(s): {', '.join(fallback_videos)}"
-                if fallback_videos else "pi harness fallback"
+                f"Harness Fallback — {'; '.join(fallback_details)}"
+                if fallback_details
+                else "Harness Fallback — Pi Agent could not complete"
             )
         else:
             harness_metadata["used_ai"] = True
@@ -660,7 +729,7 @@ def _finalize_clip_set(
     project_id: str,
     per_file_results: list[dict],
     *,
-    harness_id: str,
+    effective_harness_id: str,
     preserve_manual_timeline: bool,
 ) -> dict:
     finalized = analysis_service.finalize_clip_set(
@@ -672,7 +741,7 @@ def _finalize_clip_set(
     ranked_clips = finalized["clips"]
     projects[project_id]["clips"] = ranked_clips
     projects[project_id]["timeline"] = finalized["timeline"]
-    projects[project_id]["harness_id"] = harness_id
+    projects[project_id]["harness_id"] = effective_harness_id
     projects[project_id]["generation_stats"] = finalized["generation_stats"]
     invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
@@ -790,12 +859,14 @@ async def rederive_clips(project_id: str, preferences: dict = Body(default_facto
     finalized = _finalize_clip_set(
         project_id,
         per_file_results,
-        harness_id="manual",
+        effective_harness_id="manual",
         preserve_manual_timeline=False,
     )
     return {
         "project_id": project_id,
         "harness_id": "manual",
+        "selected_harness": projects[project_id].get("selected_harness") or DEFAULT_HARNESS_ID,
+        "effective_harness": "manual",
         "status": "complete",
         "clips": finalized["clips"],
         "sequence": finalized["timeline"],
@@ -1104,19 +1175,19 @@ def _review_inputs(
             break
     agent = _review_agent
     project = projects[project_id]
-    default_agent_requires_consent = (
-        project.get("harness_id") != "pi_agent"
-        or not project.get("cloud_ai_consent")
-    )
+    default_agent_requires_consent = not project.get("cloud_ai_consent")
     if default_agent_requires_consent and agent is default_review_agent:
-        def manual_review_agent(_context):
+        def consent_required_review_agent(_context):
             return {
-                "message": "Manual analysis is ready. Creative versions remain deterministic and local.",
+                "message": (
+                    "Conversational suggestions need cloud AI consent for this project. "
+                    "Grant consent to enable the In-App Review Agent."
+                ),
                 "operations": [],
                 "versions": [],
             }
 
-        agent = manual_review_agent
+        agent = consent_required_review_agent
     return candidates, candidate_frames, agent
 
 

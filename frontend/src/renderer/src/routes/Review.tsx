@@ -37,6 +37,7 @@ export function ReviewPage() {
     error,
     exclude,
     generationStats,
+    harnessMetadata,
     include,
     loading,
     projectId,
@@ -95,6 +96,11 @@ export function ReviewPage() {
     }
     return result;
   }, [clips]);
+
+  const fallbackVideos = useMemo(
+    () => harnessMetadata?.per_video?.filter((video) => video.warning) ?? [],
+    [harnessMetadata],
+  );
 
   const selectFormat = useCallback(
     async (format: FormatName) => {
@@ -219,6 +225,24 @@ export function ReviewPage() {
                       {refreshingVersions ? 'Refreshing…' : 'Refresh suggestions'}
                     </span>
                   </button>
+                </StatusSurface>
+              </div>
+            ) : null}
+            {harnessMetadata?.warning ? (
+              <div data-testid="harness-fallback-notice" role="status">
+                <StatusSurface tone="warning" className="harness-fallback-banner">
+                  <strong>Harness Fallback</strong>
+                  <p>{harnessMetadata.warning}</p>
+                  {fallbackVideos.length > 0 ? (
+                    <div>
+                      <span className="harness-fallback-label">Affected Source Videos</span>
+                      <ul>
+                        {fallbackVideos.map((video) => (
+                          <li key={video.file_id}>{video.file_name ?? video.file_id}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </StatusSurface>
               </div>
             ) : null}

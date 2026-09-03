@@ -28,7 +28,21 @@ async function openClips(page: Page): Promise<void> {
   await expect(panel).toHaveAttribute('data-open', 'true');
 }
 
-async function setupReview(page: Page): Promise<void> {
+interface AnalysisMetadataFixture {
+  used_ai?: boolean;
+  warning?: string;
+  per_video: Array<{
+    file_id: string;
+    file_name: string;
+    used_ai?: boolean;
+    warning?: string;
+  }>;
+}
+
+async function setupReview(
+  page: Page,
+  options: { harnessId?: 'manual' | 'pi_agent'; analysisMetadata?: AnalysisMetadataFixture } = {},
+): Promise<void> {
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
   await page.getByTestId('playwriter-qa-panel').getByRole('link', { name: 'Import' }).click();
@@ -37,7 +51,15 @@ async function setupReview(page: Page): Promise<void> {
   await expect(page.getByText(/Legacy upload project created/)).toBeVisible();
   await input.setInputFiles(fixtureVideo());
   await expect(page.getByText(/1 source video ready/)).toBeVisible();
-  await page.getByLabel('Harness').selectOption('manual');
+
+  if (options.analysisMetadata) {
+    await page.route('**/projects/*/analyze', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, metadata: options.analysisMetadata } });
+    });
+  }
+  await page.getByLabel('Harness').selectOption(options.harnessId ?? 'manual');
   await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
   await page.goto('/#/review');
@@ -329,6 +351,41 @@ test('renders the Review workstation with Your Clips visible from the first pain
   await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
   await expect(page.getByRole('heading', { name: 'Your clips' })).toBeVisible();
   await expect(page.getByTestId('source-clips-panel').locator('details, summary')).toHaveCount(0);
+  await expect(page.getByTestId('harness-fallback-notice')).toHaveCount(0);
+});
+
+test('shows a Harness Fallback with its reason and affected Source Videos', async ({ page }) => {
+  await setupReview(page, { analysisMetadata: {
+    warning: 'Harness Fallback — review-browser-fixture.mp4 (fixture): Pi Agent timed out',
+    per_video: [{
+      file_id: 'fixture',
+      file_name: 'review-browser-fixture.mp4',
+      warning: 'Pi Agent timed out',
+    }],
+  } });
+
+  const notice = page.getByTestId('harness-fallback-notice');
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('Harness Fallback');
+  await expect(notice).toContainText('Pi Agent timed out');
+  await expect(notice).toContainText('review-browser-fixture.mp4');
+});
+
+test('shows no Harness Fallback notice after a successful agentic run', async ({ page }) => {
+  page.on('dialog', (dialog) => dialog.accept());
+  await setupReview(page, {
+    harnessId: 'pi_agent',
+    analysisMetadata: {
+      used_ai: true,
+      per_video: [{
+        file_id: 'fixture',
+        file_name: 'review-browser-fixture.mp4',
+        used_ai: true,
+      }],
+    },
+  });
+
+  await expect(page.locator('[data-testid="harness-fallback-notice"]')).toHaveCount(0);
 });
 
 test('keeps the review workstation aligned while resizing Ask AI rail', async ({ page }) => {

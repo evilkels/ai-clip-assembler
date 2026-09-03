@@ -136,3 +136,13 @@ Google account:
 
 `seo-content-pilot.md` stays a separate plan: it is gated on query evidence
 from this baseline plus human editorial input.
+
+## Undrawn-in-plan designs: reference screens `2a`, `2b`, `2c` (found 2026-09-03)
+
+The app restyle export (`docs/design/2026-09-03-app-restyle-handoff.md`, companion
+`app-reference.dc.html`) carries three landing-page designs its README does not list:
+`2a` "Contact Sheet" (dark; scored frames and kept-versus-cut examples as the hero),
+`2c` "Contact Sheet · light" (same layout on light paper surfaces) and `2b` "Cutting
+Room" (light editorial page closing on a dark app screenshot). They are new marketing
+directions, not recreations of the current site. Decide whether one of them
+supersedes the 2026-09-01 landing-page restyle before spending on the launch backlog.

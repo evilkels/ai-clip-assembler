@@ -6,7 +6,6 @@ import {
   type McpClientStatus,
   type McpConnectResult,
 } from '../api/client';
-import { ReviewModelAccountSection } from './ReviewModelAccountSection';
 
 export function ConnectionsTabPanel() {
   const [clients, setClients] = useState<McpClientStatus[]>([]);
@@ -39,11 +38,13 @@ export function ConnectionsTabPanel() {
 
   return (
     <div className="settings-panel">
-      <ReviewModelAccountSection />
       <section className="settings-group">
-        <h3 className="settings-group-title">Connect your AI</h3>
+        <div className="settings-section-heading">
+          <h3 className="settings-group-title">MCP desktop clients</h3>
+          <span>Only desktop clients can inspect candidates and edit the open timeline.</span>
+        </div>
         <p className="settings-hint">
-          Connect an MCP-capable desktop client so it can inspect candidates and edit the open Timeline.
+          Connect an MCP-capable desktop client so it can inspect candidates and edit the open timeline.
         </p>
 
         {error && (

@@ -2,8 +2,8 @@
 
 Status: re-triaged 2026-09-02 against v0.2.0 (`6d79c1b`) with react-doctor
 0.2.14. Every finding group below was read in the source before being
-classified. Two real defects remain (a third is fixed); the large majority of the 94 findings
-are false positives.
+classified. Three real defects remain (a fourth is fixed); the large majority of
+the 94 findings are false positives. Defect 4 was added 2026-09-03.
 
 **Goal:** Fix the defects react-doctor actually found, and stop treating its
 score as a quality signal for this repo.
@@ -60,6 +60,20 @@ finding here blocks a build.
    async race itself *is* correctly guarded by both the `alive` flag and the
    `activeProject` ref (`useReviewConversation.ts:67-83`) — this is stale UI,
    not a data-overwrite bug. Rule: `no-adjust-state-on-prop-change`.
+
+4. **The rail-collapse preference is persisted from inside a state updater.**
+   `AppShell.toggleSidebar` writes `localStorage` inside the
+   `setSidebarCollapsed` callback (`AppShell.tsx:52-62`). Rules:
+   `no-impure-state-updater` (error), `no-side-effect-in-state-updater-function`.
+   Found 2026-09-03 while implementing the step gates; the code predates that
+   work and was not touched by it.
+
+   Honest severity: **low, and not currently user-visible.** React may invoke an
+   updater more than once for a single dispatch, which today means the same
+   value is written to `localStorage` twice — harmless. The reason to fix it is
+   that a discarded concurrent render would persist a state the UI never
+   adopted, and the fix is small: derive `next` outside the updater, or move the
+   write to an effect keyed on `sidebarCollapsed`.
 
 ## Judgment calls, not defects
 

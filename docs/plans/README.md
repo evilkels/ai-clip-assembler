@@ -31,7 +31,7 @@ plan's own header.
 | 🔴 | [030](030-truthful-ai-usage.md) | Selected vs Effective Harness; decouple the Review Agent; surface fallback |
 | 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; buttons, Settings `AI assistance`, harness popover, token deltas |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
-| 🟡 | [react-doctor-triage](react-doctor-triage.md) | 2 defects left: keyboard trim, project-switch reset |
+| 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
 | 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Preview, chat streaming and E2E await visual QA |
 | 🟡 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | Signing, notarization, clean-machine validation |

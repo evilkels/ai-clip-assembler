@@ -272,7 +272,7 @@ test('compares, focuses, and adopts complete versions in the Review workspace', 
   const cachedGenerationPanel = page.locator('.analysis-controls + .clip-generation-panel');
   await cachedGenerationPanel.getByLabel('Max clips per video', { exact: true }).fill('12');
   page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('resets manual');
+    expect(dialog.message()).toContain('discards AI enhancement');
     await dialog.accept();
   });
   const rederiveResponse = page.waitForResponse(

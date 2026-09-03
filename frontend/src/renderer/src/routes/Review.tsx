@@ -229,7 +229,7 @@ export function ReviewPage() {
               </div>
             ) : null}
             {harnessMetadata?.warning ? (
-              <div data-testid="harness-fallback-notice" role="status">
+              <output data-testid="harness-fallback-notice" className="harness-fallback-notice">
                 <StatusSurface tone="warning" className="harness-fallback-banner">
                   <strong>Harness Fallback</strong>
                   <p>{harnessMetadata.warning}</p>
@@ -244,7 +244,7 @@ export function ReviewPage() {
                     </div>
                   ) : null}
                 </StatusSurface>
-              </div>
+              </output>
             ) : null}
             {loading ? (
               <div className="empty-state">Loading candidates…</div>

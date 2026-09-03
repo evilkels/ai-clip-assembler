@@ -4779,3 +4779,7 @@ a {
   white-space: nowrap;
   letter-spacing: 0.04em;
 }
+
+.harness-fallback-notice {
+  display: block;
+}

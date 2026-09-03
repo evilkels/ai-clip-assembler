@@ -149,7 +149,11 @@ export function ClipCard({
     video.muted = cardMuted;
     video.volume = Math.max(0, Math.min(1, volume));
     video.preservesPitch = true;
-  }, [cardMuted, volume]);
+    // `activated` is a dependency because it is what brings the element into
+    // existence: a poster-first card mounts its <video> on a later render than
+    // the one that set the preference, so without it the element keeps the
+    // browser's default volume of 1 however the preference reads.
+  }, [activated, cardMuted, volume]);
 
   const seekFromTrack = (event: React.MouseEvent<HTMLButtonElement>) => {
     const video = videoRef.current;

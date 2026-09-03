@@ -111,7 +111,9 @@ async function setupTimeline(
   } else {
     await page.goto('/#/review');
     await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
-    await expect(page.getByLabel(/Preview /).first()).toBeVisible();
+    // Candidate cards are poster-first (plan 029): the <video> mounts only once
+    // the editor plays one, so wait on the card rather than a media element.
+    await expect(page.locator('.clip-card').first()).toBeVisible();
     // "Include" exact-matches only un-accepted cards ("Included ✓" otherwise).
     const includeButton = page.getByRole('button', { name: 'Include', exact: true });
     for (let i = 0; i < 6 && (await includeButton.count()) > 0; i++) {
@@ -270,7 +272,7 @@ async function postTimelineOperation(
 const fixtureA = () => ensureFixtureVideo('seq-fixture-a.mp4', 'gray');
 const fixtureB = () => ensureFixtureVideo('seq-fixture-b.mp4', 'navy');
 
-test('timeline preview has no native controls; review cards use poster videos', async ({ page }) => {
+test('timeline preview has no native controls; review cards are poster-first', async ({ page }) => {
   await setupTimeline(page, [fixtureA()]);
 
   const timelineVideo = page.getByTestId('timeline-preview-video');
@@ -278,7 +280,13 @@ test('timeline preview has no native controls; review cards use poster videos', 
 
   await page.goto('/#/review');
   await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
-  const reviewVideo = page.getByLabel(/Preview /).first();
+  const card = page.locator('.clip-card').first();
+  // A resting card costs one poster image, not a media element (plan 029).
+  await expect(card.getByAltText(/Preview /)).toBeVisible();
+  await expect(card.locator('video')).toHaveCount(0);
+
+  await card.getByRole('button', { name: 'Play clip' }).click();
+  const reviewVideo = card.locator('video');
   await expect(reviewVideo).toBeVisible();
   await expect(reviewVideo).not.toHaveAttribute('controls');
 });

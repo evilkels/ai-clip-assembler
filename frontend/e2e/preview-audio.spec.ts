@@ -6,7 +6,7 @@
  * runner. One fixture carries a real stereo track and one has no audio stream
  * at all, so the audio/silent/unknown distinction is exercised end to end.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,6 +38,18 @@ async function openClipsPanel(page: Page) {
   await expect(panel).toBeVisible();
   await expect(panel).toHaveAttribute('data-open', 'true');
   await expect(page.locator('.clip-card').first()).toBeVisible();
+}
+
+/**
+ * Poster-first candidate cards (plan 029) carry no media element until the
+ * editor plays one, so every assertion about a preview's audio has to
+ * activate the card first.
+ */
+async function activatePreview(card: Locator): Promise<Locator> {
+  await card.getByRole('button', { name: 'Play clip' }).click();
+  const video = card.locator('video');
+  await expect(video).toBeVisible();
+  return video;
 }
 
 /** Import fixtures, analyze with the manual harness, accept every candidate. */
@@ -96,7 +108,7 @@ test('starts muted, then shares one preference across Review and Timeline', asyn
   // The same preference, not a second copy seeded from storage.
   await page.goto('/#/review');
   await openClipsPanel(page);
-  const reviewVideo = page.locator('.clip-card video').first();
+  const reviewVideo = await activatePreview(page.locator('.clip-card').first());
   await expect.poll(() => mutedOf(reviewVideo)).toBe(false);
   await expect.poll(() => volumeOf(reviewVideo)).toBe(0.4);
   await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('0.4');
@@ -130,8 +142,10 @@ test('labels audio sources and keeps known-silent sources muted', async ({ page 
   await expect(silentCard.getByTestId('source-audio-badge')).toHaveText('Silent');
 
   // The audio source follows the preference; the silent source never does.
-  await expect.poll(() => mutedOf(audioCard.locator('video'))).toBe(false);
-  await expect.poll(() => mutedOf(silentCard.locator('video'))).toBe(true);
+  const audioVideo = await activatePreview(audioCard);
+  const silentVideo = await activatePreview(silentCard);
+  await expect.poll(() => mutedOf(audioVideo)).toBe(false);
+  await expect.poll(() => mutedOf(silentVideo)).toBe(true);
 
   await page.goto('/#/timeline');
   await expect(

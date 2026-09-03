@@ -49,7 +49,11 @@ test('analysis completes and review/timeline previews render playable videos', a
 
   await page.goto('/#/review');
   await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
-  const reviewPreview = page.getByLabel(/Preview /).first();
+  // Candidate cards rest on a poster (plan 029); playing one mounts the video.
+  const reviewCard = page.locator('.clip-card').first();
+  await expect(reviewCard.getByAltText(/Preview /)).toBeVisible();
+  await reviewCard.getByRole('button', { name: 'Play clip' }).click();
+  const reviewPreview = reviewCard.locator('video');
   await expect(reviewPreview).toBeVisible();
   await expect
     .poll(async () => reviewPreview.evaluate((video) => (video as HTMLVideoElement).readyState), {

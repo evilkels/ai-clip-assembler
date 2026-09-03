@@ -118,8 +118,3 @@ export function GeneralSettingsPanel() {
     </div>
   );
 }
-
-/** @deprecated Use GeneralSettingsPanel for the renamed General panel. */
-export function SettingsTabPanel() {
-  return <GeneralSettingsPanel />;
-}

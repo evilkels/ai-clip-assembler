@@ -170,7 +170,18 @@ Do these together and re-cut the baselines once, with Phase 3.
       values in a 3-column grid behind an `Edit rules and re-scan` action. The
       side-by-side layout is already correct *while analysing* — this is the
       idle state only.
-- [ ] **Step 2.15** Re-cut both baseline sets and re-run the suite. Expect the
+- [ ] **Step 2.15** The toolbar row carries five controls the design's three
+      have to share space with, which is the other half of why it reads as
+      crowded (`SourceVideoBrowser.tsx:140-192`). Design: `Source videos` + the
+      Mono count line on the left; `Search files`, the
+      `TABLE | THUMBS | COMPACT` segmented control, and `Columns` on the right.
+      Build order: search, an `All` analysis filter, `Columns`, `Harness`, the
+      segmented control, then an `N shown` meta. The `All` filter and the
+      `N shown` count have no counterpart in the reference and the harness
+      leaves in Step 2.11 — decide whether the filter and the count earn their
+      place before restoring the design's order, rather than deleting working
+      affordances to match a drawing.
+- [ ] **Step 2.16** Re-cut both baseline sets and re-run the suite. Expect the
       `shell` and `import-analyzing` fixtures to move substantially.
 
 ## Phase 3 — The button system

@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getDiagnostics, type Diagnostics } from '../api/client';
 
+function ranAgoLabel(ranAt: number): string {
+  const minutes = Math.floor((Date.now() - ranAt) / 60_000);
+  if (minutes < 1) return 'RAN JUST NOW';
+  return `RAN ${minutes} MIN AGO`;
+}
+
 export function DiagnosticsTabPanel() {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [ranAt, setRanAt] = useState<number | null>(null);
 
   const run = useCallback(() => {
     setRunning(true);
     setError(null);
     getDiagnostics()
-      .then(setData)
+      .then((result) => {
+        setData(result);
+        setRanAt(Date.now());
+      })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setRunning(false));
   }, []);
@@ -23,85 +33,57 @@ export function DiagnosticsTabPanel() {
   const guidance = review?.guidance ?? [];
 
   return (
-    <div className="settings-panel">
-      <section className="settings-group">
-        <h3 className="settings-group-title">Review model reachability</h3>
-        <p className="settings-hint">
-          Sends a tiny prompt to the configured provider/model to confirm it responds.
-        </p>
+    <div className="settings-panel diagnostics-panel">
+      {running && <p className="settings-muted">Checking…</p>}
+      {error && <p className="settings-error" role="alert">{error}</p>}
 
-        {running && <p className="settings-muted">Checking…</p>}
-        {error && <p className="settings-error" role="alert">{error}</p>}
-
-        {review && !running && (
-          <dl className="diagnostics-list">
-            <div>
-              <dt>Status</dt>
-              <dd>
-                <span
-                  className={
-                    review.reachable ? 'diagnostics-badge ok' : 'diagnostics-badge fail'
-                  }
-                >
-                  {review.reachable ? 'Reachable' : 'Not reachable'}
-                </span>
-              </dd>
+      {review && !running && (
+        <>
+          <div className={`diagnostics-status-card ${review.reachable ? 'reachable' : 'unreachable'}`} data-testid="diagnostics-result">
+            <div className="diagnostics-status-row">
+              <span className="diagnostics-ring" aria-hidden="true" />
+              <span className={`diagnostics-badge ${review.reachable ? 'ok' : 'fail'}`}>
+                {review.reachable ? 'Reachable' : 'Not reachable'}
+              </span>
+              <span className="diagnostics-status-summary">
+                {review.reachable
+                  ? review.elapsed_sec != null
+                    ? `Replied in ${review.elapsed_sec}s`
+                    : 'Replied'
+                  : 'Check failed'}
+              </span>
+              {ranAt != null && (
+                <span className="settings-diagnostics-stamp">{ranAgoLabel(ranAt)}</span>
+              )}
+              <button type="button" className={review.reachable ? 'btn' : 'btn primary'} onClick={run}>
+                {review.reachable ? 'Run again' : 'Run check again'}
+              </button>
             </div>
-            <div>
-              <dt>Provider</dt>
-              <dd>{review.provider}</dd>
-            </div>
-            <div>
-              <dt>Model</dt>
-              <dd>{review.model}</dd>
-            </div>
-            <div>
-              <dt>Executable</dt>
-              <dd>
-                {review.binary.found
-                  ? review.binary.resolved
-                  : `Not found on PATH (${review.binary.configured})`}
-              </dd>
-            </div>
-            {review.elapsed_sec != null && (
-              <div>
-                <dt>Response time</dt>
-                <dd>{review.elapsed_sec}s</dd>
-              </div>
-            )}
-            {review.detail && (
-              <div>
-                <dt>{review.reachable ? 'Reply' : 'Detail'}</dt>
-                <dd className="diagnostics-detail">{review.detail}</dd>
-              </div>
-            )}
-          </dl>
-        )}
-
-        {review && !running && !review.reachable && guidance.length > 0 && (
-          <div className="diagnostics-guidance">
-            <h4 className="diagnostics-guidance-title">How to fix this</h4>
-            <ol className="diagnostics-guidance-steps">
-              {/* Ordered remediation steps: position is the identity, and the
-                  backend may legitimately repeat a string, so the index is the
-                  stable key here rather than the text. */}
-              {guidance.map((step, index) => (
-                <li key={index}>{step}</li>
-              ))}
-            </ol>
-            <p className="settings-hint">
-              Run the check again after each step. Steps that set an environment variable
-              only take effect once AI Clip Assembler is quit and reopened.
-            </p>
+            {!review.reachable && review.detail && <p className="diagnostics-detail">{review.detail}</p>}
           </div>
-        )}
-      </section>
 
-      <div className="settings-actions">
-        <button type="button" className="btn" onClick={run} disabled={running}>
-          {running ? 'Checking…' : 'Run check again'}
-        </button>
-      </div>
+          {review.reachable ? (
+            <dl className="diagnostics-list">
+              <div><dt>Provider</dt><dd>{review.provider}</dd></div>
+              <div><dt>Model</dt><dd>{review.model}</dd></div>
+              <div><dt>Executable</dt><dd>{review.binary.found ? review.binary.resolved : `Not found on PATH (${review.binary.configured})`}</dd></div>
+              {review.elapsed_sec != null && <div><dt>Round trip</dt><dd>{review.elapsed_sec}s</dd></div>}
+            </dl>
+          ) : (
+            <div className="diagnostics-guidance">
+              <h4 className="diagnostics-guidance-title">How to fix this</h4>
+              <ol className="diagnostics-guidance-steps">
+                {guidance.map((step, index) => <li key={index}>{step}</li>)}
+              </ol>
+              <p className="diagnostics-guidance-note">
+                Environment-variable steps only take effect after quitting and reopening the app. Until then Import falls back to rule-based scoring, so your project still works.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {!review && !running && !error && <p className="settings-muted">No diagnostics result yet.</p>}
     </div>
   );
 }

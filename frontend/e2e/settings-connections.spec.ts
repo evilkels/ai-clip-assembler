@@ -81,10 +81,14 @@ async function installDesktopBridge(
   }, options);
 }
 
-async function openConnections(page: Page) {
+async function openPanel(page: Page, panel: string) {
   await page.goto('/#/import');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('tab', { name: 'Connections' }).click();
+  await page.getByRole('tab', { name: panel, exact: true }).click();
+}
+
+async function openAiAssistance(page: Page) {
+  await openPanel(page, 'AI assistance');
   await expect(page.getByRole('heading', { name: 'Review model account' })).toBeVisible();
 }
 
@@ -108,6 +112,22 @@ function diagnostics(reachable: boolean) {
   };
 }
 
+test('reaches all Settings panels and preserves the legacy Settings deep link', async ({ page }) => {
+  await installDesktopBridge(page, {
+    initial: status('connected', 'Connected to ChatGPT.'),
+  });
+  await page.goto('/#/import');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+
+  await expect(page.getByRole('tab', { name: 'General', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+
+  for (const panel of ['AI assistance', 'Connections', 'Diagnostics']) {
+    await page.getByRole('tab', { name: panel, exact: true }).click();
+    await expect(page.getByRole('heading', { name: panel })).toBeVisible();
+  }
+});
+
 test('cancels an in-flight sign-in and ignores its stale completion', async ({ page }) => {
   await installDesktopBridge(page, {
     initial: status('disconnected', 'Sign in with ChatGPT to use the review model.'),
@@ -115,7 +135,7 @@ test('cancels an in-flight sign-in and ignores its stale completion', async ({ p
     cancel: status('cancelled', 'Sign-in was cancelled.'),
     deferSignIn: true,
   });
-  await openConnections(page);
+  await openAiAssistance(page);
 
   await expect(page.getByText('Disconnected', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -139,7 +159,7 @@ test('shows waiting with a Cancel action and then cancelled', async ({ page }) =
     initial: status('waiting', 'Waiting for OpenAI sign-in.'),
     cancel: status('cancelled', 'Sign-in was cancelled.'),
   });
-  await openConnections(page);
+  await openAiAssistance(page);
 
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
@@ -165,7 +185,7 @@ test('reruns diagnostics after sign-in and shows connected', async ({ page }) =>
   });
   await expect.poll(() => diagnosticRequests).toBe(1);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('tab', { name: 'Connections' }).click();
+  await page.getByRole('tab', { name: 'AI assistance' }).click();
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Waiting', { exact: true })).toBeVisible();
   expect(diagnosticRequests).toBe(1);
@@ -187,7 +207,7 @@ test('keeps the account connected and announces unreachable diagnostics', async 
     initial: status('disconnected', 'Sign in with ChatGPT to use the review model.'),
     signIn: status('connected', 'Connected to ChatGPT.'),
   });
-  await openConnections(page);
+  await openAiAssistance(page);
 
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
@@ -201,7 +221,7 @@ test('shows expired with Reconnect', async ({ page }) => {
   await installDesktopBridge(page, {
     initial: status('expired', 'ChatGPT sign-in has expired. Sign in again.'),
   });
-  await openConnections(page);
+  await openAiAssistance(page);
 
   await expect(page.getByText('Expired', { exact: true })).toBeVisible();
   await expect(reviewModelAccount(page).getByRole('button', { name: 'Reconnect', exact: true })).toBeEnabled();
@@ -211,20 +231,21 @@ test('shows a sanitized failed state', async ({ page }) => {
   await installDesktopBridge(page, {
     initial: status('failed', 'OpenAI sign-in failed. Try again.'),
   });
-  await openConnections(page);
+  await openAiAssistance(page);
 
   await expect(page.getByRole('alert')).toContainText('OpenAI sign-in failed. Try again.');
   await expect(reviewModelAccount(page).getByRole('button', { name: 'Reconnect', exact: true })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/access[_ -]?token|refresh[_ -]?token|auth\.openai\.com/i);
 });
 
-test('keeps Claude Desktop and Codex MCP connection controls', async ({ page }) => {
+test('keeps MCP connection controls out of the model account panel', async ({ page }) => {
   await installDesktopBridge(page, {
     initial: status('connected', 'Connected to ChatGPT.'),
   });
-  await openConnections(page);
+  await openPanel(page, 'Connections');
 
-  await expect(page.getByRole('heading', { name: 'Connect your AI' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review model account' })).toHaveCount(0);
   await expect(page.getByText('Claude Desktop', { exact: true })).toBeVisible();
   await expect(page.getByText('Codex', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Connect', exact: true })).toBeVisible();
@@ -243,16 +264,16 @@ test('explains missing and incompatible Pi installations', async ({ page }) => {
     { state: 'incompatible', version: '1.0.0', detail: 'Pi 0.73.1 or newer, but earlier than 1.0.0, is required.' },
   );
   await installDesktopBridge(page, { initial: missing });
-  await openConnections(page);
+  await openAiAssistance(page);
 
   await expect(page.getByText('Pi is not installed.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
 
-  await page.getByRole('tab', { name: 'Settings' }).click();
+  await page.getByRole('tab', { name: 'General' }).click();
   await page.evaluate((next) => {
     (window as Window & { __reviewModelTest: { setStatus(value: ReviewModelAccountStatus): void } }).__reviewModelTest.setStatus(next);
   }, incompatible);
-  await page.getByRole('tab', { name: 'Connections' }).click();
+  await page.getByRole('tab', { name: 'AI assistance' }).click();
 
   await expect(page.getByText(/earlier than 1\.0\.0/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
@@ -285,7 +306,11 @@ test('the Diagnostics tab spells out how to fix an unreachable model', async ({ 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('tab', { name: 'Diagnostics' }).click();
 
+  const failureCard = page.getByTestId('diagnostics-result');
+  await expect(failureCard).toBeVisible();
   await expect(page.getByText('Not reachable', { exact: true })).toBeVisible();
+  await expect(failureCard).toContainText('Check failed');
+  await expect(failureCard).toContainText('pi CLI not found on PATH (pi)');
   const guidance = page.getByRole('heading', { name: 'How to fix this' }).locator('..');
   await expect(guidance.getByRole('listitem')).toHaveCount(2);
   await expect(guidance).toContainText('which pi');

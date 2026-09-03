@@ -48,6 +48,9 @@
 | --- | --- | --- |
 | **Harness** | A pluggable scoring or reasoning implementation that conforms to the app's clip suggestion contract. | Agent, model, provider |
 | **Manual Harness** | The deterministic rule-based harness that uses technical metrics and no AI model. | Rule-based harness, no-AI mode |
+| **Selected Harness** | The **Harness** the **Editor** chose for a project. Belongs to the project and survives navigation. | Harness setting, analysis mode |
+| **Effective Harness** | The **Harness** that actually produced the current **Candidate Clip** library. Differs from the **Selected Harness** after a fallback or a re-derive. | Harness used, actual harness |
+| **Harness Fallback** | A run where the **Selected Harness** could not complete and the rule-based result was used instead, so the **Effective Harness** is the **Manual Harness**. | Degraded run, AI skipped |
 | **Local AI Harness** | A harness that uses a local vision model to score or annotate candidate clips. | Qwen harness, Ollama harness |
 | **Export** | A generated file that carries the timeline into a professional editing app. | Render, output |
 | **FCPXML** | The primary XML export format for Final Cut Pro. | Final Cut XML |
@@ -98,5 +101,7 @@
 - "Clip" has been used to mean **Source Video**, **Candidate Clip**, and a placement on the timeline. Use **Source Video** for imported files, **Candidate Clip** for suggested time ranges, and **Timeline Item** for a placement on the **Timeline**.
 - "AI score" is too narrow for the MVP because the first scoring path is rule-based. Use **Overall Score**, **Smoothness Score**, or **Visual Interest Score** depending on the meaning.
 - "Timeline" has been used for both the editing UI and the data it edits. Use **Review Board** for the candidate-curation UI, **Timeline** for the ordered sequence of **Timeline Items**, and **Timeline Document** when stressing that the backend owns the authoritative record.
-- "Manual" can mean hand-editing or rule-based scoring. Use **Manual Harness** for deterministic no-AI scoring and **Trim** or **Accepted Clip** for editor actions.
+- "Manual" can mean hand-editing or rule-based scoring. Use **Manual Harness** for deterministic no-AI scoring and **Trim** or **Accepted Clip** for editor actions. Never say "manual mode" to an Editor: it reads as "you are editing by hand" when it means "scoring was rule-based".
+- "Harness" has been used for both what the **Editor** picked and what actually ran. Say **Selected Harness** for the choice and **Effective Harness** for what produced the current **Candidate Clips**; they diverge on a **Harness Fallback** or a re-derive.
+- The **Harness** and the **In-App Review Agent** are different concepts and are configured independently — a rule-based **Selected Harness** does not imply an absent agent. See [ADR 0005](docs/adr/0005-harness-and-review-agent-are-independent.md).
 - "Scene" and "shot" are close. Use **Scene** until the app explicitly models cinematographic shots separately.

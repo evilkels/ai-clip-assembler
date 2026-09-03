@@ -38,7 +38,7 @@ async function setupReview(page: Page): Promise<void> {
   await input.setInputFiles(fixtureVideo());
   await expect(page.getByText(/1 source video ready/)).toBeVisible();
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
   await page.goto('/#/review');
   await openClips(page);
@@ -118,7 +118,7 @@ async function setupSeededReview(page: Page): Promise<{ timelineFile: string; ti
     await route.fulfill({ response, json: body });
   });
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
 
   await page.route('**/projects/*/clips', async (route) => {
@@ -219,6 +219,103 @@ test('switches Candidate Clip views, filters records, and avoids eager list medi
   await expect(browser.locator('[data-review-count]')).toContainText('shown');
   await page.getByRole('button', { name: 'Grid' }).click();
   await expect(browser.locator('.clip-card')).not.toHaveCount(0);
+});
+
+// A 1x1 JPEG, so the poster path is covered regardless of whether the fixture
+// project happens to have sampled frames on disk.
+const POSTER_JPEG = Buffer.from(
+  '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP//////////////////////////////////////////' +
+    '////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBAB' +
+    'AAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+  'base64',
+);
+
+test('renders lazy posters and activates only the played Candidate Clip', async ({ page }) => {
+  await page.route('**/videos/*/poster*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'image/jpeg', body: POSTER_JPEG });
+  });
+  await setupReview(page);
+  const browser = page.locator('[data-review-browser]');
+  await expect(browser).toHaveAttribute('data-view-mode', 'grid');
+
+  // No media element is created before a play is requested.
+  await expect(browser.locator('video')).toHaveCount(0);
+  const cards = browser.locator('.clip-card');
+  const cardCount = await cards.count();
+  expect(cardCount).toBeGreaterThan(0);
+
+  const posters = cards.locator('img');
+  await expect(posters).toHaveCount(cardCount);
+  expect(
+    await posters.evaluateAll((images) =>
+      images.map((image) => ({
+        loading: image.getAttribute('loading'),
+        decoding: image.getAttribute('decoding'),
+      })),
+    ),
+  ).toEqual(Array.from({ length: cardCount }, () => ({ loading: 'lazy', decoding: 'async' })));
+
+  // Playing one card activates exactly that card's video.
+  await cards.first().getByRole('button', { name: 'Play clip' }).click();
+  await expect(browser.locator('video')).toHaveCount(1);
+});
+
+test('falls back to a placeholder when a clip has no sampled frame', async ({ page }) => {
+  // The plan requires a clip with no poster to still render and still play.
+  await page.route('**/videos/*/poster*', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  });
+  await setupReview(page);
+  const browser = page.locator('[data-review-browser]');
+  const card = browser.locator('.clip-card').first();
+
+  await expect(card.getByText('Poster unavailable')).toBeVisible();
+  await expect(card.locator('img')).toHaveCount(0);
+
+  // Still playable despite the missing poster.
+  await card.getByRole('button', { name: 'Play clip' }).click();
+  await expect(card.locator('video')).toHaveCount(1);
+});
+
+test('previews play once by default and loop only when the toggle is pressed', async ({ page }) => {
+  await setupReview(page);
+  const browser = page.locator('[data-review-browser]');
+  const card = browser.locator('.clip-card').first();
+  const loopToggle = card.getByRole('button', { name: 'Loop preview' });
+
+  // Default is play-once: the toggle is off before anything is played.
+  await expect(loopToggle).toHaveAttribute('aria-pressed', 'false');
+
+  await card.getByRole('button', { name: 'Play clip' }).click();
+  const video = card.locator('video');
+  await expect(video).toHaveCount(1);
+
+  // Drive playback to the out-point rather than waiting out the clip.
+  const endSec = await video.evaluate((element: HTMLVideoElement) =>
+    Number(element.dataset.endSec ?? NaN),
+  );
+  await video.evaluate((element: HTMLVideoElement, end: number) => {
+    element.currentTime = Number.isFinite(end) ? Math.max(0, end - 0.05) : element.duration - 0.05;
+  }, endSec);
+
+  // Play-once: reaching the out-point pauses instead of restarting.
+  await expect
+    .poll(async () => video.evaluate((element: HTMLVideoElement) => element.paused))
+    .toBe(true);
+
+  // The toggle survives a pause/play cycle and reports its state.
+  await loopToggle.click();
+  await expect(loopToggle).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: 'Play clip' }).click();
+  await expect(loopToggle).toHaveAttribute('aria-pressed', 'true');
+
+  // Looping: reaching the out-point restarts rather than pausing.
+  await video.evaluate((element: HTMLVideoElement, end: number) => {
+    element.currentTime = Number.isFinite(end) ? Math.max(0, end - 0.05) : element.duration - 0.05;
+  }, endSec);
+  await expect
+    .poll(async () => video.evaluate((element: HTMLVideoElement) => element.paused))
+    .toBe(false);
 });
 
 test('renders the Review workstation with Your Clips visible from the first paint', async ({ page }) => {

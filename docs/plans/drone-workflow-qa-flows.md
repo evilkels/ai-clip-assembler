@@ -1,7 +1,7 @@
 # Plan: QA Flows For The Drone Clip Extraction Workflow
 
 **Status: partially automated; real-footage, performance, DaVinci, and signal QA remain.**
-Owner: Elvijs / Codex. Related: `docs/QA.md` (per-feature pass/fail), `docs/MANUAL_QA_GUIDE.md` (launch/smoke test), `project-folder-model.md` (folder layout these flows assume).
+Owner: Elvijs / Codex. Related: `docs/QA.md` (per-feature pass/fail), `docs/MANUAL_QA_GUIDE.md` (launch/smoke test), [`done/project-folder-model.md`](done/project-folder-model.md) (folder layout these flows assume).
 
 ## Why this doc exists
 

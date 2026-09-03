@@ -4,6 +4,7 @@ import { selectProjectFolder } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProjectRenameEditor } from '../components/ProjectRenameEditor';
 import { recentProjectDisplayName, sortRecentProjects } from '../lib/projectSort';
+import { importGate, reviewGate, timelineGate } from '../lib/stepGate';
 import { useReview } from '../state/ReviewContext';
 import { SettingsModal, type SettingsTab } from '../components/SettingsModal';
 
@@ -88,6 +89,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
     clips,
     acceptedCount,
     timelineItems,
+    analysisStatus,
   } = useReview();
   const [error, setError] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -114,11 +116,17 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
     setEditingFolderPath(null);
   }, []);
 
-  // Which workflow steps already have work in them — drives the progress ticks.
+  // A rail tick means the same thing as an unblocked action bar: the step
+  // produced what the next one needs. Both read the same rule so the shell
+  // cannot tell the editor that Import is done while the bar says it is not.
   const stepDone: Record<string, boolean> = {
-    '/import': uploadedVideos.length > 0,
-    '/review': acceptedCount > 0,
-    '/timeline': timelineItems.length > 0,
+    '/import': importGate({
+      sourceCount: uploadedVideos.length,
+      clipCount: clips.length,
+      phase: analysisStatus.phase,
+    }).allowed,
+    '/review': reviewGate(acceptedCount).allowed,
+    '/timeline': timelineGate(timelineItems.length).allowed,
     '/export': false,
   };
 

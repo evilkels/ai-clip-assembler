@@ -80,6 +80,14 @@ export function buildVideoMediaUrl(projectId: string, fileId: string): string {
   return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/media`;
 }
 
+export function buildClipPosterUrl(projectId: string, fileId: string, atMs: number): string {
+  // Clip start times are frame timestamps, so atMs arrives as a float, but
+  // the route takes an integer millisecond. Round here or nearly every
+  // poster request 422s.
+  const at = Math.max(0, Math.round(atMs));
+  return `${backendUrl()}/projects/${encodeURIComponent(projectId)}/videos/${encodeURIComponent(fileId)}/poster?at_ms=${at}`;
+}
+
 export interface BackendStatus {
   online: boolean;
   version?: string;
@@ -831,6 +839,8 @@ export interface ReviewModelDiagnostic {
   reachable: boolean;
   elapsed_sec: number | null;
   detail: string;
+  /** Ordered remediation steps; empty when the model is reachable. */
+  guidance?: string[];
 }
 
 export interface Diagnostics {

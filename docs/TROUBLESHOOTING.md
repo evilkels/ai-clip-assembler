@@ -45,6 +45,34 @@ Then restart the backend.
 The uploaded file isn't a valid/probeable video, or `ffprobe` isn't on `PATH`.
 Confirm `which ffprobe` resolves and that the file plays in a normal player.
 
+## "pi CLI not found on PATH" although the terminal finds it
+
+macOS starts Finder and Dock launches with a minimal `PATH`, so anything a
+version manager adds is invisible to the app. `nvm`, `volta`, and `asdf` all
+export their bin directory from `~/.zshrc`, which a *non-interactive* login
+shell never sources — the app used to probe with `zsh -lc` and so missed exactly
+those installs. It now probes an interactive login shell (`zsh -lic`) first and
+falls back to scanning the usual install locations, including every
+`~/.nvm/versions/node/*/bin`.
+
+Two workarounds that fix an already-installed build without waiting for an
+update:
+
+```bash
+# Put pi somewhere the packaged backend's PATH always includes.
+sudo ln -sf "$(which pi)" /opt/homebrew/bin/pi   # /usr/local/bin/pi on Intel
+
+# Or hand the path to the app for one launch.
+open --env PI_BIN="$(which pi)" -a "AI Clip Assembler"
+```
+
+The symlink takes effect immediately: the backend re-resolves the executable on
+every check, and `/opt/homebrew/bin` and `/usr/local/bin` are always on its
+`PATH`, so **Settings → Diagnostics → Run check again** is enough. The `PI_BIN`
+route sets an environment variable read at launch, so it needs the app quit and
+reopened. The Diagnostics panel prints these same steps under **How to fix
+this** whenever the check fails.
+
 ## Review model account and pi harness
 
 Open **Settings → Connections** first. The **Review model account** state and

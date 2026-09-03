@@ -42,14 +42,18 @@ test('analysis completes and review/timeline previews render playable videos', a
   await expect(page.getByText(/1 source video ready/)).toBeVisible();
 
   await page.getByLabel('Harness').selectOption('manual');
-  await page.getByRole('button', { name: /Analyze/ }).click();
+  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
   await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({
     timeout: 180_000,
   });
 
   await page.goto('/#/review');
   await expect(page.getByTestId('source-clips-panel')).toHaveAttribute('data-open', 'true');
-  const reviewPreview = page.getByLabel(/Preview /).first();
+  // Candidate cards rest on a poster (plan 029); playing one mounts the video.
+  const reviewCard = page.locator('.clip-card').first();
+  await expect(reviewCard.getByAltText(/Preview /)).toBeVisible();
+  await reviewCard.getByRole('button', { name: 'Play clip' }).click();
+  const reviewPreview = reviewCard.locator('video');
   await expect(reviewPreview).toBeVisible();
   await expect
     .poll(async () => reviewPreview.evaluate((video) => (video as HTMLVideoElement).readyState), {

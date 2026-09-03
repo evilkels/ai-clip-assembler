@@ -1,75 +1,140 @@
 # Plans
 
-Single home for written plans. Closed plans move to [`done/`](done/), each marked either **DONE** (implemented) or **SUPERSEDED** (folded into another plan); a superseded file may still hold the authoritative detail for the plan that absorbed it. Numbered plans are improve handoffs; named plans are product docs.
+Single home for written plans. Each row summarises; the plan file holds the
+detail, evidence and citations.
 
-## Advisor queue
+| | Meaning |
+|---|---|
+| 🔴 | Not started |
+| 🟡 | In progress or partly shipped |
+| 🟢 | Closed — nothing left here |
 
-| Plan | Title | Status |
-|------|-------|--------|
-| [001](done/001-real-footage-validation.md) | Analysis timing + real-footage validation runbook | DONE (2026-06-11) |
-| [002](done/002-pi-harness-scaling-spike.md) | Pi harness scaling spike | DONE (2026-06-19) — bounded concurrency + retry-once + partial-results recommended |
-| [003](done/003-backend-packaging-spike.md) | Backend packaging spike | DONE (2026-06-28) — superseded by shipped self-contained DMG (PRs #31–33) |
-| [004](done/004-timeline-sequence-playback.md) | Timeline sequence playback | DONE (2026-06-11) |
-| [005](done/005-rich-candidate-pool.md) | Rich Candidate Clip discovery vs draft selection | DONE (2026-06-21) |
-| [006](done/006-persist-review-session.md) | Persist project-scoped review sessions | DONE (2026-06-21) |
-| [007](done/007-creative-visual-review-agent.md) | Visual creative curator review agent | DONE (2026-06-21) |
-| [008](done/008-chat-bubbles-and-interactions.md) | Accessible review chat presentation | DONE (2026-06-21) |
-| [009](done/009-connected-review-pipeline.md) | Connect chat, Versions, Source Clips, Timeline | DONE (2026-06-28) at `f469e43` |
-| [010](done/010-shared-frontend-backend-contract.md) | Generated FE types from BE models | DONE (2026-07-02; re-verified 2026-07-21) |
-| [011](done/011-decompose-api-god-module.md) | Decompose `api.py` god-module, slice 1 | DONE (2026-07-02); slice 2 = plan 014 |
-| [012](done/012-adjustable-clip-generation.md) | Persist frame scores → live re-derive | DONE (2026-06-28; re-verified 2026-07-21) |
-| [013](done/013-reliable-browser-e2e-signals.md) | Deterministic browser E2E signals | DONE (2026-07-21) at `9a6d56a` |
-| [014](done/014-extract-timeline-lifecycle-service.md) | Extract Timeline lifecycle service | DONE (2026-07-09) at `1c88a22` |
-| [015](done/015-record-core-architecture-decisions.md) | Record core architecture decisions as ADRs | DONE (2026-07-09) at `93b0d37` |
-| [016](done/016-edit-creation-clip-selection.md) | Fix edit creation: dupes, slivers, agent-influenced selection | CLOSED (2026-09-02) — steps 1–2 shipped, step 3 superseded by 018, step 4 moved to 027 |
-| [017](017-review-page-clarity-and-polish.md) | Review-page presentation polish | TODO — poster-first cards (`ClipCard.tsx:138-160`) and one smoothness model (`Review.tsx:137-155` + `SourceClipsPanel.tsx:250-260`). Items 3–4 moved to 027; item 5 shipped in the redesign |
-| [018](done/018-diverse-clip-generation.md) | Diverse clip generation | DONE (2026-07-21) — code complete; model bundling split out to plan 025 |
-| [019](019-clip-library-generation-and-expansion.md) | Clip-library generation and expansion | TODO — Phase 1 one generation seam (`clip_generation.py` absent); Phase 2 absorbed plan 028 |
-| [020](done/020-authoritative-timeline-items.md) | Render and edit authoritative Timeline Items | DONE (2026-08-10) — first stacked branch |
-| [021](done/021-truthful-export.md) | Export authoritative Timeline with complete warnings | DONE (2026-08-10) — second stacked branch |
-| [022](done/022-project-shell-header-and-sidebar.md) | Project shell header and project list redesign | DONE (2026-08-12) at `c186ef4`, polished at `998f6d7` |
-| [023](023-macos-app-icon-geometry.md) | Correct macOS app icon geometry | TODO |
-| [024](done/024-source-audio-in-exports.md) | Source audio in exports | DONE (2026-08-13) — shipped in PR #65; real-footage/Resolve QA passed |
-| [025](025-bundle-siglip-embedding-model.md) | Export and bundle the SigLIP embedding model | TODO — until it lands, plan 018's diversity is inert in real runs |
-| [026](done/026-preview-audio-in-app.md) | Hear source audio in the app | DONE (2026-08-13) — shipped in PR #65; real-footage QA passed |
-| [027](027-authoritative-candidate-library-and-diverse-edits.md) | Authoritative candidate library and diverse Versions | TODO — P1 correctness; absorbed 016 step 4 and 017 items 3–4. Frontend citations predate the redesign; re-derive before executing |
-| [028](done/028-find-more-clips-from-source-video.md) | Find more Candidate Clips from one Source Video | SUPERSEDED (2026-09-02) — now Phase 2 of 019; that file remains the authoritative step-level spec, and none of it is implemented |
+Closed plans live in [`done/`](done/) and are marked **DONE** (implemented) or
+**SUPERSEDED** (folded into another plan). A superseded file may still be the
+authoritative spec for whatever absorbed it — `done/` means closed, not
+necessarily built. Numbered plans are improve handoffs; named plans are product
+docs.
 
-## Release QA (human-only, not covered by CI)
+## Active
 
-Implementation-complete is not release-complete. These checks need a person and
-real hardware, and are outstanding for v0.2.0:
+17 plans. Statuses verified against the code on 2026-09-03, not taken from each
+plan's own header — several plan headers were stale and have been rewritten to
+match what the code actually shows.
 
-- Install and launch the packaged DMG on a clean Mac, past Gatekeeper (builds
-  are unsigned), with the bundled backend starting unaided.
-- Import, Review and Timeline against real footage and real input hardware.
-- Open Resolve XML, FCPXML and EDL in their target NLEs and verify relinking,
-  order, timing, speed, transform, receipts and overwrite behaviour. No
-  automated test covers this.
-- A keyboard-only pass over every route. Note that Timeline trim is currently a
-  keyboard dead end — see [react-doctor-triage](react-doctor-triage.md).
+| | Plan | What's left |
+|---|---|---|
+| 🔴 | [019](019-clip-library-generation-and-expansion.md) | One generation seam, then source expansion |
+| 🔴 | [025](025-bundle-siglip-embedding-model.md) | Bundle SigLIP — diversity is inert until it lands |
+| 🔴 | [027](027-authoritative-candidate-library-and-diverse-edits.md) | P1 correctness; re-derive frontend citations first |
+| 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
+| 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
+| 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
+| 🔴 | [030](030-truthful-ai-usage.md) | Selected vs Effective Harness; decouple the Review Agent; surface fallback |
+| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; shell/Import element deltas, buttons, Settings `AI assistance`, harness popover, tokens |
+| 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
+| 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
+| 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
+| 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Preview, chat streaming and E2E await visual QA |
+| 🟡 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | Signing, notarization, clean-machine validation |
+| 🟡 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | Launch backlog + Search Console verification |
+| 🟡 | [going-public-codex-flow](going-public-codex-flow.md) | Roadmap: trust, installability, launch |
+| 🟡 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage, perf and DaVinci flows |
+| 🟡 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | Architecture and security documentation |
 
-## Product plans
+## In flight
 
-| Plan | Status |
-|------|--------|
-| [review-model-sign-in](done/review-model-sign-in.md) | DONE (2026-07-19) — automated checks green; live OAuth/package smoke remains human QA |
-| [review-model-sign-in-followups](review-model-sign-in-followups.md) | IN PROGRESS — Tasks 0, 1, 4 done; plan/spec reconciliation remains |
-| [going-public-codex-flow](going-public-codex-flow.md) | ACTIVE — trust → installability → presentability → arch debt → launch |
-| [self-contained-runtime-tools](self-contained-runtime-tools.md) | IN PROGRESS — signing/notarization and clean-machine validation remain |
-| [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | ACTIVE — launch/distribution backlog, plus the maintainer-owned Search Console verification absorbed from seo-plan |
-| [landing-page-restyle](done/2026-09-01-landing-page-restyle.md) | DONE (2026-09-02) — shipped with the redesign in `6d79c1b`, released as v0.2.0 |
-| [seo-plan](done/seo-plan.md) | CLOSED (2026-09-02) — technical SEO shipped and test-enforced; Search Console verification moved to landing-page-polish-and-launch |
-| [seo-content-pilot](seo-content-pilot.md) | GATED — pending query evidence and editorial input |
-| [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage/perf/DaVinci QA remain |
-| [project-folder-model](project-folder-model.md) | Automated QA complete; manual app QA pending |
-| [project-sidebar](project-sidebar.md) | Effectively DONE — rename/rows via plan 022, collapse + persisted resize via the redesign; context-menu and keyboard nav moved to shell-followups |
-| [settings-page](done/settings-page.md) | DONE (2026-07-03) |
-| [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | DONE (2026-07-02); live smoke remains human QA |
-| [agent-operable-timeline](agent-operable-timeline.md) | A1–C DONE; preview/chat streaming/E2E await visual QA |
-| [studio-workflow-redesign](done/2026-08-14-studio-workflow-redesign.md) | DONE (2026-09-02) — merged as `6d79c1b`, released as v0.2.0; human packaged-app/real-NLE QA still outstanding (see Release QA below) |
-| [ui-polish-modern-shell](done/ui-polish-modern-shell.md) | SUPERSEDED (2026-09-02) — the shadcn/Radix migration will not happen; residuals moved to shell-followups |
-| [shell-followups](shell-followups.md) | TODO — P3; Cmd-K, score verification, Settings/Diagnostics styling, sidebar context menu, keyboard pass |
-| [react-doctor-triage](react-doctor-triage.md) | Partial; re-triaged 2026-09-02 against v0.2.0 — 94 findings, most are false positives; 3 confirmed defects listed in the plan |
-| [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | DONE |
-| [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | DONE |
+Work that exists but is not on `main` yet. Listed so it is not lost — a pushed
+branch with no pull request is the easiest thing in this repo to forget.
+
+Everything outstanding is consolidated onto one branch, so there is a single
+thing to review and merge:
+
+| | Branch | State | What it carries |
+|---|---|---|---|
+| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Plan 029 phases 1–3 (poster-first cards, play-once previews), plan 031 Phase 1 (step gating), this status board, the plan 017/025 prerequisites, and plan 027's parked tests |
+
+Consolidated into it and closed unmerged: PR #70 (status board) and PR #71
+(plan prerequisites), which were already ancestors of this branch, and PR #73
+(`feat/027-version-diversity-test`), merged in explicitly.
+
+### Fixed on the branch 2026-09-03
+
+Plan 029's poster-first cards turned 23 Playwright tests red and PR #72's CI
+with them. Three specs waited on a `<video>` in Review that a resting card no
+longer mounts; they now assert the poster and activate the card first. Behind
+them was a real defect, not just stale tests: `ClipCard`'s audio effect keyed on
+`[cardMuted, volume]`, so it never re-ran on the render that brings the element
+into existence and an unmuted preview played at full volume whatever the slider
+said. Fixed in `04c1bdb`.
+
+### Parked tests — plan 027 Task 1
+
+`backend/tests/test_version_diversity.py` was written test-first in an
+abandoned 027 worktree and never committed; the module it imports
+(`src.version_diversity`) was never written on any branch, so the file was one
+`git clean` from being lost. It now lives on `feat/027-version-diversity-test`
+behind a module-level `pytest.importorskip`, so the assertions **skip while the
+module is missing and start running the moment it lands** — there is no guard
+to remember to remove. Plan 027 Task 1 points at the existing file rather than
+asking for a new one.
+
+Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
+
+## Release QA — v0.2.0
+
+🔴 Not started. Human-only; no automated test covers any of it.
+
+| | Check |
+|---|---|
+| 🔴 | Packaged DMG on a clean Mac, past Gatekeeper, backend starts unaided |
+| 🔴 | Import, Review and Timeline on real footage and real input hardware |
+| 🔴 | Open Resolve XML, FCPXML and EDL in their real NLEs |
+| 🔴 | Keyboard-only pass — note trim is a known dead end |
+| 🔴 | Move or rename a project folder, reopen it, and export again — inherited from [project-folder-model](done/project-folder-model.md), whose code and automated QA are complete |
+
+## Closed
+
+40 plans.
+
+| | Plan | Outcome |
+|---|---|---|
+| 🟢 | [001](done/001-real-footage-validation.md) | Done 2026-06-11 |
+| 🟢 | [002](done/002-pi-harness-scaling-spike.md) | Done 2026-06-19 |
+| 🟢 | [003](done/003-backend-packaging-spike.md) | Superseded by the self-contained DMG |
+| 🟢 | [004](done/004-timeline-sequence-playback.md) | Done 2026-06-11 |
+| 🟢 | [005](done/005-rich-candidate-pool.md) | Done 2026-06-21 |
+| 🟢 | [006](done/006-persist-review-session.md) | Done 2026-06-21 |
+| 🟢 | [007](done/007-creative-visual-review-agent.md) | Done 2026-06-21 |
+| 🟢 | [008](done/008-chat-bubbles-and-interactions.md) | Done 2026-06-21 |
+| 🟢 | [009](done/009-connected-review-pipeline.md) | Done 2026-06-28 · `f469e43` |
+| 🟢 | [010](done/010-shared-frontend-backend-contract.md) | Done 2026-07-02 |
+| 🟢 | [011](done/011-decompose-api-god-module.md) | Done 2026-07-02 · slice 2 = plan 014 |
+| 🟢 | [012](done/012-adjustable-clip-generation.md) | Done 2026-06-28 |
+| 🟢 | [013](done/013-reliable-browser-e2e-signals.md) | Done 2026-07-21 · `9a6d56a` |
+| 🟢 | [014](done/014-extract-timeline-lifecycle-service.md) | Done 2026-07-09 · `1c88a22` |
+| 🟢 | [015](done/015-record-core-architecture-decisions.md) | Done 2026-07-09 · `93b0d37` |
+| 🟢 | [016](done/016-edit-creation-clip-selection.md) | Closed 2026-09-02 · step 4 → 027 |
+| 🟢 | [018](done/018-diverse-clip-generation.md) | Done 2026-07-21 · bundling → 025 |
+| 🟢 | [020](done/020-authoritative-timeline-items.md) | Done 2026-08-10 |
+| 🟢 | [021](done/021-truthful-export.md) | Done 2026-08-10 |
+| 🟢 | [022](done/022-project-shell-header-and-sidebar.md) | Done 2026-08-12 · `c186ef4` |
+| 🟢 | [024](done/024-source-audio-in-exports.md) | Done 2026-08-13 · PR #65 |
+| 🟢 | [024 notes](done/024-implementation-notes.md) | Implementation notes for 024 |
+| 🟢 | [026](done/026-preview-audio-in-app.md) | Done 2026-08-13 · PR #65 |
+| 🟢 | [028](done/028-find-more-clips-from-source-video.md) | Superseded 2026-09-02 → 019 Phase 2 · **not built** |
+| 🟢 | [backend-timeline-workflow](done/2026-05-12-backend-timeline-workflow.md) | Done |
+| 🟢 | [review-timeline-video-preview](done/2026-06-10-review-timeline-video-preview-playwright.md) | Done |
+| 🟢 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | Done |
+| 🟢 | [clip-quality-and-review-ux](done/2026-06-15-clip-quality-and-review-ux.md) | Done |
+| 🟢 | [compare-versions-review-ui](done/2026-06-21-compare-versions-review-ui.md) | Done |
+| 🟢 | [studio-workflow-redesign](done/2026-08-14-studio-workflow-redesign.md) | Done 2026-09-02 · `6d79c1b` · v0.2.0 |
+| 🟢 | [landing-page-restyle](done/2026-09-01-landing-page-restyle.md) | Done 2026-09-02 · v0.2.0 |
+| 🟢 | [literal-design-conformance](done/2026-09-01-literal-design-conformance.md) | Done 2026-09-02 |
+| 🟢 | [agent-operable-timeline-handoff](done/agent-operable-timeline-handoff.md) | Executed 2026-06-19 |
+| 🟢 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | Done 2026-07-02 · live smoke is human QA |
+| 🟢 | [review-model-sign-in](done/review-model-sign-in.md) | Done 2026-07-19 · follow-ups still active |
+| 🟢 | [seo-plan](done/seo-plan.md) | Closed 2026-09-02 · Search Console → landing plan |
+| 🟢 | [project-folder-model](done/project-folder-model.md) | Closed 2026-09-03 · code + automated QA done; manual check → Release QA |
+| 🟢 | [project-sidebar](done/project-sidebar.md) | Closed 2026-09-03 · superseded by shell-followups; kept as the sidebar's decision record |
+| 🟢 | [settings-page](done/settings-page.md) | Done 2026-07-03 |
+| 🟢 | [ui-polish-modern-shell](done/ui-polish-modern-shell.md) | Superseded 2026-09-02 → shell-followups |

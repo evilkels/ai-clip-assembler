@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
@@ -418,6 +418,26 @@ async def get_project_video_media(
         filename=video["file_name"],
         content_disposition_type="inline",
         headers={"Accept-Ranges": "bytes"},
+    )
+
+
+@app.get("/projects/{project_id}/videos/{file_id}/poster")
+async def get_project_video_poster(
+    project_id: str,
+    file_id: str,
+    at_ms: int = Query(..., ge=0),
+):
+    video = registered_video(project_id, file_id)
+    frame_paths = timestamped_frame_paths(project_id, video["file_id"])
+    if not frame_paths:
+        raise HTTPException(status_code=404, detail="Poster frame not found")
+    _timestamp, poster_path = min(frame_paths, key=lambda item: abs(item[0] - at_ms))
+    return FileResponse(
+        poster_path,
+        media_type="image/jpeg",
+        # Not immutable: re-analysis rewrites frames under the same
+        # timestamp names, and the poster URL for a clip does not change.
+        headers={"Cache-Control": "public, max-age=60"},
     )
 
 
@@ -976,19 +996,15 @@ def _mcp_get_controller(project_id: str) -> TimelineController:
     return get_timeline_controller(project_id)
 
 
-def mcp_frame_paths(project_id: str, clip_id: str) -> list:
-    """Local frame JPEG paths for a candidate clip, for an agent to read
-    directly (the same `@path` images `pi_cli_harness` attaches)."""
-    project = projects.get(project_id) or {}
-    clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
-    if clip is None:
+def timestamped_frame_paths(project_id: str, file_id: str) -> list[tuple[int, Path]]:
+    """Return safe, non-raw sampled frame paths with their millisecond timestamps."""
+    if Path(file_id).name != file_id:
         return []
-    file_id = clip.get("file_id")
-    base = samples_dir(project_id) / str(file_id)
-    if not base.exists():
+    samples_root = samples_dir(project_id).resolve()
+    base = (samples_root / file_id).resolve()
+    if base.parent != samples_root or not base.is_dir():
         return []
-    start_ms = float(clip.get("start_sec", 0.0)) * 1000
-    end_ms = float(clip.get("end_sec", 0.0)) * 1000
+
     paths = []
     for path in sorted(base.glob(f"{file_id}_*.jpg")):
         stem = path.stem
@@ -998,6 +1014,25 @@ def mcp_frame_paths(project_id: str, clip_id: str) -> list:
             milliseconds = int(stem.rsplit("_", 1)[1])
         except (ValueError, IndexError):
             continue
+        resolved = path.resolve()
+        if resolved.parent != base or not resolved.is_file():
+            continue
+        paths.append((milliseconds, resolved))
+    return paths
+
+
+def mcp_frame_paths(project_id: str, clip_id: str) -> list:
+    """Local frame JPEG paths for a candidate clip, for an agent to read
+    directly (the same `@path` images `pi_cli_harness` attaches)."""
+    project = projects.get(project_id) or {}
+    clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
+    if clip is None:
+        return []
+    file_id = clip.get("file_id")
+    start_ms = float(clip.get("start_sec", 0.0)) * 1000
+    end_ms = float(clip.get("end_sec", 0.0)) * 1000
+    paths = []
+    for milliseconds, path in timestamped_frame_paths(project_id, str(file_id)):
         if start_ms <= milliseconds <= end_ms:
             paths.append(str(path))
     return paths
@@ -1320,6 +1355,86 @@ async def write_settings(request: SettingsUpdateRequest):
 _DIAGNOSTIC_TIMEOUT_SEC = 45.0
 
 
+# Failure detail is provider text we do not control, so the guidance below is
+# keyed off coarse substrings and always ends with a step that works regardless.
+_AUTH_MARKERS = (
+    "no api key", "not authenticated", "unauthenticated", "unauthorized",
+    "401", "403", "sign in", "log in", "login", "credential", "token",
+)
+_MODEL_MARKERS = ("unknown model", "model not found", "invalid model", "404", "no such model")
+_NETWORK_MARKERS = (
+    "enotfound", "econnrefused", "getaddrinfo", "network", "dns", "proxy",
+    "connection", "socket", "tls", "certificate",
+)
+
+_PI_INSTALL_STEP = (
+    "Install Pi if it is missing: npm install -g @earendil-works/pi-coding-agent"
+)
+
+
+def _missing_binary_guidance(pi_bin: str) -> list:
+    """Steps for the common case: pi works in Terminal but not inside the app.
+
+    macOS starts Finder/Dock launches with a minimal PATH, so anything a version
+    manager (nvm, volta, asdf) adds from ~/.zshrc is invisible to the app even
+    though the same shell finds it interactively.
+    """
+    return [
+        f"Confirm the CLI exists: run  which {pi_bin}  in Terminal.",
+        _PI_INSTALL_STEP,
+        "macOS launches apps with a minimal PATH, so a pi installed by nvm, "
+        "volta, or asdf is invisible here even when Terminal finds it. Link it "
+        "somewhere the app always looks:  sudo ln -sf \"$(which pi)\" /opt/homebrew/bin/pi  "
+        "(use /usr/local/bin/pi on Intel Macs).",
+        "Then run this check again — no restart needed, /opt/homebrew/bin and "
+        "/usr/local/bin are always searched.",
+        "Alternative: quit the app and relaunch it with the path supplied "
+        "explicitly:  open --env PI_BIN=\"$(which pi)\" -a \"AI Clip Assembler\"",
+    ]
+
+
+def _reachability_guidance(result: dict, pi_bin: str, timeout_sec: float) -> list:
+    """Actionable next steps for a failed reachability check, most likely first."""
+    if not result["binary"]["found"]:
+        return _missing_binary_guidance(pi_bin)
+
+    detail = (result["detail"] or "").lower()
+    if any(marker in detail for marker in _AUTH_MARKERS):
+        return [
+            "Open Settings > Connections and sign in to the review model account.",
+            "Or authenticate the CLI directly:  pi /login  then retry "
+            "(the app reads the same credentials from ~/.pi/agent/auth.json).",
+            "If a different provider is configured, make sure Pi has credentials "
+            "for it, or switch the provider in Settings.",
+        ]
+    if any(marker in detail for marker in _MODEL_MARKERS):
+        return [
+            f"The provider rejected model \"{result['model']}\". Check the spelling "
+            "in Settings against the models your account can use.",
+            "Try the default model to confirm the account works at all, then "
+            "change it back.",
+        ]
+    if any(marker in detail for marker in _NETWORK_MARKERS):
+        return [
+            "Check network access — the provider call never completed.",
+            "If you are behind a VPN or proxy, allow outbound HTTPS for the CLI, "
+            "then run this check again.",
+        ]
+    if "no response within" in detail:
+        return [
+            f"The provider did not answer within {timeout_sec:.0f}s. Run the check "
+            "again — a cold or busy model often clears on a retry.",
+            "If it keeps timing out, raise the per-call timeout in Settings or "
+            "pick a faster model.",
+        ]
+    return [
+        f"Reproduce it in Terminal to see the full error:  {pi_bin} --provider "
+        f"{result['provider']} --model {result['model']} --print \"Reply with OK.\"",
+        "Check Settings > Connections for the account state, and confirm the "
+        "provider and model names are valid.",
+    ]
+
+
 def _ping_review_model(settings: dict) -> dict:
     """Run a trivial pi turn to confirm the review model is reachable.
 
@@ -1379,6 +1494,13 @@ def _ping_review_model(settings: dict) -> dict:
 async def diagnostics():
     settings = get_settings()
     review_model = await asyncio.to_thread(_ping_review_model, settings)
+    review_model["guidance"] = (
+        []
+        if review_model["reachable"]
+        else _reachability_guidance(
+            review_model, settings["pi_bin"], _DIAGNOSTIC_TIMEOUT_SEC
+        )
+    )
     return {"review_model": review_model}
 
 

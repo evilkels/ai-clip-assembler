@@ -36,6 +36,6 @@ the footage in `exports/<format>/` using paths relative to the export file.
 
 ## References
 
-- [docs/plans/project-folder-model.md](../plans/project-folder-model.md)
+- [docs/plans/done/project-folder-model.md](../plans/done/project-folder-model.md)
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — Tech stack, Persistence/migration
 - `backend/src/project_store.py` — `ProjectStoreError` and subclasses

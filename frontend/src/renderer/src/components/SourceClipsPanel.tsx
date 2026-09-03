@@ -135,6 +135,7 @@ export function SourceClipsPanel({
               clip={record.clip}
               rank={record.rank}
               decision={record.decision}
+              projectId={projectId}
               draftPosition={record.timelinePosition}
               versionLabels={record.versionLabels}
               siblingRanges={siblingRanges}

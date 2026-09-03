@@ -101,6 +101,9 @@ function diagnostics(reachable: boolean) {
       reachable,
       elapsed_sec: 0.2,
       detail: reachable ? 'OK' : 'No API key found for openai-codex',
+      guidance: reachable
+        ? []
+        : ['Open Settings > Connections and sign in to the review model account.'],
     },
   };
 }
@@ -253,4 +256,52 @@ test('explains missing and incompatible Pi installations', async ({ page }) => {
 
   await expect(page.getByText(/earlier than 1\.0\.0/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
+});
+
+test('the Diagnostics tab spells out how to fix an unreachable model', async ({ page }) => {
+  await page.route('**/diagnostics', async (route) => {
+    await route.fulfill({
+      json: {
+        review_model: {
+          binary: { configured: 'pi', resolved: null, found: false },
+          provider: 'openai-codex',
+          model: 'gpt-5.4-mini',
+          reachable: false,
+          elapsed_sec: null,
+          detail: 'pi CLI not found on PATH (pi)',
+          guidance: [
+            'Confirm the CLI exists: run  which pi  in Terminal.',
+            'Link it somewhere the app always looks: /opt/homebrew/bin/pi',
+          ],
+        },
+      },
+    });
+  });
+  await installDesktopBridge(page, {
+    initial: status('connected', 'Connected to ChatGPT.'),
+  });
+
+  await page.goto('/#/import');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Diagnostics' }).click();
+
+  await expect(page.getByText('Not reachable', { exact: true })).toBeVisible();
+  const guidance = page.getByRole('heading', { name: 'How to fix this' }).locator('..');
+  await expect(guidance.getByRole('listitem')).toHaveCount(2);
+  await expect(guidance).toContainText('which pi');
+  await expect(guidance).toContainText('/opt/homebrew/bin/pi');
+});
+
+test('the Diagnostics tab hides the fix-it steps once the model responds', async ({ page }) => {
+  await page.route('**/diagnostics', async (route) => {
+    await route.fulfill({ json: diagnostics(true) });
+  });
+  await installDesktopBridge(page, { initial: status('connected', 'Connected to ChatGPT.') });
+
+  await page.goto('/#/import');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Diagnostics' }).click();
+
+  await expect(page.getByText('Reachable', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'How to fix this' })).toHaveCount(0);
 });

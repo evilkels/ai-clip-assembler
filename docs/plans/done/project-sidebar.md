@@ -1,9 +1,19 @@
 # Plan: Project Sidebar
 
-Status: partially implemented; auto-reopen persistence shipped; remaining
-sidebar UX items deferred pending visual QA.
-Depends on: `project-folder-model.md` (project = folder, `recent.json` in
-app-data). Pairs with: `settings-page.md`, `ui-polish-modern-shell.md`.
+Status: **CLOSED 2026-09-03 — SUPERSEDED.** Everything this plan deferred has
+an owner elsewhere, so nothing is tracked here any more. The header below was
+stale: collapse and resize both shipped in the studio redesign and are covered
+by `project-shell-regressions.spec.ts:268-273`, and the remaining interaction
+items (sidebar context menu, keyboard pass) moved to
+[`shell-followups.md`](../shell-followups.md). Row rename and the card-style
+rows shipped in [plan 022](022-project-shell-header-and-sidebar.md).
+
+This file stays as the authoritative record of the sidebar's data source and
+decided interactions, which nothing else restates.
+
+Depends on: [`project-folder-model.md`](project-folder-model.md) (project =
+folder, `recent.json` in app-data). Pairs with: [`settings-page.md`](settings-page.md),
+[`ui-polish-modern-shell.md`](ui-polish-modern-shell.md).
 
 ## Goal
 
@@ -44,9 +54,9 @@ persisted resizable width **shipped** in the studio redesign (`AppShell.tsx`,
 `hooks/usePanelWidth.ts`, asserted by
 `project-shell-regressions.spec.ts:268-273`). The context-menu interaction and
 the keyboard-nav/a11y verification moved to
-[`shell-followups.md`](shell-followups.md). Superseded above:
+[`shell-followups.md`](../shell-followups.md). Superseded above:
 recents-label rename and alphabetical, card-style project rows shipped in
-[plan 022](done/022-project-shell-header-and-sidebar.md), so the "Rename ...
+[plan 022](022-project-shell-header-and-sidebar.md), so the "Rename ...
 deferred to v2" line no longer holds; `lastOpenedAt` is still written but no
 longer drives display order. Migration: first launch
 with no `recent.json` → empty state, no errors; a migration banner for the

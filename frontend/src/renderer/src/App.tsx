@@ -6,6 +6,7 @@ import { ExportPage } from './routes/Export';
 import { PlaywriterQaPage } from './routes/PlaywriterQa';
 import { AppShell } from './layouts/AppShell';
 import { ReviewProvider } from './state/ReviewContext';
+import { StepGateProvider } from './state/StepGateContext';
 import { ThemeProvider } from './state/ThemeContext';
 
 function Shell() {
@@ -27,7 +28,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <ReviewProvider>
-        <Shell />
+        {/* Routes publish the actions that unblock their step; the shell's
+            action bar renders whichever one the derived gate asks for. */}
+        <StepGateProvider>
+          <Shell />
+        </StepGateProvider>
       </ReviewProvider>
     </ThemeProvider>
   );

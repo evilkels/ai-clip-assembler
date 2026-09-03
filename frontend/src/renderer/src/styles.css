@@ -1986,6 +1986,32 @@ a {
   color: var(--yellow);
 }
 
+.harness-fallback-banner {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  color: var(--yellow);
+}
+
+.harness-fallback-banner p,
+.harness-fallback-banner ul {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.harness-fallback-banner ul {
+  padding-left: 18px;
+}
+
+.harness-fallback-label {
+  color: var(--text-muted);
+  font: 11px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 [data-testid="version-stale-warning"] {
   min-width: 0;
 }
@@ -5057,4 +5083,8 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: 0.04em;
+}
+
+.harness-fallback-notice {
+  display: block;
 }

@@ -142,6 +142,8 @@ export interface FolderProjectResult {
   project_folder: string;
   project: ProjectManifest;
   videos: UploadedVideo[];
+  selected_harness?: string;
+  effective_harness?: string | null;
   generation_stats?: ClipGenerationStats | null;
 }
 
@@ -174,6 +176,26 @@ export async function updateCloudAiConsent(
   return res.json() as Promise<{
     project_id: string;
     cloud_ai_consent: boolean;
+    project?: ProjectManifest;
+  }>;
+}
+
+export async function updateSelectedHarness(
+  projectId: string,
+  harnessId: string,
+): Promise<{ project_id: string; selected_harness: string; project?: ProjectManifest }> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/selected-harness`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ harness_id: harnessId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Failed to update Selected Harness: ${res.status}`);
+  }
+  return res.json() as Promise<{
+    project_id: string;
+    selected_harness: string;
     project?: ProjectManifest;
   }>;
 }
@@ -386,21 +408,27 @@ export async function analyzeProject(
   const raw = (await res.json()) as {
     project_id: string;
     harness_id: string;
+    selected_harness?: string;
+    effective_harness?: string;
     status: string;
     clips: BackendClipSuggestion[];
     sequence: AnalysisResult['sequence'];
     recommendation: AnalysisResult['recommendation'];
     generation_stats?: ClipGenerationStats;
+    metadata?: AnalysisResult['metadata'];
     notices?: AnalysisResult['notices'];
   };
   return {
     project_id: raw.project_id,
     harness_id: raw.harness_id,
+    selected_harness: raw.selected_harness,
+    effective_harness: raw.effective_harness,
     status: raw.status,
     clips: raw.clips.map(mapBackendClip),
     sequence: raw.sequence,
     recommendation: raw.recommendation,
     generation_stats: raw.generation_stats,
+    metadata: raw.metadata,
     notices: raw.notices,
   };
 }
@@ -421,20 +449,26 @@ export async function rederiveClips(
   const raw = (await res.json()) as {
     project_id: string;
     harness_id: string;
+    selected_harness?: string;
+    effective_harness?: string;
     status: string;
     clips: BackendClipSuggestion[];
     sequence: AnalysisResult['sequence'];
     recommendation: AnalysisResult['recommendation'];
     generation_stats?: ClipGenerationStats;
+    metadata?: AnalysisResult['metadata'];
   };
   return {
     project_id: raw.project_id,
     harness_id: raw.harness_id,
+    selected_harness: raw.selected_harness,
+    effective_harness: raw.effective_harness,
     status: raw.status,
     clips: raw.clips.map(mapBackendClip),
     sequence: raw.sequence,
     recommendation: raw.recommendation,
     generation_stats: raw.generation_stats,
+    metadata: raw.metadata,
   };
 }
 

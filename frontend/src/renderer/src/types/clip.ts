@@ -92,12 +92,32 @@ export interface RecentProject {
 export interface AnalysisResult {
   project_id: string;
   harness_id: string;
+  selected_harness?: string;
+  effective_harness?: string;
   status: string;
   clips: ClipCandidate[];
   sequence: DraftTimeline;
   recommendation: AssemblyRecommendation;
   generation_stats?: ClipGenerationStats;
+  metadata?: HarnessUsageMetadata;
   notices?: AnalysisNotice[];
+}
+
+export interface HarnessVideoUsage {
+  file_id: string;
+  file_name?: string;
+  used_ai?: boolean;
+  model_used?: string | null;
+  warning?: string;
+}
+
+export interface HarnessUsageMetadata {
+  per_video?: HarnessVideoUsage[];
+  used_ai?: boolean;
+  model_used?: string;
+  models_used?: string[];
+  local?: boolean;
+  warning?: string;
 }
 
 export interface AnalysisNotice {

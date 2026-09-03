@@ -1,6 +1,6 @@
 # Plan 031: App restyle conformance — the sections the build has not caught up to
 
-Status: PHASE 1 DONE (2026-09-03) · PHASES 2-5 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance
+Status: PHASE 1 DONE (2026-09-03) · PHASES 2-6 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance
 Written against `04c1bdb`, 2026-09-03. Source of truth is the
 **Clip Assembler Restyle** handoff, checked in at
 [`docs/design/2026-09-03-app-restyle-handoff.md`](../design/2026-09-03-app-restyle-handoff.md),
@@ -23,12 +23,20 @@ passes never saw: the step-gating states (`5a`), a four-panel Settings with an
 `AI assistance` panel the app has never had (`6a`), the harness popover (`6c`),
 and the designed cloud-consent gate (`5b` card 2).
 
-Audited 2026-09-03 against the shipped renderer. The gap is narrow but real,
-and it is concentrated in exactly those newer sections.
+Audited twice. The first pass (2026-09-03, morning) compared **tokens,
+typography and shared components** and concluded the gap was concentrated in
+the newer sections. That was true as far as it went, and it was the wrong
+granularity: a side-by-side screenshot of the reference and the running app then
+showed a row of per-element deltas across the shell and Import that a
+component-level audit does not catch. Those are Phase 2, and the
+"already conformant" list below is now scoped to what was actually verified,
+element by element, rather than implying whole screens are done.
 
 ## Already conformant — do not re-plan
 
-Verified in the code, not assumed:
+Each item below was verified in the code, not assumed. **This is a list of
+specific things, not of whole screens** — see Phase 2 for the elements on the
+same screens that are not conformant.
 
 - **Colour tokens** are the design's values under the codebase's names
   (`styles/tokens.css`): `--bg-0/1/2/3` = `#08090b`/`#0d0f12`/`#12151a`/`#171b21`,
@@ -50,6 +58,14 @@ Verified in the code, not assumed:
   satisfied.
 - **Rail collapse, per-screen view switchers, and their persistence** shipped in
   the redesign and are covered by `project-shell-regressions.spec.ts`.
+- **The project header** matches `Screen anatomy` item 1: name, absolute path,
+  the `N SOURCES · N GB` count pill and `Rename`.
+
+Not on this list, and not yet audited element by element: **Review (`1b`),
+Timeline (`3a`) and Export (`3b`)**. Phase 2 covers the shell and Import because
+that is what has been diffed against the reference. Give the other three the
+same treatment before assuming they are clean — the Import result suggests they
+will not be.
 
 ## Phase 1 — Step gating (`5a`) · DONE 2026-09-03
 
@@ -70,7 +86,94 @@ Two deliberate deviations, both recorded rather than silently taken:
   `metadata.used_ai` is still dropped by the client — that is
   [plan 030](030-truthful-ai-usage.md) Phase 3, Step 3.1. Wire the button there.
 
-## Phase 2 — The button system
+## Phase 2 — Shell and Import element deltas
+
+The screens are on the right tokens and the right components, and still do not
+look like the reference, because individual elements differ. Found by putting
+the reference and the running app side by side rather than by reading either one
+alone. Every item cites where it is in the code.
+
+Do these together and re-cut the baselines once, with Phase 3.
+
+**Shell**
+
+- [ ] **Step 2.1** The rail brand has no version line. Design: 34×34 mark +
+      `AI Clip Assembler` (14/600) + `local first · v0.2.0` (Mono 10px `+.12em`
+      uppercase `--txm`). Build: 32×32 mark + name only
+      (`Sidebar.tsx:146-149`).
+- [ ] **Step 2.2** The rail footer is wrong in both directions
+      (`Sidebar.tsx:288-295`). Design: `◈ AI assistance` with `pi · cloud` in
+      Mono 10px green, then `⚙ Settings`. Build: `⚙ Settings` and
+      `◇ Diagnostics`. **Diagnostics is not a rail item in this design** — it is
+      a Settings panel (`6b`), so this step deletes that row, and the
+      `AI assistance` row it replaces it with is the deep link into Phase 4's
+      new panel. Sequence it after Phase 4 or the link has nowhere to go.
+- [ ] **Step 2.3** Project rows carry a count only on the active row, and it
+      reads `13 sources` (`Sidebar.tsx:191-193`). Design: a Mono 10px count on
+      **every** row — `22`, `16`, `31`, `44`, `18` — the number alone.
+- [ ] **Step 2.4** The workflow step marker holds only a number or a check, and
+      the 24px line icon sits in the label beside it instead
+      (`Sidebar.tsx:252-259`). Design: the icon goes **inside** the 26×26
+      marker for the active/expanded step, with `✓` or the number otherwise.
+      This is why the rail reads as a list of checkboxes rather than as the
+      design's four marked steps.
+- [ ] **Step 2.5** The Export step carries a count (`acceptedCount`,
+      `Sidebar.tsx:262-263`). Design gives Export no count.
+- [ ] **Step 2.6** The status bar is a two-field sentence-case line
+      (`StatusBar.tsx:26-32`, `styles.css:769-779`). Design: 34px tall,
+      `padding:0 20px; gap:22px`, Mono 11px `+.04em` **uppercase**, and **three**
+      fields — a 7px state dot + state text, a middle fact
+      (`BACKEND v0.2.0 · LOCAL`, or `HARNESS: PI AGENT (CLOUD AI, OPT-IN)`), and
+      a right-aligned `11 / 16 CLIPS KEPT` in `--txd`. The build has no middle
+      field at all, no uppercase, no tracking, and `padding:0 12px; gap:16px`.
+      The harness variant of the middle fact needs the **Effective Harness**, so
+      it depends on [plan 030](030-truthful-ai-usage.md) Phase 1; ship
+      `BACKEND … · LOCAL` first rather than blocking the whole step on it.
+
+**Import (`1d`)**
+
+- [ ] **Step 2.7** There is no `Frame` column. The second cell is an `👁`
+      preview button (`SourceVideoBrowser.tsx:250,267`). Design: a 74px `Frame`
+      column holding a 48×28 radius-5 hatched placeholder — the same hatch used
+      as the loading/empty state everywhere else. Decide deliberately where the
+      preview affordance goes once the frame is clickable.
+- [ ] **Step 2.8** The File cell is the bare filename
+      (`SourceVideoBrowser.tsx:268`). Design: a 6×6 per-source identity colour
+      chip + the name at weight 500 + an `hevc` pill. The identity colour
+      already exists — `lib/reviewView.ts` `reviewFileAccentStyle` is what
+      Review's clip cards use — so reuse it rather than inventing a second
+      palette, which is the whole point of a per-source colour.
+- [ ] **Step 2.9** Codec is its own column (`SourceVideoBrowser.tsx:274`).
+      Design folds it into the File cell as the pill from Step 2.8, and uses
+      that column budget for `Frame`.
+- [ ] **Step 2.10** The selection bar's count reads `0 of 13 selected` in Sans
+      (`SourceVideoSelectionBar.tsx:42`). Design: `10 SELECTED` in Mono 11px
+      `+.1em` 600 `--acc`, then the sentence. The sentence copy already matches.
+- [ ] **Step 2.11** The selection bar has no harness trigger, and the bare
+      `Harness` `<select>` sits in the toolbar row instead
+      (`Import.tsx:449-462`, `SourceVideoBrowser.tsx:191`), which is what makes
+      that row read as crowded. Design puts the `6c` trigger in the selection
+      bar behind a 1px divider, before `Unanalyzed only`. Same work as
+      Phase 5 Step 5.1 — do it once, there.
+- [ ] **Step 2.12** The primary reads `Analyze all 13`, `Analyze 13 of 13` or
+      `Regenerate clips` (`SourceVideoSelectionBar.tsx:24-32`). Design:
+      `Analyze 10` — the selected count, nothing else. **`Regenerate clips` has
+      no counterpart anywhere in the reference**; it is a real capability
+      (re-derive from cached Frame Scores) that the design never drew, so decide
+      where it belongs instead of quietly leaving it in the accent slot. Note
+      the gated action bar already renders `Analyze N videos` (Phase 1), so
+      whatever is decided here has to agree with that label.
+- [ ] **Step 2.13** The action bar has no `Add more footage` secondary; the
+      design carries one in states 03 and 06 of `5a`.
+- [ ] **Step 2.14** The rules card is always open and spans the content width
+      when idle. Design: a 340px card beside the analysis card showing the six
+      values in a 3-column grid behind an `Edit rules and re-scan` action. The
+      side-by-side layout is already correct *while analysing* — this is the
+      idle state only.
+- [ ] **Step 2.15** Re-cut both baseline sets and re-run the suite. Expect the
+      `shell` and `import-analyzing` fixtures to move substantially.
+
+## Phase 3 — The button system
 
 The design's accent budget is **exactly one solid accent element per screen**,
 the primary in the action bar. Today `.btn.primary` is an accent *tint* at
@@ -99,7 +202,7 @@ purpose rather than as a side effect.
       `snapshotPathTemplate` note in `playwright.config.ts`. A macOS-only
       re-cut turns CI red.
 
-## Phase 3 — Settings: four panels and the `AI assistance` panel (`6a`, `6b`)
+## Phase 4 — Settings: four panels and the `AI assistance` panel (`6a`, `6b`)
 
 `SettingsModal.tsx` is three tabs across the top (`settings` | `connect-ai` |
 `diagnostics`). The design is a 1380px dialog, radius 16,
@@ -132,7 +235,7 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
       right one, and the failure card renders from a failing diagnostics
       response.
 
-## Phase 4 — Harness choice as a popover, and consent as a designed gate
+## Phase 5 — Harness choice as a popover, and consent as a designed gate
 
 - [ ] **Step 4.1** Replace the bare `<select>` labelled `Harness`
       (`Import.tsx:450-462`) with the `6c` popover: trigger `Scored by Pi Agent`
@@ -153,7 +256,7 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
 - [ ] **Step 4.4** E2E: choosing the cloud harness without consent shows the
       gate and calls no provider; declining leaves the Selected Harness alone.
 
-## Phase 5 — Token deltas
+## Phase 6 — Token deltas
 
 Four values differ from the handoff. Each is small, and each is a real
 difference on screen, so fix them together and re-cut the baselines once.
@@ -172,7 +275,7 @@ difference on screen, so fix them together and re-cut the baselines once.
 ## Open questions for the design owner
 
 Carried from the handoff's own "Known deltas" section; none of them block a
-phase, but Phase 3 and Phase 4 write user-facing copy, so settle them first.
+phase, but Phase 4 and Phase 5 write user-facing copy, so settle them first.
 
 1. **Terminology.** The designs use "Suggested cuts", "Your clips",
    "Rule-based · local" — all listed in `UBIQUITOUS_LANGUAGE.md` as aliases to

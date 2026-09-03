@@ -2,7 +2,7 @@
 
 **Status: DONE (2026-07-03)** — shipped as the Settings & Diagnostics modal in `frontend/src/renderer/src/components/SettingsModal.tsx` (`8523ed9`) plus theme switching (`cd1ef24`).
 
-Owner: Elvijs. Depends on `project-folder-model.md` (global vs per-project split). Pairs with `project-sidebar.md`, `ui-polish-modern-shell.md`.
+Owner: Elvijs. Depends on `project-folder-model.md` (global vs per-project split). Pairs with `project-sidebar.md`, `ui-polish-modern-shell.md`. All three now live in this folder.
 
 ## Goal
 

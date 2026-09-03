@@ -132,5 +132,6 @@ paths.
 
 Which provider counts as "the AI harness" for the Flow D signal test
 (`drone-workflow-qa-flows.md`, still unresolved), per-project versus global
-harness override UX (`project-folder-model.md`, still unresolved), and any
+harness override UX ([`done/project-folder-model.md`](done/project-folder-model.md),
+still unresolved), and any
 change to what the harnesses actually score.

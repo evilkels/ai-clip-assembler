@@ -17,8 +17,9 @@ docs.
 
 ## Active
 
-19 plans. Statuses verified against the code on 2026-09-03, not taken from each
-plan's own header.
+17 plans. Statuses verified against the code on 2026-09-03, not taken from each
+plan's own header — several plan headers were stale and have been rewritten to
+match what the code actually shows.
 
 | | Plan | What's left |
 |---|---|---|
@@ -26,10 +27,10 @@ plan's own header.
 | 🔴 | [025](025-bundle-siglip-embedding-model.md) | Bundle SigLIP — diversity is inert until it lands |
 | 🔴 | [027](027-authoritative-candidate-library-and-diverse-edits.md) | P1 correctness; re-derive frontend citations first |
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
-| 🔴 | [shell-followups](shell-followups.md) | Cmd-K, Settings/Diagnostics styling, sidebar menu |
+| 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
 | 🔴 | [030](030-truthful-ai-usage.md) | Selected vs Effective Harness; decouple the Review Agent; surface fallback |
-| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; buttons, Settings `AI assistance`, harness popover, token deltas |
+| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; shell/Import element deltas, buttons, Settings `AI assistance`, harness popover, tokens |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
@@ -38,9 +39,7 @@ plan's own header.
 | 🟡 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | Launch backlog + Search Console verification |
 | 🟡 | [going-public-codex-flow](going-public-codex-flow.md) | Roadmap: trust, installability, launch |
 | 🟡 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage, perf and DaVinci flows |
-| 🟡 | [project-folder-model](project-folder-model.md) | Manual folder-portability QA |
 | 🟡 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | Architecture and security documentation |
-| 🟢 | [project-sidebar](project-sidebar.md) | Nothing — archive candidate |
 
 ## In flight
 
@@ -91,10 +90,11 @@ Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
 | 🔴 | Import, Review and Timeline on real footage and real input hardware |
 | 🔴 | Open Resolve XML, FCPXML and EDL in their real NLEs |
 | 🔴 | Keyboard-only pass — note trim is a known dead end |
+| 🔴 | Move or rename a project folder, reopen it, and export again — inherited from [project-folder-model](done/project-folder-model.md), whose code and automated QA are complete |
 
 ## Closed
 
-38 plans.
+40 plans.
 
 | | Plan | Outcome |
 |---|---|---|
@@ -134,5 +134,7 @@ Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
 | 🟢 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | Done 2026-07-02 · live smoke is human QA |
 | 🟢 | [review-model-sign-in](done/review-model-sign-in.md) | Done 2026-07-19 · follow-ups still active |
 | 🟢 | [seo-plan](done/seo-plan.md) | Closed 2026-09-02 · Search Console → landing plan |
+| 🟢 | [project-folder-model](done/project-folder-model.md) | Closed 2026-09-03 · code + automated QA done; manual check → Release QA |
+| 🟢 | [project-sidebar](done/project-sidebar.md) | Closed 2026-09-03 · superseded by shell-followups; kept as the sidebar's decision record |
 | 🟢 | [settings-page](done/settings-page.md) | Done 2026-07-03 |
 | 🟢 | [ui-polish-modern-shell](done/ui-polish-modern-shell.md) | Superseded 2026-09-02 → shell-followups |

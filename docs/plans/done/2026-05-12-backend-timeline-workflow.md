@@ -11,7 +11,7 @@
 - `PUT /projects/{project_id}/timeline` — full timeline replacement, taking an ordered list of `{clip_id, start_sec, end_sec, included}`; rejects unknown `clip_id`s with 422.
 - `clips_in_timeline_order(project)` helper so export reads edited order/trims instead of raw analyzed clips.
 - Export response enriched with `clip_count` and `total_duration_sec`.
-- Later project-folder work (see `project-folder-model.md`) persists and restores this saved timeline across reopen.
+- Later project-folder work (see `project-folder-model.md`, now in this folder) persists and restores this saved timeline across reopen.
 
 ## Status
 

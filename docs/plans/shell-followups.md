@@ -5,7 +5,7 @@ Status: TODO · Priority P3 · Category UI follow-up · Created 2026-09-02
 Collects the shell work that survived the studio redesign (`6d79c1b`, v0.2.0).
 Replaces `ui-polish-modern-shell.md`, which prescribed a shadcn/Radix migration
 that the redesign overtook with hand-authored CSS, and takes over the deferred
-interaction items from `project-sidebar.md`.
+interaction items from [`done/project-sidebar.md`](done/project-sidebar.md).
 
 Nothing here is a defect. These are additive affordances and one verification
 task, which is why they sit at P3 behind the correctness plans.
@@ -24,10 +24,12 @@ task, which is why they sit at P3 behind the correctness plans.
    thresholds (>=8 green, >=5 yellow) are the intended product boundaries
    rather than inherited placeholders.
 
-3. **Settings and Diagnostics surfaces.** The redesign explicitly excluded
-   these two routes, so they now sit visually apart from the four redesigned
-   workflows. Bring them onto the shared design system, or decide deliberately
-   that a utility route may look different and record that.
+3. ~~**Settings and Diagnostics surfaces.**~~ **MOVED 2026-09-03** to
+   [plan 031](031-app-restyle-conformance.md) Phase 4, which is no longer the
+   open question this item posed. The restyle handoff answers it: Settings
+   becomes a four-panel left rail with a new `AI assistance` panel, and
+   Diagnostics gets a designed failure card. Two plans must not own the same
+   surface, so this one does not.
 
 4. **Sidebar context menu.** Replace the inline Locate and Remove buttons on
    each project row (`Sidebar.tsx:190-215`) with a context-menu interaction, so
@@ -40,7 +42,7 @@ task, which is why they sit at P3 behind the correctness plans.
 
 ## Already shipped, do not re-plan
 
-`project-sidebar.md` listed collapse and resize as deferred. Both shipped in
+[`done/project-sidebar.md`](done/project-sidebar.md) listed collapse and resize as deferred. Both shipped in
 the redesign and are covered by E2E: the collapsible rail lives in
 `AppShell.tsx`, persisted width in `hooks/usePanelWidth.ts`, and
 `project-shell-regressions.spec.ts:268-273` asserts the behaviour. Project row

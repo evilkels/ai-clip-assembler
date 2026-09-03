@@ -1,6 +1,6 @@
 # Plan 031: App restyle conformance — the sections the build has not caught up to
 
-Status: PHASE 1 DONE (2026-09-03) · PHASES 2-6 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance
+Status: PHASE 1 DONE (2026-09-03) · PHASES 2-7 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance
 Written against `04c1bdb`, 2026-09-03. Source of truth is the
 **Clip Assembler Restyle** handoff, checked in at
 [`docs/design/2026-09-03-app-restyle-handoff.md`](../design/2026-09-03-app-restyle-handoff.md),
@@ -282,6 +282,57 @@ difference on screen, so fix them together and re-cut the baselines once.
       10% rose alpha.
 - [ ] **Step 5.4** Light `--border` is `#dcdee2` in the design; the build has
       `#dcdce2` (transposed).
+
+## Phase 7 — Review, Timeline and Export element deltas (audited 2026-09-03)
+
+The three screens Phase 2 left unaudited were diffed element by element against
+`1b`, `3a` and `3b` on 2026-09-03. The full list, with `File.tsx:line` and
+reference-line citations, is
+[`docs/reviews/2026-09-03-review-timeline-export-design-audit.md`](../reviews/2026-09-03-review-timeline-export-design-audit.md).
+Summary of what it found, so this plan stays the single status board:
+
+- **Review (`1b`)** — 5 deltas. The preview player treatment (perforation strip,
+  timecode chip, bottom-left play), Version action button semantics, the grid
+  card anatomy (state badge, three meters, `scores` button), list/filmstrip
+  compositions, and the action-bar copy (`Review complete — N clips kept`,
+  runtime line). Header, chat rail, Suggested cuts, Version states, proposal
+  cards and the score meters were verified conformant.
+- **Timeline (`3a`)** — 9 deltas. Header runtime readout (`8 · 17.3s` over
+  `ITEMS · RUNTIME`), header copy, the portrait preview well, transport (Play
+  as the one solid accent; no audio/zoom buttons drawn), track geometry, the
+  playhead colour (`--red` in `styles.css:3635`, accent in the design),
+  inspector contents (Silent pill, Duplicate, destructive Remove), all-items
+  row selection state, and footer copy/pip gaps.
+- **Export (`3b`)** — 8 deltas. Header copy, unconditional `Reveal in Finder`,
+  format card names and filenames (`DaVinci Resolve` / `Final Cut Pro` /
+  `Plain EDL`, `timeline.xml|fcpxml|edl`), default selection (Resolve, not
+  EDL) and selected-card treatment, receipt shape, hand-off source dots, and
+  two build-only affordances.
+
+**Decisions, not deletions** (the build has a working affordance the design did
+not draw): real video previews with audio, source-track seeking, Timeline
+zoom/audio controls, the standalone Export button, the Export workflow footer,
+and the Timeline/Export empty states. Settle each with the design owner before
+a worker touches it.
+
+**Sequencing.** Review's fallback notice and agent copy depend on
+[plan 030](030-truthful-ai-usage.md) Phases 2–4. Timeline and Export have no
+plan 030 dependency and can be done together with Phases 2, 3 and 6 under the
+same single baseline re-cut.
+
+- [ ] **Step 7.1** Settle the decisions above with the design owner and record
+      the outcome here.
+- [ ] **Step 7.2** Timeline deltas 1–9.
+- [ ] **Step 7.3** Export deltas 1–8.
+- [ ] **Step 7.4** Review deltas 1–5, after plan 030 Phases 2–3 land.
+- [ ] **Step 7.5** Re-cut both baseline sets once, with Phases 2, 3 and 6.
+
+**Not part of this plan.** Reference screens `2a` (`Contact Sheet`, dark),
+`2c` (`Contact Sheet · light`) and `2b` (`Cutting Room`) are new marketing /
+landing-page designs, not app screens and not before-state recreations; the
+handoff README does not list them. They belong to
+[landing-page-polish-and-launch](landing-page-polish-and-launch.md), which now
+carries the pointer.
 
 ## Open questions for the design owner
 

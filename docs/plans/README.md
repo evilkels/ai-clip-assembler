@@ -30,7 +30,7 @@ match what the code actually shows.
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
 | 🔴 | [030](030-truthful-ai-usage.md) | Selected vs Effective Harness; decouple the Review Agent; surface fallback |
-| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; shell/Import element deltas, buttons, Settings `AI assistance`, harness popover, tokens |
+| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; shell/Import element deltas, buttons, Settings `AI assistance`, harness popover, tokens, Review/Timeline/Export deltas (Phase 7, audited 2026-09-03) |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
@@ -46,12 +46,14 @@ match what the code actually shows.
 Work that exists but is not on `main` yet. Listed so it is not lost — a pushed
 branch with no pull request is the easiest thing in this repo to forget.
 
-Everything outstanding is consolidated onto one branch, so there is a single
-thing to review and merge:
+Branches, in merge order:
 
 | | Branch | State | What it carries |
 |---|---|---|---|
-| 🟡 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) | Plan 029 phases 1–3 (poster-first cards, play-once previews), plan 031 Phase 1 (step gating), this status board, the plan 017/025 prerequisites, and plan 027's parked tests |
+| 🟢 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) merged 2026-09-03 (`08d284a`) | Plan 029 phases 1–3, plan 031 Phase 1, this status board, the plan 017/025 prerequisites, plan 027's parked tests |
+| 🟡 | `feat/030-truthful-ai-usage` | in progress (Codex worktree, 2026-09-03) | Plan 030 Phases 1–3: persisted Selected Harness, Effective Harness, decoupled Review Agent, visible Harness Fallback |
+| 🟡 | `feat/031-settings-panels` | in progress (Codex worktree, 2026-09-03) | Plan 031 Phase 4 Steps 3.1, 3.3, 3.4, 3.5: four-panel Settings, account row moved, Diagnostics card, E2E. Step 3.2 waits on 030 |
+| 🟡 | `docs/031-review-timeline-export-audit` | this branch | Plan 031 Phase 7 (Review/Timeline/Export audit) and the `2a`/`2b`/`2c` pointer in the landing plan |
 
 Consolidated into it and closed unmerged: PR #70 (status board) and PR #71
 (plan prerequisites), which were already ancestors of this branch, and PR #73

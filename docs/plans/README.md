@@ -17,9 +17,8 @@ docs.
 
 ## Active
 
-17 plans. Statuses verified against the code on 2026-09-03, not taken from each
-plan's own header — several plan headers were stale and have been rewritten to
-match what the code actually shows.
+16 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
+not taken from each plan's own header.
 
 | | Plan | What's left |
 |---|---|---|
@@ -29,60 +28,31 @@ match what the code actually shows.
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
-| 🔴 | [030](030-truthful-ai-usage.md) | Selected vs Effective Harness; decouple the Review Agent; surface fallback |
-| 🟡 | [031](031-app-restyle-conformance.md) | Phase 1 (step gating) shipped; shell/Import element deltas, buttons, Settings `AI assistance`, harness popover, tokens, Review/Timeline/Export deltas (Phase 7, audited 2026-09-03) |
-| 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); Phase 5 moves poster creation into analysis |
+| 🟡 | [030](030-truthful-ai-usage.md) | Phases 1–3 (PR #76) and Step 4.1 (PR #78) shipped; only the Phase 4 full-gate run remains. The Phase 1–3 checkboxes in the file are stale, not unshipped |
+| 🟡 | [031](031-app-restyle-conformance.md) | Step gating, Phase 7 audit and all of Settings Phase 3 shipped (PRs #72, #74, #75, #78); shell/Import, buttons, popover/consent, tokens and workflow-screen deltas remain |
+| 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); real-footage measurement and Phase 5 analysis-written posters remain |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
-| 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the two smoothness controls (posters moved to 029) |
-| 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Preview, chat streaming and E2E await visual QA |
-| 🟡 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | Signing, notarization, clean-machine validation |
+| 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the generation and view-only smoothness controls; posters remain in 029 |
+| 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Full pan/crop preview, chat token streaming and propose→accept E2E await visual QA |
+| 🟡 | [self-contained-runtime-tools](self-contained-runtime-tools.md) | Compliance, fixtures, Intel evidence, diagnostics, signing/notarization and clean-machine validation |
 | 🟡 | [landing-page-polish-and-launch](landing-page-polish-and-launch.md) | Launch backlog + Search Console verification |
 | 🟡 | [going-public-codex-flow](going-public-codex-flow.md) | Roadmap: trust, installability, launch |
 | 🟡 | [drone-workflow-qa-flows](drone-workflow-qa-flows.md) | Real-footage, perf and DaVinci flows |
-| 🟡 | [review-model-sign-in-followups](review-model-sign-in-followups.md) | Architecture and security documentation |
 
 ## In flight
 
-Work that exists but is not on `main` yet. Listed so it is not lost — a pushed
-branch with no pull request is the easiest thing in this repo to forget.
+Nothing. Every branch this table used to list is merged and deleted from the
+remote, including `feat/031-scoring-engine-cards`
+([PR #78](https://github.com/evilkels/ai-clip-assembler/pull/78), the scoring-engine
+cards and plan 030 Step 4.1), which was an uncommitted worktree until 2026-09-10.
+Add a row the moment work leaves `main` again — a branch with no pull request is
+the easiest thing in this repo to forget.
 
-Branches, in merge order:
+Plan 027's parked `backend/tests/test_version_diversity.py` is on `main` behind
+`pytest.importorskip`; `backend/src/version_diversity.py` is still absent, so
+the plan remains unstarted.
 
-| | Branch | State | What it carries |
-|---|---|---|---|
-| 🟢 | `feat/029-clip-posters` | [PR #72](https://github.com/evilkels/ai-clip-assembler/pull/72) merged 2026-09-03 (`08d284a`) | Plan 029 phases 1–3, plan 031 Phase 1, this status board, the plan 017/025 prerequisites, plan 027's parked tests |
-| 🟡 | `feat/030-truthful-ai-usage` | in progress (Codex worktree, 2026-09-03) | Plan 030 Phases 1–3: persisted Selected Harness, Effective Harness, decoupled Review Agent, visible Harness Fallback |
-| 🟡 | `feat/031-settings-panels` | in progress (Codex worktree, 2026-09-03) | Plan 031 Phase 4 Steps 3.1, 3.3, 3.4, 3.5: four-panel Settings, account row moved, Diagnostics card, E2E. Step 3.2 waits on 030 |
-| 🟡 | `docs/031-review-timeline-export-audit` | this branch | Plan 031 Phase 7 (Review/Timeline/Export audit) and the `2a`/`2b`/`2c` pointer in the landing plan |
-
-Consolidated into it and closed unmerged: PR #70 (status board) and PR #71
-(plan prerequisites), which were already ancestors of this branch, and PR #73
-(`feat/027-version-diversity-test`), merged in explicitly.
-
-### Fixed on the branch 2026-09-03
-
-Plan 029's poster-first cards turned 23 Playwright tests red and PR #72's CI
-with them. Three specs waited on a `<video>` in Review that a resting card no
-longer mounts; they now assert the poster and activate the card first. Behind
-them was a real defect, not just stale tests: `ClipCard`'s audio effect keyed on
-`[cardMuted, volume]`, so it never re-ran on the render that brings the element
-into existence and an unmuted preview played at full volume whatever the slider
-said. Fixed in `04c1bdb`.
-
-### Parked tests — plan 027 Task 1
-
-`backend/tests/test_version_diversity.py` was written test-first in an
-abandoned 027 worktree and never committed; the module it imports
-(`src.version_diversity`) was never written on any branch, so the file was one
-`git clean` from being lost. It now lives on `feat/027-version-diversity-test`
-behind a module-level `pytest.importorskip`, so the assertions **skip while the
-module is missing and start running the moment it lands** — there is no guard
-to remember to remove. Plan 027 Task 1 points at the existing file rather than
-asking for a new one.
-
-Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
-
-## Release QA — v0.2.0
+## Release QA — v0.3.0
 
 🔴 Not started. Human-only; no automated test covers any of it.
 
@@ -96,7 +66,7 @@ Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
 
 ## Closed
 
-40 plans.
+41 plans.
 
 | | Plan | Outcome |
 |---|---|---|
@@ -134,7 +104,8 @@ Plan 027 itself remains at 0 of 27 tasks; nothing is implemented.
 | 🟢 | [literal-design-conformance](done/2026-09-01-literal-design-conformance.md) | Done 2026-09-02 |
 | 🟢 | [agent-operable-timeline-handoff](done/agent-operable-timeline-handoff.md) | Executed 2026-06-19 |
 | 🟢 | [connect-your-ai-mcp](done/connect-your-ai-mcp.md) | Done 2026-07-02 · live smoke is human QA |
-| 🟢 | [review-model-sign-in](done/review-model-sign-in.md) | Done 2026-07-19 · follow-ups still active |
+| 🟢 | [review-model-sign-in](done/review-model-sign-in.md) | Done 2026-07-19 |
+| 🟢 | [review-model-sign-in-followups](done/review-model-sign-in-followups.md) | Done 2026-09-10 · plan/spec record reconciled |
 | 🟢 | [seo-plan](done/seo-plan.md) | Closed 2026-09-02 · Search Console → landing plan |
 | 🟢 | [project-folder-model](done/project-folder-model.md) | Closed 2026-09-03 · code + automated QA done; manual check → Release QA |
 | 🟢 | [project-sidebar](done/project-sidebar.md) | Closed 2026-09-03 · superseded by shell-followups; kept as the sidebar's decision record |

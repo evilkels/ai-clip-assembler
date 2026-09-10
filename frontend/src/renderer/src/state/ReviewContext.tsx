@@ -59,6 +59,7 @@ interface ReviewState {
   projectFolder: string | null;
   cloudAiConsent: boolean;
   selectedHarness: string;
+  effectiveHarness: string | null;
   setSelectedHarness: (harness: string) => void;
   recentProjects: RecentProject[];
   uploadedVideos: UploadedVideo[];
@@ -133,6 +134,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [projectFolder, setProjectFolder] = useState<string | null>(null);
   const [cloudAiConsent, setCloudAiConsentState] = useState(false);
   const [selectedHarness, setSelectedHarnessState] = useState('manual');
+  const [effectiveHarness, setEffectiveHarnessState] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [uploadedVideos, setUploadedVideos] = useState<UploadedVideo[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({ phase: 'idle' });
@@ -294,6 +296,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setRecommendation(null);
     setGenerationStats(null);
     setHarnessMetadata(null);
+    setEffectiveHarnessState(null);
     setProfile('cinematic_highlight');
     setTargetDuration(120);
     setDraftFormat(null);
@@ -338,9 +341,10 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setProjectName(result.project.name);
         setProjectFolder(result.project_folder);
         setCloudAiConsentState(result.project.cloud_ai_consent);
-        setSelectedHarnessState(result.project.harness || 'manual');
         setUploadedVideos(result.videos);
         resetProjectSession();
+        setSelectedHarnessState(result.selected_harness ?? result.project.harness ?? 'manual');
+        setEffectiveHarnessState(result.effective_harness ?? null);
         setGenerationStats(result.generation_stats ?? null);
         setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
       } finally {
@@ -381,9 +385,10 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setProjectName(result.project.name);
       setProjectFolder(result.project_folder);
       setCloudAiConsentState(result.project.cloud_ai_consent);
-      setSelectedHarnessState(result.project.harness || 'manual');
       setUploadedVideos(result.videos);
       resetProjectSession();
+      setSelectedHarnessState(result.selected_harness ?? result.project.harness ?? 'manual');
+      setEffectiveHarnessState(result.effective_harness ?? null);
       setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
     } finally {
       setLoading(false);
@@ -411,6 +416,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setGenerationStats(result.generation_stats ?? null);
       setHarnessMetadata(result.metadata ?? null);
       if (result.selected_harness) setSelectedHarnessState(result.selected_harness);
+      setEffectiveHarnessState(result.effective_harness ?? null);
       setProfile(result.recommendation.profile);
       setTargetDuration(result.recommendation.target_duration_sec);
       setDraftFormat(result.recommendation.format ?? null);
@@ -611,6 +617,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       projectFolder,
       cloudAiConsent,
       selectedHarness,
+      effectiveHarness,
       setSelectedHarness: selectHarness,
       recentProjects,
       uploadedVideos,
@@ -666,6 +673,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       projectFolder,
       cloudAiConsent,
       selectedHarness,
+      effectiveHarness,
       recentProjects,
       uploadedVideos,
       analysisStatus,

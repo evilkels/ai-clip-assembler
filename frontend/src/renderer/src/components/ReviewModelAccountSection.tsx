@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   cancelReviewModelSignIn,
   getDiagnostics,
@@ -93,15 +93,25 @@ function useReviewModelAccount() {
   return { account, actionPending, diagnosticState, handleAccountAction };
 }
 
-export function ReviewModelAccountSection() {
+// A div rather than a section, because when embedded this sits inside the Pi
+// Agent scoring card and a nested section would break the heading outline.
+function AccountGroup({ embedded, children }: { embedded: boolean; children: ReactNode }) {
+  return (
+    <div className={embedded ? 'settings-group review-model-account-section-embedded' : 'settings-group'}>
+      <h3 className="settings-group-title">Review model account</h3>
+      {children}
+    </div>
+  );
+}
+
+export function ReviewModelAccountSection({ embedded = false }: { embedded?: boolean }) {
   const { account, actionPending, diagnosticState, handleAccountAction } = useReviewModelAccount();
 
   if (!account) {
     return (
-      <section className="settings-group">
-        <h3 className="settings-group-title">Review model account</h3>
+      <AccountGroup embedded={embedded}>
         <p className="settings-muted" role="status" aria-live="polite">Checking account…</p>
-      </section>
+      </AccountGroup>
     );
   }
 
@@ -110,8 +120,7 @@ export function ReviewModelAccountSection() {
   const actionDisabled = actionPending || (!waiting && account.pi.state !== 'ready');
 
   return (
-    <section className="settings-group">
-      <h3 className="settings-group-title">Review model account</h3>
+    <AccountGroup embedded={embedded}>
       <div className={`review-model-account state-${account.state}`}>
         <div className="review-model-account-main">
           <div>
@@ -141,6 +150,6 @@ export function ReviewModelAccountSection() {
           </p>
         )}
       </div>
-    </section>
+    </AccountGroup>
   );
 }

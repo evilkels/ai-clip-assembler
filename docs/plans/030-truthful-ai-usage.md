@@ -103,9 +103,10 @@ paths.
 
 ## Phase 4 — Show the Selected Harness
 
-- [ ] **Step 4.1** Render the Selected Harness where the Editor can see it
+- [x] **Step 4.1** Render the Selected Harness where the Editor can see it
       outside Import, so "what is this project set to?" is answerable without
       navigating back. Show Effective alongside it when they differ.
+      Settings › AI assistance now renders the persisted selection and effective fallback receipt.
 - [ ] **Step 4.2** Full gates: backend, ruff, lint, typecheck, `test:main`,
       Playwright.
 

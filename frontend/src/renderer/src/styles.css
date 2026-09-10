@@ -4899,6 +4899,113 @@ a {
 .settings-deferred strong { color: var(--text); font-size: 14px; }
 .settings-deferred p { margin: 0; font-size: 12.5px; line-height: 1.55; }
 
+.settings-harness-options { display: grid; gap: 10px; }
+
+.settings-harness-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.settings-harness-card > label {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 14px;
+  cursor: pointer;
+}
+
+.settings-harness-card.disabled,
+.settings-harness-card.disabled > label { opacity: 0.5; cursor: not-allowed; }
+
+.settings-harness-card.selected {
+  background-image: linear-gradient(120deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.settings-harness-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.settings-harness-card:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.settings-harness-radio {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.settings-harness-card.selected .settings-harness-radio { border-color: var(--accent); }
+.settings-harness-card.selected .settings-harness-radio::after {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  content: '';
+}
+.settings-harness-card.disabled .settings-harness-radio { border-style: dashed; }
+
+.settings-harness-card-content { display: grid; gap: 7px; min-width: 0; }
+
+.settings-harness-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.settings-harness-card-title strong { font-size: 14.5px; font-weight: 600; }
+
+.settings-harness-badge {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.settings-harness-card.selected .settings-harness-badge { border-color: var(--accent); color: var(--accent); }
+
+.settings-harness-consent {
+  margin-left: auto;
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.settings-harness-description { color: var(--text-dim); font-size: 12.5px; line-height: 1.55; }
+
+.settings-harness-facts,
+.settings-effective-harness {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.settings-harness-facts { display: flex; gap: 16px; }
+.settings-effective-harness { margin: 0; }
+.review-model-account-section-embedded { margin-left: 34px; gap: 8px; }
+.review-model-account-section-embedded .settings-group-title { letter-spacing: 0.1em; }
+
 .settings-consent-group,
 .pi-routing-settings {
   padding-top: 20px;

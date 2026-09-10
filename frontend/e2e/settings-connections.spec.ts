@@ -92,6 +92,95 @@ async function openAiAssistance(page: Page) {
   await expect(page.getByRole('heading', { name: 'Review model account' })).toBeVisible();
 }
 
+async function installScoringProject(page: Page, effectiveHarness: string | null = null) {
+  await installDesktopBridge(page, {
+    initial: status('connected', 'Connected to ChatGPT.'),
+  });
+  await page.addInitScript(({ folderPath }) => {
+    Object.assign(window.clipAssembler, {
+      getLastOpenedRecentProject: async () => ({
+        folderPath,
+        lastOpenedAt: '2026-09-03T10:00:00Z',
+        name: 'Scoring Project',
+      }),
+      addRecentProject: async () => [],
+    });
+  }, { folderPath: '/projects/scoring' });
+
+  await page.route('http://127.0.0.1:8000/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname === '/projects/from-folder') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          project_id: 'scoring-project',
+          project_folder: '/projects/scoring',
+          project: {
+            schema_version: 1,
+            name: 'Scoring Project',
+            created_at: '2026-09-03T10:00:00Z',
+            harness: 'pi_agent',
+            cloud_ai_consent: true,
+            source_videos: [{ filename: 'drone.mp4', imported_at: '2026-09-03T10:00:00Z' }],
+            settings_overrides: {},
+          },
+          videos: [
+            {
+              file_id: 'source-1',
+              file_name: 'drone.mp4',
+              status: 'ready',
+              metadata: {
+                file_id: 'source-1',
+                file_name: 'drone.mp4',
+                duration_sec: 24,
+                fps: 30,
+                resolution: [1920, 1080],
+                codec: 'h264',
+              },
+            },
+          ],
+          selected_harness: 'pi_agent',
+          effective_harness: effectiveHarness,
+          generation_stats: null,
+        }),
+      });
+      return;
+    }
+    if (url.pathname === '/harnesses') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ harnesses: [] }),
+      });
+      return;
+    }
+    if (url.pathname.endsWith('/clips')) {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ clips: [] }) });
+      return;
+    }
+    if (url.pathname.endsWith('/timeline/document')) {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          document: { version: 1, revision: 0, items: [], profile: null, target_duration_sec: null, decisions: {} },
+          sequence_fingerprint: '',
+          review_context_fingerprint: '',
+        }),
+      });
+      return;
+    }
+    if (url.pathname.endsWith('/selected-harness') && request.method() === 'PUT') {
+      const body = request.postDataJSON() as { harness_id: string };
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ project_id: 'scoring-project', selected_harness: body.harness_id }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 204, body: '' });
+  });
+}
+
 function reviewModelAccount(page: Page) {
   return page.getByRole('heading', { name: 'Review model account' }).locator('..');
 }
@@ -236,6 +325,41 @@ test('shows a sanitized failed state', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('OpenAI sign-in failed. Try again.');
   await expect(reviewModelAccount(page).getByRole('button', { name: 'Reconnect', exact: true })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/access[_ -]?token|refresh[_ -]?token|auth\.openai\.com/i);
+});
+
+test('renders persisted scoring cards and updates the Import harness control', async ({ page }) => {
+  await installScoringProject(page);
+  await page.goto('/#/import');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'AI assistance', exact: true }).click();
+
+  const scoringEngine = page.getByRole('radiogroup', { name: 'Scoring engine' });
+  await expect(scoringEngine.getByRole('radio', { name: 'Pi Agent · cloud' })).toBeChecked();
+  await expect(scoringEngine.getByRole('radio', { name: 'Rule-based · local' })).toBeVisible();
+  await expect(scoringEngine.getByRole('radio', { name: 'Local model · Qwen 3-VL' })).toBeDisabled();
+  await expect(page.getByTestId('effective-harness')).toHaveCount(0);
+
+  const update = page.waitForRequest((request) =>
+    request.method() === 'PUT' && request.url().endsWith('/projects/scoring-project/selected-harness'));
+  // The radio itself is visually hidden behind the custom control, so click the
+  // card's label the way a person does rather than forcing the input.
+  await scoringEngine.locator('label').filter({ hasText: 'Rule-based · local' }).click();
+  expect((await (await update).postDataJSON()).harness_id).toBe('manual');
+  await expect(scoringEngine.getByRole('radio', { name: 'Rule-based · local' })).toBeChecked();
+
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expect(page.getByLabel('Harness')).toHaveValue('manual');
+});
+
+test('shows the effective scoring result only when it differs from selection', async ({ page }) => {
+  await installScoringProject(page, 'manual');
+  await page.goto('/#/import');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'AI assistance', exact: true }).click();
+
+  await expect(page.getByTestId('effective-harness')).toHaveText(
+    'Current clips scored by Rule-based · local (Pi Agent fell back)',
+  );
 });
 
 test('keeps MCP connection controls out of the model account panel', async ({ page }) => {

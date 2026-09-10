@@ -1,7 +1,23 @@
 # Review Model Sign-In — Review Follow-ups
 
-Status: IN PROGRESS. PR #56 review follow-up; Tasks 0, 1, and 4 are DONE.
-Tasks 2–3 remain plan/spec-record reconciliation, not known product defects.
+Status: **DONE (2026-09-10).** The remaining plan/spec reconciliation matches
+the shipped implementation.
+
+The four decisions Tasks 2 and 3 asked to be recorded, recorded here:
+
+- The delivered E2E is `frontend/e2e/settings-connections.spec.ts`, which covers
+  cancellation and stale completion. It replaces the example the original plan
+  named; the behaviour is covered, so renaming code would add nothing.
+- `frontend/src/main/piExecutable.ts` and its test are the dedicated Pi
+  resolver. It feeds both backend startup and account inspection on purpose —
+  one resolver, so the two paths cannot disagree about which Pi they found.
+- `withLoopbackCallbackHost` in `reviewModelAuth.ts` owns the forced-loopback
+  OAuth callback. It serializes a temporary `process.env` mutation around Pi
+  login because Pi takes the host from the environment and offers no per-call
+  argument; a non-global Pi API would replace it.
+- Marker plus `stat`/`X_OK` validation of the resolved Pi binary is deliberate
+  defense against a noisy or hostile login shell, whose stdout would otherwise
+  be trusted as a path.
 
 ## Origin
 

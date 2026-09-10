@@ -28,8 +28,8 @@ not taken from each plan's own header.
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
-| 🟡 | [030](030-truthful-ai-usage.md) | Phases 1–3 shipped (PR #76); project-visible Selected/Effective Harness and full gate remain |
-| 🟡 | [031](031-app-restyle-conformance.md) | Step gating, Phase 7 audit and Settings 3.1/3.3–3.5 shipped (PRs #72, #74, #75); shell/Import, buttons, scoring cards, popover/consent, tokens and workflow-screen deltas remain |
+| 🟡 | [030](030-truthful-ai-usage.md) | Phases 1–3 (PR #76) and Step 4.1 (PR #78) shipped; only the Phase 4 full-gate run remains. The Phase 1–3 checkboxes in the file are stale, not unshipped |
+| 🟡 | [031](031-app-restyle-conformance.md) | Step gating, Phase 7 audit and all of Settings Phase 3 shipped (PRs #72, #74, #75, #78); shell/Import, buttons, popover/consent, tokens and workflow-screen deltas remain |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); real-footage measurement and Phase 5 analysis-written posters remain |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the generation and view-only smoothness controls; posters remain in 029 |
@@ -41,12 +41,12 @@ not taken from each plan's own header.
 
 ## In flight
 
-All previously listed branches are merged and deleted from the remote. One
-branch is open:
-
-| | Branch | State | What it carries |
-|---|---|---|---|
-| 🟡 | `feat/031-scoring-engine-cards` | [PR #78](https://github.com/evilkels/ai-clip-assembler/pull/78) open | Plan 031 Step 3.2 (`AI assistance` scoring-engine radio cards) and plan 030 Step 4.1 |
+Nothing. Every branch this table used to list is merged and deleted from the
+remote, including `feat/031-scoring-engine-cards`
+([PR #78](https://github.com/evilkels/ai-clip-assembler/pull/78), the scoring-engine
+cards and plan 030 Step 4.1), which was an uncommitted worktree until 2026-09-10.
+Add a row the moment work leaves `main` again — a branch with no pull request is
+the easiest thing in this repo to forget.
 
 Plan 027's parked `backend/tests/test_version_diversity.py` is on `main` behind
 `pytest.importorskip`; `backend/src/version_diversity.py` is still absent, so

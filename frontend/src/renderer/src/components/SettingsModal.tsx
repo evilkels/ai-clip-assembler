@@ -79,7 +79,7 @@ export function SettingsModal({ initialPanel = 'ai', initialTab, onClose }: Sett
         <aside className="settings-rail">
           <div className="settings-rail-heading">
             <strong>Settings</strong>
-            <span>local first · v0.3.0</span>
+            <span>local first · v0.3.1</span>
           </div>
           <div className="settings-rail-items" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
             {panels.map((panel) => (

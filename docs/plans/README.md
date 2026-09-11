@@ -17,12 +17,14 @@ docs.
 
 ## Active
 
-17 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
+18 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
 not taken from each plan's own header. [032](032-valid-fcpxml-and-nle-verification.md)
-was added 2026-09-11 from the first outside bug report.
+was added 2026-09-11 from the first outside bug report, and
+[033](033-in-app-updates-and-a-trusted-build.md) the same day.
 
 | | Plan | What's left |
 |---|---|---|
+| 🔴 | [033](033-in-app-updates-and-a-trusted-build.md) | Sign and notarize so macOS stops asking, then let the app download and install its own updates. Blocked on [self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4; costs 99 USD/year |
 | 🔴 | [032](032-valid-fcpxml-and-nle-verification.md) | FCPXML is invalid in Final Cut ([#80](https://github.com/evilkels/ai-clip-assembler/issues/80)); 23.976 exports as 24 fps; verify exports in the real NLEs |
 | 🔴 | [019](019-clip-library-generation-and-expansion.md) | One generation seam, then source expansion |
 | 🔴 | [025](025-bundle-siglip-embedding-model.md) | Bundle SigLIP — diversity is inert until it lands |

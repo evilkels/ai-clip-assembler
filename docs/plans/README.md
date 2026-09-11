@@ -52,7 +52,7 @@ Plan 027's parked `backend/tests/test_version_diversity.py` is on `main` behind
 `pytest.importorskip`; `backend/src/version_diversity.py` is still absent, so
 the plan remains unstarted.
 
-## Release QA — v0.3.0
+## Release QA — v0.3.1
 
 🔴 Not started. Human-only; no automated test covers any of it.
 

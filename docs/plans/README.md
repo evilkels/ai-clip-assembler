@@ -17,11 +17,13 @@ docs.
 
 ## Active
 
-16 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
-not taken from each plan's own header.
+17 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
+not taken from each plan's own header. [032](032-valid-fcpxml-and-nle-verification.md)
+was added 2026-09-11 from the first outside bug report.
 
 | | Plan | What's left |
 |---|---|---|
+| 🔴 | [032](032-valid-fcpxml-and-nle-verification.md) | FCPXML is invalid in Final Cut ([#80](https://github.com/evilkels/ai-clip-assembler/issues/80)); 23.976 exports as 24 fps; verify exports in the real NLEs |
 | 🔴 | [019](019-clip-library-generation-and-expansion.md) | One generation seam, then source expansion |
 | 🔴 | [025](025-bundle-siglip-embedding-model.md) | Bundle SigLIP — diversity is inert until it lands |
 | 🔴 | [027](027-authoritative-candidate-library-and-diverse-edits.md) | P1 correctness; re-derive frontend citations first |
@@ -60,7 +62,7 @@ the plan remains unstarted.
 |---|---|
 | 🔴 | Packaged DMG on a clean Mac, past Gatekeeper, backend starts unaided |
 | 🔴 | Import, Review and Timeline on real footage and real input hardware |
-| 🔴 | Open Resolve XML, FCPXML and EDL in their real NLEs |
+| 🔴 | Open Resolve XML, FCPXML and EDL in their real NLEs — scheduled and scoped by [032](032-valid-fcpxml-and-nle-verification.md) Phase 5. FCPXML is known invalid until that plan lands |
 | 🔴 | Keyboard-only pass — note trim is a known dead end |
 | 🔴 | Move or rename a project folder, reopen it, and export again — inherited from [project-folder-model](done/project-folder-model.md), whose code and automated QA are complete |
 

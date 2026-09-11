@@ -28,10 +28,21 @@ Applications. The owner pays that toll on their own machine every time.
 
 **The Gatekeeper prompt and the missing auto-update are the same problem.** The
 DMG is unsigned and un-notarized, which is why macOS asks for approval — and it
-is also why electron-updater cannot work, because on macOS it verifies the code
-signature of the downloaded update before swapping it in. Fixing the signature
-fixes the prompt and unblocks the installer together.
-`docs/UPDATING.md` already says this is the intended successor to the notice.
+is also why no updater can install anything. Electron states it twice, without
+hedging:
+
+> `autoUpdater` — `Squirrel.Mac` requires the app to be signed for automatic
+> updates to work at all.
+> — [Code Signing](https://www.electronjs.org/docs/latest/tutorial/code-signing)
+
+> Your application must be signed for automatic updates on macOS. This is a
+> requirement of `Squirrel.Mac`.
+> — [autoUpdater API](https://www.electronjs.org/docs/latest/api/auto-updater)
+
+electron-updater installs through Squirrel.Mac, so the requirement is the same
+whichever updater this project ends up using. Fixing the signature fixes the
+prompt and unblocks the installer together. `docs/UPDATING.md` already says this
+is the intended successor to the notice.
 
 ### What the build produces today
 
@@ -101,18 +112,31 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
 
 ## Phase 2 — Publish an update feed, not just installers
 
-- [ ] **Step 2.1** Add `zip` to the mac targets. electron-updater installs from
-      the zip on macOS; the DMG stays for first-time human downloads.
+- [ ] **Step 2.1** Add `zip` back to the mac targets. electron-builder's default
+      is `dmg` + `zip` precisely because Squirrel.Mac needs the zip and
+      `latest-mac.yml` cannot be generated without it — and
+      `frontend/package.json` explicitly narrows `build.mac.target` to `"dmg"`,
+      which overrides that default. **The current config would break auto-update
+      even after signing**, and the failure surfaces as a missing feed rather
+      than as a target problem. The DMG stays for first-time human downloads.
 - [ ] **Step 2.2** Publish `latest-mac.yml` and the zips to the same release as
-      the DMGs. Verify the two architectures do not overwrite each other's feed —
-      the workflow runs them as independent matrix jobs that each publish.
+      the DMGs. Two concrete blockers in `build-dmg.yml` today: it packages with
+      `--publish never`, and its release step uploads `frontend/dist/*.dmg`, a
+      glob that excludes both the zip and the feed. Verify the two architectures
+      do not overwrite each other's feed — they run as independent matrix jobs
+      that each publish.
 - [ ] **Step 2.3** Fetch the feed from a machine and confirm it names the version,
       the files and their hashes.
 
 ## Phase 3 — Download and install from inside the app
 
 - [ ] **Step 3.1** Adopt electron-updater in the main process for download and
-      install. Keep one checker, not two: `updateCheck.ts` already owns the check,
+      install. Note for whoever picks this up: Electron's own docs route people
+      to Electron Forge and its `@electron/osx-sign` / `@electron/notarize`
+      packages, while this project packages with electron-builder, which carries
+      its own signing and notarization support. Staying on electron-builder is
+      the assumption here — record it as a decision rather than rediscovering the
+      question mid-implementation. Keep one checker, not two: `updateCheck.ts` already owns the check,
       the six-hour cache and per-version dismissal, so route the updater through
       it rather than letting both poll.
 - [ ] **Step 3.2** Surface progress as state the renderer can render — downloading
@@ -173,3 +197,10 @@ each pass in this table; an unrecorded pass did not happen.
 - [ ] A failed or interrupted update leaves a working app and a stated reason.
 - [ ] `docs/UPDATING.md` and the Settings copy describe what the app does, not
       what it used to do.
+
+## Sources
+
+- [Electron — Code Signing](https://www.electronjs.org/docs/latest/tutorial/code-signing) — signing is required for automatic updates at all, and the two-step sign-then-notarize shape.
+- [Electron — autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater) — the same requirement stated against the API, and a pointer to Squirrel.Mac's server support for feed shape.
+- [electron-builder — Auto Update](https://www.electron.build/docs/features/auto-update/) and [macOS targets](https://www.electron.build/docs/mac/) — the mac default is `dmg` + `zip`; disabling `zip` breaks auto-update in the DMG build because `latest-mac.yml` cannot be generated.
+- [Apple Developer Program enrollment](https://developer.apple.com/programs/enroll/) — 99 USD per membership year, local currency at enrollment, waivers for nonprofit/education/government only. Checked 2026-09-11.

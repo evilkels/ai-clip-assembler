@@ -78,32 +78,18 @@ HTTP API never receive OAuth credentials. Terminal `pi /login` and supported
 provider environment variables remain advanced alternatives. Authentication
 does not replace the backend's required per-project cloud AI consent check.
 
-### 1. Local Model Harness (Postponed)
-
-> **Status:** Postponed and disabled in `GET /harnesses`. The local-model path
-> (Ollama/MLX) is not fully figured out yet. The code in
-> `backend/src/local_qwen_harness.py` is retained for future re-enablement but is
-> not a selectable harness in `/analyze`.
-
-**ID:** `local_qwen`. Sends batches of frames plus OpenCV metrics to a local
-Qwen3-VL model via Ollama/MLX, prompting it to score smoothness and visual
-interest and flag camera shake, then aggregates scores across frames.
-Configuration is via environment variables only: `OLLAMA_URL` (default
-`http://localhost:11434`), `OLLAMA_MODEL` (default `qwen3-vl:8b`), and
-`OLLAMA_TEMPERATURE` (default `0.2`, fixed for deterministic scoring).
-
-### 2. Claude Code Harness
+### 1. Claude Code Harness
 
 **ID:** `claude_code`. Spawns a Claude Code subprocess with an analysis script
 that reads frames and calls the Claude API for scoring, returning structured
 JSON. Config: `api_key`, `model`, `max_frames`.
 
-### 3. Codex Harness
+### 2. Codex Harness
 
 **ID:** `codex`. Spawns the Codex CLI, which generates analysis via the OpenAI
 API and returns structured JSON. Config: `api_key`, `model`, `max_frames`.
 
-### 4. Manual / Rule-Based Harness
+### 3. Manual / Rule-Based Harness
 
 **ID:** `manual`
 **Status:** Default local harness.
@@ -125,10 +111,6 @@ Config: `min_smoothness`, `min_brightness`, `max_blur`, `scene_min_duration`.
 
 Harnesses are registered in the `GET /harnesses` API endpoint (see `backend/src/api.py`).
 The endpoint returns the list of available harnesses with their enabled/disabled status.
-
-The local Qwen harness reads configuration from environment variables only:
-`OLLAMA_URL`, `OLLAMA_MODEL`, and `OLLAMA_TEMPERATURE`. See the Local Model Harness
-section above for details.
 
 ## Error Handling
 

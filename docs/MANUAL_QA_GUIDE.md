@@ -49,7 +49,7 @@ fallback. The backend reads `PI_PROVIDER`, `PI_MODEL`, `PI_BIN`, and
 
 Analyze with authenticated Pi: candidates gain visual interest and a Clip
 Reason. Set `PI_BIN=/bin/false`, reanalyze, and confirm per-video Manual fallback
-with warning. Local Qwen remains disabled. For OAuth QA, use disposable data and
+with warning. For OAuth QA, use disposable data and
 never record real auth files, URLs, codes, or tokens:
 
 1. Sign in from a fresh state; restart and confirm Connected. Verify Pi's auth

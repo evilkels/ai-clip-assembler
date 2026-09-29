@@ -106,7 +106,7 @@ speed/transform caveat remains visible in the handoff summary and receipt.
 ## Choosing an AI harness
 
 `manual` is local/default. `pi_agent` requires a configured provider and
-per-project cloud consent. Local Qwen/Ollama is postponed. See
+per-project cloud consent. See
 [HARNESS_SPEC.md](HARNESS_SPEC.md).
 
 ## Review model account (optional)

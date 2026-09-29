@@ -126,7 +126,6 @@ backend/src/
   quality_scoring.py     blur/exposure/contrast scoring
   clip_assembly.py       rule-based candidate clip assembly
   pi_cli_harness.py      DEFAULT AI harness — drives the `pi` CLI
-  local_qwen_harness.py  POSTPONED local Ollama/Qwen harness (kept, disabled)
   export_engine.py       FCPXML / EDL / DaVinci (FCP7 XMEML) generation
   project_store.py       folder projects: manifest + persisted analysis results
 

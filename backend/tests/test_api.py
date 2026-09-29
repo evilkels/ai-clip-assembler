@@ -1732,19 +1732,26 @@ def test_reopen_folder_project_restores_selected_and_effective_harness(monkeypat
     assert reopened_project["harness_id"] == "manual"
 
 
-def test_analyze_rejects_postponed_local_qwen_harness(monkeypatch, tmp_path):
+def test_reopen_folder_project_saved_with_removed_local_qwen_harness_resolves_to_manual(tmp_path):
     api.projects.clear()
-    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
     client = TestClient(api.app)
-    project_id = client.post("/projects").json()["project_id"]
+    client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
+    manifest_path = project_folder / "clipassembler" / "project.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["harness"] = "local_qwen"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    response = client.post(
-        f"/projects/{project_id}/analyze",
-        json={"project_id": project_id, "harness_id": "local_qwen", "preferences": {}},
-    )
+    api.projects.clear()
+    response = client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
 
-    assert response.status_code == 400
-    assert "manual and pi_agent" in response.json()["detail"]
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected_harness"] == "manual"
+    assert body["project"]["harness"] == "manual"
+    assert api.projects[body["project_id"]]["selected_harness"] == "manual"
 
 
 def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
@@ -2139,15 +2146,13 @@ def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path)
     assert "00:00:01:00 00:00:02:00 00:00:00:00 00:00:01:00" in Path(response.json()["file_path"]).read_text()
 
 
-def test_list_harnesses_shows_pi_agent_enabled_and_local_qwen_postponed():
+def test_list_harnesses_shows_pi_agent_enabled():
     client = TestClient(api.app)
     response = client.get("/harnesses")
     assert response.status_code == 200
     harnesses = {h["id"]: h for h in response.json()["harnesses"]}
     assert harnesses["manual"]["enabled"] is True
     assert harnesses["pi_agent"]["enabled"] is True
-    # Local Qwen is postponed until the local-model path is fully figured out.
-    assert harnesses["local_qwen"]["enabled"] is False
 
 
 def _project_with_one_video(monkeypatch, tmp_path):

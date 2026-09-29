@@ -28,7 +28,7 @@ Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for decisions. See 
 
 - Frontend: Electron + React + Vite + Tailwind
 - Backend: FastAPI + FFmpeg + OpenCV + PySceneDetect
-- AI: Modular harness system (Claude, Codex, Pi, Local Qwen, Manual)
+- AI: Modular harness system (Claude, Codex, Pi, Manual)
 - Data: JSON files + FFmpeg metadata (no database)
 
 ## Development Workflow

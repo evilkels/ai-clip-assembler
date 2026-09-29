@@ -51,7 +51,6 @@
 | **Selected Harness** | The **Harness** the **Editor** chose for a project. Belongs to the project and survives navigation. | Harness setting, analysis mode |
 | **Effective Harness** | The **Harness** that actually produced the current **Candidate Clip** library. Differs from the **Selected Harness** after a fallback or a re-derive. | Harness used, actual harness |
 | **Harness Fallback** | A run where the **Selected Harness** could not complete and the rule-based result was used instead, so the **Effective Harness** is the **Manual Harness**. | Degraded run, AI skipped |
-| **Local AI Harness** | A harness that uses a local vision model to score or annotate candidate clips. | Qwen harness, Ollama harness |
 | **Export** | A generated file that carries the timeline into a professional editing app. | Render, output |
 | **FCPXML** | The primary XML export format for Final Cut Pro. | Final Cut XML |
 | **EDL** | A simple edit decision list export format for broad editor compatibility. | CMX3600 |
@@ -84,9 +83,9 @@
 
 ## Example Dialogue
 
-> **Dev:** "For the drone-first MVP, should the **Local AI Harness** decide which clips go on the **Timeline**?"
+> **Dev:** "For the drone-first MVP, should an AI **Harness** decide which clips go on the **Timeline**?"
 >
-> **Domain expert:** "No. The **Manual Harness** should first find smooth **Candidate Clips** from technical scores. The **Local AI Harness** can improve **Visual Interest Score** later."
+> **Domain expert:** "No. The **Manual Harness** should first find smooth **Candidate Clips** from technical scores. An AI **Harness** can improve **Visual Interest Score** later."
 >
 > **Dev:** "So the **Review Board** shows **Candidate Clips** ranked by **Overall Score**, with **Smoothness Score** weighted most heavily?"
 >

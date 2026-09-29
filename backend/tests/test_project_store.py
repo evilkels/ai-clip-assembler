@@ -375,6 +375,29 @@ def test_open_project_rejects_unsupported_schema_version(tmp_path):
         open_project(project_folder)
 
 
+def test_open_project_resolves_removed_local_qwen_harness_to_manual(tmp_path):
+    project_folder = tmp_path / "footage"
+    manifest_folder = project_folder / "clipassembler"
+    manifest_folder.mkdir(parents=True)
+    (manifest_folder / "project.json").write_text(
+        """
+        {
+          "schema_version": 1,
+          "name": "footage",
+          "created_at": "2026-05-30T19:00:00Z",
+          "harness": "local_qwen",
+          "source_videos": [
+            {"filename": "DJI_0042.MP4", "imported_at": "2026-05-30T19:00:00Z"}
+          ],
+          "settings_overrides": {}
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    assert open_project(project_folder).harness == "manual"
+
+
 def test_open_project_rejects_absolute_source_video_filename(tmp_path):
     project_folder = tmp_path / "footage"
     manifest_folder = project_folder / "clipassembler"

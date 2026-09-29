@@ -42,4 +42,4 @@ Multi-track timeline, color grading/transitions/effects, Windows/Linux support
 
 ## Open questions
 
-Test-machine hardware baseline for timing targets — unnamed/unresolved. Whether Pi Agent or Local Qwen (or both) counts as "the AI harness" for Flow D — unresolved.
+Test-machine hardware baseline for timing targets — unnamed/unresolved. Which harness counts as "the AI harness" for Flow D — Pi Agent; the local Qwen harness was removed on 2026-09-29.

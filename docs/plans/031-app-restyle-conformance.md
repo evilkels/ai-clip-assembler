@@ -228,14 +228,14 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
       because it is a rail item and not a selection. Rail footnote, verbatim:
       "Settings are per machine. Cloud consent is per project."
 - [x] **Step 3.2** Build the `AI assistance` panel — the screen the app has
-      never had. Three radio cards under `SCORING ENGINE` with their
-      consequences in a Mono facts row: Rule-based · local (`DEFAULT`),
-      Pi Agent · cloud (`OPT-IN`, nested account row, consent state), and
-      Local model · Qwen 3-VL (disabled, dashed radio). Copy is in the handoff
-      and is final. This is where the **Selected Harness** setting belongs, so
+      never had. Radio cards under `SCORING ENGINE` with their
+      consequences in a Mono facts row: Rule-based · local (`DEFAULT`) and
+      Pi Agent · cloud (`OPT-IN`, nested account row, consent state). The
+      local model card was dropped: the local Qwen harness was removed on
+      2026-09-29. Copy is in the handoff and is final. This is where the **Selected Harness** setting belongs, so
       do it after [plan 030](030-truthful-ai-usage.md) Phase 1 persists it —
       otherwise the panel writes to component state that resets on navigation.
-      Implemented persisted radio cards, the disabled Qwen option, and effective scoring fallback feedback in Settings › AI assistance.
+      Implemented persisted radio cards and effective scoring fallback feedback in Settings › AI assistance.
 - [ ] **Step 3.3** Move the model account out of Connections into the account
       row of `AI assistance`; Connections becomes MCP desktop clients only.
 - [ ] **Step 3.4** Give the Diagnostics failure branch its designed form. The

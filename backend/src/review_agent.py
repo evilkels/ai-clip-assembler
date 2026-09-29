@@ -19,6 +19,7 @@ import logging
 import os
 import subprocess
 import uuid
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,7 +38,13 @@ from .app_settings import get_settings
 from .pi_cli_harness import REPO_ROOT
 from .project_store import read_review_session, write_review_session
 from .review_state import review_context_fingerprint, sequence_fingerprint
-from .timeline_ops import OPERATIONS, Sources, TimelineController, apply_operation
+from .timeline_ops import (
+    OPERATIONS,
+    Sources,
+    TimelineController,
+    apply_operation,
+    seeded_item_ids,
+)
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -79,16 +86,22 @@ def _describe(operation: str, args: dict) -> str:
 
 
 def _simulate(
-    document: TimelineDocument, sources: Sources, operations: List[dict]
+    document: TimelineDocument,
+    sources: Sources,
+    operations: List[dict],
+    id_seed: Optional[str] = None,
 ) -> TimelineDocument:
     """Apply the staged operations to a throwaway copy to compute the diff.
 
     Raises ``TimelineOpError`` if any staged operation is invalid, so a bad
-    proposal is rejected at creation time rather than on accept.
+    proposal is rejected at creation time rather than on accept. With
+    ``id_seed`` the items the operations create get deterministic ids, so later
+    operations in the batch can refer to them (see ``seeded_item_ids``).
     """
     working = document
-    for op in operations:
-        working = apply_operation(working, sources, op["operation"], **op.get("args", {}))
+    with seeded_item_ids(id_seed) if id_seed is not None else nullcontext():
+        for op in operations:
+            working = apply_operation(working, sources, op["operation"], **op.get("args", {}))
     return working
 
 
@@ -174,9 +187,12 @@ class ProposalStore:
     ) -> Proposal:
         baseline = baseline_document or controller.document.model_copy(deep=True)
         # Validate by simulating on the captured document (no live mutation).
-        resulting = _simulate(baseline, controller.sources, operations)
+        # The id is minted first because it seeds the item ids of the simulation;
+        # accept() replays with the same seed so both runs agree.
+        proposal_id = uuid.uuid4().hex
+        resulting = _simulate(baseline, controller.sources, operations, id_seed=proposal_id)
         proposal = Proposal(
-            proposal_id=uuid.uuid4().hex,
+            proposal_id=proposal_id,
             project_id=project_id,
             message=message,
             operations=operations,
@@ -218,9 +234,13 @@ class ProposalStore:
         proposal = self._require(proposal_id, project_id)
         if proposal.status != "pending":
             raise ReviewAgentError(f"proposal {proposal_id} is {proposal.status}, not pending")
+        # Seeding with the proposal id reproduces the ids the simulation minted.
+        # Proposals saved before this seeding existed only reference pre-existing
+        # items, so seeding them here is harmless.
         document = await controller.apply_batch(
             proposal.operations,
             expected_revision=proposal.based_on_timeline_revision,
+            id_seed=proposal.proposal_id,
         )
         proposal.status = "accepted"
         self._save(proposal.project_id)

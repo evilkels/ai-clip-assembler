@@ -1,7 +1,6 @@
 # 034 — Review chat timeline scripting (Lua)
 
-Status: 🟡 in progress — S0 planned 2026-09-29; S1, S2 and the runtime research
-delegated. Branch: `feat/review-chat-scripting`. Decision record:
+Status: 🟡 in progress — planned 2026-09-29; R1, S1 and S2 done. Branch: `feat/review-chat-scripting`. Decision record:
 [ADR 0006](../adr/0006-review-scripts-compile-to-proposals.md).
 
 ## Goal
@@ -43,7 +42,7 @@ and scripts the Editor writes need no model and no cloud consent.
 | D6 | **Stale runs re-run, not rebase.** If the Timeline changed since the run, Apply gets the existing 409; the card offers **Run again**, which runs the same source against the current Timeline and produces a new Proposal. The old one becomes `superseded`. |
 | D7 | **Where the Editor writes scripts:** the Review chat composer gets a **Message / Script** switch. Script mode is a monospace editor; ⌘↩ runs it. The Editor's script message carries its own result (Proposal or error). No model call, so no consent is needed. |
 | D8 | **Agent scripts:** the Review Agent's reply may carry `"script"`; the backend runs it exactly like an Editor script and attaches the result to the agent message. The prompt's API reference is generated from the same table that binds the API, so prompt and runtime cannot drift. A turn that returns a script or Operations and no Versions attaches **no** fabricated VersionSet. No automatic repair round in v1. |
-| D9 | **Sandbox and limits:** fresh runtime per run, no path from Lua to Python, no `os`/`io`/`package`/`require`/`load*`/`dofile`/`debug`/`string.dump`/`collectgarbage`. Limits: source ≤ 64 KB, ≤ 2 s of instructions and 5 s wall, ≤ 64 MB Lua memory, ≤ 1000 recorded Operations, ≤ 200 log lines of ≤ 500 chars. Runs in a worker thread (`asyncio.to_thread`) so the server keeps serving. |
+| D9 | **Sandbox and limits** (verified in the [runtime research](../specs/2026-09-29-lua-scripting-runtime-research.md)): `lupa==2.8`, imported as `lupa.lua54`; a fresh runtime per run; in-process for v1 (single-user local app; a subprocess worker is the follow-up if isolation or pattern matching is ever needed). Closed: every one of the research's 16 escape vectors, including `python`, `getmetatable`, `__gc` metatables, coroutines and Lua patterns. Limits: source ≤ 64 KB, ≤ 20 M instructions and ≤ 2 s wall (one count hook that re-arms after tripping), ≤ 16 MiB Lua memory, ≤ 1000 recorded Operations, ≤ 200 log lines of ≤ 500 chars. Runs in a worker thread (`asyncio.to_thread`). |
 | D10 | **Same rules as the GUI.** Operations are validated by the Operations core exactly as GUI edits are; an invalid call raises a Lua error at that line and the run produces no Proposal. Agent-specific limits (candidate bounds, no repeats) are not part of v1; see [review-visual-editing](review-visual-editing.md). |
 | D11 | **Persisted with the conversation:** a `ScriptRun` (language, engine, source, author `editor`/`agent`, log, error, limits hit) is saved on the Review Message in `review-session.json`, next to its Proposal. |
 
@@ -73,8 +72,12 @@ copy live, so they are never stale inside a run.
 
 A Clip table: `id`, `file_name`, `source_in`, `source_out`, `duration`,
 `score`, `smoothness`, `decision`, `reason`. Standard library available:
-`math`, `string` (no `dump`), `table`, `utf8`, `ipairs`, `pairs`, `next`,
-`select`, `type`, `tostring`, `tonumber`, `error`, `assert`, `pcall`.
+`math`, `table`, `utf8`, `ipairs`, `pairs`, `next`, `select`, `type`,
+`tostring`, `tonumber`, `error`, `assert`, `pcall`, `setmetatable` (no `__gc`),
+and `string` without `dump`, `match`, `gmatch` and `gsub`; `string.find` is
+plain-substring only and `string.rep` is capped. `pairs` order over string keys
+is unspecified, so scripts that must be repeatable iterate arrays with `ipairs`;
+every list the API returns is an array.
 
 ## Slices
 
@@ -83,9 +86,9 @@ delegated implementer in `.worktrees/`, reviewed here, and merged back.
 
 | Slice | Scope | Depends on | Status |
 |---|---|---|---|
-| R1 | Runtime research: pin lupa engine/version, verified sandbox + limits sketch, PyInstaller needs | — | 🟡 delegated |
-| S1 | Remove the Local Qwen harness (owner decision 2026-09-29), with a load-compat test for projects that selected it | — | 🟡 delegated |
-| S2 | Deterministic item ids inside a prepared batch (D5) | — | 🟡 delegated |
+| R1 | Runtime research: pin lupa engine/version, verified sandbox + limits sketch, PyInstaller needs | — | 🟢 [done](../specs/2026-09-29-lua-scripting-runtime-research.md) |
+| S1 | Remove the Local Qwen harness (owner decision 2026-09-29), with a load-compat test for projects that selected it | — | 🟢 merged |
+| S2 | Deterministic item ids inside a prepared batch (D5) | — | 🟢 merged |
 | S3 | `backend/src/timeline_script.py`: sandboxed runtime, API bindings, recording, limits, errors — pure module, no HTTP | R1, S2 | 🔴 |
 | S4 | Contract: `ScriptRun` model, `ReviewMessage.script`, `superseded` status, `POST /projects/{id}/review/script`, agent `script` replies (D8), prompt API reference, generated types | S3 | 🔴 |
 | S5 | Frontend: composer switch, script message rendering, Run/Apply/Run again, e2e `review-scripting.spec.ts` | S4 | 🔴 |

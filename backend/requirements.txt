@@ -14,6 +14,9 @@ scenedetect==0.6.5
 httpx==0.27.2
 onnxruntime==1.19.2
 
+# Sandboxed Lua 5.4 for Review scripts (ADR 0006)
+lupa==2.8
+
 # Data / Utils
 numpy==2.0.2
 pillow==11.1.0

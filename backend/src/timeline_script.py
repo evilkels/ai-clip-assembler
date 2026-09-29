@@ -16,9 +16,15 @@ Sandbox and limits follow ``docs/specs/2026-09-29-lua-scripting-runtime-research
 from __future__ import annotations
 
 import math
+import json
+import logging
+import os
 import re
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 import lupa.lua54 as lupa  # never a bare `import lupa`: it binds the newest engine at runtime
@@ -272,9 +278,10 @@ _CLIP_FIELDS: List[Tuple[str, str]] = [
 _STDLIB_KEPT = (
     "`math` (no `random`), `table` (`concat`, `insert`, `remove`, `sort`, `unpack`, `pack`), `utf8`, "
     "`ipairs`, `pairs`, `next`, `select`, `type`, `tostring`, `tonumber`, `error`, `assert`, `pcall`, "
-    "`setmetatable` (a metatable with `__gc` is refused) and `string` without `dump`, `match`, "
+    "`setmetatable` (only approved keys and Lua-function metamethods are allowed) and `string` without `dump`, `match`, "
     "`gmatch` and `gsub`. `string.find` searches for a plain substring only, and `string.rep` "
-    "is capped at 1,000,000 characters."
+    "is capped at 1,000,000 characters. `string.find` is capped at 10,000,000 input-pattern character pairs. "
+    "`table.move` is capped at a range of 1,000,000 values."
 )
 _STDLIB_REMOVED = (
     "`os`, `io`, `package`, `require`, `load`, `loadfile`, `dofile`, `debug`, `collectgarbage`, "
@@ -357,10 +364,11 @@ _BOOT = r"""
 local api, check, on_trip, max_ticks = ...
 local error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type, load =
       error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type, load
-local sethook = debug.sethook
+local sethook, getinfo = debug.sethook, debug.getinfo
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local real_string, real_find, real_rep = string, string.find, string.rep
 local real_utf8, real_math, real_table = utf8, math, table
+local real_next = next
 
 local ticks, tripped = 0, nil
 local function hook()                       -- every 1000 VM instructions
@@ -377,11 +385,16 @@ end
 
 -- `string` is shared with every string's metatable, so patch the real table.
 real_string.dump, real_string.match, real_string.gmatch, real_string.gsub = nil, nil, nil, nil
-real_string.find = function(s, pattern, init) return real_find(s, pattern, init, true) end
+real_string.find = function(s, pattern, init)
+  if #s * #pattern > 1e7 then error("string.find too large", 2) end
+  return real_find(s, pattern, init, true)
+end
 real_string.rep = function(s, n, sep)       -- an uninterruptible native loop: cap it
-  local unit = #tostring(s) + #tostring(sep or "")
-  if type(n) == "number" and (n > 1e6 or n * unit > 1e6) then error("string.rep too large", 2) end
-  return real_rep(s, n, sep)
+  local count = tonumber(n)
+  if count == nil then error("string.rep count must be a number", 2) end
+  local text, separator = tostring(s), sep == nil and "" or tostring(sep)
+  if count > 1e6 or count * (#text + #separator) > 1e6 then error("string.rep too large", 2) end
+  return real_rep(text, count, separator)
 end
 
 local function pick(source, names)
@@ -397,8 +410,33 @@ for key, value in pairs(real_math) do
   if key ~= "random" and key ~= "randomseed" then env.math[key] = value end
 end
 env.table = pick(real_table, {"concat", "insert", "remove", "sort", "unpack", "pack"})
-env.setmetatable = function(t, mt)          -- finalizers run with hooks off, so refuse them
-  if type(mt) == "table" and rawget(mt, "__gc") ~= nil then error("__gc is not allowed", 2) end
+env.table.move = function(t, f, e, target, dest)
+  if e - f + 1 > 1e6 then error("table.move range too large", 2) end
+  return real_table.move(t, f, e, target, dest)
+end
+local metamethods = {
+  __index=true, __newindex=true, __call=true, __tostring=true, __eq=true, __lt=true, __le=true,
+  __unm=true, __add=true, __sub=true, __mul=true, __div=true, __mod=true, __pow=true,
+  __idiv=true, __band=true, __bor=true, __bxor=true, __shl=true, __shr=true, __bnot=true,
+  __concat=true, __close=true, __name=true,
+}
+env.setmetatable = function(t, mt)
+  if type(mt) == "table" then
+    for key, value in real_next, mt do
+      if type(key) ~= "string" or not metamethods[key] then
+        error("metatable key '" .. tostring(key) .. "' is not allowed", 2)
+      end
+      if key == "__name" then
+        if type(value) ~= "string" then error("metatable key '__name' must be a string", 2) end
+      elseif key == "__index" or key == "__newindex" then
+        if type(value) ~= "table" and not (type(value) == "function" and getinfo(value, "S").what == "Lua") then
+          error("metatable key '" .. key .. "' must be a Lua function or table", 2)
+        end
+      elseif type(value) ~= "function" or getinfo(value, "S").what ~= "Lua" then
+        error("metatable key '" .. key .. "' must be a Lua function", 2)
+      end
+    end
+  end
   return setmetatable(t, mt)
 end
 
@@ -788,7 +826,7 @@ def _limit_message(name: str, limits: ScriptLimits) -> str:
     return f"{name} exceeded ({detail})"
 
 
-def run_script(
+def run_script_in_process(
     source: str,
     *,
     document: TimelineDocument,
@@ -877,6 +915,83 @@ def run_script(
         api = boot = run = None
         del runtime
     return outcome
+
+
+def _worker_command() -> List[str]:
+    """Return the worker command in both source and frozen backend builds."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--script-worker"]
+    return [sys.executable, "-m", "src.script_worker"]
+
+
+def run_script(
+    source: str,
+    *,
+    document: TimelineDocument,
+    sources: Sources,
+    library: List[dict],
+    id_seed: str,
+    limits: ScriptLimits = ScriptLimits(),
+) -> ScriptResult:
+    """Run a script in a killable worker process, preserving all-or-nothing results."""
+    if not isinstance(source, str):
+        raise TypeError("source must be a str")
+    if not isinstance(document, TimelineDocument):
+        raise TypeError("document must be a TimelineDocument")
+    if not isinstance(id_seed, str):
+        raise TypeError("id_seed must be a str")
+    if not isinstance(limits, ScriptLimits):
+        raise TypeError("limits must be a ScriptLimits")
+
+    def failure(kind: Literal["runtime", "limit"], message: str) -> ScriptResult:
+        return ScriptResult([], document.model_copy(deep=True), [], ScriptError(kind, message, None))
+
+    backend_dir = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(backend_dir)
+    request = {
+        "source": source,
+        "document": document.model_dump(mode="json"),
+        "sources": {clip_id: clip.model_dump(mode="json") for clip_id, clip in sources.items()},
+        "library": library,
+        "id_seed": id_seed,
+        "limits": limits.__dict__,
+    }
+    try:
+        completed = subprocess.run(
+            _worker_command(),
+            input=json.dumps(request),
+            capture_output=True,
+            text=True,
+            timeout=limits.timeout_sec + 1.0,
+            env=env,
+            cwd=backend_dir,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return failure("limit", "time limit exceeded (the script was stopped)")
+    except OSError as exc:
+        logging.getLogger(__name__).warning("Lua script worker could not start: %s", exc)
+        return failure("runtime", "the script runner stopped unexpectedly")
+
+    if completed.returncode != 0:
+        if completed.stderr:
+            logging.getLogger(__name__).warning("Lua script worker stopped: %s", completed.stderr.rstrip())
+        return failure("runtime", "the script runner stopped unexpectedly")
+    try:
+        payload = json.loads(completed.stdout)
+        result_error = payload["error"]
+        error = ScriptError(**result_error) if result_error is not None else None
+        return ScriptResult(
+            operations=payload["operations"],
+            document=TimelineDocument.model_validate(payload["document"]),
+            log=payload["log"],
+            error=error,
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        if completed.stderr:
+            logging.getLogger(__name__).warning("Lua script worker returned invalid output: %s", completed.stderr.rstrip())
+        return failure("runtime", "the script runner stopped unexpectedly")
 
 
 def _with_line(line: Optional[int], text: str) -> str:

@@ -9,6 +9,12 @@ import uvicorn
 
 
 def main() -> None:
+    if "--script-worker" in sys.argv:
+        from src.script_worker import main as run_script_worker
+
+        run_script_worker()
+        return
+
     if "--mcp-stdio" in sys.argv:
         from src.mcp_bridge import parse_args, run_mcp_stdio
 

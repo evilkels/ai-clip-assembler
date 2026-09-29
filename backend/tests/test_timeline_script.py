@@ -6,6 +6,9 @@ recorded. Nothing here touches HTTP, models on disk, or the live Timeline.
 """
 
 import asyncio
+import json
+import subprocess
+import sys
 import time
 
 import pytest
@@ -19,6 +22,7 @@ from src.timeline_script import (
     ScriptLimits,
     ScriptResult,
     run_script,
+    run_script_in_process,
 )
 
 
@@ -87,7 +91,7 @@ def make_document():
 
 def run(source, document=None, **kwargs):
     kwargs.setdefault("limits", ScriptLimits())
-    return run_script(
+    return run_script_in_process(
         source,
         document=document if document is not None else make_document(),
         sources=make_sources(),

@@ -1,4 +1,9 @@
-"""One-shot subprocess entry point for isolated timeline script execution."""
+"""One-shot subprocess entry point for isolated timeline script execution.
+
+Protocol on stdout: one JSON object per line, flushed. ``{"log": line}`` the
+moment the script logs, then ``{"result": {...}}`` last. Nothing else may reach
+stdout, so stray prints go to stderr.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +16,12 @@ from .timeline_script import ScriptLimits, run_script_in_process
 
 
 def main() -> None:
+    out, sys.stdout = sys.stdout, sys.stderr
+
+    def emit(message: dict) -> None:
+        out.write(json.dumps(message) + "\n")
+        out.flush()
+
     request = json.load(sys.stdin)
     document = TimelineDocument.model_validate(request["document"])
     sources = {
@@ -24,25 +35,26 @@ def main() -> None:
         library=request["library"],
         id_seed=request["id_seed"],
         limits=ScriptLimits(**request["limits"]),
+        on_log=lambda line: emit({"log": line}),
     )
-    json.dump(
+    emit(
         {
-            "operations": result.operations,
-            "document": result.document.model_dump(mode="json"),
-            "log": result.log,
-            "error": (
-                {
-                    "kind": result.error.kind,
-                    "message": result.error.message,
-                    "line": result.error.line,
-                }
-                if result.error
-                else None
-            ),
-        },
-        sys.stdout,
+            "result": {
+                "operations": result.operations,
+                "document": result.document.model_dump(mode="json"),
+                "log": result.log,
+                "error": (
+                    {
+                        "kind": result.error.kind,
+                        "message": result.error.message,
+                        "line": result.error.line,
+                    }
+                    if result.error
+                    else None
+                ),
+            }
+        }
     )
-    sys.stdout.write("\n")
 
 
 if __name__ == "__main__":

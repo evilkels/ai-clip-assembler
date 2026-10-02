@@ -2153,6 +2153,7 @@ def test_list_harnesses_shows_pi_agent_enabled():
     harnesses = {h["id"]: h for h in response.json()["harnesses"]}
     assert harnesses["manual"]["enabled"] is True
     assert harnesses["pi_agent"]["enabled"] is True
+    assert "local_qwen" not in harnesses
 
 
 def _project_with_one_video(monkeypatch, tmp_path):

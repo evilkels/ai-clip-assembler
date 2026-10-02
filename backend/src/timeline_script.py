@@ -22,6 +22,8 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,6 +44,15 @@ class ScriptLimits:
     max_operations: int = 1000
     max_log_lines: int = 200
     max_log_line_chars: int = 500
+    max_recording_bytes: int = 1_048_576  # JSON size of the recorded operations
+
+
+_MAX_STRING_BYTES = 4096  # any string an API call takes from a script
+
+
+def _bytes(count: int) -> str:
+    mib = 1024 * 1024
+    return f"{count // mib} MiB" if count % mib == 0 else f"{count:,} bytes"
 
 
 @dataclass(frozen=True)
@@ -278,7 +289,8 @@ _CLIP_FIELDS: List[Tuple[str, str]] = [
 _STDLIB_KEPT = (
     "`math` (no `random`), `table` (`concat`, `insert`, `remove`, `sort`, `unpack`, `pack`), `utf8`, "
     "`ipairs`, `pairs`, `next`, `select`, `type`, `tostring`, `tonumber`, `error`, `assert`, `pcall`, "
-    "`setmetatable` (only approved keys and Lua-function metamethods are allowed) and `string` without `dump`, `match`, "
+    "`setmetatable` (only approved keys and Lua-function metamethods are allowed; a metatable is copied "
+    "when set; changing it afterwards has no effect) and `string` without `dump`, `match`, "
     "`gmatch` and `gsub`. `string.find` searches for a plain substring only, and `string.rep` "
     "is capped at 1,000,000 characters. `string.find` is capped at 10,000,000 input-pattern character pairs. "
     "`table.move` is capped at a range of 1,000,000 values."
@@ -313,7 +325,7 @@ def _build_reference(limits: ScriptLimits = ScriptLimits()) -> str:
         "- Item handles read the working copy live. A handle whose Item was removed (or split) "
         "raises `item was removed`.",
         "- An invalid edit (bad split point, unknown Clip, position out of range) is a Lua error at "
-        "that line and the run records nothing.",
+        "that line and the run records nothing; `pcall` cannot catch it.",
         "- Later lines see earlier edits.",
         "- `pairs` order over string keys is unspecified; iterate arrays with `ipairs` so a script "
         "records the same Operations every run. Every list the API returns is an array.",
@@ -343,8 +355,10 @@ def _build_reference(limits: ScriptLimits = ScriptLimits()) -> str:
         "",
         f"Source up to {limits.max_source_bytes // 1024} KiB, {limits.max_instructions:,} instructions, "
         f"{limits.timeout_sec:g} s, {limits.max_memory_bytes // (1024 * 1024)} MiB of Lua memory, "
-        f"{limits.max_operations} recorded Operations, {limits.max_log_lines} log lines. "
-        "A script that reaches one is stopped and records nothing.",
+        f"{limits.max_operations} recorded Operations of at most {_bytes(limits.max_recording_bytes)} "
+        f"together, {limits.max_log_lines} log lines (each cut to {limits.max_log_line_chars} characters). "
+        f"A string passed to an API call may be up to {_MAX_STRING_BYTES} bytes. "
+        "A script that reaches a limit is stopped and records nothing, even inside `pcall`.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -361,7 +375,7 @@ _LUA_TABLE = {"timeline": "timeline", "library": "library", "item": "ITEM", "": 
 # from the binding table, installs the limit hook, and only then strips the real
 # globals (including `debug`).
 _BOOT = r"""
-local api, check, on_trip, max_ticks = ...
+local api, check, on_trip, fault_at, max_ticks = ...
 local error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type, load =
       error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type, load
 local sethook, getinfo = debug.sethook, debug.getinfo
@@ -370,30 +384,55 @@ local real_string, real_find, real_rep = string, string.find, string.rep
 local real_utf8, real_math, real_table = utf8, math, table
 local real_next = next
 
-local ticks, tripped = 0, nil
-local function hook()                       -- every 1000 VM instructions
+local ticks, tripped, faulted = 0, nil, false
+local hook
+local function trip(name)                   -- re-arm at count 1 so no pcall can swallow the limit
+  if not tripped then tripped = name end
+  on_trip(tripped)
+  sethook(hook, "", 1)
+end
+function hook()                             -- every 1000 VM instructions
   ticks = ticks + 1
   if not tripped then
-    if ticks > max_ticks then tripped = "instruction limit" else tripped = check() end
+    local name = ticks > max_ticks and "instruction limit" or check()
+    if name then trip(name) end
   end
-  if tripped then                           -- re-arm at count 1 so no pcall can swallow the limit
-    on_trip(tripped)
-    sethook(hook, "", 1)
-    error(tripped .. " exceeded", 0)
+  if tripped then error(tripped .. " exceeded", 0) end
+end
+
+-- Limits, Lua memory errors and Operation errors stop the run even inside pcall.
+local function sticky(err)
+  if err == "not enough memory" then trip("memory limit") end
+  return faulted or tripped ~= nil
+end
+
+-- The line of the nearest script frame: tail calls and native callers hide the direct caller.
+local function script_line()
+  local level = 2
+  while true do
+    local info = getinfo(level, "Sl")
+    if info == nil then return nil end
+    if info.source == "=script" then return info.currentline end
+    level = level + 1
   end
 end
+local function at_line(line, msg)
+  if line == nil then return msg end
+  return "script:" .. line .. ": " .. msg
+end
+local function fail(msg) error(at_line(script_line(), msg), 0) end
 
 -- `string` is shared with every string's metatable, so patch the real table.
 real_string.dump, real_string.match, real_string.gmatch, real_string.gsub = nil, nil, nil, nil
 real_string.find = function(s, pattern, init)
-  if #s * #pattern > 1e7 then error("string.find too large", 2) end
+  if #s * #pattern > 1e7 then fail("string.find too large") end
   return real_find(s, pattern, init, true)
 end
 real_string.rep = function(s, n, sep)       -- an uninterruptible native loop: cap it
   local count = tonumber(n)
-  if count == nil then error("string.rep count must be a number", 2) end
+  if count == nil then fail("string.rep count must be a number") end
   local text, separator = tostring(s), sep == nil and "" or tostring(sep)
-  if count > 1e6 or count * (#text + #separator) > 1e6 then error("string.rep too large", 2) end
+  if count > 1e6 or count * (#text + #separator) > 1e6 then fail("string.rep too large") end
   return real_rep(text, count, separator)
 end
 
@@ -402,16 +441,21 @@ local function pick(source, names)
   for _, key in ipairs(names) do t[key] = source[key] end
   return t
 end
-local env = pick(_G, {"assert", "error", "ipairs", "next", "pairs", "pcall", "select", "tonumber",
+local env = pick(_G, {"assert", "error", "ipairs", "next", "pairs", "select", "tonumber",
                       "tostring", "type"})
 env._G, env.string, env.utf8 = env, real_string, real_utf8
+env.pcall = function(fn, ...)
+  local results = pack(pcall(fn, ...))
+  if not results[1] and sticky(results[2]) then error(results[2], 0) end
+  return unpack(results, 1, results.n)
+end
 env.math = {}
 for key, value in pairs(real_math) do
   if key ~= "random" and key ~= "randomseed" then env.math[key] = value end
 end
 env.table = pick(real_table, {"concat", "insert", "remove", "sort", "unpack", "pack"})
 env.table.move = function(t, f, e, target, dest)
-  if e - f + 1 > 1e6 then error("table.move range too large", 2) end
+  if e - f + 1 > 1e6 then fail("table.move range too large") end
   return real_table.move(t, f, e, target, dest)
 end
 local metamethods = {
@@ -420,32 +464,37 @@ local metamethods = {
   __idiv=true, __band=true, __bor=true, __bxor=true, __shl=true, __shr=true, __bnot=true,
   __concat=true, __close=true, __name=true,
 }
+-- Installs a validated copy: the script cannot reach it, so later changes to `mt` do nothing.
 env.setmetatable = function(t, mt)
-  if type(mt) == "table" then
-    for key, value in real_next, mt do
-      if type(key) ~= "string" or not metamethods[key] then
-        error("metatable key '" .. tostring(key) .. "' is not allowed", 2)
-      end
-      if key == "__name" then
-        if type(value) ~= "string" then error("metatable key '__name' must be a string", 2) end
-      elseif key == "__index" or key == "__newindex" then
-        if type(value) ~= "table" and not (type(value) == "function" and getinfo(value, "S").what == "Lua") then
-          error("metatable key '" .. key .. "' must be a Lua function or table", 2)
-        end
-      elseif type(value) ~= "function" or getinfo(value, "S").what ~= "Lua" then
-        error("metatable key '" .. key .. "' must be a Lua function", 2)
-      end
+  if type(mt) ~= "table" then return setmetatable(t, mt) end
+  local sealed = {}
+  for key, value in real_next, mt do
+    if type(key) ~= "string" or not metamethods[key] then
+      fail("metatable key '" .. tostring(key) .. "' is not allowed")
     end
+    if key == "__name" then
+      if type(value) ~= "string" then fail("metatable key '__name' must be a string") end
+    elseif key == "__index" or key == "__newindex" then
+      if type(value) ~= "table" and not (type(value) == "function" and getinfo(value, "S").what == "Lua") then
+        fail("metatable key '" .. key .. "' must be a Lua function or table")
+      end
+    elseif type(value) ~= "function" or getinfo(value, "S").what ~= "Lua" then
+      fail("metatable key '" .. key .. "' must be a Lua function")
+    end
+    sealed[key] = value
   end
-  return setmetatable(t, mt)
+  return setmetatable(t, sealed)
 end
 
 -- Python exceptions and API errors become strings at the calling script line.
 local function guard(fn)
   return function(...)
     local results = pack(pcall(fn, ...))
-    if not results[1] then error(tostring(results[2]), 2) end
-    return unpack(results, 2, results.n)
+    if results[1] then return unpack(results, 2, results.n) end
+    local line = script_line()
+    if fault_at(line) then faulted = true end
+    sticky(results[2])
+    error(at_line(line, tostring(results[2])), 0)
   end
 end
 
@@ -540,6 +589,8 @@ def _typename(value: Any) -> str:
 def _str(value: Any, what: str) -> str:
     if not isinstance(value, str):
         raise _Fault(f"expected a string for {what}, got {_typename(value)}")
+    if len(value.encode("utf-8")) > _MAX_STRING_BYTES:
+        raise _Fault(f"{what} is too long (max {_MAX_STRING_BYTES} bytes)")
     return value
 
 
@@ -569,16 +620,22 @@ class _Session:
     """One run: the working copy, the recording, the log, and the API natives."""
 
     def __init__(
-        self, document: TimelineDocument, sources: Sources, library: List[dict], limits: ScriptLimits
+        self,
+        document: TimelineDocument,
+        sources: Sources,
+        library: List[dict],
+        limits: ScriptLimits,
+        on_log: Optional[Callable[[str], None]],
     ) -> None:
         self.document = document.model_copy(deep=True)
+        self.on_log = on_log
         self.sources = sources
         self.limits = limits
         self.operations: List[dict] = []
+        self.recording_bytes = 0
         self.log_lines: List[str] = []
         self.limit: Optional[str] = None  # a budget the Python side found spent
-        self.tripped: Optional[str] = None  # the limit the Lua hook stopped the run for
-        self.last_op_error: Optional[str] = None
+        self.fault: Optional[ScriptError] = None  # the first limit or Operation error; it decides the run
         self.deadline = 0.0
         self._clips = [self._clip_row(entry) for entry in library]
         self._clip_positions: Dict[str, int] = {}
@@ -615,20 +672,36 @@ class _Session:
         return None
 
     def on_trip(self, name: str) -> None:
-        if self.tripped is None:
-            self.tripped = name
+        if self.fault is None:
+            self.fault = ScriptError("limit", _limit_message(name, self.limits), None)
 
     def _spend(self, name: str) -> _LimitReached:
         self.limit = self.limit or name
+        self.on_trip(name)
         return _LimitReached(f"{name} exceeded")
+
+    def fault_at(self, line: Optional[int]) -> bool:
+        """Called by the Lua guard when an API call fails: give an Operation error its script
+        line, and say whether the run is faulted (so `pcall` must not swallow the error)."""
+        fault = self.fault
+        if fault is None:
+            return False
+        if fault.kind == "operation" and fault.line is None and line is not None:
+            self.fault = ScriptError("operation", _with_line(line, fault.message), line)
+        return True
 
     # -- recording -----------------------------------------------------------
 
     def _record(self, operation: str, **args: Any) -> None:
         if len(self.operations) >= self.limits.max_operations:
             raise self._spend("operation limit")
+        recorded = {"operation": operation, "args": args}
+        size = len(json.dumps(recorded))
+        if self.recording_bytes + size > self.limits.max_recording_bytes:
+            raise self._spend("recording limit")
         self.document = apply_operation(self.document, self.sources, operation, **args)
-        self.operations.append({"operation": operation, "args": args})
+        self.operations.append(recorded)
+        self.recording_bytes += size
 
     def _locate(self, item_id: Any) -> int:
         item_id = _str(item_id, "an Item")
@@ -772,11 +845,14 @@ class _Session:
         self._require_clip(clip_id)
         self._record(operation, clip_id=clip_id)
 
-    def log(self, line: Any) -> None:
-        line = _str(line, "a log line")
+    def log(self, line: str) -> None:
+        """Takes the string `join` built; a long line is cut, not refused like other API strings."""
         if len(self.log_lines) >= self.limits.max_log_lines:
             raise self._spend("log limit")
-        self.log_lines.append(line[: self.limits.max_log_line_chars])
+        line = line[: self.limits.max_log_line_chars]
+        self.log_lines.append(line)
+        if self.on_log is not None:
+            self.on_log(line)
 
     def natives(self) -> Dict[str, Callable[..., Any]]:
         names = (
@@ -787,13 +863,14 @@ class _Session:
         return {name: self._tracked(getattr(self, name)) for name in names}
 
     def _tracked(self, fn: Callable[..., Any]) -> Callable[..., Any]:
-        """Remember the text of an Operation error, to tell it from other runtime errors."""
+        """Record an Operation error as the run's fault, to tell it from other runtime errors."""
 
         def call(*args: Any) -> Any:
             try:
                 return fn(*args)
             except TimelineOpError as exc:
-                self.last_op_error = str(exc)
+                if self.fault is None:
+                    self.fault = ScriptError("operation", str(exc), None)
                 raise
 
         return call
@@ -821,6 +898,7 @@ def _limit_message(name: str, limits: ScriptLimits) -> str:
         "time limit": f"over {limits.timeout_sec:g} s",
         "memory limit": f"over {limits.max_memory_bytes // (1024 * 1024)} MiB of Lua memory",
         "operation limit": f"more than {limits.max_operations} operations",
+        "recording limit": f"over {_bytes(limits.max_recording_bytes)} of recorded operations",
         "log limit": f"more than {limits.max_log_lines} log lines",
     }[name]
     return f"{name} exceeded ({detail})"
@@ -834,12 +912,13 @@ def run_script_in_process(
     library: List[dict],
     id_seed: str,
     limits: ScriptLimits = ScriptLimits(),
+    on_log: Optional[Callable[[str], None]] = None,
 ) -> ScriptResult:
     """Run ``source`` against a copy of ``document`` and return what it recorded.
 
     All or nothing: any error gives no Operations and the input document back,
     with the log kept. Script faults are reported in the result, never raised;
-    only bad Python arguments raise.
+    only bad Python arguments raise. ``on_log`` sees each log line as it is written.
     """
     if not isinstance(source, str):
         raise TypeError("source must be a str")
@@ -850,7 +929,7 @@ def run_script_in_process(
     if not isinstance(limits, ScriptLimits):
         raise TypeError("limits must be a ScriptLimits")
 
-    session = _Session(document, sources, library, limits)
+    session = _Session(document, sources, library, limits, on_log)
 
     def failure(kind: str, message: str, line: Optional[int] = None) -> ScriptResult:
         return ScriptResult(
@@ -881,7 +960,9 @@ def run_script_in_process(
     try:
         api = runtime.table_from(session.natives())
         boot = runtime.compile(_BOOT_SOURCE, name="=sandbox", mode="t")
-        run = boot(api, session.check, session.on_trip, max(1, limits.max_instructions // 1000))
+        run = boot(
+            api, session.check, session.on_trip, session.fault_at, max(1, limits.max_instructions // 1000)
+        )
         session.deadline = time.monotonic() + limits.timeout_sec
         loaded, load_error = True, None
         raised: Optional[BaseException] = None
@@ -889,17 +970,16 @@ def run_script_in_process(
             try:
                 loaded, load_error = run(source)
             except lupa.LuaMemoryError:
-                session.tripped = session.tripped or "memory limit"
+                session.on_trip("memory limit")
             except lupa.LuaError as exc:
                 raised = exc
         # The hook poisons the runtime once it trips: never call back into it here.
-        limit = session.tripped or session.limit
-        if limit is not None:
-            outcome = failure("limit", _limit_message(limit, limits))
+        if session.fault is not None:  # even when the script caught it and returned normally
+            fault = session.fault
+            outcome = failure(fault.kind, fault.message, fault.line)
         elif raised is not None:
             line, text = _describe(raised)
-            is_operation = session.last_op_error is not None and text.endswith(session.last_op_error)
-            outcome = failure("operation" if is_operation else "runtime", _with_line(line, text), line)
+            outcome = failure("runtime", _with_line(line, text), line)
         elif not loaded:
             line, text = _describe(load_error)
             outcome = failure("syntax", _with_line(line, text), line)
@@ -915,6 +995,9 @@ def run_script_in_process(
         api = boot = run = None
         del runtime
     return outcome
+
+
+_MAX_WORKER_OUTPUT = 16 * 1024 * 1024  # bytes of worker stdout the parent reads
 
 
 def _worker_command() -> List[str]:
@@ -943,9 +1026,13 @@ def run_script(
     if not isinstance(limits, ScriptLimits):
         raise TypeError("limits must be a ScriptLimits")
 
-    def failure(kind: Literal["runtime", "limit"], message: str) -> ScriptResult:
-        return ScriptResult([], document.model_copy(deep=True), [], ScriptError(kind, message, None))
+    log_lines: List[str] = []  # streamed by the worker, so a killed run keeps its log
 
+    def failure(kind: Literal["runtime", "limit"], message: str) -> ScriptResult:
+        return ScriptResult([], document.model_copy(deep=True), list(log_lines), ScriptError(kind, message, None))
+
+    logger = logging.getLogger(__name__)
+    stopped = "the script runner stopped unexpectedly"
     backend_dir = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(backend_dir)
@@ -957,41 +1044,83 @@ def run_script(
         "id_seed": id_seed,
         "limits": limits.__dict__,
     }
-    try:
-        completed = subprocess.run(
-            _worker_command(),
-            input=json.dumps(request),
-            capture_output=True,
-            text=True,
-            timeout=limits.timeout_sec + 1.0,
-            env=env,
-            cwd=backend_dir,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return failure("limit", "time limit exceeded (the script was stopped)")
-    except OSError as exc:
-        logging.getLogger(__name__).warning("Lua script worker could not start: %s", exc)
-        return failure("runtime", "the script runner stopped unexpectedly")
+    with tempfile.TemporaryFile() as stderr:
+        try:
+            worker = subprocess.Popen(
+                _worker_command(),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=stderr,
+                env=env,
+                cwd=backend_dir,
+            )
+        except OSError as exc:
+            logger.warning("Lua script worker could not start: %s", exc)
+            return failure("runtime", stopped)
 
-    if completed.returncode != 0:
-        if completed.stderr:
-            logging.getLogger(__name__).warning("Lua script worker stopped: %s", completed.stderr.rstrip())
-        return failure("runtime", "the script runner stopped unexpectedly")
+        received: Dict[str, Any] = {"result": None, "problem": None}
+
+        def read() -> None:
+            try:
+                worker.stdin.write(json.dumps(request).encode("utf-8"))
+                worker.stdin.close()
+            except OSError:
+                pass  # the worker exited early; its exit status says why
+            total = 0
+            while raw := worker.stdout.readline(_MAX_WORKER_OUTPUT + 1 - total):
+                total += len(raw)
+                if total > _MAX_WORKER_OUTPUT:
+                    received["problem"] = "wrote over 16 MiB"
+                    worker.kill()
+                    return
+                try:
+                    message = json.loads(raw)
+                except ValueError:
+                    message = None
+                if isinstance(message, dict) and isinstance(message.get("log"), str):
+                    log_lines.append(message["log"])
+                elif isinstance(message, dict) and "result" in message:
+                    received["result"] = message["result"]
+                else:
+                    received["problem"] = "wrote invalid output"
+                    worker.kill()
+                    return
+
+        with worker:
+            deadline = time.monotonic() + limits.timeout_sec + 1.0
+            reader = threading.Thread(target=read, daemon=True)
+            reader.start()
+            reader.join(limits.timeout_sec + 1.0)
+            try:
+                worker.wait(max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                worker.kill()
+                worker.wait()
+                reader.join()
+                return failure("limit", "time limit exceeded (the script was stopped)")
+            reader.join()
+        stderr.seek(0)
+        errors = stderr.read().decode("utf-8", "replace").rstrip()
+
+    if received["problem"] or worker.returncode != 0 or received["result"] is None:
+        logger.warning(
+            "Lua script worker %s: %s",
+            received["problem"] or f"stopped with status {worker.returncode}",
+            errors,
+        )
+        return failure("runtime", stopped)
     try:
-        payload = json.loads(completed.stdout)
+        payload = received["result"]
         result_error = payload["error"]
-        error = ScriptError(**result_error) if result_error is not None else None
         return ScriptResult(
             operations=payload["operations"],
             document=TimelineDocument.model_validate(payload["document"]),
             log=payload["log"],
-            error=error,
+            error=ScriptError(**result_error) if result_error is not None else None,
         )
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-        if completed.stderr:
-            logging.getLogger(__name__).warning("Lua script worker returned invalid output: %s", completed.stderr.rstrip())
-        return failure("runtime", "the script runner stopped unexpectedly")
+    except (KeyError, TypeError, ValueError):
+        logger.warning("Lua script worker returned an invalid result: %s", errors)
+        return failure("runtime", stopped)
 
 
 def _with_line(line: Optional[int], text: str) -> str:

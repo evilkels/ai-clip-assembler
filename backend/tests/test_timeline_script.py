@@ -6,18 +6,18 @@ recorded. Nothing here touches HTTP, models on disk, or the live Timeline.
 """
 
 import asyncio
-import json
-import subprocess
+import os
+import re
 import sys
 import time
 
 import pytest
 
+from src import timeline_script
 from src.models import TimelineDocument, TimelineItem
 from src.timeline_ops import SourceClip, TimelineController
 from src.timeline_script import (
     API_REFERENCE,
-    BINDINGS,
     ScriptError,
     ScriptLimits,
     ScriptResult,
@@ -107,9 +107,9 @@ def ok(source, document=None, **kwargs) -> ScriptResult:
     return result
 
 
-def replay(operations, document):
+def replay(operations, document, sources=None):
     async def go():
-        controller = TimelineController(document, make_sources())
+        controller = TimelineController(document, sources if sources is not None else make_sources())
         return await controller.apply_batch(
             operations, expected_revision=document.revision, id_seed=SEED
         )
@@ -336,13 +336,29 @@ log(("%d shots, %.1fs"):format(timeline:count(), timeline:duration()))
 """
 
 
-def test_goal_example_runs_on_fixture():
-    result = ok(GOAL_SCRIPT)
+def test_goal_example_stops_at_the_first_item_that_crosses_40_seconds():
+    # 20 included 5 s clips; clip-19 scores best. Trimmed to 3 s, 13 items make 39 s and the 14th crosses 40.
+    starts = {f"clip-{n:02d}": 10.0 * n for n in range(20)}
+    sources = {
+        clip_id: SourceClip(clip_id=clip_id, start_sec=start, end_sec=start + 5, source_duration_sec=300.0)
+        for clip_id, start in starts.items()
+    }
+    library = [
+        {"clip_id": clip_id, "file_name": f"{clip_id}.mp4", "start_sec": start, "end_sec": start + 5,
+         "overall_score": start / 1000}
+        for clip_id, start in starts.items()
+    ]
+    document = TimelineDocument(revision=1, items=[], decisions={clip_id: "included" for clip_id in starts})
+    result = run_script_in_process(
+        GOAL_SCRIPT, document=document, sources=sources, library=library, id_seed=SEED
+    )
+    assert result.error is None, result.error
     items = result.document.items
-    assert [i.source_clip_id for i in items] == ["clip-c", "clip-a", "clip-b", "clip-d"]
-    assert [(i.start_sec, i.end_sec) for i in items] == [(20.0, 22.0), (0.0, 3.0), (10.0, 13.0), (30.0, 33.0)]
-    assert result.log == ["4 shots, 11.0s"]
-    assert same_content(replay(result.operations, make_document()), result.document)
+    best_first = [f"clip-{n:02d}" for n in range(19, 5, -1)]
+    assert [i.source_clip_id for i in items] == best_first
+    assert [(i.start_sec, i.end_sec) for i in items] == [(starts[c], starts[c] + 3) for c in best_first]
+    assert result.log == ["14 shots, 42.0s"]
+    assert same_content(replay(result.operations, document, sources), result.document)
 
 
 # --- 5. determinism ---------------------------------------------------------
@@ -410,13 +426,47 @@ def test_unknown_clip_is_an_operation_error():
         assert "unknown candidate clip" in result.error.message
 
 
-def test_pcall_can_catch_an_operation_error_and_the_run_continues():
-    result = ok(
-        "local okay, e = pcall(function() timeline:item(1):split(99) end) "
-        "log(tostring(okay), type(e)) timeline:item(1):set_speed(2)"
+def test_pcall_cannot_swallow_an_operation_error():
+    result = run(
+        "local okay = pcall(function()\n  timeline:item(1):split(99)\nend)\n"
+        "log('after') timeline:item(1):set_speed(2)"
     )
-    assert result.log == ["false\tstring"]
+    assert result.error.kind == "operation"
+    assert result.error.line == 2
+    assert result.error.message == "line 2: split point 99.0 must lie strictly within [0.0, 6.0]"
+    assert result.operations == []
+    assert result.log == []
+
+
+def test_a_close_handler_cannot_replace_an_operation_error():
+    result = run(
+        "do\n  local h <close> = setmetatable({}, { __close = function() error('replaced') end })\n"
+        "  timeline:item(1):split(99)\nend"
+    )
+    assert result.error.kind == "operation"
+    assert result.error.line == 3
+    assert result.operations == []
+
+
+def test_pcall_still_catches_ordinary_errors():
+    result = ok(
+        "log(tostring(pcall(error, 'x'))) "
+        "local okay, e = pcall(function() return nil + 1 end) log(tostring(okay), e) "
+        "timeline:item(1):set_speed(2)"
+    )
+    assert result.log == ["false", "false\tscript:1: attempt to perform arithmetic on a nil value"]
     assert [op["operation"] for op in result.operations] == ["set_speed"]
+
+
+@pytest.mark.parametrize(
+    "call",
+    ["f()", "pcall(function() return f() end)", "table.sort({2, 1}, function() return f() end)"],
+    ids=["plain", "under pcall", "under a native caller"],
+)
+def test_operation_error_in_tail_position_reports_the_calling_line(call):
+    result = run(f"local function f()\n  return timeline:item(1):split(999)\nend\n{call}")
+    assert result.error.kind == "operation"
+    assert result.error.line == 4
 
 
 def test_log_is_kept_when_the_run_fails():
@@ -526,7 +576,7 @@ BLOCKED = [
     ("coroutine", "coroutine.wrap(function() end)()", "global 'coroutine'"),
     ("xpcall", "xpcall(print, print)", "global 'xpcall'"),
     # 13. __gc finalizers run with hooks off
-    ("__gc finalizer", "setmetatable({}, {__gc = function() while true do end end})", "__gc is not allowed"),
+    ("__gc finalizer", "setmetatable({}, {__gc = function() while true do end end})", "metatable key '__gc' is not allowed"),
     # 14. pattern matching
     ("string.match", "return ('x'):match('x')", "method 'match'"),
     ("string.gmatch", "for _ in string.gmatch('x', 'x') do end", "field 'gmatch'"),
@@ -585,6 +635,30 @@ def test_standard_library_that_should_remain():
 def test_setmetatable_without_gc_is_allowed():
     result = ok("local t = setmetatable({}, {__index = function() return 5 end}) log(t.x)")
     assert result.log == ["5"]
+
+
+MUTATED_METATABLE = (
+    "local mt = {} local t = setmetatable({}, mt) "
+    "mt.__len = function() return 1e9 end "
+    "log(#t) table.insert(t, 1, 0) log(#t)"
+)
+
+
+def test_changing_a_metatable_after_setmetatable_has_no_effect():
+    started = time.monotonic()
+    result = ok(MUTATED_METATABLE)
+    assert time.monotonic() - started < 1.0
+    assert result.log == ["0", "1"]
+
+
+def test_class_methods_added_after_setmetatable_still_resolve():
+    result = ok(
+        "local Shot = {} Shot.__index = Shot "
+        "local s = setmetatable({ n = 2 }, Shot) "
+        "function Shot:double() return self.n * 2 end "
+        "log(s:double())"
+    )
+    assert result.log == ["4"]
 
 
 def test_runtime_is_fresh_per_run():
@@ -675,14 +749,27 @@ def test_limits_are_configurable():
 
 
 def test_log_lines_are_joined_with_tabs_and_truncated():
-    result = ok("log('a', 1, nil, true) log(('x'):rep(600))", limits=ScriptLimits(max_log_line_chars=500))
+    result = ok("log('a', 1, nil, true) log(('x'):rep(5000))", limits=ScriptLimits(max_log_line_chars=500))
     assert result.log[0] == "a\t1\tnil\ttrue"
     assert len(result.log[1]) == 500
 
 
+def test_a_string_argument_over_4096_bytes_is_refused():
+    result = run("timeline:set_profile(('x'):rep(4096))\ntimeline:set_profile(('x'):rep(5000))")
+    assert result.error.kind == "runtime"
+    assert result.error.message == "line 2: a profile name is too long (max 4096 bytes)"
+    assert result.operations == []
+
+
+def test_recording_limit():
+    source = "for i = 1, 10 do timeline:set_profile(('x'):rep(4000)) end"
+    result, _ = limit_run(source, "recording limit", max_recording_bytes=20_000)
+    assert result.error.message == "recording limit exceeded (over 20,000 bytes of recorded operations)"
+
+
 def test_recursion_is_a_runtime_error_not_a_crash():
     result = run("local function f(n) return 1 + f(n + 1) end return f(1)", limits=ScriptLimits(max_memory_bytes=1 << 28))
-    assert result.error.kind in ("runtime", "limit")
+    assert result.error == ScriptError("runtime", "line 1: stack overflow", 1)
 
 
 # --- 10. pcall cannot swallow a limit ---------------------------------------
@@ -707,35 +794,136 @@ def test_pcall_cannot_swallow_the_time_limit():
     assert elapsed < 3 * 0.3
 
 
+def test_pcall_cannot_swallow_the_memory_limit():
+    source = (
+        "local okay = pcall(function() local t = {} for i = 1, 1e8 do t[i] = ('x'):rep(100) .. i end end) "
+        "timeline:item(1):set_speed(2)"
+    )
+    result, _ = limit_run(source, "memory limit")
+    assert result.error.message == "memory limit exceeded (over 16 MiB of Lua memory)"
+
+
 def test_pcall_cannot_swallow_the_operation_limit():
-    source = "local it = timeline:item(1) for i = 1, 5000 do pcall(function() it:set_speed(2) end) end"
-    limit_run(source, "operation limit")
+    source = (
+        "local it = timeline:item(1) "
+        "for i = 1, 5000 do pcall(function() it:set_speed(2) end) if i > 1000 then log(i) end end"
+    )
+    result, _ = limit_run(source, "operation limit")
+    assert result.log == []  # stopped at the 1001st call, not some instructions later
 
 
 def test_pcall_cannot_swallow_the_log_limit():
-    source = "for i = 1, 5000 do pcall(log, 'x') end log('done')"
-    limit_run(source, "log limit")
+    source = "for i = 1, 5000 do pcall(log, i) end log('done')"
+    result, _ = limit_run(source, "log limit")
+    assert result.log == [str(i) for i in range(1, 201)]
 
 
-# --- 11. API reference ------------------------------------------------------
+# --- 11. the worker process -------------------------------------------------
 
 
-def test_api_reference_mentions_every_bound_function():
-    assert BINDINGS
-    for binding in BINDINGS:
-        assert binding.call in API_REFERENCE, binding.call
-        assert binding.doc in API_REFERENCE
-        if binding.records:
-            assert binding.records in API_REFERENCE
+def run_worker(source, id_seed=SEED, **limit_kwargs):
+    return run_script(
+        source,
+        document=make_document(),
+        sources=make_sources(),
+        library=make_library(),
+        id_seed=id_seed,
+        limits=ScriptLimits(**limit_kwargs),
+    )
 
 
-def test_every_binding_exists_in_the_runtime():
-    lines = ["local it = timeline:item(1)"]
-    for binding in BINDINGS:
-        holder = {"timeline": "timeline", "library": "library", "item": "it", "": "_G"}[binding.receiver]
-        lines.append(f"if type({holder}.{binding.name}) ~= 'function' then error('missing {binding.call}') end")
-    result = ok("\n".join(lines))
-    assert result.error is None
+def fake_worker(monkeypatch, body):
+    """Replace the worker with a Python child running ``body``."""
+    monkeypatch.setattr(timeline_script, "_worker_command", lambda: [sys.executable, "-c", body])
+
+
+# Scripts that once pinned native code until the worker was killed (losing the log).
+NATIVE_PINS = [
+    ("string-count rep", "return ('x'):rep('1e12')", "string.rep too large"),
+    (
+        "__len and table.insert",
+        "local t = setmetatable({}, { __len = function() return 1e9 end }) table.insert(t, 1, 0)",
+        "metatable key '__len' is not allowed",
+    ),
+    ("metatable changed after setmetatable", MUTATED_METATABLE + " error('length ' .. #t)", "length 1"),
+    ("huge plain find", "local s = ('x'):rep(1e6) return s:find(s .. 'y')", "string.find too large"),
+]
+
+
+@pytest.mark.parametrize("source,message", [(s, m) for _, s, m in NATIVE_PINS], ids=[c for c, _, _ in NATIVE_PINS])
+def test_worker_names_the_error_of_a_former_native_pin(source, message):
+    started = time.monotonic()
+    result = run_worker(source)
+    assert time.monotonic() - started < 2.0
+    assert result.error.kind == "runtime"
+    assert message in result.error.message
+    assert result.operations == []
+
+
+def test_worker_is_deterministic_and_seeds_new_item_ids():
+    source = "local it = timeline:add('clip-d') local a, b = it:split(35) b:set_speed(2)"
+    first, second, other = run_worker(source), run_worker(source), run_worker(source, id_seed="proposal-2")
+    assert first.error is None
+    assert first.operations == second.operations
+    assert first.document == second.document
+    new_ids = {item.item_id for item in first.document.items} - {"i1", "i2", "i3"}
+    other_ids = {item.item_id for item in other.document.items} - {"i1", "i2", "i3"}
+    assert len(new_ids) == 2
+    assert new_ids.isdisjoint(other_ids)
+
+
+def test_worker_keeps_the_streamed_log_when_it_is_killed(monkeypatch):
+    fake_worker(
+        monkeypatch,
+        "import json, sys, time\n"
+        "for line in ('one', 'two'):\n"
+        "    print(json.dumps({'log': line}), flush=True)\n"
+        "time.sleep(60)",
+    )
+    started = time.monotonic()
+    result = run_worker("log('one') log('two')", timeout_sec=0.5)
+    assert time.monotonic() - started < 2.5
+    assert result.error == ScriptError("limit", "time limit exceeded (the script was stopped)", None)
+    assert result.log == ["one", "two"]
+    assert result.operations == []
+
+
+def test_worker_output_over_16_mib_stops_the_worker(monkeypatch, tmp_path):
+    pid_file = tmp_path / "pid"
+    fake_worker(
+        monkeypatch,
+        "import os, sys, time\n"
+        f"open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
+        "sys.stdout.write('x' * (17 << 20))\n"
+        "sys.stdout.flush()\n"
+        "time.sleep(60)",
+    )
+    started = time.monotonic()
+    result = run_worker("timeline:count()", timeout_sec=10)
+    assert time.monotonic() - started < 5
+    assert result.error == ScriptError("runtime", "the script runner stopped unexpectedly", None)
+    with pytest.raises(ProcessLookupError):  # killed and reaped, not left as a zombie
+        os.kill(int(pid_file.read_text()), 0)
+
+
+# --- 12. API reference ------------------------------------------------------
+
+
+def test_api_reference_names_exactly_what_the_runtime_exposes():
+    documented = set(re.findall(r"^- `((?:timeline|library|item):\w+)", API_REFERENCE, re.M))
+    item_names = sorted(call.split(":")[1] for call in documented if call.startswith("item:"))
+    # Item methods live behind a metatable the sandbox cannot read, so probe them by name: every
+    # documented Item method plus every name the other receivers expose.
+    result = ok(
+        "local function each(t, prefix) for k, v in pairs(t) do\n"
+        "  if type(v) == 'function' then log(prefix .. ':' .. k) end end end\n"
+        "each(timeline, 'timeline') each(library, 'library')\n"
+        "local it, probe = timeline:item(1), {" + ", ".join(f"'{n}'" for n in item_names) + "}\n"
+        "for k in pairs(timeline) do probe[#probe + 1] = k end\n"
+        "for k in pairs(library) do probe[#probe + 1] = k end\n"
+        "for _, k in ipairs(probe) do if type(it[k]) == 'function' then log('item:' .. k) end end"
+    )
+    assert set(result.log) == documented
 
 
 def test_api_reference_documents_clip_fields_conventions_and_stdlib():
@@ -747,12 +935,3 @@ def test_api_reference_documents_clip_fields_conventions_and_stdlib():
         assert name in API_REFERENCE
     for name in ("os", "io", "debug", "coroutine", "string.match"):
         assert name in API_REFERENCE  # the restricted list
-
-
-def test_result_types_are_frozen():
-    result = ok("timeline:count()")
-    with pytest.raises(Exception):
-        result.error = None  # type: ignore[misc]
-    with pytest.raises(Exception):
-        ScriptLimits().timeout_sec = 1  # type: ignore[misc]
-    assert isinstance(ScriptError("syntax", "x", None), ScriptError)

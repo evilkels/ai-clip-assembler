@@ -96,8 +96,10 @@ export interface Proposal {
   summary?: string[];
   before_item_count?: number;
   after_item_count?: number;
+  before_duration_sec?: number;
+  after_duration_sec?: number;
   based_on_timeline_revision?: number;
-  status?: "pending" | "accepted" | "rejected";
+  status?: "pending" | "accepted" | "rejected" | "superseded";
 }
 export interface ReviewMessage {
   message_id: string;
@@ -106,9 +108,30 @@ export interface ReviewMessage {
   created_at: string;
   reply_to_message_id?: string | null;
   proposal?: Proposal | null;
+  script?: ScriptRun | null;
   payload?: {
     [k: string]: unknown;
   };
+}
+/**
+ * One run of a Script, saved on the Review Message that carries it (ADR 0006).
+ */
+export interface ScriptRun {
+  language?: "lua";
+  engine?: string;
+  source: string;
+  author: "editor" | "agent";
+  log?: string[];
+  error?: ScriptRunError | null;
+  proposal_id?: string | null;
+  operation_count?: number;
+  based_on_timeline_revision: number;
+  ran_at: string;
+}
+export interface ScriptRunError {
+  kind: "syntax" | "runtime" | "operation" | "limit";
+  message: string;
+  line?: number | null;
 }
 export interface ReviewSession {
   schema_version?: number;

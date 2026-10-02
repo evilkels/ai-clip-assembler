@@ -6,6 +6,7 @@ operations through the operations core (so they land in Undo History); rejecting
 discards them. Read access is provided as context, so reads "run normally".
 """
 
+import subprocess
 import uuid
 
 import pytest
@@ -14,6 +15,7 @@ from src import review_agent
 from src.models import TimelineDocument, VersionSet
 from src.review_state import review_context_fingerprint, sequence_fingerprint
 from src.timeline_ops import SourceClip, TimelineController, apply_operation, seeded_item_ids
+from src.timeline_script import API_REFERENCE
 from src.timeline_service import TimelineEventBroker
 from src.review_agent import (
     ProposalStore,
@@ -26,8 +28,12 @@ from src.review_agent import (
 
 def _sources():
     return {
-        "clip-a": SourceClip(clip_id="clip-a", start_sec=1.0, end_sec=7.0, source_duration_sec=30.0),
-        "clip-b": SourceClip(clip_id="clip-b", start_sec=2.0, end_sec=5.0, source_duration_sec=30.0),
+        "clip-a": SourceClip(
+            clip_id="clip-a", start_sec=1.0, end_sec=7.0, source_duration_sec=30.0, file_name="A.MOV"
+        ),
+        "clip-b": SourceClip(
+            clip_id="clip-b", start_sec=2.0, end_sec=5.0, source_duration_sec=30.0, file_name="B.MOV"
+        ),
     }
 
 
@@ -55,7 +61,58 @@ def test_create_proposal_does_not_touch_live_document():
     # The diff describes the staged result.
     assert proposal.before_item_count == 0
     assert proposal.after_item_count == 1
-    assert proposal.summary  # human-readable lines
+    assert proposal.summary == ["Accept A.MOV 1.0–7.0 s"]
+
+
+@pytest.mark.asyncio
+async def test_proposal_change_list_names_items_by_position_and_file_as_each_step_finds_them():
+    controller = _controller()
+    await controller.apply("include", clip_id="clip-a")
+    orbit = controller.document.items[0].item_id
+
+    proposal = ProposalStore().create(
+        "p1",
+        controller,
+        message="Tighten the orbit.",
+        operations=[
+            {"operation": "add_item", "args": {"source_clip_id": "clip-b", "at_index": 0}},
+            {"operation": "set_bounds", "args": {"item_id": orbit, "start_sec": 4, "end_sec": 7}},
+            {"operation": "reorder", "args": {"item_id": orbit, "to_index": 0}},
+            {"operation": "set_speed", "args": {"item_id": orbit, "speed": 2}},
+            {"operation": "split_item", "args": {"item_id": orbit, "at_sec": 5.5}},
+            {"operation": "set_target_duration", "args": {"target_duration_sec": 40}},
+            {"operation": "exclude", "args": {"clip_id": "clip-b"}},
+        ],
+    )
+
+    assert proposal.summary == [
+        "Add B.MOV 2.0–5.0 s at position 1",
+        "Trim item 2 (A.MOV) to 4.0–7.0 s",
+        "Move item 2 (A.MOV) to position 1",
+        "Set speed 2× on item 1 (A.MOV)",
+        "Split item 1 (A.MOV) at 5.5 s",
+        "Set target duration to 40.0 s",
+        "Reject B.MOV 2.0–5.0 s",
+    ]
+    assert proposal.before_duration_sec == 6.0
+    assert proposal.after_duration_sec == 1.5
+
+
+@pytest.mark.asyncio
+async def test_proposal_trim_line_shows_the_bounds_apply_will_produce():
+    controller = _controller()
+    await controller.apply("include", clip_id="clip-b")
+    await controller.apply("include", clip_id="clip-a")
+    orbit = controller.document.items[1].item_id
+
+    proposal = ProposalStore().create(
+        "p1",
+        controller,
+        message="Use the whole source.",
+        operations=[{"operation": "set_bounds", "args": {"item_id": orbit, "start_sec": -10, "end_sec": 100}}],
+    )
+
+    assert proposal.summary == ["Trim item 2 (A.MOV) to 0.0–30.0 s"]
 
 
 def test_create_proposal_rejects_invalid_operations():
@@ -413,6 +470,13 @@ async def test_run_review_turn_uses_one_captured_snapshot_for_context_and_propos
         return {
             "message": "Add clip A.",
             "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+            "versions": [
+                {
+                    "version_id": "v1",
+                    "profile": "long_scenic",
+                    "items": [{"source_clip_id": "clip-a", "start_sec": 1.0, "end_sec": 7.0}],
+                }
+            ],
         }
 
     result = await run_review_turn(
@@ -519,6 +583,122 @@ async def test_empty_model_versions_use_deterministic_backend_fallback():
     assert version_set["based_on_review_context_fingerprint"] == review_context_fingerprint(
         TimelineDocument(), candidates
     )
+
+
+_CANDIDATES = [
+    {
+        "clip_id": "clip-a",
+        "file_id": "file-a",
+        "file_name": "A.MOV",
+        "start_sec": 1.0,
+        "end_sec": 7.0,
+        "overall_score": 8.0,
+    },
+    {
+        "clip_id": "clip-b",
+        "file_id": "file-a",
+        "file_name": "A.MOV",
+        "start_sec": 2.0,
+        "end_sec": 5.0,
+        "overall_score": 9.0,
+    },
+]
+
+
+def test_default_agent_offers_the_script_api_and_returns_the_model_script(monkeypatch):
+    prompts = []
+
+    def fake_pi(command, **_kwargs):
+        prompts.append(command[-1])
+        return subprocess.CompletedProcess(
+            command, 0, stdout='{"message":"Sorted.","script":"timeline:clear()"}', stderr=""
+        )
+
+    monkeypatch.setattr(review_agent.subprocess, "run", fake_pi)
+
+    reply = review_agent.default_review_agent({"user_message": "Sort by score", "candidates": []})
+
+    assert API_REFERENCE in prompts[0]
+    assert reply["script"] == "timeline:clear()"
+
+
+@pytest.mark.asyncio
+async def test_agent_script_reply_becomes_a_proposal_on_the_agent_message_without_versions():
+    controller = _controller()
+    store = ProposalStore()
+    script = (
+        "local clips = library:clips()\n"
+        "table.sort(clips, function(a, b) return a.score > b.score end)\n"
+        "for _, clip in ipairs(clips) do timeline:add(clip) end"
+    )
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Best first",
+        controller=controller,
+        candidates=_CANDIDATES,
+        store=store,
+        agent=lambda _context: {
+            "message": "Best first.",
+            "script": script,
+            # Ignored: the script wins.
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+        },
+    )
+
+    agent_message = result["agent_message"]
+    assert agent_message["script"]["author"] == "agent"
+    assert agent_message["script"]["source"] == script
+    assert agent_message["script"]["error"] is None
+    assert agent_message["script"]["proposal_id"] == result["proposal"]["proposal_id"]
+    assert [op["args"]["source_clip_id"] for op in result["proposal"]["operations"]] == [
+        "clip-b",
+        "clip-a",
+    ]
+    assert "version_set" not in agent_message["payload"]
+    assert controller.document.items == []
+
+
+@pytest.mark.asyncio
+async def test_failing_agent_script_stages_nothing_not_even_its_operations():
+    store = ProposalStore()
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Best first",
+        controller=_controller(),
+        candidates=_CANDIDATES,
+        store=store,
+        agent=lambda _context: {
+            "message": "Best first.",
+            "script": 'timeline:add("missing")',
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+        },
+    )
+
+    agent_message = result["agent_message"]
+    assert agent_message["script"]["error"]["kind"] == "operation"
+    assert result["proposal"] is None
+    assert store.list_for_project("p1") == []
+    assert "version_set" not in agent_message["payload"]
+
+
+@pytest.mark.asyncio
+async def test_agent_operations_without_versions_attach_no_fabricated_versions():
+    result = await run_review_turn(
+        "p1",
+        user_message="Add the orbit",
+        controller=_controller(),
+        candidates=_CANDIDATES,
+        store=ProposalStore(),
+        agent=lambda _context: {
+            "message": "Adding the orbit.",
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+        },
+    )
+
+    assert result["proposal"]["status"] == "pending"
+    assert "version_set" not in result["agent_message"]["payload"]
 
 
 @pytest.mark.asyncio

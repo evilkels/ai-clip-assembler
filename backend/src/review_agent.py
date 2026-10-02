@@ -14,6 +14,7 @@ deterministic and testable; the default implementation reuses
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -23,7 +24,7 @@ from contextlib import nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .models import (
     CreativeVersion,
@@ -31,7 +32,10 @@ from .models import (
     Proposal,
     ReviewMessage,
     ReviewSession,
+    ScriptRun,
+    ScriptRunError,
     TimelineDocument,
+    TimelineItem,
     VersionSet,
 )
 from .app_settings import get_settings
@@ -42,9 +46,11 @@ from .timeline_ops import (
     OPERATIONS,
     Sources,
     TimelineController,
-    apply_operation,
+    TimelineOpError,
+    apply_operation_in_place,
     seeded_item_ids,
 )
+from .timeline_script import API_REFERENCE, run_script
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -58,31 +64,60 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _describe(operation: str, args: dict) -> str:
-    """A short human-readable line for one staged operation."""
-    if operation == "include":
-        return f"Accept {args.get('clip_id')}"
-    if operation == "exclude":
-        return f"Reject {args.get('clip_id')}"
+def _clip_label(sources: Sources, clip_id: str) -> str:
+    source = sources.get(clip_id)  # exclude/reset_decision accept unknown clip ids
+    if source is None or source.file_name is None:
+        return clip_id
+    return f"{source.file_name} {source.start_sec:.1f}–{source.end_sec:.1f} s"
+
+
+def _locate(document: TimelineDocument, item_id: str) -> Tuple[int, TimelineItem]:
+    """The item's 1-based position in ``document``, and the item."""
+    for position, item in enumerate(document.items, start=1):
+        if item.item_id == item_id:
+            return position, item
+    # Most steps are described before they apply, so the core has not rejected this yet.
+    raise TimelineOpError(f"unknown timeline item: {item_id}")
+
+
+def _describe(document: TimelineDocument, sources: Sources, operation: str, args: dict) -> str:
+    """A short human-readable line for one staged operation, as it applies to ``document``."""
+    if operation in ("include", "exclude", "reset_decision"):
+        verb = {"include": "Accept", "exclude": "Reject", "reset_decision": "Clear the decision on"}
+        return f"{verb[operation]} {_clip_label(sources, args['clip_id'])}"
     if operation == "add_item":
-        return f"Add {args.get('source_clip_id')} to the timeline"
-    if operation == "remove_item":
-        return f"Remove item {args.get('item_id')}"
-    if operation == "split_item":
-        return f"Split item {args.get('item_id')} at {args.get('at_sec')}s"
-    if operation == "set_bounds":
-        return f"Trim item {args.get('item_id')} to {args.get('start_sec')}–{args.get('end_sec')}s"
-    if operation == "reorder":
-        return f"Move item {args.get('item_id')} to position {args.get('to_index')}"
-    if operation == "set_speed":
-        return f"Set speed {args.get('speed')}× on item {args.get('item_id')}"
-    if operation == "set_transform":
-        return f"Reframe item {args.get('item_id')}"
+        at_index = args.get("at_index")
+        where = "at the end" if at_index is None else f"at position {at_index + 1}"
+        return f"Add {_clip_label(sources, args['source_clip_id'])} {where}"
     if operation == "set_profile":
         return f"Set profile to {args.get('profile')}"
     if operation == "set_target_duration":
-        return f"Set target duration to {args.get('target_duration_sec')}s"
+        target = args.get("target_duration_sec")
+        if target is None:
+            return "Clear the target duration"
+        return f"Set target duration to {target:.1f} s"
+    if "item_id" not in args:
+        return f"{operation} {args}"
+    position, target = _locate(document, args["item_id"])
+    source = sources.get(target.source_clip_id)
+    item = f"item {position} ({source.file_name if source and source.file_name else target.source_clip_id})"
+    if operation == "remove_item":
+        return f"Remove {item}"
+    if operation == "split_item":
+        return f"Split {item} at {args['at_sec']:.1f} s"
+    if operation == "set_bounds":
+        return f"Trim {item} to {target.start_sec:.1f}–{target.end_sec:.1f} s"
+    if operation == "reorder":
+        return f"Move {item} to position {args['to_index'] + 1}"
+    if operation == "set_speed":
+        return f"Set speed {args['speed']:g}× on {item}"
+    if operation == "set_transform":
+        return f"Reframe {item}"
     return f"{operation} {args}"
+
+
+def _effective_duration(document: TimelineDocument) -> float:
+    return sum(item.effective_duration_sec for item in document.items)
 
 
 def _simulate(
@@ -90,19 +125,29 @@ def _simulate(
     sources: Sources,
     operations: List[dict],
     id_seed: Optional[str] = None,
-) -> TimelineDocument:
+) -> Tuple[TimelineDocument, List[str]]:
     """Apply the staged operations to a throwaway copy to compute the diff.
 
-    Raises ``TimelineOpError`` if any staged operation is invalid, so a bad
+    Returns the resulting document and one change-list line per operation,
+    each describing the document that operation applied to. Raises
+    ``TimelineOpError`` if any staged operation is invalid, so a bad
     proposal is rejected at creation time rather than on accept. With
     ``id_seed`` the items the operations create get deterministic ids, so later
     operations in the batch can refer to them (see ``seeded_item_ids``).
     """
-    working = document
+    working = document.model_copy(deep=True)
+    summary = []
     with seeded_item_ids(id_seed) if id_seed is not None else nullcontext():
         for op in operations:
-            working = apply_operation(working, sources, op["operation"], **op.get("args", {}))
-    return working
+            operation, args = op["operation"], op.get("args", {})
+            # A trim is described after it lands, so the line shows the clamped bounds;
+            # it never moves the item, so the position is the pre-step one.
+            if operation != "set_bounds":
+                summary.append(_describe(working, sources, operation, args))
+            apply_operation_in_place(working, sources, operation, **args)
+            if operation == "set_bounds":
+                summary.append(_describe(working, sources, operation, args))
+    return working, summary
 
 
 class ProposalStore:
@@ -150,6 +195,7 @@ class ProposalStore:
         role: str,
         text: str,
         proposal: Optional[Proposal] = None,
+        script: Optional[ScriptRun] = None,
         payload: Optional[dict] = None,
         message_id: Optional[str] = None,
         reply_to_message_id: Optional[str] = None,
@@ -162,6 +208,7 @@ class ProposalStore:
             created_at=timestamp,
             reply_to_message_id=reply_to_message_id,
             proposal=proposal,
+            script=script,
             payload=payload or {},
         )
         session = self.session(project_id)
@@ -184,21 +231,25 @@ class ProposalStore:
         operations: List[dict],
         record_message: bool = True,
         baseline_document: Optional[TimelineDocument] = None,
+        proposal_id: Optional[str] = None,
     ) -> Proposal:
         baseline = baseline_document or controller.document.model_copy(deep=True)
         # Validate by simulating on the captured document (no live mutation).
         # The id is minted first because it seeds the item ids of the simulation;
-        # accept() replays with the same seed so both runs agree.
-        proposal_id = uuid.uuid4().hex
-        resulting = _simulate(baseline, controller.sources, operations, id_seed=proposal_id)
+        # accept() replays with the same seed so both runs agree. A script run
+        # passes the id it already seeded its recording with.
+        proposal_id = proposal_id or uuid.uuid4().hex
+        resulting, summary = _simulate(baseline, controller.sources, operations, id_seed=proposal_id)
         proposal = Proposal(
             proposal_id=proposal_id,
             project_id=project_id,
             message=message,
             operations=operations,
-            summary=[_describe(op["operation"], op.get("args", {})) for op in operations],
+            summary=summary,
             before_item_count=len(baseline.items),
             after_item_count=len(resulting.items),
+            before_duration_sec=_effective_duration(baseline),
+            after_duration_sec=_effective_duration(resulting),
             based_on_timeline_revision=baseline.revision,
         )
         if record_message:
@@ -254,11 +305,135 @@ class ProposalStore:
         self._save(proposal.project_id)
         return proposal
 
+    def supersede(self, proposal_id: str, project_id: Optional[str] = None) -> Proposal:
+        """Retire a pending Proposal that a re-run replaced; any other status stays."""
+        proposal = self._require(proposal_id, project_id)
+        if proposal.status == "pending":
+            proposal.status = "superseded"
+            self._save(proposal.project_id)
+        return proposal
+
     def _require(self, proposal_id: str, project_id: Optional[str] = None) -> Proposal:
         proposal = self.get(proposal_id, project_id)
         if proposal is None:
             raise ReviewAgentError(f"unknown proposal: {proposal_id}")
         return proposal
+
+
+async def _run_script_proposal(
+    project_id: str,
+    source: str,
+    *,
+    author: str,
+    controller: TimelineController,
+    baseline: TimelineDocument,
+    library: List[dict],
+    store: ProposalStore,
+    message: str = "",
+) -> Tuple[ScriptRun, Optional[Proposal]]:
+    """Run a Script against ``baseline`` and stage what it recorded as a Proposal.
+
+    The Proposal id is minted first because it seeds the ids of the Items the
+    script creates, so the Proposal's simulation and its accept replay the
+    recording exactly. A fault or an empty recording stages nothing.
+    """
+    proposal_id = uuid.uuid4().hex
+    result = await asyncio.to_thread(
+        run_script,
+        source,
+        document=baseline,
+        sources=controller.sources,
+        library=library,
+        id_seed=proposal_id,
+    )
+    proposal = None
+    if result.error is None and result.operations:
+        # Simulating a long recording is CPU work too; keep it off the event loop.
+        # Nothing is persisted here: the caller appends the message under its lock.
+        proposal = await asyncio.to_thread(
+            store.create,
+            project_id,
+            controller,
+            message=message,
+            operations=result.operations,
+            record_message=False,
+            baseline_document=baseline,
+            proposal_id=proposal_id,
+        )
+    error = result.error
+    script = ScriptRun(
+        source=source,
+        author=author,
+        log=result.log,
+        error=ScriptRunError(kind=error.kind, message=error.message, line=error.line) if error else None,
+        proposal_id=proposal.proposal_id if proposal else None,
+        operation_count=len(result.operations),
+        based_on_timeline_revision=baseline.revision,
+        ran_at=_now(),
+    )
+    return script, proposal
+
+
+async def run_editor_script(
+    project_id: str,
+    *,
+    source: str,
+    controller: TimelineController,
+    library: List[dict],
+    store: ProposalStore,
+    client_message_id: Optional[str] = None,
+    rerun_of_proposal_id: Optional[str] = None,
+) -> dict:
+    """Run the Editor's Script and record it as an Editor message.
+
+    Local only: no model call, so no cloud consent. Retrying with the same
+    ``client_message_id`` and source returns the stored run. With
+    ``rerun_of_proposal_id``, a run without an error supersedes the old Proposal,
+    even when it records nothing; a faulted run leaves it pending.
+    """
+    session = store.session(project_id)
+    if client_message_id:
+        existing = next(
+            (message for message in session.messages if message.message_id == client_message_id),
+            None,
+        )
+        if existing is not None:
+            if existing.script is None or existing.script.source != source:
+                raise ReviewAgentError(
+                    f"client message id {client_message_id} was already used for another message"
+                )
+            return _script_result(existing, session)
+    if rerun_of_proposal_id and store.get(rerun_of_proposal_id, project_id) is None:
+        raise ReviewAgentError(f"unknown proposal: {rerun_of_proposal_id}")
+    baseline = controller.document.model_copy(deep=True)
+    script, proposal = await _run_script_proposal(
+        project_id,
+        source,
+        author="editor",
+        controller=controller,
+        baseline=baseline,
+        library=library,
+        store=store,
+    )
+    if script.error is None and rerun_of_proposal_id:
+        store.supersede(rerun_of_proposal_id, project_id)
+    message = store.append_message(
+        project_id,
+        role="editor",
+        text="",
+        proposal=proposal,
+        script=script,
+        message_id=client_message_id,
+    )
+    return _script_result(message, store.session(project_id))
+
+
+def _script_result(message: ReviewMessage, session: ReviewSession) -> dict:
+    return {
+        "message": message.model_dump(),
+        "proposal": message.proposal.model_dump() if message.proposal else None,
+        "session": session.model_dump(),
+    }
 
 
 # Signature of the injectable model call: given read context, return a message
@@ -277,6 +452,7 @@ async def run_review_turn(
     record_user_message: bool = True,
     candidate_frames: Optional[List[dict]] = None,
     client_message_id: Optional[str] = None,
+    library: Optional[List[dict]] = None,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -284,6 +460,8 @@ async def run_review_turn(
     ``agent`` for an assistant message and staged operations, and — if it
     proposes any — captures them as a pending Proposal. Returns
     ``{"message", "proposal"}`` (``proposal`` is ``None`` for a chat-only turn).
+    An agent script reads ``library``, the complete Candidate Clip library
+    (``candidates`` may leave excluded clips out); it defaults to ``candidates``.
     """
     session = store.session(project_id)
     editor_message = None
@@ -329,9 +507,23 @@ async def run_review_turn(
     }
     reply = agent(context)
     message = reply.get("message", "")
+    source = reply.get("script")
     operations = reply.get("operations") or []
     proposal = None
-    if operations:
+    script = None
+    if source:
+        # A script wins over any operations in the same reply.
+        script, proposal = await _run_script_proposal(
+            project_id,
+            source,
+            author="agent",
+            message=message,
+            controller=controller,
+            baseline=baseline,
+            library=candidates if library is None else library,
+            store=store,
+        )
+    elif operations:
         proposal = store.create(
             project_id,
             controller,
@@ -343,28 +535,30 @@ async def run_review_turn(
     validated_versions = _validate_versions(
         reply.get("versions") or [], bounded_candidates
     )
-    if not validated_versions:
-        validated_versions = [
-            version.model_dump() for version in deterministic_versions(bounded_candidates)
-        ]
-    version_set = VersionSet(
-        version_set_id=uuid.uuid4().hex,
-        versions=validated_versions,
-        created_at=_now(),
-        based_on_timeline_revision=baseline.revision,
-        based_on_sequence_fingerprint=sequence_fingerprint(baseline.items),
-        based_on_review_context_fingerprint=review_context_fingerprint(
-            baseline, bounded_candidates
-        ),
-    )
     payload = dict(reply.get("payload") or {})
     payload.pop("versions", None)
-    payload["version_set"] = version_set.model_dump()
+    # A turn that edits and brings no valid Versions gets none fabricated (plan 034 D8).
+    if validated_versions or not (source or operations):
+        if not validated_versions:
+            validated_versions = [
+                version.model_dump() for version in deterministic_versions(bounded_candidates)
+            ]
+        payload["version_set"] = VersionSet(
+            version_set_id=uuid.uuid4().hex,
+            versions=validated_versions,
+            created_at=_now(),
+            based_on_timeline_revision=baseline.revision,
+            based_on_sequence_fingerprint=sequence_fingerprint(baseline.items),
+            based_on_review_context_fingerprint=review_context_fingerprint(
+                baseline, bounded_candidates
+            ),
+        ).model_dump()
     agent_message = store.append_message(
         project_id,
         role="agent",
         text=message,
         proposal=proposal,
+        script=script,
         payload=payload,
         reply_to_message_id=editor_message.message_id if editor_message else None,
     )
@@ -399,6 +593,10 @@ _AGENT_PROMPT = (
     "set_speed takes {{item_id, speed}}; split_item takes {{item_id, at_sec}}; "
     "set_bounds takes {{item_id, start_sec, end_sec}}; set_transform takes "
     "{{item_id, transform:{{scale,x,y}}}}.\n\n"
+    "When an edit needs loops, sorting or arithmetic, put a Lua script in "
+    '"script" instead of listing "operations"; the editor sees what it changes '
+    "before applying it. A reply with a script ignores its operations. The script "
+    "API:\n\n{api_reference}\n"
     "Candidates (JSON): {candidates}\n"
     "Labelled frame samples (JSON): {candidate_frames}\n"
     "Current timeline (JSON): {timeline}\n"
@@ -430,7 +628,11 @@ def _parse_agent_json(raw: str) -> dict:
         if isinstance(op, dict) and op.get("operation") in OPERATIONS
     ]
     versions = parsed.get("versions") or []
-    return {"message": message, "operations": cleaned, "versions": versions}
+    reply = {"message": message, "operations": cleaned, "versions": versions}
+    script = parsed.get("script")
+    if isinstance(script, str) and script.strip():
+        reply["script"] = script
+    return reply
 
 
 def _validate_versions(raw_versions: list, candidates: List[dict]) -> List[dict]:
@@ -608,6 +810,7 @@ def default_review_agent(context: dict) -> dict:
     """Call the pi CLI for a propose-mode turn; degrade to chat-only on failure."""
     prompt = _AGENT_PROMPT.format(
         catalogue=OPERATION_CATALOGUE,
+        api_reference=API_REFERENCE,
         candidates=json.dumps(context.get("candidates", []))[:6000],
         candidate_frames=json.dumps(context.get("candidate_frames", []))[:4000],
         timeline=json.dumps(context.get("timeline", {}))[:6000],

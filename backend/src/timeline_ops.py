@@ -65,6 +65,7 @@ class SourceClip(BaseModel):
     start_sec: float
     end_sec: float
     source_duration_sec: float
+    file_name: Optional[str] = None  # names the item in a Proposal's change list
 
 
 Sources = Dict[str, SourceClip]

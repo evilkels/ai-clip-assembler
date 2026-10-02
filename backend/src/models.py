@@ -106,8 +106,32 @@ class Proposal(BaseModel):
     summary: List[str] = Field(default_factory=list)
     before_item_count: int = 0
     after_item_count: int = 0
+    # Effective (speed-aware) Timeline duration, the measure `timeline:duration()` reads.
+    before_duration_sec: float = 0.0
+    after_duration_sec: float = 0.0
     based_on_timeline_revision: int = 0
-    status: Literal["pending", "accepted", "rejected"] = "pending"
+    status: Literal["pending", "accepted", "rejected", "superseded"] = "pending"
+
+
+class ScriptRunError(BaseModel):
+    kind: Literal["syntax", "runtime", "operation", "limit"]
+    message: str
+    line: Optional[int] = None
+
+
+class ScriptRun(BaseModel):
+    """One run of a Script, saved on the Review Message that carries it (ADR 0006)."""
+
+    language: Literal["lua"] = "lua"
+    engine: str = "lua5.4"
+    source: str
+    author: Literal["editor", "agent"]
+    log: List[str] = Field(default_factory=list)
+    error: Optional[ScriptRunError] = None
+    proposal_id: Optional[str] = None
+    operation_count: int = 0
+    based_on_timeline_revision: int
+    ran_at: str
 
 
 class ReviewMessage(BaseModel):
@@ -117,6 +141,7 @@ class ReviewMessage(BaseModel):
     created_at: str
     reply_to_message_id: Optional[str] = None
     proposal: Optional[Proposal] = None
+    script: Optional[ScriptRun] = None
     payload: dict = Field(default_factory=dict)
 
 

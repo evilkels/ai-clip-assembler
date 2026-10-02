@@ -36,6 +36,7 @@ def main() -> None:
         id_seed=request["id_seed"],
         limits=ScriptLimits(**request["limits"]),
         on_log=lambda line: emit({"log": line}),
+        on_ready=lambda: emit({"ready": True}),
     )
     emit(
         {

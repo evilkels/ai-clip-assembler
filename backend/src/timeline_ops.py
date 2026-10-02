@@ -5,10 +5,12 @@ This module is the **only** way a :class:`TimelineDocument` is mutated. The GUI
 named operations through :func:`apply_operation`, so the two adapters cannot
 drift.
 
-Operations are pure: each returns a *new* document (the input is never mutated),
-which makes snapshot-based undo/redo trivial. :class:`TimelineController` wraps
-the core with a bounded per-project history ring and a per-project async write
-lock so a GUI edit and an external-agent edit cannot interleave mid-operation.
+``apply_operation`` is pure: it returns a *new* document (the input is never
+mutated), which makes snapshot-based undo/redo trivial. Script sessions use
+``apply_operation_in_place`` on their private working copy to avoid copying it
+for every recorded Operation. :class:`TimelineController` wraps the core with
+a bounded per-project history ring and a per-project async write lock so a GUI
+edit and an external-agent edit cannot interleave mid-operation.
 """
 
 from __future__ import annotations
@@ -127,7 +129,7 @@ def _require_source(sources: Sources, clip_id: str) -> SourceClip:
 
 # --- operations -------------------------------------------------------------
 #
-# Each handler mutates the already-deep-copied ``doc`` in place and returns it.
+# Each handler mutates its owned ``doc`` in place and returns it.
 # Validation raises ``TimelineOpError`` before any mutation, so a rejected
 # operation leaves the document untouched.
 
@@ -348,11 +350,21 @@ def apply_operation(
     The input ``document`` is never mutated. Raises :class:`TimelineOpError` for
     an unknown operation name or invalid arguments.
     """
+    working_copy = document.model_copy(deep=True)
+    return apply_operation_in_place(working_copy, sources, operation, **args)
+
+
+def apply_operation_in_place(
+    document: TimelineDocument,
+    sources: Sources,
+    operation: str,
+    **args,
+) -> TimelineDocument:
+    """Apply one validated operation to a document owned by the caller."""
     handler = OPERATIONS.get(operation)
     if handler is None:
         raise TimelineOpError(f"unknown operation: {operation}")
-    working_copy = document.model_copy(deep=True)
-    return handler(working_copy, sources, **args)
+    return handler(document, sources, **args)
 
 
 # --- history + write lock ---------------------------------------------------

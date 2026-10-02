@@ -32,7 +32,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 import lupa.lua54 as lupa  # never a bare `import lupa`: it binds the newest engine at runtime
 
 from .models import TimelineDocument
-from .timeline_ops import Sources, TimelineOpError, apply_operation, seeded_item_ids
+from .timeline_ops import Sources, TimelineOpError, apply_operation_in_place, seeded_item_ids
 
 
 @dataclass(frozen=True)
@@ -266,11 +266,11 @@ end""",
     # globals
     _binding(
         "", "log", "(...)", "Append a line to the run log; arguments are joined with tabs.", None,
-        "function(...) api.log(join(...)) end",
+        "function(...) api.log(cut(join(...), 2000)) end",
     ),
     _binding(
         "", "print", "(...)", "Same as `log`.", None,
-        "function(...) api.log(join(...)) end",
+        "function(...) api.log(cut(join(...), 2000)) end",
     ),
 ]
 
@@ -287,10 +287,11 @@ _CLIP_FIELDS: List[Tuple[str, str]] = [
 ]
 
 _STDLIB_KEPT = (
-    "`math` (no `random`), `table` (`concat`, `insert`, `remove`, `sort`, `unpack`, `pack`), `utf8`, "
+    "`math` (no `random`), `table` (`concat`, `insert`, `move`, `remove`, `sort`, `unpack`, `pack`), `utf8`, "
     "`ipairs`, `pairs`, `next`, `select`, `type`, `tostring`, `tonumber`, `error`, `assert`, `pcall`, "
-    "`setmetatable` (only approved keys and Lua-function metamethods are allowed; a metatable is copied "
-    "when set; changing it afterwards has no effect) and `string` without `dump`, `match`, "
+    "`setmetatable` (only approved keys and Lua-function metamethods are allowed; `__close` is refused "
+    "and a metatable is copied when set; changing it afterwards has no effect) and `string` without "
+    "`dump`, `match`, "
     "`gmatch` and `gsub`. `string.find` searches for a plain substring only, and `string.rep` "
     "is capped at 1,000,000 characters. `string.find` is capped at 10,000,000 input-pattern character pairs. "
     "`table.move` is capped at a range of 1,000,000 values."
@@ -381,20 +382,26 @@ local error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type,
 local sethook, getinfo = debug.sethook, debug.getinfo
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local real_string, real_find, real_rep = string, string.find, string.rep
+local real_sub = string.sub
 local real_utf8, real_math, real_table = utf8, math, table
 local real_next = next
 
-local ticks, tripped, faulted = 0, nil, false
+local ticks, calls, tripped, faulted = 0, 0, nil, false
 local hook
 local function trip(name)                   -- re-arm at count 1 so no pcall can swallow the limit
   if not tripped then tripped = name end
   on_trip(tripped)
   sethook(hook, "", 1)
 end
-function hook()                             -- every 1000 VM instructions
-  ticks = ticks + 1
+function hook(event)
+  if event == "call" then
+    calls = calls + 1
+    if calls % 64 ~= 0 then return end
+  else
+    ticks = ticks + 1
+  end
   if not tripped then
-    local name = ticks > max_ticks and "instruction limit" or check()
+    local name = event ~= "call" and ticks > max_ticks and "instruction limit" or check()
     if name then trip(name) end
   end
   if tripped then error(tripped .. " exceeded", 0) end
@@ -425,6 +432,10 @@ local function fail(msg) error(at_line(script_line(), msg), 0) end
 -- `string` is shared with every string's metatable, so patch the real table.
 real_string.dump, real_string.match, real_string.gmatch, real_string.gsub = nil, nil, nil, nil
 real_string.find = function(s, pattern, init)
+  if type(s) == "number" then s = tostring(s) end
+  if type(pattern) == "number" then pattern = tostring(pattern) end
+  if type(s) ~= "string" then fail("string.find expects a string or number for s") end
+  if type(pattern) ~= "string" then fail("string.find expects a string or number for pattern") end
   if #s * #pattern > 1e7 then fail("string.find too large") end
   return real_find(s, pattern, init, true)
 end
@@ -455,6 +466,9 @@ for key, value in pairs(real_math) do
 end
 env.table = pick(real_table, {"concat", "insert", "remove", "sort", "unpack", "pack"})
 env.table.move = function(t, f, e, target, dest)
+  if type(f) ~= "number" or type(e) ~= "number" or type(target) ~= "number" then
+    fail("table.move positions must be numbers")
+  end
   if e - f + 1 > 1e6 then fail("table.move range too large") end
   return real_table.move(t, f, e, target, dest)
 end
@@ -462,7 +476,7 @@ local metamethods = {
   __index=true, __newindex=true, __call=true, __tostring=true, __eq=true, __lt=true, __le=true,
   __unm=true, __add=true, __sub=true, __mul=true, __div=true, __mod=true, __pow=true,
   __idiv=true, __band=true, __bor=true, __bxor=true, __shl=true, __shr=true, __bnot=true,
-  __concat=true, __close=true, __name=true,
+  __concat=true, __name=true,
 }
 -- Installs a validated copy: the script cannot reach it, so later changes to `mt` do nothing.
 env.setmetatable = function(t, mt)
@@ -470,6 +484,7 @@ env.setmetatable = function(t, mt)
   local sealed = {}
   for key, value in real_next, mt do
     if type(key) ~= "string" or not metamethods[key] then
+      faulted = true
       fail("metatable key '" .. tostring(key) .. "' is not allowed")
     end
     if key == "__name" then
@@ -487,14 +502,30 @@ env.setmetatable = function(t, mt)
 end
 
 -- Python exceptions and API errors become strings at the calling script line.
-local function guard(fn)
+local cut
+local function guard(fn, name)
   return function(...)
-    local results = pack(pcall(fn, ...))
+    local args = pack(...)
+    for i = 1, args.n do
+      if type(args[i]) == "string" then
+        if name == "log" or name == "print" then
+          args[i] = cut(args[i], 2000)
+        elseif #args[i] > 4096 then
+          local what = name == "set_profile" and "a profile name" or "a clip id"
+          fail(what .. " is too long (max 4096 bytes)")
+        end
+      end
+    end
+    local results = pack(pcall(fn, unpack(args, 1, args.n)))
     if results[1] then return unpack(results, 2, results.n) end
     local line = script_line()
     if fault_at(line) then faulted = true end
     sticky(results[2])
-    error(at_line(line, tostring(results[2])), 0)
+    local message = tostring(results[2])
+    if real_find(message, "codec can't decode", 1, true) then
+      message = "strings must be valid UTF-8"
+    end
+    error(at_line(line, message), 0)
   end
 end
 
@@ -526,6 +557,12 @@ local function join(...)
   for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
   return concat(parts, "\t")
 end
+cut = function(s, limit)
+  if #s <= limit then return s end
+  local okay, next_char = pcall(real_utf8.offset, s, 0, limit + 1)
+  if okay and next_char then return real_sub(s, 1, next_char - 1) end
+  return real_sub(s, 1, limit)
+end
 
 local timeline, library, globals = {}, {}, {}
 --BINDINGS--
@@ -538,7 +575,7 @@ for _, key in ipairs{"os", "io", "package", "require", "load", "loadfile", "dofi
                      "xpcall", "python"} do
   _G[key] = nil                             -- defence in depth: the real globals are stripped too
 end
-sethook(hook, "", 1000)
+sethook(hook, "c", 1000)
 return function(source)
   local fn, err = load(source, "=script", "t", env)   -- "t": text only, never bytecode
   if not fn then return false, err end
@@ -550,7 +587,7 @@ end
 
 def _boot_source() -> str:
     body = "\n".join(
-        f"{_LUA_TABLE[b.receiver]}.{b.name} = guard({b.lua})" for b in BINDINGS
+        f"{_LUA_TABLE[b.receiver]}.{b.name} = guard({b.lua}, '{b.name}')" for b in BINDINGS
     )
     return _BOOT.replace("--BINDINGS--", body)
 
@@ -693,13 +730,15 @@ class _Session:
     # -- recording -----------------------------------------------------------
 
     def _record(self, operation: str, **args: Any) -> None:
+        if time.monotonic() > self.deadline:
+            raise self._spend("time limit")
         if len(self.operations) >= self.limits.max_operations:
             raise self._spend("operation limit")
         recorded = {"operation": operation, "args": args}
         size = len(json.dumps(recorded))
         if self.recording_bytes + size > self.limits.max_recording_bytes:
             raise self._spend("recording limit")
-        self.document = apply_operation(self.document, self.sources, operation, **args)
+        apply_operation_in_place(self.document, self.sources, operation, **args)
         self.operations.append(recorded)
         self.recording_bytes += size
 
@@ -913,6 +952,7 @@ def run_script_in_process(
     id_seed: str,
     limits: ScriptLimits = ScriptLimits(),
     on_log: Optional[Callable[[str], None]] = None,
+    on_ready: Optional[Callable[[], None]] = None,
 ) -> ScriptResult:
     """Run ``source`` against a copy of ``document`` and return what it recorded.
 
@@ -964,6 +1004,8 @@ def run_script_in_process(
             api, session.check, session.on_trip, session.fault_at, max(1, limits.max_instructions // 1000)
         )
         session.deadline = time.monotonic() + limits.timeout_sec
+        if on_ready is not None:
+            on_ready()
         loaded, load_error = True, None
         raised: Optional[BaseException] = None
         with seeded_item_ids(id_seed):
@@ -973,6 +1015,8 @@ def run_script_in_process(
                 session.on_trip("memory limit")
             except lupa.LuaError as exc:
                 raised = exc
+        if session.check() == "time limit":
+            session.on_trip("time limit")
         # The hook poisons the runtime once it trips: never call back into it here.
         if session.fault is not None:  # even when the script caught it and returned normally
             fault = session.fault
@@ -1058,7 +1102,12 @@ def run_script(
             logger.warning("Lua script worker could not start: %s", exc)
             return failure("runtime", stopped)
 
-        received: Dict[str, Any] = {"result": None, "problem": None}
+        received: Dict[str, Any] = {
+            "result": None,
+            "problem": None,
+            "ready_at": None,
+        }
+        ready = threading.Event()
 
         def read() -> None:
             try:
@@ -1067,30 +1116,51 @@ def run_script(
             except OSError:
                 pass  # the worker exited early; its exit status says why
             total = 0
-            while raw := worker.stdout.readline(_MAX_WORKER_OUTPUT + 1 - total):
-                total += len(raw)
-                if total > _MAX_WORKER_OUTPUT:
-                    received["problem"] = "wrote over 16 MiB"
-                    worker.kill()
-                    return
-                try:
-                    message = json.loads(raw)
-                except ValueError:
-                    message = None
-                if isinstance(message, dict) and isinstance(message.get("log"), str):
-                    log_lines.append(message["log"])
-                elif isinstance(message, dict) and "result" in message:
-                    received["result"] = message["result"]
-                else:
-                    received["problem"] = "wrote invalid output"
-                    worker.kill()
-                    return
+            try:
+                while raw := worker.stdout.readline(_MAX_WORKER_OUTPUT + 1 - total):
+                    total += len(raw)
+                    if total > _MAX_WORKER_OUTPUT:
+                        received["problem"] = "wrote over 16 MiB"
+                        worker.kill()
+                        return
+                    try:
+                        message = json.loads(raw)
+                    except ValueError:
+                        message = None
+                    if isinstance(message, dict) and isinstance(message.get("log"), str):
+                        log_lines.append(message["log"])
+                    elif isinstance(message, dict) and message.get("ready") is True:
+                        received["ready_at"] = time.monotonic()
+                        ready.set()
+                    elif isinstance(message, dict) and "result" in message:
+                        received["result"] = message["result"]
+                    else:
+                        received["problem"] = "wrote invalid output"
+                        worker.kill()
+                        return
+            finally:
+                ready.set()  # a worker that stops before it is ready must not wait out the startup budget
 
         with worker:
-            deadline = time.monotonic() + limits.timeout_sec + 1.0
             reader = threading.Thread(target=read, daemon=True)
             reader.start()
-            reader.join(limits.timeout_sec + 1.0)
+            if not ready.wait(10.0):
+                worker.kill()
+                worker.wait()
+                reader.join()
+                stderr.seek(0)
+                logger.warning("Lua script worker did not become ready: %s", stderr.read().decode("utf-8", "replace").rstrip())
+                return failure("runtime", stopped)
+            if received["ready_at"] is None:
+                worker.wait()
+                reader.join()
+                stderr.seek(0)
+                logger.warning(
+                    "Lua script worker failed before readiness: %s",
+                    stderr.read().decode("utf-8", "replace").rstrip(),
+                )
+                return failure("runtime", stopped)
+            deadline = received["ready_at"] + limits.timeout_sec + 1.0
             try:
                 worker.wait(max(0.0, deadline - time.monotonic()))
             except subprocess.TimeoutExpired:

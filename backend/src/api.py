@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-# Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
+# Load repo-root .env before harness imports: PI_* are read at import time.
 load_dotenv()
 
 from . import analysis_service
@@ -38,7 +38,6 @@ from .export_engine import (
     generate_resolve_xml,
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
-from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (postponed; kept for future re-enable)
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
 from .frame_extraction import extract_frames
 from .models import FrameScore
@@ -173,7 +172,7 @@ def _make_cancellable_runner(project_id: str):
 
 class AnalysisRequest(BaseModel):
     project_id: str
-    harness_id: Literal["local_qwen", "claude_code", "codex", "pi_agent", "manual"]
+    harness_id: Literal["claude_code", "codex", "pi_agent", "manual"]
     preferences: dict
     # When provided, only these source videos are analyzed (file_id values).
     # Empty/omitted means analyze every source video in the project.
@@ -1581,7 +1580,6 @@ async def list_harnesses():
         "harnesses": [
             {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True},
             {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": True},
-            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": False},
             {"id": "claude_code", "name": "Claude Code", "type": "agent", "enabled": False},
             {"id": "codex", "name": "Codex", "type": "agent", "enabled": False},
         ]

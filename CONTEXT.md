@@ -16,9 +16,7 @@ working in this repo. The current implementation centers on:
 
 The default **Selected Harness** is `manual`, which keeps analysis local and
 rule-based. The optional `pi_agent` cloud-backed harness drives the `pi` CLI to
-add visual-interest scoring only after per-project consent is saved. The
-`local_qwen` Local AI Harness is retained in code but postponed and disabled
-until the local-model path is ready.
+add visual-interest scoring only after per-project consent is saved.
 
 The **Selected Harness** and the **Effective Harness** are not the same thing:
 a run can fall back to the rule-based result, and re-deriving clips from cached

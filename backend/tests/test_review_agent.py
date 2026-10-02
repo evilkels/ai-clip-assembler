@@ -6,11 +6,14 @@ operations through the operations core (so they land in Undo History); rejecting
 discards them. Read access is provided as context, so reads "run normally".
 """
 
+import uuid
+
 import pytest
 
+from src import review_agent
 from src.models import TimelineDocument, VersionSet
 from src.review_state import review_context_fingerprint, sequence_fingerprint
-from src.timeline_ops import SourceClip, TimelineController
+from src.timeline_ops import SourceClip, TimelineController, apply_operation, seeded_item_ids
 from src.timeline_service import TimelineEventBroker
 from src.review_agent import (
     ProposalStore,
@@ -115,6 +118,46 @@ async def test_accept_is_one_atomic_revision_event_and_undo_snapshot():
     assert queue.qsize() == 1
     await controller.undo()
     assert controller.document.items == []
+
+
+@pytest.mark.asyncio
+async def test_accept_replays_items_created_earlier_in_the_same_proposal(monkeypatch):
+    controller = _controller()
+    await controller.apply("include", clip_id="clip-a")
+    original_id = controller.document.items[0].item_id
+    revision = controller.document.revision
+    undo_baseline = controller.document
+
+    # Pin the Proposal id so the test can name the item its split will create.
+    pinned = uuid.UUID(int=42)
+    monkeypatch.setattr(review_agent.uuid, "uuid4", lambda: pinned)
+    split = {"operation": "split_item", "args": {"item_id": original_id, "at_sec": 3.0}}
+    with seeded_item_ids(pinned.hex):
+        second_half_id = apply_operation(
+            controller.document, controller.sources, "split_item", **split["args"]
+        ).items[1].item_id
+
+    store = ProposalStore()
+    proposal = store.create(
+        "p1",
+        controller,
+        message="Split the orbit and slow the second half.",
+        operations=[
+            split,
+            {"operation": "set_speed", "args": {"item_id": second_half_id, "speed": 0.5}},
+        ],
+    )
+    assert proposal.proposal_id == pinned.hex
+    assert proposal.after_item_count == 2
+
+    document = await store.accept(proposal.proposal_id, controller)
+
+    # One atomic transition: a single revision bump and a single undo snapshot.
+    assert document.revision == revision + 1
+    assert [i.item_id for i in document.items][1] == second_half_id
+    assert [i.speed for i in document.items] == [1.0, 0.5]
+    await controller.undo()
+    assert controller.document.items == undo_baseline.items
 
 
 @pytest.mark.asyncio

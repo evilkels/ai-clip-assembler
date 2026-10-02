@@ -376,7 +376,7 @@ _LUA_TABLE = {"timeline": "timeline", "library": "library", "item": "ITEM", "": 
 # from the binding table, installs the limit hook, and only then strips the real
 # globals (including `debug`).
 _BOOT = r"""
-local api, check, on_trip, fault_at, max_ticks = ...
+local api, check, on_trip, fault_at, max_ticks, timeout_sec = ...
 local error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type, load =
       error, pcall, pairs, ipairs, select, setmetatable, rawget, tostring, type, load
 local sethook, getinfo = debug.sethook, debug.getinfo
@@ -385,8 +385,10 @@ local real_string, real_find, real_rep = string, string.find, string.rep
 local real_sub = string.sub
 local real_utf8, real_math, real_table = utf8, math, table
 local real_next = next
+local clock = os.clock                   -- captured before `os` is stripped
 
 local ticks, calls, tripped, faulted = 0, 0, nil, false
+local cpu_deadline = math.huge
 local hook
 local function trip(name)                   -- re-arm at count 1 so no pcall can swallow the limit
   if not tripped then tripped = name end
@@ -464,7 +466,17 @@ env.math = {}
 for key, value in pairs(real_math) do
   if key ~= "random" and key ~= "randomseed" then env.math[key] = value end
 end
-env.table = pick(real_table, {"concat", "insert", "remove", "sort", "unpack", "pack"})
+env.table = pick(real_table, {"insert", "remove", "unpack", "pack"})
+-- Sorting and concatenating large tables are the uncapped native calls that run
+-- long between hook events, so each one checks the CPU clock before it starts.
+local function timed(native)
+  return function(...)
+    if not tripped and clock() > cpu_deadline then trip("time limit") end
+    if tripped then error(tripped .. " exceeded", 0) end
+    return native(...)
+  end
+end
+env.table.sort, env.table.concat = timed(real_table.sort), timed(real_table.concat)
 env.table.move = function(t, f, e, target, dest)
   if type(f) ~= "number" or type(e) ~= "number" or type(target) ~= "number" then
     fail("table.move positions must be numbers")
@@ -579,6 +591,7 @@ sethook(hook, "c", 1000)
 return function(source)
   local fn, err = load(source, "=script", "t", env)   -- "t": text only, never bytecode
   if not fn then return false, err end
+  cpu_deadline = clock() + timeout_sec
   fn()
   return true, nil
 end
@@ -1001,7 +1014,8 @@ def run_script_in_process(
         api = runtime.table_from(session.natives())
         boot = runtime.compile(_BOOT_SOURCE, name="=sandbox", mode="t")
         run = boot(
-            api, session.check, session.on_trip, session.fault_at, max(1, limits.max_instructions // 1000)
+            api, session.check, session.on_trip, session.fault_at,
+            max(1, limits.max_instructions // 1000), limits.timeout_sec,
         )
         session.deadline = time.monotonic() + limits.timeout_sec
         if on_ready is not None:

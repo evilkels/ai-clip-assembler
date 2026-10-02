@@ -793,13 +793,14 @@ def test_time_limit_on_a_native_heavy_loop():
     assert elapsed < 3 * 0.3
 
 
-def test_call_events_interrupt_repeated_native_sorts():
+def test_repeated_native_sorts_stop_at_the_time_limit():
     source = (
         "local t={} for i=1,400000 do t[i]=(i*7919)%400000 end "
         "for k=1,100000 do table.sort(t) end"
     )
     _, elapsed = limit_run(source, "time limit", timeout_sec=1.0, max_instructions=10**9)
-    assert elapsed < 3
+    # Stopped within a few native calls of the deadline, not after a batch of them.
+    assert elapsed < 1.6
 
 
 def test_memory_limit_on_table_growth():

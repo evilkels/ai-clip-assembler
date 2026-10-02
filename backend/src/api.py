@@ -1154,27 +1154,17 @@ class ReviewScriptRequest(BaseModel):
     rerun_of_proposal_id: Optional[str] = None
 
 
-def _excluded_clip_ids(document: TimelineDocument) -> frozenset:
-    return frozenset(
-        clip_id for clip_id, decision in document.decisions.items() if decision == "excluded"
-    )
-
-
-def _review_candidates(project_id: str, excluded_clip_ids: frozenset = frozenset()) -> list:
+def _review_inputs(
+    project_id: str, excluded_clip_ids: frozenset = frozenset()
+) -> tuple[list, list, object]:
     # Clips the user explicitly excluded on the review board are dropped from the
     # pool entirely, so the agent cannot propose them in a Version (and neither
     # can the deterministic fallback). Included/pending clips stay.
-    return [
+    candidates = [
         candidate
         for candidate in get_mcp_server()._list_candidates(project_id)
         if candidate.get("clip_id") not in excluded_clip_ids
     ]
-
-
-def _review_inputs(
-    project_id: str, excluded_clip_ids: frozenset = frozenset()
-) -> tuple[list, list, object]:
-    candidates = _review_candidates(project_id, excluded_clip_ids)
     candidate_frames = []
     for candidate in candidates:
         paths = mcp_frame_paths(project_id, candidate.get("clip_id"))
@@ -1217,9 +1207,12 @@ async def _run_review_turn(
     project_id: str, user_message: str, client_message_id: Optional[str] = None
 ) -> dict:
     controller = get_timeline_controller(project_id)
-    candidates, candidate_frames, agent = _review_inputs(
-        project_id, _excluded_clip_ids(controller.document)
+    excluded_clip_ids = frozenset(
+        clip_id
+        for clip_id, decision in controller.document.decisions.items()
+        if decision == "excluded"
     )
+    candidates, candidate_frames, agent = _review_inputs(project_id, excluded_clip_ids)
     return await run_review_turn(
         project_id,
         user_message=user_message,
@@ -1229,6 +1222,8 @@ async def _run_review_turn(
         agent=agent,
         candidate_frames=candidate_frames,
         client_message_id=client_message_id,
+        # Scripts read the whole library, excluded clips included (Script API v1).
+        library=get_mcp_server()._list_candidates(project_id),
     )
 
 
@@ -1268,7 +1263,7 @@ async def review_script(project_id: str, request: ReviewScriptRequest):
                 project_id,
                 source=request.source,
                 controller=controller,
-                candidates=_review_candidates(project_id, _excluded_clip_ids(controller.document)),
+                library=get_mcp_server()._list_candidates(project_id),
                 store=_proposal_store,
                 client_message_id=request.client_message_id,
                 rerun_of_proposal_id=request.rerun_of_proposal_id,

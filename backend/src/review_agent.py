@@ -35,6 +35,7 @@ from .models import (
     ScriptRun,
     ScriptRunError,
     TimelineDocument,
+    TimelineItem,
     VersionSet,
 )
 from .app_settings import get_settings
@@ -45,7 +46,8 @@ from .timeline_ops import (
     OPERATIONS,
     Sources,
     TimelineController,
-    apply_operation,
+    TimelineOpError,
+    apply_operation_in_place,
     seeded_item_ids,
 )
 from .timeline_script import API_REFERENCE, run_script
@@ -69,16 +71,13 @@ def _clip_label(sources: Sources, clip_id: str) -> str:
     return f"{source.file_name} {source.start_sec:.1f}–{source.end_sec:.1f} s"
 
 
-def _item_label(document: TimelineDocument, sources: Sources, item_id: str) -> str:
-    """``item 3 (DJI_0042.MP4)``: 1-based position and source file in ``document``."""
-    position, item = next(
-        (position, item)
-        for position, item in enumerate(document.items, start=1)
-        if item.item_id == item_id
-    )
-    source = sources.get(item.source_clip_id)
-    name = source.file_name if source and source.file_name else item.source_clip_id
-    return f"item {position} ({name})"
+def _locate(document: TimelineDocument, item_id: str) -> Tuple[int, TimelineItem]:
+    """The item's 1-based position in ``document``, and the item."""
+    for position, item in enumerate(document.items, start=1):
+        if item.item_id == item_id:
+            return position, item
+    # Most steps are described before they apply, so the core has not rejected this yet.
+    raise TimelineOpError(f"unknown timeline item: {item_id}")
 
 
 def _describe(document: TimelineDocument, sources: Sources, operation: str, args: dict) -> str:
@@ -99,13 +98,15 @@ def _describe(document: TimelineDocument, sources: Sources, operation: str, args
         return f"Set target duration to {target:.1f} s"
     if "item_id" not in args:
         return f"{operation} {args}"
-    item = _item_label(document, sources, args["item_id"])
+    position, target = _locate(document, args["item_id"])
+    source = sources.get(target.source_clip_id)
+    item = f"item {position} ({source.file_name if source and source.file_name else target.source_clip_id})"
     if operation == "remove_item":
         return f"Remove {item}"
     if operation == "split_item":
         return f"Split {item} at {args['at_sec']:.1f} s"
     if operation == "set_bounds":
-        return f"Trim {item} to {args['start_sec']:.1f}–{args['end_sec']:.1f} s"
+        return f"Trim {item} to {target.start_sec:.1f}–{target.end_sec:.1f} s"
     if operation == "reorder":
         return f"Move {item} to position {args['to_index'] + 1}"
     if operation == "set_speed":
@@ -134,14 +135,18 @@ def _simulate(
     ``id_seed`` the items the operations create get deterministic ids, so later
     operations in the batch can refer to them (see ``seeded_item_ids``).
     """
-    working = document
+    working = document.model_copy(deep=True)
     summary = []
     with seeded_item_ids(id_seed) if id_seed is not None else nullcontext():
         for op in operations:
-            args = op.get("args", {})
-            before = working
-            working = apply_operation(working, sources, op["operation"], **args)
-            summary.append(_describe(before, sources, op["operation"], args))
+            operation, args = op["operation"], op.get("args", {})
+            # A trim is described after it lands, so the line shows the clamped bounds;
+            # it never moves the item, so the position is the pre-step one.
+            if operation != "set_bounds":
+                summary.append(_describe(working, sources, operation, args))
+            apply_operation_in_place(working, sources, operation, **args)
+            if operation == "set_bounds":
+                summary.append(_describe(working, sources, operation, args))
     return working, summary
 
 
@@ -322,7 +327,7 @@ async def _run_script_proposal(
     author: str,
     controller: TimelineController,
     baseline: TimelineDocument,
-    candidates: List[dict],
+    library: List[dict],
     store: ProposalStore,
     message: str = "",
 ) -> Tuple[ScriptRun, Optional[Proposal]]:
@@ -338,12 +343,15 @@ async def _run_script_proposal(
         source,
         document=baseline,
         sources=controller.sources,
-        library=candidates,
+        library=library,
         id_seed=proposal_id,
     )
     proposal = None
     if result.error is None and result.operations:
-        proposal = store.create(
+        # Simulating a long recording is CPU work too; keep it off the event loop.
+        # Nothing is persisted here: the caller appends the message under its lock.
+        proposal = await asyncio.to_thread(
+            store.create,
             project_id,
             controller,
             message=message,
@@ -371,7 +379,7 @@ async def run_editor_script(
     *,
     source: str,
     controller: TimelineController,
-    candidates: List[dict],
+    library: List[dict],
     store: ProposalStore,
     client_message_id: Optional[str] = None,
     rerun_of_proposal_id: Optional[str] = None,
@@ -380,7 +388,8 @@ async def run_editor_script(
 
     Local only: no model call, so no cloud consent. Retrying with the same
     ``client_message_id`` and source returns the stored run. With
-    ``rerun_of_proposal_id``, a run that stages a new Proposal supersedes the old one.
+    ``rerun_of_proposal_id``, a run without an error supersedes the old Proposal,
+    even when it records nothing; a faulted run leaves it pending.
     """
     session = store.session(project_id)
     if client_message_id:
@@ -403,10 +412,10 @@ async def run_editor_script(
         author="editor",
         controller=controller,
         baseline=baseline,
-        candidates=candidates,
+        library=library,
         store=store,
     )
-    if proposal is not None and rerun_of_proposal_id:
+    if script.error is None and rerun_of_proposal_id:
         store.supersede(rerun_of_proposal_id, project_id)
     message = store.append_message(
         project_id,
@@ -443,6 +452,7 @@ async def run_review_turn(
     record_user_message: bool = True,
     candidate_frames: Optional[List[dict]] = None,
     client_message_id: Optional[str] = None,
+    library: Optional[List[dict]] = None,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -450,6 +460,8 @@ async def run_review_turn(
     ``agent`` for an assistant message and staged operations, and — if it
     proposes any — captures them as a pending Proposal. Returns
     ``{"message", "proposal"}`` (``proposal`` is ``None`` for a chat-only turn).
+    An agent script reads ``library``, the complete Candidate Clip library
+    (``candidates`` may leave excluded clips out); it defaults to ``candidates``.
     """
     session = store.session(project_id)
     editor_message = None
@@ -508,7 +520,7 @@ async def run_review_turn(
             message=message,
             controller=controller,
             baseline=baseline,
-            candidates=bounded_candidates,
+            library=candidates if library is None else library,
             store=store,
         )
     elif operations:

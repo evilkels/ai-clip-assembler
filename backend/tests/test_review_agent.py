@@ -98,6 +98,23 @@ async def test_proposal_change_list_names_items_by_position_and_file_as_each_ste
     assert proposal.after_duration_sec == 1.5
 
 
+@pytest.mark.asyncio
+async def test_proposal_trim_line_shows_the_bounds_apply_will_produce():
+    controller = _controller()
+    await controller.apply("include", clip_id="clip-b")
+    await controller.apply("include", clip_id="clip-a")
+    orbit = controller.document.items[1].item_id
+
+    proposal = ProposalStore().create(
+        "p1",
+        controller,
+        message="Use the whole source.",
+        operations=[{"operation": "set_bounds", "args": {"item_id": orbit, "start_sec": -10, "end_sec": 100}}],
+    )
+
+    assert proposal.summary == ["Trim item 2 (A.MOV) to 0.0–30.0 s"]
+
+
 def test_create_proposal_rejects_invalid_operations():
     controller = _controller()
     store = ProposalStore()
@@ -640,6 +657,30 @@ async def test_agent_script_reply_becomes_a_proposal_on_the_agent_message_withou
     ]
     assert "version_set" not in agent_message["payload"]
     assert controller.document.items == []
+
+
+@pytest.mark.asyncio
+async def test_failing_agent_script_stages_nothing_not_even_its_operations():
+    store = ProposalStore()
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Best first",
+        controller=_controller(),
+        candidates=_CANDIDATES,
+        store=store,
+        agent=lambda _context: {
+            "message": "Best first.",
+            "script": 'timeline:add("missing")',
+            "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+        },
+    )
+
+    agent_message = result["agent_message"]
+    assert agent_message["script"]["error"]["kind"] == "operation"
+    assert result["proposal"] is None
+    assert store.list_for_project("p1") == []
+    assert "version_set" not in agent_message["payload"]
 
 
 @pytest.mark.asyncio

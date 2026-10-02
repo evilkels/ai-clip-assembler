@@ -1,16 +1,21 @@
+import asyncio
 import json
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src import api
+from src import api, review_agent
 from src.embeddings import FakeEmbeddingProvider
 from src.frame_extraction import FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
 from src.review_state import sequence_fingerprint
+from src.timeline_script import ScriptResult
 
 
 def create_folder_project_with_video(tmp_path, content=b"folder video bytes", filename="DJI_0042.MP4"):
@@ -2780,6 +2785,207 @@ def test_review_turn_rejects_blank_message(monkeypatch, tmp_path):
     response = client.post(f"/projects/{project_id}/review/turn", json={"message": "  "})
 
     assert response.status_code == 422
+
+
+# --- Review scripts (plan 034 S4) -------------------------------------------
+
+
+def _script_project(monkeypatch, tmp_path):
+    """An analyzed project with consent off and an agent that must never run."""
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["cloud_ai_consent"] = False
+
+    def agent_must_not_run(_context):
+        raise AssertionError("running a script must not call the review agent")
+
+    monkeypatch.setattr(api, "default_review_agent", agent_must_not_run)
+    monkeypatch.setattr(api, "_review_agent", agent_must_not_run)
+    return client, project_id
+
+
+def _run_script(client, project_id, source, **extra):
+    return client.post(f"/projects/{project_id}/review/script", json={"source": source, **extra})
+
+
+def _timeline_items(client, project_id):
+    return client.get(f"/projects/{project_id}/timeline/document").json()["document"]["items"]
+
+
+def test_editor_script_becomes_a_proposal_without_consent_or_an_agent_call(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+
+    response = _run_script(client, project_id, 'timeline:add("clip-2")\ntimeline:add("clip-1")')
+
+    assert response.status_code == 200
+    body = response.json()
+    message = body["message"]
+    assert message["role"] == "editor"
+    assert message["script"]["author"] == "editor"
+    assert message["script"]["error"] is None
+    assert message["script"]["operation_count"] == 2
+    assert message["script"]["based_on_timeline_revision"] == 0
+    assert body["proposal"]["status"] == "pending"
+    assert body["proposal"]["summary"] == [
+        "Add DJI_0001.MP4 5.0–7.0 s at the end",
+        "Add DJI_0001.MP4 1.0–4.0 s at the end",
+    ]
+    assert (body["proposal"]["before_duration_sec"], body["proposal"]["after_duration_sec"]) == (0.0, 5.0)
+    assert message["script"]["proposal_id"] == body["proposal"]["proposal_id"]
+    assert message["proposal"]["proposal_id"] == body["proposal"]["proposal_id"]
+    assert body["session"]["messages"][-1]["message_id"] == message["message_id"]
+    assert _timeline_items(client, project_id) == []
+
+
+def test_accepting_a_script_proposal_is_one_revision_and_one_undo(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    before = _timeline_items(client, project_id)
+    proposal_id = _run_script(
+        client,
+        project_id,
+        'timeline:add("clip-2", 1)\nlocal a, b = timeline:item(2):split(2.5)\nb:set_speed(2)',
+    ).json()["proposal"]["proposal_id"]
+
+    accepted = client.post(f"/projects/{project_id}/proposals/{proposal_id}/accept")
+
+    assert accepted.status_code == 200
+    document = accepted.json()["document"]
+    assert document["revision"] == 2
+    assert [(i["source_clip_id"], i["start_sec"], i["end_sec"], i["speed"]) for i in document["items"]] == [
+        ("clip-2", 5.0, 7.0, 1.0),
+        ("clip-1", 1.0, 2.5, 1.0),
+        ("clip-1", 2.5, 4.0, 2.0),
+    ]
+    client.post(f"/projects/{project_id}/timeline/undo")
+    assert _timeline_items(client, project_id) == before
+
+
+def test_script_syntax_error_reports_its_line_and_stages_nothing(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+
+    response = _run_script(client, project_id, 'timeline:add("clip-1")\nfor i = 1 do\nend')
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["script"]["error"]["kind"] == "syntax"
+    assert body["message"]["script"]["error"]["line"] == 2
+    assert body["message"]["script"]["proposal_id"] is None
+    assert body["proposal"] is None
+    assert _timeline_items(client, project_id) == []
+
+
+def test_script_that_only_logs_keeps_its_log_and_stages_nothing(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+
+    response = _run_script(client, project_id, 'log(("%d clips"):format(#library:clips()))')
+
+    assert response.status_code == 200
+    script = response.json()["message"]["script"]
+    assert script["log"] == ["2 clips"]
+    assert script["error"] is None
+    assert script["operation_count"] == 0
+    assert response.json()["proposal"] is None
+
+
+def test_stale_script_proposal_is_rerun_and_the_old_one_superseded(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    source = 'timeline:add("clip-1")'
+    stale_id = _run_script(client, project_id, source).json()["proposal"]["proposal_id"]
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    stale_accept = client.post(f"/projects/{project_id}/proposals/{stale_id}/accept")
+    rerun = _run_script(client, project_id, source, rerun_of_proposal_id=stale_id)
+    old_accept = client.post(f"/projects/{project_id}/proposals/{stale_id}/accept")
+
+    assert stale_accept.status_code == 409
+    assert rerun.status_code == 200
+    fresh = rerun.json()["proposal"]
+    assert fresh["status"] == "pending"
+    assert fresh["proposal_id"] != stale_id
+    assert fresh["based_on_timeline_revision"] == 1
+    statuses = {
+        p["proposal_id"]: p["status"]
+        for p in client.get(f"/projects/{project_id}/proposals").json()["proposals"]
+    }
+    assert statuses == {stale_id: "superseded", fresh["proposal_id"]: "pending"}
+    assert 400 <= old_accept.status_code < 500
+    assert [i["source_clip_id"] for i in _timeline_items(client, project_id)] == ["clip-2"]
+
+
+def test_script_run_is_idempotent_by_client_message_id(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    message_id = "5f1d3c52-8a0e-4f43-9d3b-0c7a2e61b9a4"
+    source = 'timeline:add("clip-1")'
+
+    first = _run_script(client, project_id, source, client_message_id=message_id)
+    retry = _run_script(client, project_id, source, client_message_id=message_id)
+    reused = _run_script(client, project_id, 'timeline:add("clip-2")', client_message_id=message_id)
+
+    assert first.status_code == retry.status_code == 200
+    assert retry.json()["message"] == first.json()["message"]
+    assert len(retry.json()["session"]["messages"]) == 1
+    assert len(client.get(f"/projects/{project_id}/proposals").json()["proposals"]) == 1
+    assert reused.status_code == 409
+
+
+def test_script_runs_and_their_errors_survive_reopening_the_project_folder(monkeypatch, tmp_path):
+    api.projects.clear()
+    api._proposal_store = api.ProposalStore()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    first_project_id = client.post(
+        "/projects/from-folder", json={"folder_path": str(project_folder)}
+    ).json()["project_id"]
+    _run_script(client, first_project_id, 'log("checking")\nerror("no clips yet")')
+    _run_script(client, first_project_id, "timeline:add(")
+    saved = client.get(f"/projects/{first_project_id}/review/session").json()["messages"]
+
+    api.projects.clear()
+    api._proposal_store = api.ProposalStore()
+    second_project_id = client.post(
+        "/projects/from-folder", json={"folder_path": str(project_folder)}
+    ).json()["project_id"]
+    restored = client.get(f"/projects/{second_project_id}/review/session").json()["messages"]
+
+    assert [message["script"] for message in restored] == [message["script"] for message in saved]
+    assert [message["script"]["error"]["kind"] for message in restored] == ["runtime", "syntax"]
+    assert restored[0]["script"]["log"] == ["checking"]
+    assert restored[0]["script"]["error"]["line"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_slow_script_does_not_block_other_requests(monkeypatch, tmp_path):
+    _client, project_id = _script_project(monkeypatch, tmp_path)
+    started = threading.Event()
+
+    def slow_run_script(source, *, document, **_kwargs):
+        started.set()
+        time.sleep(1.0)
+        return ScriptResult(operations=[], document=document, log=["done"], error=None)
+
+    monkeypatch.setattr(review_agent, "run_script", slow_run_script)
+    finished = []
+    transport = httpx.ASGITransport(app=api.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+
+        async def run_slow_script():
+            response = await http.post(f"/projects/{project_id}/review/script", json={"source": "x = 1"})
+            finished.append("script")
+            return response
+
+        async def read_timeline():
+            await asyncio.to_thread(started.wait, 5)
+            response = await http.get(f"/projects/{project_id}/timeline/document")
+            finished.append("timeline")
+            return response
+
+        script, timeline = await asyncio.gather(run_slow_script(), read_timeline())
+
+    assert script.status_code == timeline.status_code == 200
+    assert finished == ["timeline", "script"]
 
 
 def diagnostic_result(found=True, detail="", model="gpt-5.4-mini", provider="openai-codex"):

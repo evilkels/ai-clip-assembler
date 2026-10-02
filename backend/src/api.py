@@ -70,7 +70,13 @@ from .project_store import (
     write_timeline_document,
 )
 from .mcp_server import TimelineMCPServer
-from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
+from .review_agent import (
+    ProposalStore,
+    ReviewAgentError,
+    default_review_agent,
+    run_editor_script,
+    run_review_turn,
+)
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
@@ -937,6 +943,7 @@ def build_timeline_sources(project: dict) -> dict[str, SourceClip]:
             start_sec=float(clip.get("start_sec", 0.0)),
             end_sec=float(clip.get("end_sec", 0.0)),
             source_duration_sec=float(duration),
+            file_name=clip.get("file_name"),
         )
     return sources
 
@@ -1141,17 +1148,33 @@ class ReviewTurnRequest(BaseModel):
     client_message_id: Optional[uuid.UUID] = None
 
 
-def _review_inputs(
-    project_id: str, excluded_clip_ids: frozenset = frozenset()
-) -> tuple[list, list, object]:
+class ReviewScriptRequest(BaseModel):
+    source: str
+    client_message_id: Optional[str] = None
+    rerun_of_proposal_id: Optional[str] = None
+
+
+def _excluded_clip_ids(document: TimelineDocument) -> frozenset:
+    return frozenset(
+        clip_id for clip_id, decision in document.decisions.items() if decision == "excluded"
+    )
+
+
+def _review_candidates(project_id: str, excluded_clip_ids: frozenset = frozenset()) -> list:
     # Clips the user explicitly excluded on the review board are dropped from the
     # pool entirely, so the agent cannot propose them in a Version (and neither
     # can the deterministic fallback). Included/pending clips stay.
-    candidates = [
+    return [
         candidate
         for candidate in get_mcp_server()._list_candidates(project_id)
         if candidate.get("clip_id") not in excluded_clip_ids
     ]
+
+
+def _review_inputs(
+    project_id: str, excluded_clip_ids: frozenset = frozenset()
+) -> tuple[list, list, object]:
+    candidates = _review_candidates(project_id, excluded_clip_ids)
     candidate_frames = []
     for candidate in candidates:
         paths = mcp_frame_paths(project_id, candidate.get("clip_id"))
@@ -1194,12 +1217,9 @@ async def _run_review_turn(
     project_id: str, user_message: str, client_message_id: Optional[str] = None
 ) -> dict:
     controller = get_timeline_controller(project_id)
-    excluded_clip_ids = frozenset(
-        clip_id
-        for clip_id, decision in controller.document.decisions.items()
-        if decision == "excluded"
+    candidates, candidate_frames, agent = _review_inputs(
+        project_id, _excluded_clip_ids(controller.document)
     )
-    candidates, candidate_frames, agent = _review_inputs(project_id, excluded_clip_ids)
     return await run_review_turn(
         project_id,
         user_message=user_message,
@@ -1226,6 +1246,32 @@ async def review_turn(project_id: str, request: ReviewTurnRequest):
                 project_id,
                 message,
                 str(request.client_message_id) if request.client_message_id else None,
+            )
+        except ReviewAgentError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/projects/{project_id}/review/script")
+async def review_script(project_id: str, request: ReviewScriptRequest):
+    """Run the Editor's Script against a copy of the Timeline (ADR 0006).
+
+    Local: no frames, no consent check, no agent call. A script fault is a 200
+    with ``script.error`` set; a clean run with Operations stages a Proposal.
+    """
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    lock = _review_locks.setdefault(project_id, asyncio.Lock())
+    async with lock:
+        controller = get_timeline_controller(project_id)
+        try:
+            return await run_editor_script(
+                project_id,
+                source=request.source,
+                controller=controller,
+                candidates=_review_candidates(project_id, _excluded_clip_ids(controller.document)),
+                store=_proposal_store,
+                client_message_id=request.client_message_id,
+                rerun_of_proposal_id=request.rerun_of_proposal_id,
             )
         except ReviewAgentError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc

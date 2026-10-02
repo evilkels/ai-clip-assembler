@@ -62,7 +62,9 @@
 | --- | --- | --- |
 | **Operation** | A single, validated, reversible mutation of the **Timeline Document** (e.g. split, set speed, set transform, reorder). The one and only way the timeline changes, shared by the GUI and agents. | Command, action, edit |
 | **Undo History** | The bounded per-project sequence of **Timeline Document** snapshots that makes every **Operation** reversible via undo/redo. | Edit history, command stack |
-| **Proposal** | A staged set of **Operations** plus the resulting diff, suggested by the **In-App Review Agent** and applied only after the **Editor** accepts it. | Suggestion, draft edit, pending change |
+| **Proposal** | A staged set of **Operations** plus the resulting diff, suggested by the **In-App Review Agent** or recorded by a **Script Run**, and applied only after the **Editor** accepts it. A stale Proposal that a re-run replaced is superseded. | Suggestion, draft edit, pending change |
+| **Script** | A short Lua program, written by the **Editor** or the **In-App Review Agent** in the Review chat, that edits a copy of the **Timeline** through the app's own script API; each change it makes is one **Operation**. See [ADR 0006](docs/adr/0006-review-scripts-compile-to-proposals.md). | Macro, Resolve script, console script |
+| **Script Run** | One dry run of a **Script** against the current **Timeline**, saved on its Review chat message: its source, author, log, and either its error or the **Proposal** it recorded. Running is local and needs no cloud consent. | Execution, script result |
 | **MCP Server** | The local Model Context Protocol endpoint the backend exposes while running, letting agents call **Operations** and read tools with full project context. | Agent server, tool server |
 | **In-App Review Agent** | The hosted conversational agent inside the app; an MCP client of our own **MCP Server** that runs in propose mode (it suggests **Proposals**, it does not apply directly). | Chat bot, assistant, copilot |
 | **External Agent** | An agent outside the app (e.g. Claude Code, Cursor, Codex) connected over the **MCP Server**; it applies **Operations** directly because the **Editor** is driving it. | Remote agent, CLI agent |
@@ -78,6 +80,7 @@
 - A **Timeline Item** carries its own bounds, **Speed**, and **Transform**.
 - Every change to the **Timeline Document** is an **Operation**, recorded in the **Undo History** so it can be reversed.
 - The **In-App Review Agent** offers **Proposals** the **Editor** accepts or rejects; an **External Agent** applies **Operations** directly over the **MCP Server**.
+- A **Script Run** turns a **Script**'s recorded **Operations** into one **Proposal**; applying it is one undo step, and a stale one is re-run rather than rebased.
 - A **Harness** produces or enriches **Candidate Clips**, but the **Manual Harness** is the MVP default.
 - An **Export** serializes the **Timeline Document** as **FCPXML**, **EDL**, or **Resolve XML** (EDL flattens **Speed** and **Transform**).
 

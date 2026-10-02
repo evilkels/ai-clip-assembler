@@ -90,7 +90,7 @@ delegated implementer in `.worktrees/`, reviewed here, and merged back.
 | S1 | Remove the Local Qwen harness (owner decision 2026-09-29), with a load-compat test for projects that selected it | — | 🟢 merged |
 | S2 | Deterministic item ids inside a prepared batch (D5) | — | 🟢 merged |
 | S3 | `backend/src/timeline_script.py`: sandboxed runtime, API bindings, recording, limits, errors — pure module, no HTTP | R1, S2 | 🟢 implemented on `feat/rcs-3-script-engine` (S3c), pending review |
-| S4 | Contract: `ScriptRun` model, `ReviewMessage.script`, `superseded` status, `POST /projects/{id}/review/script`, agent `script` replies (D8), prompt API reference, generated types | S3 | 🔴 |
+| S4 | Contract: `ScriptRun` model, `ReviewMessage.script`, `superseded` status, `POST /projects/{id}/review/script`, agent `script` replies (D8), prompt API reference, generated types | S3 | 🟢 implemented on `feat/rcs-4-contract`, pending review |
 | S5 | Frontend: composer switch, script message rendering, Run/Apply/Run again, e2e `review-scripting.spec.ts` | S4 | 🔴 |
 | S6 | Ship: pin `lupa` in `requirements.txt`, PyInstaller spec, packaged-backend smoke, User Guide "Scripting in Review", glossary terms | S3 (packaging), S5 (docs) | 🔴 |
 

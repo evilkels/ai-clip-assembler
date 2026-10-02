@@ -492,8 +492,9 @@ class TimelineController:
             await self._notify()
             return self._document
 
-    async def undo(self) -> TimelineDocument:
+    async def undo(self, *, expected_revision: Optional[int] = None) -> TimelineDocument:
         async with self._lock:
+            self._check_revision(expected_revision)
             if not self._undo:
                 return self._document
             self._redo.append(self._document)

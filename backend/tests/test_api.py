@@ -2448,6 +2448,40 @@ def test_timeline_op_undo_and_redo(monkeypatch, tmp_path):
     assert len(redo.json()["document"]["items"]) == 2
 
 
+def test_timeline_undo_with_stale_expected_revision_returns_409_and_keeps_document(
+    monkeypatch, tmp_path
+):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    response = client.post(
+        f"/projects/{project_id}/timeline/undo", json={"expected_revision": 1}
+    )
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["expected_revision"] == 1
+    assert detail["current_revision"] == 2
+    assert detail["current_snapshot"]["document"]["revision"] == 2
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert (document["revision"], len(document["items"])) == (2, 2)
+
+
+def test_timeline_undo_with_current_expected_revision_undoes(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    response = client.post(
+        f"/projects/{project_id}/timeline/undo", json={"expected_revision": 2}
+    )
+
+    assert response.status_code == 200
+    document = response.json()["document"]
+    assert (document["revision"], len(document["items"])) == (3, 1)
+
+
 def test_timeline_op_split_and_set_speed(monkeypatch, tmp_path):
     client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
     item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]

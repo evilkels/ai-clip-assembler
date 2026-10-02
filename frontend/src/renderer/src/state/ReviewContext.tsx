@@ -95,7 +95,8 @@ interface ReviewState {
   ) => Promise<void>;
   /** Mirror an authoritative snapshot, e.g. the `current_snapshot` of a revision conflict. */
   reconcileTimelineSnapshot: (snapshot: TimelineSnapshot) => void;
-  undo: () => Promise<void>;
+  /** With `expectedRevision`, undoes only if no newer edit landed; a conflict reconciles and rethrows. */
+  undo: (expectedRevision?: number) => Promise<void>;
   redo: () => Promise<void>;
   setProjectId: (id: string | null) => void;
   setUploadedVideos: (videos: UploadedVideo[]) => void;
@@ -581,10 +582,20 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     [applyTimelineOperation],
   );
 
-  const undo = useCallback(async () => {
-    if (!projectId) return;
-    reconcileTimelineSnapshot(await undoTimeline(projectId));
-  }, [projectId, reconcileTimelineSnapshot]);
+  const undo = useCallback(
+    async (expectedRevision?: number) => {
+      if (!projectId) return;
+      try {
+        reconcileTimelineSnapshot(await undoTimeline(projectId, expectedRevision));
+      } catch (reason: unknown) {
+        if (reason instanceof TimelineRevisionConflictError) {
+          reconcileTimelineSnapshot(reason.detail.current_snapshot);
+        }
+        throw reason;
+      }
+    },
+    [projectId, reconcileTimelineSnapshot],
+  );
 
   const redo = useCallback(async () => {
     if (!projectId) return;

@@ -3899,7 +3899,9 @@ a {
   background: var(--bg-1);
   text-align: left;
 }
-.proposal-summary { margin: 0 0 6px; padding-left: 18px; }
+/* Markers sit inside each row so the list adds no indent in the narrow rail. */
+.proposal-summary { margin: 0 0 6px; padding-left: 0; list-style-position: inside; }
+.proposal-summary li::marker { color: var(--text-muted); }
 .proposal-delta {
   display: flex;
   flex-wrap: wrap;
@@ -3997,7 +3999,7 @@ a {
 .review-chat-script {
   width: 100%;
   min-width: 0;
-  max-height: calc(20 * 1.55 * 12px + 20px);
+  max-height: min(40vh, calc(12 * 1.55 * 12px + 20px));
   resize: none;
   padding: 9px 12px;
   border: 1px solid var(--border);

@@ -10,7 +10,7 @@
  * The composer's Script mode runs the Editor's Lua Script locally; its Script
  * Run comes back on the Editor's own message with a Proposal to Apply (ADR 0006).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReviewConversation } from '../hooks/useReviewConversation';
 import { ProposalCard } from './ProposalCard';
 import { ScriptRunCard } from './ScriptRunCard';
@@ -50,6 +50,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
     runScript,
     resolveProposal,
     staleProposalIds,
+    pendingProposalIds,
     undoableProposalId,
     undoProposal,
     clearHistory,
@@ -59,12 +60,20 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
   const [scriptDraft, setScriptDraft] = useState('');
   const scriptRef = useRef<HTMLTextAreaElement>(null);
   const focusScript = useRef(false);
+  const hintId = useId();
   const logRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const hydrated = useRef(false);
-  const nearBottom = useRef(true);
+  // The log follows new messages until the Editor scrolls up. Scroll events
+  // from our own smooth scrolling are ignored, so a result that grows the log
+  // mid-scroll is still followed.
+  const following = useRef(true);
+  const autoScrolling = useRef(false);
   useEffect(() => {
-    if (!hydrated.current || nearBottom.current) {
+    const log = logRef.current;
+    if (hydrated.current && !following.current) return;
+    if (log && log.scrollHeight - log.scrollTop - log.clientHeight > 1) {
+      autoScrolling.current = hydrated.current;
       endRef.current?.scrollIntoView({
         behavior: hydrated.current ? 'smooth' : 'auto',
         block: 'end',
@@ -76,22 +85,34 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
     if (mode !== 'script' || !focusScript.current) return;
     focusScript.current = false;
     scriptRef.current?.focus();
-  }, [mode, scriptDraft]);
+  }, [mode]);
+
+  const follow = () => {
+    following.current = true;
+  };
 
   const editScript = (source: string) => {
-    focusScript.current = true;
     setScriptDraft(source);
+    if (mode === 'script') {
+      scriptRef.current?.focus();
+      return;
+    }
+    focusScript.current = true;
     setMode('script');
   };
 
   const submit = () => {
     if (mode === 'script') {
+      if (!scriptDraft.trim()) return;
+      follow();
       // Scripts are iterated, so the draft stays; it is sent untrimmed to keep line numbers.
-      if (scriptDraft.trim()) void runScript(scriptDraft);
+      if (scriptRef.current) scriptRef.current.scrollLeft = 0;
+      void runScript(scriptDraft);
       return;
     }
     const text = messageDraft.trim();
     if (!text) return;
+    follow();
     setMessageDraft('');
     void send(text);
   };
@@ -136,8 +157,16 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
         role="log"
         onScroll={() => {
           const log = logRef.current;
-          if (!log) return;
-          nearBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+          if (!log || autoScrolling.current) return;
+          following.current = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+        }}
+        onScrollEnd={() => {
+          autoScrolling.current = false;
+        }}
+        onWheel={(event) => {
+          if (event.deltaY >= 0) return;
+          autoScrolling.current = false;
+          following.current = false;
         }}
       >
         {messages.map((message) => {
@@ -171,11 +200,12 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
                       <button
                         type="button"
                         className="chat-retry"
-                        onClick={() =>
+                        onClick={() => {
+                          follow();
                           void (script
                             ? runScript(script.source, message.rerunOfProposalId, message.message_id)
-                            : send(message.text, message.message_id))
-                        }
+                            : send(message.text, message.message_id));
+                        }}
                         disabled={busy}
                       >
                         Retry
@@ -191,10 +221,16 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
                   fromScript={Boolean(script)}
                   stale={staleProposalIds.has(proposal.proposal_id)}
                   onRunAgain={
-                    script ? () => void runScript(script.source, proposal.proposal_id) : undefined
+                    script
+                      ? () => {
+                          follow();
+                          void runScript(script.source, proposal.proposal_id);
+                        }
+                      : undefined
                   }
                   undoable={undoableProposalId === proposal.proposal_id}
                   onUndo={() => void undoProposal()}
+                  disabled={busy || pendingProposalIds.has(proposal.proposal_id)}
                 />
               ) : null}
             </article>
@@ -240,7 +276,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
             ref={scriptRef}
             className="review-chat-script"
             value={scriptDraft}
-            rows={Math.min(20, Math.max(8, scriptDraft.split('\n').length))}
+            rows={Math.min(12, Math.max(5, scriptDraft.split('\n').length))}
             wrap="off"
             spellCheck={false}
             autoCapitalize="off"
@@ -262,6 +298,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
               }
             }}
             aria-label="Lua script"
+            aria-describedby={hintId}
           />
         ) : null}
         <div className="review-chat-row">
@@ -274,7 +311,9 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
               aria-label="Message the AI"
             />
           ) : (
-            <span className="review-chat-hint">{RUN_SHORTCUT} to run</span>
+            <span id={hintId} className="review-chat-hint">
+              Tab indents · Shift+Tab leaves · {RUN_SHORTCUT} runs
+            </span>
           )}
           <button type="submit" className="btn primary" disabled={busy || !draft.trim()}>
             {mode === 'script' ? 'Run' : 'Send'}

@@ -32,7 +32,9 @@ export interface ReviewConversation {
   resolveProposal: (proposalId: string, accept: boolean) => Promise<void>;
   /** Proposals whose Apply hit a revision conflict: the Timeline moved since they were made. */
   staleProposalIds: ReadonlySet<string>;
-  /** The applied Proposal whose single undo step is still the latest edit. */
+  /** Proposals with an Apply, Discard or Undo request queued or in flight. */
+  pendingProposalIds: ReadonlySet<string>;
+  /** The applied Proposal whose undo step is still exactly the latest edit. */
   undoableProposalId: string | null;
   undoProposal: () => Promise<void>;
   clearHistory: () => Promise<void>;
@@ -50,6 +52,15 @@ function persistedMessages(messages: ReviewMessage[]): ReviewMessageView[] {
   return messages.map((message) => ({ ...message, deliveryState: 'persisted' }));
 }
 
+function toggled(ids: ReadonlySet<string>, id: string, present: boolean): ReadonlySet<string> {
+  const next = new Set(ids);
+  if (present) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+const SETTLED: Promise<unknown> = Promise.resolve();
+
 export function useReviewConversation(projectId: string | null): ReviewConversation {
   const { reconcileTimelineSnapshot, timelineSnapshot, undo } = useReview();
   const [messages, setMessages] = useState<ReviewMessageView[]>([]);
@@ -58,8 +69,18 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
   const [runningScript, setRunningScript] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [staleProposalIds, setStaleProposalIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pendingProposalIds, setPendingProposalIds] = useState<ReadonlySet<string>>(() => new Set());
   const [applied, setApplied] = useState<{ proposalId: string; revision: number } | null>(null);
   const activeProject = useRef<string | null>(projectId);
+  // Every conversation mutation runs after the previous one settles, so a
+  // slower response can never apply an older session over a newer one.
+  const mutations = useRef<Promise<unknown>>(SETTLED);
+
+  const serialize = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    const run = mutations.current.then(task);
+    mutations.current = run.catch(() => undefined);
+    return run;
+  }, []);
 
   const applySession = useCallback((session: ReviewSession) => {
     const persisted = persistedMessages(session.messages);
@@ -79,6 +100,7 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     setVersionSet(null);
     setError(null);
     setStaleProposalIds(new Set());
+    setPendingProposalIds(new Set());
     setApplied(null);
     if (!projectId) {
       setBusy(false);
@@ -86,25 +108,27 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     }
     let alive = true;
     setBusy(true);
-    getReviewSession(projectId)
-      .then((session) =>
-        session.messages.length > 0
-          ? session
-          : reviewKickoff(projectId).then((result) => result.session),
-      )
-      .then((session) => {
-        if (alive && activeProject.current === projectId) applySession(session);
-      })
-      .catch(() => {
-        // The proactive opening turn is best-effort; sending remains available.
-      })
-      .finally(() => {
-        if (alive && activeProject.current === projectId) setBusy(false);
-      });
+    void serialize(() =>
+      getReviewSession(projectId)
+        .then((session) =>
+          session.messages.length > 0
+            ? session
+            : reviewKickoff(projectId).then((result) => result.session),
+        )
+        .then((session) => {
+          if (alive && activeProject.current === projectId) applySession(session);
+        })
+        .catch(() => {
+          // The proactive opening turn is best-effort; sending remains available.
+        })
+        .finally(() => {
+          if (alive && activeProject.current === projectId) setBusy(false);
+        }),
+    );
     return () => {
       alive = false;
     };
-  }, [projectId, applySession]);
+  }, [projectId, applySession, serialize]);
 
   /**
    * Shared optimistic-delivery loop for messages and Scripts: show the Editor's
@@ -112,44 +136,45 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
    * Retry is idempotent), then adopt the persisted session or mark it unsent.
    */
   const deliver = useCallback(
-    async (
+    (
       optimistic: ReviewMessageView,
       request: (projectId: string) => Promise<{ session: ReviewSession }>,
       failure: string,
-    ) => {
-      if (!projectId) return;
-      const messageId = optimistic.message_id;
-      setMessages((current) => {
-        const exists = current.some((message) => message.message_id === messageId);
-        return exists
-          ? current.map((message) =>
-              message.message_id === messageId
-                ? { ...message, deliveryState: 'sending' as const }
-                : message,
-            )
-          : [...current, optimistic];
-      });
-      setError(null);
-      setBusy(true);
-      try {
-        const result = await request(projectId);
-        if (activeProject.current === projectId) applySession(result.session);
-      } catch {
-        if (activeProject.current === projectId) {
-          setMessages((current) =>
-            current.map((message) =>
-              message.message_id === messageId
-                ? { ...message, deliveryState: 'failed' as const }
-                : message,
-            ),
-          );
-          setError(failure);
+    ) =>
+      serialize(async () => {
+        if (!projectId) return;
+        const messageId = optimistic.message_id;
+        setMessages((current) => {
+          const exists = current.some((message) => message.message_id === messageId);
+          return exists
+            ? current.map((message) =>
+                message.message_id === messageId
+                  ? { ...message, deliveryState: 'sending' as const }
+                  : message,
+              )
+            : [...current, optimistic];
+        });
+        setError(null);
+        setBusy(true);
+        try {
+          const result = await request(projectId);
+          if (activeProject.current === projectId) applySession(result.session);
+        } catch {
+          if (activeProject.current === projectId) {
+            setMessages((current) =>
+              current.map((message) =>
+                message.message_id === messageId
+                  ? { ...message, deliveryState: 'failed' as const }
+                  : message,
+              ),
+            );
+            setError(failure);
+          }
+        } finally {
+          if (activeProject.current === projectId) setBusy(false);
         }
-      } finally {
-        if (activeProject.current === projectId) setBusy(false);
-      }
-    },
-    [projectId, applySession],
+      }),
+    [projectId, applySession, serialize],
   );
 
   const send = useCallback(
@@ -210,71 +235,89 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     [busy, deliver, timelineSnapshot],
   );
 
-  const resolveProposal = useCallback(
-    async (proposalId: string, accept: boolean) => {
+  /** Queue a request that acts on one Proposal, disabling its card actions until it settles. */
+  const actOnProposal = useCallback(
+    async (proposalId: string, task: (projectId: string) => Promise<void>) => {
       if (!projectId) return;
-      setError(null);
+      setPendingProposalIds((current) => toggled(current, proposalId, true));
       try {
-        if (accept) {
-          const document = await acceptProposal(projectId, proposalId);
-          if (activeProject.current === projectId) {
-            setApplied({ proposalId, revision: document.revision });
-          }
-        } else {
-          await rejectProposal(projectId, proposalId);
-        }
-        const session = await getReviewSession(projectId);
-        if (activeProject.current === projectId) applySession(session);
-      } catch (reason: unknown) {
-        if (activeProject.current !== projectId) return;
-        if (reason instanceof TimelineRevisionConflictError) {
-          reconcileTimelineSnapshot(reason.detail.current_snapshot);
-          setStaleProposalIds((current) => new Set(current).add(proposalId));
-          return;
-        }
-        setError('The Working Timeline changed. Refresh before applying this proposal.');
+        await serialize(() => task(projectId));
+      } finally {
+        setPendingProposalIds((current) => toggled(current, proposalId, false));
       }
     },
-    [projectId, applySession, reconcileTimelineSnapshot],
+    [projectId, serialize],
   );
 
-  // An applied Proposal stays undoable from its card until any later edit
-  // (revisions only advance, undo included) moves the Timeline past it.
-  const currentRevision = timelineSnapshot?.document.revision;
+  const resolveProposal = useCallback(
+    (proposalId: string, accept: boolean) =>
+      actOnProposal(proposalId, async (id) => {
+        setError(null);
+        try {
+          if (accept) {
+            const snapshot = await acceptProposal(id, proposalId);
+            if (activeProject.current !== id) return;
+            reconcileTimelineSnapshot(snapshot);
+            setApplied({ proposalId, revision: snapshot.document.revision });
+          } else {
+            await rejectProposal(id, proposalId);
+          }
+          const session = await getReviewSession(id);
+          if (activeProject.current === id) applySession(session);
+        } catch (reason: unknown) {
+          if (activeProject.current !== id) return;
+          if (reason instanceof TimelineRevisionConflictError) {
+            reconcileTimelineSnapshot(reason.detail.current_snapshot);
+            setStaleProposalIds((current) => toggled(current, proposalId, true));
+            return;
+          }
+          setError('The Working Timeline changed. Refresh before applying this proposal.');
+        }
+      }),
+    [actOnProposal, applySession, reconcileTimelineSnapshot],
+  );
+
+  // A card's Undo is offered only while the Timeline is still exactly at the
+  // revision its Apply produced; any later edit (or undo) advances it.
   const undoableProposalId =
-    applied && currentRevision !== undefined && currentRevision <= applied.revision
-      ? applied.proposalId
-      : null;
+    applied && timelineSnapshot?.document.revision === applied.revision ? applied.proposalId : null;
 
   const undoProposal = useCallback(async () => {
-    setApplied(null);
-    try {
-      await undo();
-    } catch {
-      setError('Could not undo that change.');
-    }
-  }, [undo]);
+    if (!applied) return;
+    await actOnProposal(applied.proposalId, async () => {
+      try {
+        await undo(applied.revision);
+        setApplied(null);
+      } catch (reason: unknown) {
+        // A newer edit landed first: the backend refused, so this Undo is spent.
+        if (reason instanceof TimelineRevisionConflictError) setApplied(null);
+        else setError('Could not undo that change.');
+      }
+    });
+  }, [applied, actOnProposal, undo]);
 
   const clearHistory = useCallback(async () => {
     if (!projectId || busy) return;
     setBusy(true);
     setError(null);
-    try {
-      await clearReviewSession(projectId);
-      if (activeProject.current !== projectId) return;
-      setMessages([]);
-      setVersionSet(null);
-      // Re-kick a fresh opening turn so the new session isn't left empty.
-      const result = await reviewKickoff(projectId);
-      if (activeProject.current === projectId) applySession(result.session);
-    } catch {
-      if (activeProject.current === projectId) {
-        setError('Could not start a new session.');
+    await serialize(async () => {
+      try {
+        await clearReviewSession(projectId);
+        if (activeProject.current !== projectId) return;
+        setMessages([]);
+        setVersionSet(null);
+        // Re-kick a fresh opening turn so the new session isn't left empty.
+        const result = await reviewKickoff(projectId);
+        if (activeProject.current === projectId) applySession(result.session);
+      } catch {
+        if (activeProject.current === projectId) {
+          setError('Could not start a new session.');
+        }
+      } finally {
+        if (activeProject.current === projectId) setBusy(false);
       }
-    } finally {
-      if (activeProject.current === projectId) setBusy(false);
-    }
-  }, [projectId, busy, applySession]);
+    });
+  }, [projectId, busy, applySession, serialize]);
 
   return {
     messages,
@@ -286,6 +329,7 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     runScript,
     resolveProposal,
     staleProposalIds,
+    pendingProposalIds,
     undoableProposalId,
     undoProposal,
     clearHistory,

@@ -3,15 +3,20 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-export function fixtureVideo(): string {
+/** A solid-colour Source Video; distinct names, colours and lengths give distinguishable clips. */
+export function fixtureVideo(
+  name = 'review-browser-fixture',
+  color = 'slateblue',
+  seconds = 8,
+): string {
   const directory = join(process.cwd(), 'e2e', '.fixtures');
-  const file = join(directory, 'review-browser-fixture.mp4');
+  const file = join(directory, `${name}.mp4`);
   mkdirSync(directory, { recursive: true });
   if (!existsSync(file)) {
     execFileSync('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',
-      '-f', 'lavfi', '-i', 'color=c=slateblue:size=640x360:rate=30',
-      '-t', '8', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', file,
+      '-f', 'lavfi', '-i', `color=c=${color}:size=640x360:rate=30`,
+      '-t', String(seconds), '-pix_fmt', 'yuv420p', '-c:v', 'libx264', file,
     ]);
   }
   return file;
@@ -36,16 +41,23 @@ export interface AnalysisMetadataFixture {
 
 export async function setupReview(
   page: Page,
-  options: { harnessId?: 'manual' | 'pi_agent'; analysisMetadata?: AnalysisMetadataFixture } = {},
+  options: {
+    harnessId?: 'manual' | 'pi_agent';
+    analysisMetadata?: AnalysisMetadataFixture;
+    videos?: string[];
+  } = {},
 ): Promise<void> {
+  const videos = options.videos ?? [fixtureVideo()];
   await page.goto('/#/playwriter');
   await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
   await page.getByTestId('playwriter-qa-panel').getByRole('link', { name: 'Import' }).click();
   const input = page.locator('input[type="file"]');
-  await input.setInputFiles(fixtureVideo());
+  await input.setInputFiles(videos[0]);
   await expect(page.getByText(/Legacy upload project created/)).toBeVisible();
-  await input.setInputFiles(fixtureVideo());
-  await expect(page.getByText(/1 source video ready/)).toBeVisible();
+  await input.setInputFiles(videos);
+  await expect(
+    page.getByText(`${videos.length} source video${videos.length === 1 ? '' : 's'} ready`),
+  ).toBeVisible();
 
   if (options.analysisMetadata) {
     await page.route('**/projects/*/analyze', async (route) => {

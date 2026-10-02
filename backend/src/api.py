@@ -1032,10 +1032,24 @@ async def apply_timeline_op(project_id: str, request: TimelineOpRequest):
     return _timeline_snapshot(project_id, document)
 
 
+class TimelineUndoRequest(BaseModel):
+    # Undo only if the Timeline is still at this revision, so an undo aimed at
+    # one edit cannot pop a newer one.
+    expected_revision: Optional[int] = None
+
+
 @app.post("/projects/{project_id}/timeline/undo")
-async def undo_timeline_op(project_id: str):
+async def undo_timeline_op(project_id: str, request: Optional[TimelineUndoRequest] = None):
     controller = get_timeline_controller(project_id)
-    document = await controller.undo()
+    try:
+        document = await controller.undo(
+            expected_revision=request.expected_revision if request else None
+        )
+    except TimelineRevisionConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=_revision_conflict_detail(project_id, exc, controller),
+        ) from exc
     return _timeline_snapshot(project_id, document)
 
 

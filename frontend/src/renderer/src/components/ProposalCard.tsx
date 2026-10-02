@@ -17,6 +17,8 @@ type ProposalActionsProps = {
   onRunAgain?: () => void;
   undoable?: boolean;
   onUndo?: () => void;
+  /** A request for this card is queued or in flight, or the chat is busy. */
+  disabled?: boolean;
 };
 
 function ProposalActions({
@@ -27,12 +29,14 @@ function ProposalActions({
   onRunAgain,
   undoable = false,
   onUndo,
+  disabled = false,
 }: ProposalActionsProps) {
   const reject = (
     <button
       type="button"
       className="btn subtle"
       onClick={() => onResolve(proposal.proposal_id, false)}
+      disabled={disabled}
       data-testid="proposal-reject"
     >
       {fromScript ? 'Discard' : 'Reject'}
@@ -46,7 +50,7 @@ function ProposalActions({
           {proposal.status === 'superseded' ? 'Superseded by a newer run' : proposal.status}
         </p>
         {undoable && onUndo ? (
-          <button type="button" className="btn subtle" onClick={onUndo}>
+          <button type="button" className="btn subtle" onClick={onUndo} disabled={disabled}>
             Undo
           </button>
         ) : null}
@@ -60,7 +64,7 @@ function ProposalActions({
           {onRunAgain ? 'The Timeline changed since this run.' : 'The Timeline changed since this proposal.'}
         </p>
         {onRunAgain ? (
-          <button type="button" className="btn primary" onClick={onRunAgain}>
+          <button type="button" className="btn primary" onClick={onRunAgain} disabled={disabled}>
             Run again
           </button>
         ) : (
@@ -75,6 +79,7 @@ function ProposalActions({
         type="button"
         className="btn primary"
         onClick={() => onResolve(proposal.proposal_id, true)}
+        disabled={disabled}
         data-testid="proposal-accept"
       >
         {fromScript ? 'Apply' : 'Accept'}

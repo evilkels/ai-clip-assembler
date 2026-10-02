@@ -684,9 +684,20 @@ export async function applyTimelineOp(
   return res.json() as Promise<TimelineSnapshot>;
 }
 
-export async function undoTimeline(projectId: string): Promise<TimelineSnapshot> {
-  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/undo`, { method: 'POST' });
-  if (!res.ok) throw new Error(`Undo failed: ${res.status}`);
+/** Undo the latest edit; with `expectedRevision`, only if the Timeline is still at that revision. */
+export async function undoTimeline(projectId: string, expectedRevision?: number): Promise<TimelineSnapshot> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/undo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expected_revision: expectedRevision ?? null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    if (res.status === 409 && typeof err.detail === 'object') {
+      throw new TimelineRevisionConflictError(err.detail as TimelineRevisionConflictDetail);
+    }
+    throw new Error(`Undo failed: ${res.status}`);
+  }
   return res.json() as Promise<TimelineSnapshot>;
 }
 
@@ -812,7 +823,7 @@ export async function reviewKickoff(projectId: string): Promise<ReviewTurnResult
   return res.json() as Promise<ReviewTurnResult>;
 }
 
-export async function acceptProposal(projectId: string, proposalId: string): Promise<TimelineDocument> {
+export async function acceptProposal(projectId: string, proposalId: string): Promise<TimelineSnapshot> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/proposals/${proposalId}/accept`, {
     method: 'POST',
   });
@@ -823,7 +834,7 @@ export async function acceptProposal(projectId: string, proposalId: string): Pro
     }
     throw new Error(`Accept proposal failed: ${res.status}`);
   }
-  return (await res.json()).document as TimelineDocument;
+  return res.json() as Promise<TimelineSnapshot>;
 }
 
 export async function rejectProposal(projectId: string, proposalId: string): Promise<Proposal> {

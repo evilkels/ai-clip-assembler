@@ -91,7 +91,7 @@ delegated implementer in `.worktrees/`, reviewed here, and merged back.
 | S2 | Deterministic item ids inside a prepared batch (D5) | — | 🟢 merged |
 | S3 | `backend/src/timeline_script.py`: sandboxed runtime, API bindings, recording, limits, errors — pure module, no HTTP | R1, S2 | 🟢 merged (S3–S3d, after two independent reviews) |
 | S4 | Contract: `ScriptRun` model, `ReviewMessage.script`, `superseded` status, `POST /projects/{id}/review/script`, agent `script` replies (D8), prompt API reference, generated types | S3 | 🟢 merged (after an independent review and one fix round) |
-| S5 | Frontend: composer switch, script message rendering, Run/Apply/Run again, e2e `review-scripting.spec.ts` | S4 | 🔴 |
+| S5 | Frontend: composer switch, script message rendering, Run/Apply/Run again, e2e `review-scripting.spec.ts` | S4 | 🟢 implemented on `feat/rcs-5-frontend`, pending review |
 | S6 | Ship: pin `lupa` in `requirements.txt`, PyInstaller spec, packaged-backend smoke, User Guide "Scripting in Review", glossary terms | S3 (packaging), S5 (docs) | 🟡 lupa pin, spec and `--script-worker` done in S3; a local PyInstaller (Python 3.12, arm64) build ran scripts through the packaged worker on 2026-10-02; docs and an endpoint-level smoke remain |
 
 ### Acceptance by slice

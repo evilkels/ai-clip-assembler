@@ -20,7 +20,7 @@ import type {
   VideoMetadata,
 } from '../types/clip';
 import { mockClips } from './mockClips';
-import type { ClipSuggestion } from '../types/generated';
+import type { ClipSuggestion, ScriptRun } from '../types/generated';
 import type { VersionSet } from '../types/version';
 import type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
 import type { UpdateStatus } from '../../../shared/updateStatus';
@@ -720,8 +720,11 @@ export interface Proposal {
   summary: string[];
   before_item_count: number;
   after_item_count: number;
+  /** Effective (speed-aware) Timeline duration before and after the Proposal. */
+  before_duration_sec?: number;
+  after_duration_sec?: number;
   based_on_timeline_revision: number;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'superseded';
 }
 
 export interface ReviewTurnResult {
@@ -738,6 +741,7 @@ export interface ReviewMessage {
   created_at: string;
   reply_to_message_id: string | null;
   proposal: Proposal | null;
+  script?: ScriptRun | null;
   payload: Record<string, unknown> & { version_set?: VersionSet };
 }
 
@@ -774,6 +778,32 @@ export async function reviewTurn(
   });
   if (!res.ok) throw new Error(`Review turn failed: ${res.status}`);
   return res.json() as Promise<ReviewTurnResult>;
+}
+
+export interface ReviewScriptResult {
+  message: ReviewMessage;
+  proposal: Proposal | null;
+  session: ReviewSession;
+}
+
+/** Run the Editor's Script against a copy of the Timeline; a script fault is a result, not an error. */
+export async function runReviewScript(
+  projectId: string,
+  source: string,
+  clientMessageId: string,
+  rerunOfProposalId?: string,
+): Promise<ReviewScriptResult> {
+  const res = await fetch(`${backendUrl()}/projects/${projectId}/review/script`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source,
+      client_message_id: clientMessageId,
+      rerun_of_proposal_id: rerunOfProposalId ?? null,
+    }),
+  });
+  if (!res.ok) throw new Error(`Review script failed: ${res.status}`);
+  return res.json() as Promise<ReviewScriptResult>;
 }
 
 export async function reviewKickoff(projectId: string): Promise<ReviewTurnResult> {

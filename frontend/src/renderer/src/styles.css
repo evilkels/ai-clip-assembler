@@ -3900,19 +3900,121 @@ a {
   text-align: left;
 }
 .proposal-summary { margin: 0 0 6px; padding-left: 18px; }
-.proposal-delta { margin: 0 0 8px; font-size: 0.85em; opacity: 0.75; }
-.proposal-actions { display: flex; gap: 8px; }
-.proposal-status { text-transform: capitalize; font-size: 0.85em; opacity: 0.8; }
+.proposal-delta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0 0 8px;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.proposal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.proposal-status { margin: 0; text-transform: capitalize; font-size: 0.85em; opacity: 0.8; }
+.proposal-superseded { text-transform: none; color: var(--text-muted); }
 .proposal-accepted { color: #4caf50; }
 .proposal-rejected { color: #e57373; }
+.proposal-stale { flex: 1 1 100%; margin: 0; color: var(--yellow); font-size: 0.85em; }
+.proposal-more,
+.script-run-link {
+  justify-self: start;
+  padding: 0;
+  margin: 0 0 6px;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.proposal-more:hover,
+.script-run-link:hover { color: var(--text); }
+
+/* A Script Run reads as a code well inside the Editor's (or the AI's) message. */
+.chat-msg.chat-script {
+  width: 100%;
+  max-width: 100%;
+  text-align: left;
+  background: var(--bg-2);
+}
+.script-run-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.script-run-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.script-run-head strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.script-run-count,
+.script-run-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.script-run-head .script-run-link { margin: 0 0 0 auto; }
+.script-run-code,
+.script-run-log pre {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-0);
+  color: var(--text);
+  font: 11.5px/1.55 var(--font-mono);
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  tab-size: 2;
+}
+.script-run-log { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.script-run-log pre { color: var(--text-dim); }
+.script-run-error {
+  margin: 0;
+  color: var(--red);
+  font: 11.5px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
 .review-chat-input {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 12px 14px;
   border-top: 1px solid var(--border);
   background: var(--bg-2);
 }
+.review-chat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .review-chat-input input { flex: 1 1 auto; min-width: 0; }
+.composer-mode { align-self: flex-start; }
+.review-chat-script {
+  width: 100%;
+  min-width: 0;
+  max-height: calc(20 * 1.55 * 12px + 20px);
+  resize: none;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+  color: var(--text);
+  font: 12px/1.55 var(--font-mono);
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+.review-chat-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
 
 @keyframes chat-busy-pulse {
   0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }

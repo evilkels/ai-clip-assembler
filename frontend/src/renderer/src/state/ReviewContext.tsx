@@ -93,6 +93,8 @@ interface ReviewState {
     args: Record<string, unknown>,
     expectedRevision?: number,
   ) => Promise<void>;
+  /** Mirror an authoritative snapshot, e.g. the `current_snapshot` of a revision conflict. */
+  reconcileTimelineSnapshot: (snapshot: TimelineSnapshot) => void;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   setProjectId: (id: string | null) => void;
@@ -644,6 +646,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       sortAcceptedChronologically,
       setTrim,
       applyTimelineOperation,
+      reconcileTimelineSnapshot,
       undo,
       redo,
       setProjectId,
@@ -700,6 +703,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       sortAcceptedChronologically,
       setTrim,
       applyTimelineOperation,
+      reconcileTimelineSnapshot,
       undo,
       redo,
       setCloudAiConsent,

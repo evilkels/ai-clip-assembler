@@ -1,6 +1,6 @@
 # 034 — Review chat timeline scripting (Lua)
 
-Status: 🟡 in progress — planned 2026-09-29; R1, S1, S2 and S3 and S4 done; S5 in progress. Branch: `feat/review-chat-scripting`. Decision record:
+Status: 🟡 in progress — planned 2026-09-29; R1 and S1–S4 done; S5 in progress. Branch: `feat/review-chat-scripting`. Decision record:
 [ADR 0006](../adr/0006-review-scripts-compile-to-proposals.md).
 
 ## Goal

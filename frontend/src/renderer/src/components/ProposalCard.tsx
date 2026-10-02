@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { type Proposal } from '../api/client';
 
 const COLLAPSED_SUMMARY_LINES = 8;
@@ -7,15 +7,7 @@ function formatSeconds(seconds: number): string {
   return `${seconds.toFixed(1)} s`;
 }
 
-export function ProposalCard({
-  proposal,
-  onResolve,
-  fromScript = false,
-  stale = false,
-  onRunAgain,
-  undoable = false,
-  onUndo,
-}: {
+type ProposalActionsProps = {
   proposal: Proposal;
   onResolve: (proposalId: string, accept: boolean) => void;
   /** A Script Run's Proposal reads Apply / Discard instead of Accept / Reject. */
@@ -25,13 +17,17 @@ export function ProposalCard({
   onRunAgain?: () => void;
   undoable?: boolean;
   onUndo?: () => void;
-}) {
-  const [showAll, setShowAll] = useState(false);
-  const pending = proposal.status === 'pending';
-  const hiddenCount = Math.max(0, proposal.summary.length - COLLAPSED_SUMMARY_LINES);
-  const summary = showAll ? proposal.summary : proposal.summary.slice(0, COLLAPSED_SUMMARY_LINES);
-  const { before_duration_sec: beforeDuration, after_duration_sec: afterDuration } = proposal;
+};
 
+function ProposalActions({
+  proposal,
+  onResolve,
+  fromScript = false,
+  stale = false,
+  onRunAgain,
+  undoable = false,
+  onUndo,
+}: ProposalActionsProps) {
   const reject = (
     <button
       type="button"
@@ -43,9 +39,22 @@ export function ProposalCard({
     </button>
   );
 
-  let footer: ReactNode;
-  if (pending && stale) {
-    footer = (
+  if (proposal.status !== 'pending') {
+    return (
+      <div className="proposal-actions">
+        <p className={`proposal-status proposal-${proposal.status}`}>
+          {proposal.status === 'superseded' ? 'Superseded by a newer run' : proposal.status}
+        </p>
+        {undoable && onUndo ? (
+          <button type="button" className="btn subtle" onClick={onUndo}>
+            Undo
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+  if (stale) {
+    return (
       <div className="proposal-actions">
         <p className="proposal-stale">
           {onRunAgain ? 'The Timeline changed since this run.' : 'The Timeline changed since this proposal.'}
@@ -59,34 +68,28 @@ export function ProposalCard({
         )}
       </div>
     );
-  } else if (pending) {
-    footer = (
-      <div className="proposal-actions">
-        <button
-          type="button"
-          className="btn primary"
-          onClick={() => onResolve(proposal.proposal_id, true)}
-          data-testid="proposal-accept"
-        >
-          {fromScript ? 'Apply' : 'Accept'}
-        </button>
-        {reject}
-      </div>
-    );
-  } else {
-    footer = (
-      <div className="proposal-actions">
-        <p className={`proposal-status proposal-${proposal.status}`}>
-          {proposal.status === 'superseded' ? 'Superseded by a newer run' : proposal.status}
-        </p>
-        {undoable && onUndo ? (
-          <button type="button" className="btn subtle" onClick={onUndo}>
-            Undo
-          </button>
-        ) : null}
-      </div>
-    );
   }
+  return (
+    <div className="proposal-actions">
+      <button
+        type="button"
+        className="btn primary"
+        onClick={() => onResolve(proposal.proposal_id, true)}
+        data-testid="proposal-accept"
+      >
+        {fromScript ? 'Apply' : 'Accept'}
+      </button>
+      {reject}
+    </div>
+  );
+}
+
+export function ProposalCard(props: ProposalActionsProps) {
+  const { proposal } = props;
+  const [showAll, setShowAll] = useState(false);
+  const hiddenCount = Math.max(0, proposal.summary.length - COLLAPSED_SUMMARY_LINES);
+  const summary = showAll ? proposal.summary : proposal.summary.slice(0, COLLAPSED_SUMMARY_LINES);
+  const { before_duration_sec: beforeDuration, after_duration_sec: afterDuration } = proposal;
 
   return (
     <div className="proposal-card" data-testid="proposal-card" data-proposal-id={proposal.proposal_id}>
@@ -116,7 +119,7 @@ export function ProposalCard({
           </span>
         ) : null}
       </p>
-      {footer}
+      <ProposalActions {...props} />
     </div>
   );
 }

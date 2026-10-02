@@ -55,6 +55,72 @@ Candidate Clips can be shown as **Grid** cards, a compact **List**, or a
 Timeline membership; List and Filmstrip use static poster surfaces so opening
 Review does not eagerly mount a video for every candidate.
 
+### Scripting in Review
+
+Script mode gives you a Resolve-console-like way to edit the Timeline with Lua.
+It runs against a copy, so nothing changes until you choose **Apply**; the
+accepted Proposal is one Undo step. Switch the composer from **Message** to
+**Script**, then press ⌘↩ to run. Review the change list, item counts and
+durations, and the log before choosing **Apply** or **Discard**. If the Timeline
+changed after a run, choose **Run again** to build a fresh Proposal. The Review
+Agent can also reply with a script; it follows the same Run → Apply flow.
+Writing or running a script needs no AI and no cloud consent.
+
+The API uses 1-based indices and source seconds. Timeline and Item durations
+include Speed.
+
+| Area | Calls |
+|---|---|
+| Timeline | `timeline:items()`, `timeline:item(i)`, `timeline:count()`, `timeline:duration()`, `timeline:add(clip [, at])`, `timeline:clear()`, `timeline:set_target_duration(sec)`, `timeline:set_profile(name)` |
+| Item | `item:id()`, `item:clip_id()`, `item:index()`, `item:source_in()`, `item:source_out()`, `item:speed()`, `item:duration()`, `item:transform()`, `item:trim(in, out)`, `item:split(at)`, `item:move(to)`, `item:set_speed(x)`, `item:reframe{scale=, x=, y=}`, `item:remove()` |
+| Library | `library:clips{decision=...}`, `library:clip(id)`, `library:include(clip)`, `library:exclude(clip)`, `library:reset(clip)` |
+| Log | `log(...)`, `print(...)` |
+
+Keep each shot under 3 seconds, best first, and stop near 40 seconds:
+
+```lua
+local clips = library:clips{ decision = "included" }
+table.sort(clips, function(a, b) return a.score > b.score end)
+timeline:clear()
+for _, clip in ipairs(clips) do
+  local item = timeline:add(clip)
+  if item:duration() > 3 then item:trim(item:source_in(), item:source_in() + 3) end
+  if timeline:duration() >= 40 then break end
+end
+log(("%d shots, %.1fs"):format(timeline:count(), timeline:duration()))
+```
+
+Include every excluded Clip with a Smoothness Score of at least 7:
+
+```lua
+for _, clip in ipairs(library:clips{ decision = "excluded" }) do
+  if clip.smoothness and clip.smoothness >= 7 then
+    library:include(clip)
+  end
+end
+log("Included excluded clips with smoothness >= 7")
+```
+
+Speed up each Timeline Item longer than 6 seconds to fit in 4 seconds, and log
+each change:
+
+```lua
+for _, item in ipairs(timeline:items()) do
+  local duration = item:duration()
+  if duration > 6 then
+    local speed = item:speed() * duration / 4
+    item:set_speed(speed)
+    log(("Item %d: %.1fs → 4.0s at %.2fx"):format(item:index(), duration, speed))
+  end
+end
+```
+
+Scripts have a 64 KiB source limit, a 2-second runtime, 16 MiB of Lua memory,
+1,000 Operations, and 200 log lines of up to 500 characters each. They cannot
+access files, the network, or frames. `string.match`, `string.gmatch`, and
+`string.gsub` are unavailable; `string.find` searches plain text only.
+DaVinci Resolve `DaVinciResolveScript` scripts do not run here.
+
 ### 3. Timeline
 
 ![Timeline screen](images/timeline.png)

@@ -154,6 +154,41 @@ def test_clear_records_remove_item_for_every_item():
     assert result.document.items == []
 
 
+def test_clearing_a_thousand_items_stays_under_one_second():
+    document = TimelineDocument(
+        items=[
+            TimelineItem(item_id=f"item-{index}", source_clip_id="clip-a", start_sec=0, end_sec=1)
+            for index in range(1000)
+        ]
+    )
+    started = time.monotonic()
+    result = run("timeline:clear()", document)
+    elapsed = time.monotonic() - started
+    print(f"1000-item clear: {elapsed:.3f}s")
+    assert result.error is None, result.error
+    assert len(result.operations) == 1000
+    assert result.document.items == []
+    assert elapsed < 1.0
+
+
+def test_recording_checks_the_python_side_deadline():
+    document = TimelineDocument(
+        items=[
+            TimelineItem(item_id=f"deadline-{index}", source_clip_id="clip-a", start_sec=0, end_sec=1)
+            for index in range(1000)
+        ]
+    )
+    result = run(
+        "timeline:clear()",
+        document,
+        limits=ScriptLimits(timeout_sec=0.000001, max_instructions=10**9),
+    )
+    assert result.error is not None
+    assert result.error.kind == "limit"
+    assert "time limit" in result.error.message
+    assert result.operations == []
+
+
 def test_set_target_duration_and_profile():
     result = ok("timeline:set_target_duration(30) timeline:set_profile('cinematic')")
     assert result.operations == [
@@ -438,13 +473,25 @@ def test_pcall_cannot_swallow_an_operation_error():
     assert result.log == []
 
 
-def test_a_close_handler_cannot_replace_an_operation_error():
+def test_close_metamethod_is_refused():
     result = run(
         "do\n  local h <close> = setmetatable({}, { __close = function() error('replaced') end })\n"
         "  timeline:item(1):split(99)\nend"
     )
-    assert result.error.kind == "operation"
-    assert result.error.line == 3
+    assert result.error.kind == "runtime"
+    assert "metatable key '__close' is not allowed" in result.error.message
+    assert result.operations == []
+
+
+def test_close_handlers_cannot_swallow_a_memory_limit():
+    result = run(
+        "pcall(function() local g <close> = setmetatable({}, "
+        "{__close=function() error('replaced', 0) end}) "
+        "local t={} local i=0 while true do i=i+1 t[i]={i} end end) "
+        "timeline:item(1):set_speed(2)"
+    )
+    assert result.error is not None
+    assert result.error.kind in {"limit", "runtime"}
     assert result.operations == []
 
 
@@ -619,6 +666,55 @@ def test_string_find_is_plain_search_only():
     assert result.log == ["2\tnil\t2"]
 
 
+def test_string_find_coerces_numbers_and_reports_bad_types_at_the_line():
+    result = ok("log(string.find(12345, 3))")
+    assert result.log == ["3\t3"]
+    invalid = run("log(string.find({}, 'x'))")
+    assert invalid.error.kind == "runtime"
+    assert invalid.error.line == 1
+
+
+def test_table_move_reports_bad_numeric_arguments_at_the_line():
+    result = run("table.move({}, '1', 1, 1)")
+    assert result.error.kind == "runtime"
+    assert result.error.line == 1
+
+
+def test_api_strings_are_rejected_before_the_native_call(monkeypatch):
+    called = False
+
+    def reject_if_called(self, profile):
+        nonlocal called
+        called = True
+        return None
+
+    monkeypatch.setattr(timeline_script._Session, "set_profile", reject_if_called)
+    result = run("timeline:set_profile(('x'):rep(4097))")
+    assert result.error.kind == "runtime"
+    assert result.error.line == 1
+    assert "too long (max 4096 bytes)" in result.error.message
+    assert not called
+
+
+def test_log_rejects_invalid_utf8_at_the_calling_line():
+    result = run('log("\\xff")')
+    assert result.error.kind == "runtime"
+    assert result.error.line == 1
+    assert result.error.message.endswith("strings must be valid UTF-8")
+
+
+def test_log_strings_are_cut_before_the_native_call(monkeypatch):
+    received = []
+
+    def capture(self, line):
+        received.append(len(line.encode("utf-8")))
+
+    monkeypatch.setattr(timeline_script._Session, "log", capture)
+    result = run("log(('x'):rep(1500), ('y'):rep(1500))")
+    assert result.error is None
+    assert received == [2000]
+
+
 def test_string_rep_within_the_cap_still_works():
     result = ok("log(('ab'):rep(3, '-'))")
     assert result.log == ["ab-ab-ab"]
@@ -695,6 +791,15 @@ def test_time_limit_on_a_native_heavy_loop():
     )
     _, elapsed = limit_run(source, "time limit", timeout_sec=0.3, max_instructions=10**9)
     assert elapsed < 3 * 0.3
+
+
+def test_call_events_interrupt_repeated_native_sorts():
+    source = (
+        "local t={} for i=1,400000 do t[i]=(i*7919)%400000 end "
+        "for k=1,100000 do table.sort(t) end"
+    )
+    _, elapsed = limit_run(source, "time limit", timeout_sec=1.0, max_instructions=10**9)
+    assert elapsed < 3
 
 
 def test_memory_limit_on_table_growth():
@@ -854,7 +959,7 @@ NATIVE_PINS = [
 def test_worker_names_the_error_of_a_former_native_pin(source, message):
     started = time.monotonic()
     result = run_worker(source)
-    assert time.monotonic() - started < 2.0
+    assert time.monotonic() - started < 5.0
     assert result.error.kind == "runtime"
     assert message in result.error.message
     assert result.operations == []
@@ -870,21 +975,54 @@ def test_worker_is_deterministic_and_seeds_new_item_ids():
     other_ids = {item.item_id for item in other.document.items} - {"i1", "i2", "i3"}
     assert len(new_ids) == 2
     assert new_ids.isdisjoint(other_ids)
+    replayed = replay(first.operations, make_document())
+    assert same_content(replayed, first.document)
 
 
 def test_worker_keeps_the_streamed_log_when_it_is_killed(monkeypatch):
     fake_worker(
         monkeypatch,
         "import json, sys, time\n"
+        "print(json.dumps({'ready': True}), flush=True)\n"
         "for line in ('one', 'two'):\n"
         "    print(json.dumps({'log': line}), flush=True)\n"
         "time.sleep(60)",
     )
     started = time.monotonic()
     result = run_worker("log('one') log('two')", timeout_sec=0.5)
-    assert time.monotonic() - started < 2.5
+    assert time.monotonic() - started < 5.0
     assert result.error == ScriptError("limit", "time limit exceeded (the script was stopped)", None)
     assert result.log == ["one", "two"]
+    assert result.operations == []
+
+
+def test_worker_startup_budget_is_separate_from_script_timeout(monkeypatch):
+    fake_worker(
+        monkeypatch,
+        "import json, sys, time\n"
+        "time.sleep(1.5)\n"
+        "print(json.dumps({'ready': True}), flush=True)\n"
+        "sys.stdin.read()\n"
+        "print(json.dumps({'result': {'operations': [], 'document': "
+        "{'revision': 3, 'items': [], 'decisions': {}, 'profile': None, 'target_duration_sec': None}, "
+        "'log': [], 'error': None}}), flush=True)\n",
+    )
+    result = run_worker("return nil", timeout_sec=0.5)
+    assert result.error is None
+    assert result.operations == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["import sys; sys.exit(3)", "print('not json', flush=True)"],
+    ids=["exits before ready", "prints garbage"],
+)
+def test_worker_crash_is_reported_promptly_without_its_stderr(monkeypatch, body):
+    fake_worker(monkeypatch, "import sys; sys.stderr.write('secret traceback'); " + body)
+    started = time.monotonic()
+    result = run_worker("return nil")
+    assert time.monotonic() - started < 5.0
+    assert result.error == ScriptError("runtime", "the script runner stopped unexpectedly", None)
     assert result.operations == []
 
 

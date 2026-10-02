@@ -49,7 +49,7 @@ fallback. The backend reads `PI_PROVIDER`, `PI_MODEL`, `PI_BIN`, and
 
 Analyze with authenticated Pi: candidates gain visual interest and a Clip
 Reason. Set `PI_BIN=/bin/false`, reanalyze, and confirm per-video Manual fallback
-with warning. Local Qwen remains disabled. For OAuth QA, use disposable data and
+with warning. For OAuth QA, use disposable data and
 never record real auth files, URLs, codes, or tokens:
 
 1. Sign in from a fresh state; restart and confirm Connected. Verify Pi's auth
@@ -74,6 +74,17 @@ never record real auth files, URLs, codes, or tokens:
    (Timeline unchanged). Resolve XML preserves speed/transform and linked
    source audio; silent-source clips stay video-only. EDL preserves its
    representable audio channel code, flattens speed/transform, and warns.
+
+## Review scripting
+
+1. In Review, switch to Script mode, run the Goal example, inspect its changes
+   and log, Apply it, then Undo and confirm the prior Timeline returns.
+2. Run a script with a syntax error; confirm the line is shown and no changes
+   are proposed.
+3. Run a script, make a GUI Timeline edit, then choose **Run again** and confirm
+   the refreshed Proposal uses the edited Timeline.
+4. With project cloud consent enabled, ask the Pi Review Agent for a script;
+   confirm its reply follows the same run and Apply flow.
 
 ## Backend smoke/API
 

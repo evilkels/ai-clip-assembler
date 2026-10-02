@@ -1,4 +1,5 @@
 import sys
+import types
 from importlib import util
 from pathlib import Path
 
@@ -13,7 +14,11 @@ ENTRY_SPEC.loader.exec_module(entry)
 def test_packaged_backend_uses_environment_port(monkeypatch):
     calls = []
     monkeypatch.setenv("CLIP_ASSEMBLER_PORT", "8765")
-    monkeypatch.setattr(entry.uvicorn, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setitem(
+        sys.modules,
+        "uvicorn",
+        types.SimpleNamespace(run=lambda *args, **kwargs: calls.append((args, kwargs))),
+    )
 
     entry.main()
 

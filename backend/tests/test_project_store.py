@@ -375,6 +375,29 @@ def test_open_project_rejects_unsupported_schema_version(tmp_path):
         open_project(project_folder)
 
 
+def test_open_project_resolves_removed_local_qwen_harness_to_manual(tmp_path):
+    project_folder = tmp_path / "footage"
+    manifest_folder = project_folder / "clipassembler"
+    manifest_folder.mkdir(parents=True)
+    (manifest_folder / "project.json").write_text(
+        """
+        {
+          "schema_version": 1,
+          "name": "footage",
+          "created_at": "2026-05-30T19:00:00Z",
+          "harness": "local_qwen",
+          "source_videos": [
+            {"filename": "DJI_0042.MP4", "imported_at": "2026-05-30T19:00:00Z"}
+          ],
+          "settings_overrides": {}
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    assert open_project(project_folder).harness == "manual"
+
+
 def test_open_project_rejects_absolute_source_video_filename(tmp_path):
     project_folder = tmp_path / "footage"
     manifest_folder = project_folder / "clipassembler"
@@ -583,6 +606,48 @@ def test_round_trip_timeline_document_preserves_revision(tmp_path):
 
     assert loaded is not None
     assert loaded.revision == 7
+
+
+def test_read_review_session_loads_messages_saved_before_script_runs(tmp_path):
+    project_folder = _project_with_state(tmp_path)
+    path = review_session_path(project_folder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "session_id": "before-scripts",
+                "updated_at": "2026-09-01T00:00:00Z",
+                "messages": [
+                    {
+                        "message_id": "agent-1",
+                        "role": "agent",
+                        "text": "Add the orbit.",
+                        "created_at": "2026-09-01T00:00:00Z",
+                        "proposal": {
+                            "proposal_id": "p-1",
+                            "project_id": "old",
+                            "message": "Add the orbit.",
+                            "operations": [{"operation": "include", "args": {"clip_id": "clip-a"}}],
+                            "summary": ["Accept clip-a"],
+                            "before_item_count": 0,
+                            "after_item_count": 1,
+                            "status": "pending",
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    session = read_review_session(project_folder)
+
+    assert session is not None
+    message = session.messages[0]
+    assert message.script is None
+    assert message.proposal.before_duration_sec == 0.0
+    assert message.proposal.after_duration_sec == 0.0
 
 
 def test_read_review_session_migrates_v1_bare_versions_without_rewriting(tmp_path):

@@ -11,7 +11,6 @@ harness/
 ├── claude/       # Claude Code agent harness
 ├── codex/        # OpenAI Codex agent harness
 ├── pi_agent/     # Pi agent harness
-├── local/        # Local vision model harness (Qwen, LLaVA)
 └── manual/       # Rule-based harness (no AI)
 ```
 
@@ -22,4 +21,4 @@ harness/
 3. Add config.json with harness metadata
 4. Register in `config.json`
 
-See `local/` for the reference implementation.
+See `pi_agent/` for the reference implementation.

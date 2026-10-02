@@ -83,6 +83,9 @@ jobs:
         working-directory: frontend
         run: npm run build:backend
 
+      - name: Check packaged script worker
+        run: python3 scripts/check_packaged_script_worker.py backend/dist/ai-clip-backend/ai-clip-backend
+
       # npm run build runs check:types-fresh, which regenerates TypeScript
       # types from the backend Pydantic models via backend/.venv.
       - name: Set up backend venv for type generation

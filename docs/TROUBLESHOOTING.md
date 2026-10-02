@@ -118,10 +118,8 @@ safe error text shown by the app.
 
 ## "Only manual and pi_agent harnesses are available"
 
-`/analyze` currently accepts `manual` and `pi_agent`. The local Qwen/Ollama
-harness (`local_qwen`) is **postponed** and disabled — its code is retained but
-not selectable. The desktop app uses `manual` by default; `pi_agent` requires
-per-project cloud AI consent. See [HARNESS_SPEC.md](HARNESS_SPEC.md).
+`/analyze` currently accepts `manual` and `pi_agent`. The desktop app uses
+`manual` by default; `pi_agent` requires per-project cloud AI consent. See [HARNESS_SPEC.md](HARNESS_SPEC.md).
 
 ## pi analysis is slow
 

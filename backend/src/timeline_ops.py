@@ -5,18 +5,23 @@ This module is the **only** way a :class:`TimelineDocument` is mutated. The GUI
 named operations through :func:`apply_operation`, so the two adapters cannot
 drift.
 
-Operations are pure: each returns a *new* document (the input is never mutated),
-which makes snapshot-based undo/redo trivial. :class:`TimelineController` wraps
-the core with a bounded per-project history ring and a per-project async write
-lock so a GUI edit and an external-agent edit cannot interleave mid-operation.
+``apply_operation`` is pure: it returns a *new* document (the input is never
+mutated), which makes snapshot-based undo/redo trivial. Script sessions use
+``apply_operation_in_place`` on their private working copy to avoid copying it
+for every recorded Operation. :class:`TimelineController` wraps the core with
+a bounded per-project history ring and a per-project async write lock so a GUI
+edit and an external-agent edit cannot interleave mid-operation.
 """
 
 from __future__ import annotations
 
 import asyncio
+import itertools
 import math
 import uuid
-from typing import Awaitable, Callable, Dict, List, Mapping, Optional, Sequence
+from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
+from typing import Awaitable, Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 
 from pydantic import BaseModel
 
@@ -60,6 +65,7 @@ class SourceClip(BaseModel):
     start_sec: float
     end_sec: float
     source_duration_sec: float
+    file_name: Optional[str] = None  # names the item in a Proposal's change list
 
 
 Sources = Dict[str, SourceClip]
@@ -68,8 +74,44 @@ Sources = Dict[str, SourceClip]
 # --- helpers ----------------------------------------------------------------
 
 
-def _new_item_id() -> str:
+# Namespace for seeded Timeline Item ids. Fixed forever: changing it would
+# change the ids a saved seed produces.
+_ITEM_ID_NAMESPACE = uuid.UUID("6f0c2d1e-3b7a-4c58-9e41-5d8a7b2c9f30")
+
+
+def _random_item_id() -> str:
     return uuid.uuid4().hex
+
+
+_item_id_allocator: ContextVar[Callable[[], str]] = ContextVar(
+    "timeline_item_id_allocator", default=_random_item_id
+)
+
+
+def _new_item_id() -> str:
+    return _item_id_allocator.get()()
+
+
+@contextmanager
+def seeded_item_ids(seed: str) -> Iterator[None]:
+    """Mint Timeline Item ids deterministically from ``seed`` inside the block.
+
+    A Proposal is validated by simulating its Operations and accepted by
+    replaying them. Both runs seed with the Proposal id, so an Operation that
+    refers to an item created earlier in the same batch sees the same id in both.
+    The previous allocator is restored on exit (including on exception), so
+    seeds nest.
+    """
+    counter = itertools.count()
+
+    def allocate() -> str:
+        return uuid.uuid5(_ITEM_ID_NAMESPACE, f"{seed}:{next(counter)}").hex
+
+    token = _item_id_allocator.set(allocate)
+    try:
+        yield
+    finally:
+        _item_id_allocator.reset(token)
 
 
 def _find_index(doc: TimelineDocument, item_id: str) -> int:
@@ -88,7 +130,7 @@ def _require_source(sources: Sources, clip_id: str) -> SourceClip:
 
 # --- operations -------------------------------------------------------------
 #
-# Each handler mutates the already-deep-copied ``doc`` in place and returns it.
+# Each handler mutates its owned ``doc`` in place and returns it.
 # Validation raises ``TimelineOpError`` before any mutation, so a rejected
 # operation leaves the document untouched.
 
@@ -309,11 +351,21 @@ def apply_operation(
     The input ``document`` is never mutated. Raises :class:`TimelineOpError` for
     an unknown operation name or invalid arguments.
     """
+    working_copy = document.model_copy(deep=True)
+    return apply_operation_in_place(working_copy, sources, operation, **args)
+
+
+def apply_operation_in_place(
+    document: TimelineDocument,
+    sources: Sources,
+    operation: str,
+    **args,
+) -> TimelineDocument:
+    """Apply one validated operation to a document owned by the caller."""
     handler = OPERATIONS.get(operation)
     if handler is None:
         raise TimelineOpError(f"unknown operation: {operation}")
-    working_copy = document.model_copy(deep=True)
-    return handler(working_copy, sources, **args)
+    return handler(document, sources, **args)
 
 
 # --- history + write lock ---------------------------------------------------
@@ -415,6 +467,7 @@ class TimelineController:
         operations: Sequence[Mapping[str, object]],
         *,
         expected_revision: int,
+        id_seed: Optional[str] = None,
     ) -> TimelineDocument:
         """Apply several operations as one atomic, undoable transition.
 
@@ -422,20 +475,26 @@ class TimelineController:
         committed, so a later failure leaves the live document untouched. Success
         produces exactly one revision bump, one undo snapshot, and one
         notification.
+
+        With ``id_seed`` the batch mints Timeline Item ids via
+        :func:`seeded_item_ids`, so it reproduces the ids of an earlier
+        simulation run with the same seed.
         """
         async with self._lock:
             self._check_revision(expected_revision)
             working = self._document
-            for operation in operations:
-                name = operation["operation"]
-                args = operation.get("args", {})
-                working = apply_operation(working, self._sources, name, **args)
+            with seeded_item_ids(id_seed) if id_seed is not None else nullcontext():
+                for operation in operations:
+                    name = operation["operation"]
+                    args = operation.get("args", {})
+                    working = apply_operation(working, self._sources, name, **args)
             self._commit(working, clear_redo=True)
             await self._notify()
             return self._document
 
-    async def undo(self) -> TimelineDocument:
+    async def undo(self, *, expected_revision: Optional[int] = None) -> TimelineDocument:
         async with self._lock:
+            self._check_revision(expected_revision)
             if not self._undo:
                 return self._document
             self._redo.append(self._document)

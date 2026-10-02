@@ -1,70 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { fixtureVideo, openClips, setupReview } from './reviewSetup';
 
 test.afterEach(async ({ page }) => {
   // Let in-flight route.fetch handlers finish before Playwright tears down the page.
   await page.unrouteAll({ behavior: 'wait' });
 });
-
-function fixtureVideo(): string {
-  const directory = join(process.cwd(), 'e2e', '.fixtures');
-  const file = join(directory, 'review-browser-fixture.mp4');
-  mkdirSync(directory, { recursive: true });
-  if (!existsSync(file)) {
-    execFileSync('ffmpeg', [
-      '-hide_banner', '-loglevel', 'error', '-y',
-      '-f', 'lavfi', '-i', 'color=c=slateblue:size=640x360:rate=30',
-      '-t', '8', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', file,
-    ]);
-  }
-  return file;
-}
-
-async function openClips(page: Page): Promise<void> {
-  const panel = page.getByTestId('source-clips-panel');
-  await expect(panel).toBeVisible();
-  await expect(panel).toHaveAttribute('data-open', 'true');
-}
-
-interface AnalysisMetadataFixture {
-  used_ai?: boolean;
-  warning?: string;
-  per_video: Array<{
-    file_id: string;
-    file_name: string;
-    used_ai?: boolean;
-    warning?: string;
-  }>;
-}
-
-async function setupReview(
-  page: Page,
-  options: { harnessId?: 'manual' | 'pi_agent'; analysisMetadata?: AnalysisMetadataFixture } = {},
-): Promise<void> {
-  await page.goto('/#/playwriter');
-  await expect(page.getByTestId('playwriter-qa-panel')).toBeVisible();
-  await page.getByTestId('playwriter-qa-panel').getByRole('link', { name: 'Import' }).click();
-  const input = page.locator('input[type="file"]');
-  await input.setInputFiles(fixtureVideo());
-  await expect(page.getByText(/Legacy upload project created/)).toBeVisible();
-  await input.setInputFiles(fixtureVideo());
-  await expect(page.getByText(/1 source video ready/)).toBeVisible();
-
-  if (options.analysisMetadata) {
-    await page.route('**/projects/*/analyze', async (route) => {
-      const response = await route.fetch();
-      const body = await response.json();
-      await route.fulfill({ response, json: { ...body, metadata: options.analysisMetadata } });
-    });
-  }
-  await page.getByLabel('Harness').selectOption(options.harnessId ?? 'manual');
-  await page.getByTestId('source-video-selection-bar').getByRole('button', { name: /Analyze/ }).click();
-  await expect(page.getByText('Analysis complete. Head to Review')).toBeVisible({ timeout: 180_000 });
-  await page.goto('/#/review');
-  await openClips(page);
-}
 
 interface RawClipFixture {
   [key: string]: unknown;

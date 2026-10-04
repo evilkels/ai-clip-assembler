@@ -1,8 +1,9 @@
 # Plan 017: Review-page clarity and polish
 
-Status: Step 1 DONE (2026-07-20). Remaining item 5 (design-system adoption)
-DONE via `2026-08-14-studio-workflow-redesign.md`; items 1–4 still TODO, and
-item 2 got *worse* — see "Reconciled 2026-08-31" below. Priority P1, effort M,
+Status: **DONE 2026-10-04.** Step 1 DONE (2026-07-20); item 2 (one smoothness
+model) DONE 2026-10-04 on `feat/small-plans-batch`; item 5 DONE via
+`2026-08-14-studio-workflow-redesign.md`; items 1, 3 and 4 moved to plans 029
+and 027, which own them. Nothing is left here. Priority P1, effort M,
 risk LOW/MED. Planned at `6fc6c6d`; depends on plans 012 and 016.
 
 ## Reconciled 2026-08-31 against `redesign/studio-workflows`
@@ -43,7 +44,7 @@ confusing smoothness controls, and excluded clips still entering AI proposals.
 ## Remaining work
 
 1. **Poster-first cards — MOVED 2026-09-02** to
-   [`029-review-clip-posters-and-playback.md`](029-review-clip-posters-and-playback.md),
+   [`029-review-clip-posters-and-playback.md`](../029-review-clip-posters-and-playback.md),
    which owns it along with the play-once preview default and carries the
    missing-route prerequisite recorded below. Original text kept for context:
 
@@ -81,18 +82,26 @@ confusing smoothness controls, and excluded clips still entering AI proposals.
    `<video>` at all, so switching away from the default Grid avoids this
    entirely without any code change. Grid is the default
    (`SourceClipsPanel.tsx:82`).
-2. **One smoothness model:** remove the view-only filter or label it so clearly
-   that it cannot be confused with the generation threshold.
+2. ~~**One smoothness model:** remove the view-only filter or label it so clearly
+   that it cannot be confused with the generation threshold.~~ **DONE
+   2026-10-04.** Review had the view-only filter twice — a "Display filter"
+   slider in the header and "Minimum Smoothness" in the clip browser toolbar —
+   both on a context value defaulting to 7, while generation's "How steady"
+   defaults to 6, so Review silently hid clips that generation kept. The header
+   slider is gone; "Minimum Smoothness" is the one view-only control, held in
+   `Review.tsx` local state next to Minimum Overall and defaulting to 0. The
+   browser helper now says: "These filters only hide clips from this list; which
+   clips exist is set by How clips are found on the Import step." Covered by
+   `review-browser-redesign.spec.ts` "Review has one view-only smoothness control
+   and hides nothing by default"; darwin Review baselines re-cut.
 Items 3 (included-means-preferred) and 4 (onboarding explainer) moved to
-[`027-authoritative-candidate-library-and-diverse-edits.md`](027-authoritative-candidate-library-and-diverse-edits.md)
+[`027-authoritative-candidate-library-and-diverse-edits.md`](../027-authoritative-candidate-library-and-diverse-edits.md)
 on 2026-09-02, since both depend on All Clips being the stated Candidate Clip
 authority. Item 5 (design-system adoption) is DONE — delivered by the studio
 redesign (`6d79c1b`), not by the retired modern-shell plan.
 
-What remains here is presentation-only. Verified still outstanding on
-2026-09-02: grid cards still mount `<video>` directly (`ClipCard.tsx:138-160`),
-and both smoothness controls are still present (`Review.tsx:137-155` and
-`SourceClipsPanel.tsx:250-260`).
+Item 2 was the last presentation item here. Poster-first Grid cards are
+tracked in plan 029.
 
 ## Verification and constraints
 

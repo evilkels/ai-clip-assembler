@@ -46,15 +46,13 @@ was added 2026-09-11 from the first outside bug report, and
 
 ## In flight
 
-| Branch | Scope | Status |
-|---|---|---|
-| `feat/review-chat-scripting` | [034](done/034-review-chat-timeline-scripting.md) review-chat scripting; carries the review-visual-editing plan commit | Integration branch; slices merge here, then one PR to `main` |
+Nothing. [034](done/034-review-chat-timeline-scripting.md) merged to `main` in PR #86 and shipped in v0.4.0.
 
 Plan 027's parked `backend/tests/test_version_diversity.py` is on `main` behind
 `pytest.importorskip`; `backend/src/version_diversity.py` is still absent, so
 the plan remains unstarted.
 
-## Release QA — v0.3.1
+## Release QA — v0.4.0
 
 🔴 Not started. Human-only; no automated test covers any of it.
 
@@ -63,6 +61,7 @@ the plan remains unstarted.
 | 🔴 | Packaged DMG on a clean Mac, past Gatekeeper, backend starts unaided |
 | 🔴 | Import, Review and Timeline on real footage and real input hardware |
 | 🔴 | Open Resolve XML, FCPXML and EDL in their real NLEs — scheduled and scoped by [032](032-valid-fcpxml-and-nle-verification.md) Phase 5. FCPXML is known invalid until that plan lands |
+| 🔴 | Review scripting — the checklist in [`MANUAL_QA_GUIDE.md`](../MANUAL_QA_GUIDE.md#review-scripting) on the packaged app |
 | 🔴 | Keyboard-only pass — note trim is a known dead end |
 | 🔴 | Move or rename a project folder, reopen it, and export again — inherited from [project-folder-model](done/project-folder-model.md), whose code and automated QA are complete |
 

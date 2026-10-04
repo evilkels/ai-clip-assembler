@@ -97,6 +97,8 @@ interface StubOptions {
   op?: ReturnType<typeof gate>;
   /** Make Alpha's timeline operation fail with a 500, then hold its recovery GET of the timeline document. */
   failedOp?: { requested: ReturnType<typeof gate>; held: ReturnType<typeof gate> };
+  /** Hold Alpha's Redo response open until released; it resolves to an item Bravo does not have. */
+  redo?: ReturnType<typeof gate>;
 }
 
 const BRAVO_ITEMS = ['bravo-item-1', 'bravo-item-2'];
@@ -227,6 +229,10 @@ async function stubTwoProjects(page: Page, options: StubOptions = {}) {
       }
       await options.op?.opened;
       return json(snapshotOf(3, ['alpha-edited-item']));
+    }
+    if (project && url.pathname.endsWith('/timeline/redo')) {
+      await options.redo?.opened;
+      return json(snapshotOf(4, ['alpha-redone-item']));
     }
     if (project && url.pathname.endsWith('/timeline/undo')) {
       await options.undo?.opened;
@@ -363,8 +369,7 @@ test("a timeline edit resolving after a project switch never rewrites the new pr
 
   const settled = page.waitForResponse((response) => response.url().endsWith('/timeline/op'));
   op.release();
-  await settled;
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await settle(page, settled);
 
   expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
 });
@@ -394,6 +399,23 @@ test("a recovery fetch resolving after a project switch never rewrites the new p
   expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
 });
 
+test("a Redo resolving after a project switch never rewrites the new project's Timeline", async ({ page }) => {
+  const redo = gate();
+  await stubTwoProjects(page, { redo });
+
+  await page.goto('/#/timeline');
+  await page.getByTestId('timeline-redo').click();
+
+  await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  await expectBravoCommitted(page);
+
+  const settled = page.waitForResponse((response) => response.url().endsWith('/timeline/redo'));
+  redo.release();
+  await settle(page, settled);
+
+  expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
+});
+
 test('a message queued in the previous project is dropped, not delivered to the next', async ({ page }) => {
   const accept = gate();
   await stubTwoProjects(page, { alphaProposal: true, accept });
@@ -409,6 +431,7 @@ test('a message queued in the previous project is dropped, not delivered to the 
   await rail.getByRole('button', { name: 'Send' }).click();
 
   await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  await expectBravoCommitted(page);
   accept.release();
   await expect(rail).toContainText('BRAVO-MARKER');
 

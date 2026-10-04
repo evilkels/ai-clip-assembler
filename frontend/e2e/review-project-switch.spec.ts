@@ -3,7 +3,7 @@
  * conversation, not even for a single commit while the new one loads, and a
  * request still in flight for the previous project must not touch the new one.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 const PROJECTS = [
   { id: 'switch-alpha', folder: '/tmp/ai-clip-assembler/ALPHA', name: 'Alpha Project', marker: 'ALPHA-MARKER' },
@@ -95,6 +95,8 @@ interface StubOptions {
   undo?: ReturnType<typeof gate>;
   /** Hold Alpha's first timeline operation open until released; it resolves to an item Bravo does not have. */
   op?: ReturnType<typeof gate>;
+  /** Make Alpha's timeline operation fail with a 500, then hold its recovery GET of the timeline document. */
+  failedOp?: { requested: ReturnType<typeof gate>; held: ReturnType<typeof gate> };
 }
 
 const BRAVO_ITEMS = ['bravo-item-1', 'bravo-item-2'];
@@ -124,6 +126,7 @@ async function stubTwoProjects(page: Page, options: StubOptions = {}) {
   let alphaItems: string[] = [];
   let alphaRevision = 0;
   let alphaSessionServed = false;
+  let recoveryArmed = false;
 
   const messageOf = (text: string, id: string, role: 'agent' | 'editor' = 'agent') => ({
     message_id: id,
@@ -214,6 +217,14 @@ async function stubTwoProjects(page: Page, options: StubOptions = {}) {
       return json(snapshotOf(alphaRevision, alphaItems));
     }
     if (project && url.pathname.endsWith('/timeline/op')) {
+      if (options.failedOp) {
+        recoveryArmed = true;
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Timeline operation exploded' }),
+        });
+      }
       await options.op?.opened;
       return json(snapshotOf(3, ['alpha-edited-item']));
     }
@@ -223,6 +234,12 @@ async function stubTwoProjects(page: Page, options: StubOptions = {}) {
     }
     if (project && url.pathname.endsWith('/clips')) return json({ clips: [clip] });
     if (project && url.pathname.endsWith('/timeline/document')) {
+      if (isAlpha && options.failedOp && recoveryArmed) {
+        recoveryArmed = false;
+        options.failedOp.requested.release();
+        await options.failedOp.held.opened;
+        return json(snapshotOf(alphaRevision, ['alpha-recovered-item']));
+      }
       return json(isAlpha ? snapshotOf(alphaRevision, alphaItems) : snapshotOf(5, BRAVO_ITEMS));
     }
     if (url.pathname === '/harnesses') {
@@ -263,6 +280,17 @@ async function timelineItemIds(page: Page) {
 async function expectBravoCommitted(page: Page) {
   await expect(page.locator('.project-header-name')).toHaveText('Bravo Project');
   await expect(page.getByLabel('2 timeline items')).toBeVisible();
+}
+
+/**
+ * Wait until a stubbed response for the previous project has been delivered and the app
+ * has had time to act on it. The app has no completion signal, so this window can only
+ * make a test pass falsely, never fail falsely.
+ */
+async function settle(page: Page, settled: Promise<Response>) {
+  const response = await settled;
+  await response.finished();
+  await page.waitForTimeout(250);
 }
 
 test('switching projects never paints the previous conversation', async ({ page }) => {
@@ -337,6 +365,31 @@ test("a timeline edit resolving after a project switch never rewrites the new pr
   op.release();
   await settled;
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
+});
+
+test("a recovery fetch resolving after a project switch never rewrites the new project's Timeline", async ({
+  page,
+}) => {
+  const failedOp = { requested: gate(), held: gate() };
+  await stubTwoProjects(page, { failedOp });
+
+  await page.goto('/#/review');
+  const rail = page.getByTestId('ask-ai-rail');
+  await expect(rail).toContainText('ALPHA-MARKER');
+  await page.getByRole('button', { name: 'Add to working timeline' }).click();
+  await failedOp.requested.opened;
+
+  await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  await expect(rail).toContainText('BRAVO-MARKER');
+  await expectBravoCommitted(page);
+
+  const settled = page.waitForResponse((response) =>
+    response.url().endsWith(`/projects/${PROJECTS[0].id}/timeline/document`),
+  );
+  failedOp.held.release();
+  await settle(page, settled);
 
   expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
 });

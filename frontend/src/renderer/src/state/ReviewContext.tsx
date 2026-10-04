@@ -225,7 +225,11 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         }
         if (stillActive) {
           setError(reason instanceof Error ? reason.message : 'Timeline operation failed');
-          getTimelineDocument(requested).then(reconcileTimelineSnapshot).catch(() => {});
+          getTimelineDocument(requested)
+            .then((snapshot) => {
+              if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
+            })
+            .catch(() => {});
         }
         return;
       }

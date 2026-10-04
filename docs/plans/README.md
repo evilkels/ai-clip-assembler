@@ -17,13 +17,14 @@ docs.
 
 ## Active
 
-18 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
+19 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
 not taken from each plan's own header. [032](032-valid-fcpxml-and-nle-verification.md)
 was added 2026-09-11 from the first outside bug report, and
 [033](033-in-app-updates-and-a-trusted-build.md) the same day.
 
 | | Plan | What's left |
 |---|---|---|
+| 🔴 | [review-visual-editing](review-visual-editing.md) | Grounded Review chat, visual context, thematic cut proposals and exported-file verification ([#84](https://github.com/evilkels/ai-clip-assembler/issues/84)); sequenced after [034](done/034-review-chat-timeline-scripting.md), which delivers its "no fabricated Versions" rule for script turns |
 | 🔴 | [033](033-in-app-updates-and-a-trusted-build.md) | Sign and notarize so macOS stops asking, then let the app download and install its own updates. Blocked on [self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4; costs 99 USD/year |
 | 🔴 | [032](032-valid-fcpxml-and-nle-verification.md) | FCPXML is invalid in Final Cut ([#80](https://github.com/evilkels/ai-clip-assembler/issues/80)); 23.976 exports as 24 fps; verify exports in the real NLEs |
 | 🔴 | [019](019-clip-library-generation-and-expansion.md) | One generation seam, then source expansion |
@@ -45,12 +46,9 @@ was added 2026-09-11 from the first outside bug report, and
 
 ## In flight
 
-Nothing. Every branch this table used to list is merged and deleted from the
-remote, including `feat/031-scoring-engine-cards`
-([PR #78](https://github.com/evilkels/ai-clip-assembler/pull/78), the scoring-engine
-cards and plan 030 Step 4.1), which was an uncommitted worktree until 2026-09-10.
-Add a row the moment work leaves `main` again — a branch with no pull request is
-the easiest thing in this repo to forget.
+| Branch | Scope | Status |
+|---|---|---|
+| `feat/review-chat-scripting` | [034](done/034-review-chat-timeline-scripting.md) review-chat scripting; carries the review-visual-editing plan commit | Integration branch; slices merge here, then one PR to `main` |
 
 Plan 027's parked `backend/tests/test_version_diversity.py` is on `main` behind
 `pytest.importorskip`; `backend/src/version_diversity.py` is still absent, so
@@ -70,7 +68,7 @@ the plan remains unstarted.
 
 ## Closed
 
-41 plans.
+42 plans.
 
 | | Plan | Outcome |
 |---|---|---|
@@ -98,6 +96,7 @@ the plan remains unstarted.
 | 🟢 | [024 notes](done/024-implementation-notes.md) | Implementation notes for 024 |
 | 🟢 | [026](done/026-preview-audio-in-app.md) | Done 2026-08-13 · PR #65 |
 | 🟢 | [028](done/028-find-more-clips-from-source-video.md) | Superseded 2026-09-02 → 019 Phase 2 · **not built** |
+| 🟢 | [034](done/034-review-chat-timeline-scripting.md) | Done 2026-10-02 · S5 merged after review; S6 guide, verified examples and smoke checks |
 | 🟢 | [backend-timeline-workflow](done/2026-05-12-backend-timeline-workflow.md) | Done |
 | 🟢 | [review-timeline-video-preview](done/2026-06-10-review-timeline-video-preview-playwright.md) | Done |
 | 🟢 | [real-footage-qa-improvements](done/2026-06-11-real-footage-qa-improvements.md) | Done |

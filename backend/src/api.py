@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-# Load repo-root .env before harness imports: PI_*/OLLAMA_* are read at import time.
+# Load repo-root .env before harness imports: PI_* are read at import time.
 load_dotenv()
 
 from . import analysis_service
@@ -38,7 +38,6 @@ from .export_engine import (
     generate_resolve_xml,
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
-from .local_qwen_harness import enhance_clips_with_local_qwen  # noqa: F401 (postponed; kept for future re-enable)
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
 from .frame_extraction import extract_frames
 from .models import FrameScore
@@ -71,7 +70,13 @@ from .project_store import (
     write_timeline_document,
 )
 from .mcp_server import TimelineMCPServer
-from .review_agent import ProposalStore, ReviewAgentError, default_review_agent, run_review_turn
+from .review_agent import (
+    ProposalStore,
+    ReviewAgentError,
+    default_review_agent,
+    run_editor_script,
+    run_review_turn,
+)
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
@@ -173,7 +178,7 @@ def _make_cancellable_runner(project_id: str):
 
 class AnalysisRequest(BaseModel):
     project_id: str
-    harness_id: Literal["local_qwen", "claude_code", "codex", "pi_agent", "manual"]
+    harness_id: Literal["claude_code", "codex", "pi_agent", "manual"]
     preferences: dict
     # When provided, only these source videos are analyzed (file_id values).
     # Empty/omitted means analyze every source video in the project.
@@ -938,6 +943,7 @@ def build_timeline_sources(project: dict) -> dict[str, SourceClip]:
             start_sec=float(clip.get("start_sec", 0.0)),
             end_sec=float(clip.get("end_sec", 0.0)),
             source_duration_sec=float(duration),
+            file_name=clip.get("file_name"),
         )
     return sources
 
@@ -1026,10 +1032,24 @@ async def apply_timeline_op(project_id: str, request: TimelineOpRequest):
     return _timeline_snapshot(project_id, document)
 
 
+class TimelineUndoRequest(BaseModel):
+    # Undo only if the Timeline is still at this revision, so an undo aimed at
+    # one edit cannot pop a newer one.
+    expected_revision: Optional[int] = None
+
+
 @app.post("/projects/{project_id}/timeline/undo")
-async def undo_timeline_op(project_id: str):
+async def undo_timeline_op(project_id: str, request: Optional[TimelineUndoRequest] = None):
     controller = get_timeline_controller(project_id)
-    document = await controller.undo()
+    try:
+        document = await controller.undo(
+            expected_revision=request.expected_revision if request else None
+        )
+    except TimelineRevisionConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=_revision_conflict_detail(project_id, exc, controller),
+        ) from exc
     return _timeline_snapshot(project_id, document)
 
 
@@ -1142,6 +1162,12 @@ class ReviewTurnRequest(BaseModel):
     client_message_id: Optional[uuid.UUID] = None
 
 
+class ReviewScriptRequest(BaseModel):
+    source: str
+    client_message_id: Optional[str] = None
+    rerun_of_proposal_id: Optional[str] = None
+
+
 def _review_inputs(
     project_id: str, excluded_clip_ids: frozenset = frozenset()
 ) -> tuple[list, list, object]:
@@ -1210,6 +1236,8 @@ async def _run_review_turn(
         agent=agent,
         candidate_frames=candidate_frames,
         client_message_id=client_message_id,
+        # Scripts read the whole library, excluded clips included (Script API v1).
+        library=get_mcp_server()._list_candidates(project_id),
     )
 
 
@@ -1227,6 +1255,32 @@ async def review_turn(project_id: str, request: ReviewTurnRequest):
                 project_id,
                 message,
                 str(request.client_message_id) if request.client_message_id else None,
+            )
+        except ReviewAgentError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/projects/{project_id}/review/script")
+async def review_script(project_id: str, request: ReviewScriptRequest):
+    """Run the Editor's Script against a copy of the Timeline (ADR 0006).
+
+    Local: no frames, no consent check, no agent call. A script fault is a 200
+    with ``script.error`` set; a clean run with Operations stages a Proposal.
+    """
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    lock = _review_locks.setdefault(project_id, asyncio.Lock())
+    async with lock:
+        controller = get_timeline_controller(project_id)
+        try:
+            return await run_editor_script(
+                project_id,
+                source=request.source,
+                controller=controller,
+                library=get_mcp_server()._list_candidates(project_id),
+                store=_proposal_store,
+                client_message_id=request.client_message_id,
+                rerun_of_proposal_id=request.rerun_of_proposal_id,
             )
         except ReviewAgentError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -1581,7 +1635,6 @@ async def list_harnesses():
         "harnesses": [
             {"id": "manual", "name": "Manual / Rule-based", "type": "rule", "enabled": True},
             {"id": "pi_agent", "name": "Pi Agent", "type": "agent", "enabled": True},
-            {"id": "local_qwen", "name": "Local Qwen Vision", "type": "local", "enabled": False},
             {"id": "claude_code", "name": "Claude Code", "type": "agent", "enabled": False},
             {"id": "codex", "name": "Codex", "type": "agent", "enabled": False},
         ]

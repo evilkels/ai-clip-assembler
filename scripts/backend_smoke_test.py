@@ -23,6 +23,11 @@ def post_json(url: str, payload: Optional[dict] = None) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def get_json(url: str) -> dict:
+    with urllib.request.urlopen(url) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def upload_file(url: str, field_name: str, path: Path) -> dict:
     boundary = "----ai-clip-assembler-smoke-test"
     content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
@@ -93,6 +98,7 @@ def main() -> int:
     parser.add_argument("video_path", type=Path)
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--sample-fps", type=float, default=1.0)
+    parser.add_argument("--skip-script", action="store_true")
     args = parser.parse_args()
 
     if not args.video_path.exists():
@@ -128,6 +134,28 @@ def main() -> int:
         )
         print("\n".join(format_analysis_summary(analysis)))
 
+        if not args.skip_script:
+            before = get_json(f"{args.base_url}/projects/{project_id}/timeline/document")
+            revision_before = before["document"]["revision"]
+            print(f"Timeline revision before script: {revision_before}")
+            result = post_json(
+                f"{args.base_url}/projects/{project_id}/review/script",
+                {"source": 'log(timeline:count()) timeline:item(1):set_speed(1.5)'},
+            )
+            script_run = result["message"].get("script") or {}
+            print(f"Script Run log: {json.dumps(script_run.get('log', []))}")
+            print(f"Script Run error: {json.dumps(script_run.get('error'))}")
+            proposal = result.get("proposal")
+            if script_run.get("error") or not proposal:
+                raise RuntimeError("Script smoke did not produce an applicable Proposal")
+            print(f"Proposal summary: {json.dumps(proposal.get('summary', []))}")
+            post_json(
+                f"{args.base_url}/projects/{project_id}/proposals/{proposal['proposal_id']}/accept"
+            )
+            after = get_json(f"{args.base_url}/projects/{project_id}/timeline/document")
+            revision_after = after["document"]["revision"]
+            print(f"Timeline revision after script: {revision_after}")
+
         for export_format in ["edl", "fcpxml"]:
             export = post_json(f"{args.base_url}/projects/{project_id}/export?format={export_format}")
             print(f"{export_format.upper()} export: {export['file_path']}")
@@ -136,6 +164,9 @@ def main() -> int:
         return 1
     except urllib.error.URLError as exc:
         print(f"Could not reach backend at {args.base_url}: {exc}", file=sys.stderr)
+        return 1
+    except (KeyError, RuntimeError) as exc:
+        print(f"Script smoke failed: {exc}", file=sys.stderr)
         return 1
 
     return 0

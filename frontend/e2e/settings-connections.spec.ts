@@ -336,7 +336,7 @@ test('renders persisted scoring cards and updates the Import harness control', a
   const scoringEngine = page.getByRole('radiogroup', { name: 'Scoring engine' });
   await expect(scoringEngine.getByRole('radio', { name: 'Pi Agent · cloud' })).toBeChecked();
   await expect(scoringEngine.getByRole('radio', { name: 'Rule-based · local' })).toBeVisible();
-  await expect(scoringEngine.getByRole('radio', { name: 'Local model · Qwen 3-VL' })).toBeDisabled();
+  await expect(scoringEngine.getByRole('radio')).toHaveCount(2);
   await expect(page.getByTestId('effective-harness')).toHaveCount(0);
 
   const update = page.waitForRequest((request) =>

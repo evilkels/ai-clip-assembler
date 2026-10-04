@@ -9,6 +9,8 @@ The operations core is the *only* way a `TimelineDocument` is mutated; the GUI,
 the in-app review agent, and external MCP agents all drive it.
 """
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
@@ -19,7 +21,10 @@ from src.timeline_ops import (
     TimelineController,
     TimelineOpError,
     TimelineRevisionConflict,
+    _ITEM_ID_NAMESPACE,
+    _new_item_id,
     apply_operation,
+    seeded_item_ids,
 )
 
 
@@ -735,3 +740,103 @@ async def test_controller_apply_batch_rejects_stale_revision_without_mutation():
             expected_revision=0,
         )
     assert controller.document is before
+
+
+# --- deterministic ids inside a prepared batch -------------------------------
+
+
+def _split_then_slow(second_half_id):
+    return [
+        {"operation": "split_item", "args": {"item_id": "item-1", "at_sec": 3.5}},
+        {"operation": "set_speed", "args": {"item_id": second_half_id, "speed": 2.0}},
+    ]
+
+
+def _simulate_batch(document, sources, operations, seed):
+    working = document
+    with seeded_item_ids(seed):
+        for operation in operations:
+            working = apply_operation(
+                working, sources, operation["operation"], **operation.get("args", {})
+            )
+    return working
+
+
+def _second_half_id(document, sources, seed):
+    split = _simulate_batch(document, sources, _split_then_slow("unused")[:1], seed)
+    return split.items[1].item_id
+
+
+def _batch_fixture():
+    sources = make_sources(("clip-a", 0.0, 10.0, 30.0))
+    return TimelineDocument(items=[make_item("item-1", "clip-a", 2.0, 5.0)]), sources
+
+
+def _item_facts(document):
+    return [(i.item_id, i.start_sec, i.end_sec, i.speed) for i in document.items]
+
+
+@pytest.mark.asyncio
+async def test_apply_batch_with_matching_seed_reproduces_simulated_item_ids():
+    document, sources = _batch_fixture()
+    operations = _split_then_slow(_second_half_id(document, sources, "S"))
+    simulated = _simulate_batch(document, sources, operations, "S")
+    assert simulated.items[1].speed == 2.0
+
+    controller = TimelineController(document, sources)
+    result = await controller.apply_batch(operations, expected_revision=0, id_seed="S")
+
+    assert _item_facts(result) == _item_facts(simulated)
+    assert result.revision == 1
+
+
+@pytest.mark.asyncio
+async def test_apply_batch_without_seed_cannot_replay_ids_minted_in_the_batch():
+    document, sources = _batch_fixture()
+    operations = _split_then_slow(_second_half_id(document, sources, "S"))
+
+    controller = TimelineController(document, sources)
+    with pytest.raises(TimelineOpError):
+        await controller.apply_batch(operations, expected_revision=0)
+    assert controller.document is document
+
+
+def test_seeded_item_ids_are_a_deterministic_uuid5_hex_sequence():
+    with seeded_item_ids("S"):
+        first = [_new_item_id() for _ in range(3)]
+    with seeded_item_ids("S"):
+        second = [_new_item_id() for _ in range(3)]
+    assert first == second
+    assert len(set(first)) == 3
+    assert first[0] == uuid.uuid5(_ITEM_ID_NAMESPACE, "S:0").hex
+    assert first[2] == uuid.uuid5(_ITEM_ID_NAMESPACE, "S:2").hex
+    with seeded_item_ids("T"):
+        assert _new_item_id() != first[0]
+
+
+def test_item_ids_are_random_again_after_leaving_the_seeded_context():
+    with seeded_item_ids("S"):
+        seeded = _new_item_id()
+    after = [_new_item_id(), _new_item_id()]
+    assert after[0] != after[1]
+    assert seeded not in after
+    assert after[0] != uuid.uuid5(_ITEM_ID_NAMESPACE, "S:1").hex
+
+
+def test_seeded_item_ids_restores_the_allocator_when_the_body_raises():
+    with pytest.raises(RuntimeError):
+        with seeded_item_ids("S"):
+            raise RuntimeError("boom")
+    assert _new_item_id() != uuid.uuid5(_ITEM_ID_NAMESPACE, "S:0").hex
+
+
+def test_nested_seeded_item_ids_restore_the_outer_seed():
+    with seeded_item_ids("outer"):
+        first = _new_item_id()
+        with seeded_item_ids("inner"):
+            inner = _new_item_id()
+        second = _new_item_id()
+    assert first == uuid.uuid5(_ITEM_ID_NAMESPACE, "outer:0").hex
+    assert inner == uuid.uuid5(_ITEM_ID_NAMESPACE, "inner:0").hex
+    # The outer sequence resumes where it left off rather than restarting.
+    assert second == uuid.uuid5(_ITEM_ID_NAMESPACE, "outer:1").hex

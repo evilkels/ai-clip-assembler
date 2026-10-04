@@ -27,6 +27,7 @@ TIMELINE_DOCUMENT_FILENAME = "timeline.json"
 REVIEW_SESSION_FILENAME = "review-session.json"
 SUPPORTED_SOURCE_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv"}
 DEFAULT_HARNESS_ID = "manual"
+REMOVED_HARNESS_IDS = frozenset({"local_qwen"})
 UNSAFE_PROJECT_ROOTS = [
     Path("/System"),
     Path("/Applications"),
@@ -86,6 +87,12 @@ class ProjectManifest(BaseModel):
         if value != PROJECT_SCHEMA_VERSION:
             raise ValueError(f"unsupported schema_version: {value}")
         return value
+
+    @field_validator("harness")
+    @classmethod
+    def removed_harness_resolves_to_manual(cls, value: str) -> str:
+        # Projects saved before the local Qwen harness was removed still load.
+        return DEFAULT_HARNESS_ID if value in REMOVED_HARNESS_IDS else value
 
 
 def datetime_now_utc() -> datetime:

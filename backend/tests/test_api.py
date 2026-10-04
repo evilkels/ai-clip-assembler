@@ -1,16 +1,30 @@
+import asyncio
 import json
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src import api
+from src import api, review_agent
 from src.embeddings import FakeEmbeddingProvider
 from src.frame_extraction import FFmpegUnavailableError
-from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence, VideoMetadata
+from src.models import (
+    AssemblyResult,
+    ClipSuggestion,
+    FrameSample,
+    FrameScore,
+    TimelineDocument,
+    TimelineItem,
+    TimelineSequence,
+    VideoMetadata,
+)
 from src.review_state import sequence_fingerprint
+from src.timeline_script import ScriptResult
 
 
 def create_folder_project_with_video(tmp_path, content=b"folder video bytes", filename="DJI_0042.MP4"):
@@ -1732,19 +1746,26 @@ def test_reopen_folder_project_restores_selected_and_effective_harness(monkeypat
     assert reopened_project["harness_id"] == "manual"
 
 
-def test_analyze_rejects_postponed_local_qwen_harness(monkeypatch, tmp_path):
+def test_reopen_folder_project_saved_with_removed_local_qwen_harness_resolves_to_manual(tmp_path):
     api.projects.clear()
-    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
     client = TestClient(api.app)
-    project_id = client.post("/projects").json()["project_id"]
+    client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
+    manifest_path = project_folder / "clipassembler" / "project.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["harness"] = "local_qwen"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    response = client.post(
-        f"/projects/{project_id}/analyze",
-        json={"project_id": project_id, "harness_id": "local_qwen", "preferences": {}},
-    )
+    api.projects.clear()
+    response = client.post("/projects/from-folder", json={"folder_path": str(project_folder)})
 
-    assert response.status_code == 400
-    assert "manual and pi_agent" in response.json()["detail"]
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected_harness"] == "manual"
+    assert body["project"]["harness"] == "manual"
+    assert api.projects[body["project_id"]]["selected_harness"] == "manual"
 
 
 def test_update_timeline_replaces_order_and_trims(monkeypatch, tmp_path):
@@ -2139,15 +2160,14 @@ def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path)
     assert "00:00:01:00 00:00:02:00 00:00:00:00 00:00:01:00" in Path(response.json()["file_path"]).read_text()
 
 
-def test_list_harnesses_shows_pi_agent_enabled_and_local_qwen_postponed():
+def test_list_harnesses_shows_pi_agent_enabled():
     client = TestClient(api.app)
     response = client.get("/harnesses")
     assert response.status_code == 200
     harnesses = {h["id"]: h for h in response.json()["harnesses"]}
     assert harnesses["manual"]["enabled"] is True
     assert harnesses["pi_agent"]["enabled"] is True
-    # Local Qwen is postponed until the local-model path is fully figured out.
-    assert harnesses["local_qwen"]["enabled"] is False
+    assert "local_qwen" not in harnesses
 
 
 def _project_with_one_video(monkeypatch, tmp_path):
@@ -2426,6 +2446,40 @@ def test_timeline_op_undo_and_redo(monkeypatch, tmp_path):
     redo = client.post(f"/projects/{project_id}/timeline/redo")
     assert redo.status_code == 200
     assert len(redo.json()["document"]["items"]) == 2
+
+
+def test_timeline_undo_with_stale_expected_revision_returns_409_and_keeps_document(
+    monkeypatch, tmp_path
+):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    response = client.post(
+        f"/projects/{project_id}/timeline/undo", json={"expected_revision": 1}
+    )
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["expected_revision"] == 1
+    assert detail["current_revision"] == 2
+    assert detail["current_snapshot"]["document"]["revision"] == 2
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert (document["revision"], len(document["items"])) == (2, 2)
+
+
+def test_timeline_undo_with_current_expected_revision_undoes(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    response = client.post(
+        f"/projects/{project_id}/timeline/undo", json={"expected_revision": 2}
+    )
+
+    assert response.status_code == 200
+    document = response.json()["document"]
+    assert (document["revision"], len(document["items"])) == (3, 1)
 
 
 def test_timeline_op_split_and_set_speed(monkeypatch, tmp_path):
@@ -2774,6 +2828,321 @@ def test_review_turn_rejects_blank_message(monkeypatch, tmp_path):
     response = client.post(f"/projects/{project_id}/review/turn", json={"message": "  "})
 
     assert response.status_code == 422
+
+
+# --- Review scripts (plan 034 S4) -------------------------------------------
+
+
+def _script_project(monkeypatch, tmp_path):
+    """An analyzed project with consent off and an agent that must never run."""
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["cloud_ai_consent"] = False
+
+    def agent_must_not_run(_context):
+        raise AssertionError("running a script must not call the review agent")
+
+    monkeypatch.setattr(api, "default_review_agent", agent_must_not_run)
+    monkeypatch.setattr(api, "_review_agent", agent_must_not_run)
+    return client, project_id
+
+
+def _run_script(client, project_id, source, **extra):
+    return client.post(f"/projects/{project_id}/review/script", json={"source": source, **extra})
+
+
+def _timeline_items(client, project_id):
+    return client.get(f"/projects/{project_id}/timeline/document").json()["document"]["items"]
+
+
+def test_editor_script_becomes_a_proposal_without_consent_or_an_agent_call(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+
+    response = _run_script(client, project_id, 'timeline:add("clip-2")\ntimeline:add("clip-1")')
+
+    assert response.status_code == 200
+    body = response.json()
+    message = body["message"]
+    assert message["role"] == "editor"
+    assert message["script"]["author"] == "editor"
+    assert message["script"]["error"] is None
+    assert message["script"]["operation_count"] == 2
+    assert message["script"]["based_on_timeline_revision"] == 0
+    assert body["proposal"]["status"] == "pending"
+    assert body["proposal"]["summary"] == [
+        "Add DJI_0001.MP4 5.0–7.0 s at the end",
+        "Add DJI_0001.MP4 1.0–4.0 s at the end",
+    ]
+    assert (body["proposal"]["before_duration_sec"], body["proposal"]["after_duration_sec"]) == (0.0, 5.0)
+    assert message["script"]["proposal_id"] == body["proposal"]["proposal_id"]
+    assert message["proposal"]["proposal_id"] == body["proposal"]["proposal_id"]
+    assert body["session"]["messages"][-1]["message_id"] == message["message_id"]
+    assert _timeline_items(client, project_id) == []
+
+
+def test_accepting_a_script_proposal_is_one_revision_and_one_undo(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    before = _timeline_items(client, project_id)
+    run = _run_script(
+        client,
+        project_id,
+        'local added = timeline:add("clip-2", 1)\n'
+        "local a, b = timeline:item(2):split(2.5)\n"
+        "b:set_speed(2)\n"
+        "log(added:id()); log(a:id()); log(b:id())",
+    ).json()
+    dry_run_ids = run["message"]["script"]["log"]
+
+    accepted = client.post(f"/projects/{project_id}/proposals/{run['proposal']['proposal_id']}/accept")
+
+    assert accepted.status_code == 200
+    document = accepted.json()["document"]
+    assert document["revision"] == 2
+    assert [(i["source_clip_id"], i["start_sec"], i["end_sec"], i["speed"]) for i in document["items"]] == [
+        ("clip-2", 5.0, 7.0, 1.0),
+        ("clip-1", 1.0, 2.5, 1.0),
+        ("clip-1", 2.5, 4.0, 2.0),
+    ]
+    assert [item["item_id"] for item in document["items"]] == dry_run_ids
+    client.post(f"/projects/{project_id}/timeline/undo")
+    assert _timeline_items(client, project_id) == before
+
+
+_RESTORE_EXCLUDED = 'for _, c in ipairs(library:clips{decision="excluded"}) do library:include(c.id) end'
+
+
+def test_editor_script_sees_excluded_clips_and_can_restore_them(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    _op(client, project_id, "exclude", clip_id="clip-1")
+
+    proposal = _run_script(client, project_id, _RESTORE_EXCLUDED).json()["proposal"]
+
+    assert proposal["operations"] == [{"operation": "include", "args": {"clip_id": "clip-1"}}]
+
+
+def test_agent_script_sees_excluded_clips_while_its_candidates_stay_filtered(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    seen_candidate_ids = []
+
+    def scripting_agent(context):
+        seen_candidate_ids.extend(candidate["clip_id"] for candidate in context["candidates"])
+        return {"message": "Bringing it back.", "script": _RESTORE_EXCLUDED}
+
+    monkeypatch.setattr(api, "_review_agent", scripting_agent)
+    _op(client, project_id, "exclude", clip_id="clip-1")
+
+    turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "restore"}).json()
+
+    assert seen_candidate_ids == ["clip-2"]
+    assert turn["proposal"]["operations"] == [{"operation": "include", "args": {"clip_id": "clip-1"}}]
+
+
+def test_script_syntax_error_reports_its_line_and_stages_nothing(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+
+    response = _run_script(client, project_id, 'timeline:add("clip-1")\nfor i = 1 do\nend')
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["script"]["error"]["kind"] == "syntax"
+    assert body["message"]["script"]["error"]["line"] == 2
+    assert body["message"]["script"]["proposal_id"] is None
+    assert body["proposal"] is None
+    assert _timeline_items(client, project_id) == []
+
+
+def test_script_that_only_logs_keeps_its_log_and_stages_nothing(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+
+    response = _run_script(client, project_id, 'log(("%d clips"):format(#library:clips()))')
+
+    assert response.status_code == 200
+    script = response.json()["message"]["script"]
+    assert script["log"] == ["2 clips"]
+    assert script["error"] is None
+    assert script["operation_count"] == 0
+    assert response.json()["proposal"] is None
+
+
+def test_stale_script_proposal_is_rerun_and_the_old_one_superseded(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    source = 'timeline:add("clip-1")'
+    stale_id = _run_script(client, project_id, source).json()["proposal"]["proposal_id"]
+    _op(client, project_id, "include", clip_id="clip-2")
+
+    stale_accept = client.post(f"/projects/{project_id}/proposals/{stale_id}/accept")
+    rerun = _run_script(client, project_id, source, rerun_of_proposal_id=stale_id)
+    old_accept = client.post(f"/projects/{project_id}/proposals/{stale_id}/accept")
+
+    assert stale_accept.status_code == 409
+    assert rerun.status_code == 200
+    fresh = rerun.json()["proposal"]
+    assert fresh["status"] == "pending"
+    assert fresh["proposal_id"] != stale_id
+    assert fresh["based_on_timeline_revision"] == 1
+    statuses = {
+        p["proposal_id"]: p["status"]
+        for p in client.get(f"/projects/{project_id}/proposals").json()["proposals"]
+    }
+    assert statuses == {stale_id: "superseded", fresh["proposal_id"]: "pending"}
+    assert old_accept.status_code == 409
+    assert "superseded" in old_accept.json()["detail"]
+    assert [i["source_clip_id"] for i in _timeline_items(client, project_id)] == ["clip-2"]
+
+    accepted = client.post(f"/projects/{project_id}/proposals/{fresh['proposal_id']}/accept")
+
+    assert accepted.status_code == 200
+    assert [i["source_clip_id"] for i in accepted.json()["document"]["items"]] == ["clip-2", "clip-1"]
+
+
+def test_a_clean_rerun_supersedes_even_when_it_records_nothing_and_a_faulted_one_does_not(
+    monkeypatch, tmp_path
+):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    kept_id = _run_script(client, project_id, 'timeline:add("clip-1")').json()["proposal"]["proposal_id"]
+    retired_id = _run_script(client, project_id, 'timeline:add("clip-2")').json()["proposal"]["proposal_id"]
+
+    faulted = _run_script(client, project_id, 'error("not yet")', rerun_of_proposal_id=kept_id)
+    emptied = _run_script(client, project_id, 'log("nothing to change")', rerun_of_proposal_id=retired_id)
+
+    assert faulted.json()["message"]["script"]["error"]["kind"] == "runtime"
+    assert emptied.json()["proposal"] is None
+    statuses = {
+        p["proposal_id"]: p["status"]
+        for p in client.get(f"/projects/{project_id}/proposals").json()["proposals"]
+    }
+    assert statuses == {kept_id: "pending", retired_id: "superseded"}
+
+
+def test_script_run_is_idempotent_by_client_message_id(monkeypatch, tmp_path):
+    client, project_id = _script_project(monkeypatch, tmp_path)
+    message_id = "5f1d3c52-8a0e-4f43-9d3b-0c7a2e61b9a4"
+    source = 'timeline:add("clip-1")'
+
+    first = _run_script(client, project_id, source, client_message_id=message_id)
+    retry = _run_script(client, project_id, source, client_message_id=message_id)
+    reused = _run_script(client, project_id, 'timeline:add("clip-2")', client_message_id=message_id)
+
+    assert first.status_code == retry.status_code == 200
+    assert retry.json()["message"] == first.json()["message"]
+    assert len(retry.json()["session"]["messages"]) == 1
+    assert len(client.get(f"/projects/{project_id}/proposals").json()["proposals"]) == 1
+    assert reused.status_code == 409
+
+
+def test_script_runs_and_their_errors_survive_reopening_the_project_folder(monkeypatch, tmp_path):
+    api.projects.clear()
+    api._proposal_store = api.ProposalStore()
+    project_folder = tmp_path / "footage"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    clips = [
+        {
+            "clip_id": "clip-1", "file_id": "file-1", "file_name": "DJI_0042.MP4",
+            "start_sec": 1.0, "end_sec": 4.0, "duration_sec": 3.0, "overall_score": 8,
+        }
+    ]
+
+    def open_project():
+        project_id = client.post(
+            "/projects/from-folder", json={"folder_path": str(project_folder)}
+        ).json()["project_id"]
+        api.projects[project_id]["clips"] = clips
+        return project_id
+
+    first_project_id = open_project()
+    applied = _run_script(client, first_project_id, 'timeline:add("clip-1")').json()["proposal"]
+    _run_script(client, first_project_id, 'log("checking")\nerror("not this one")')
+    _run_script(client, first_project_id, "timeline:add(")
+    _run_script(client, first_project_id, 'timeline:add("clip-1")\ntimeline:add("missing")')
+    _run_script(client, first_project_id, 'for i = 1, 1001 do timeline:add("clip-1") end')
+    saved = client.get(f"/projects/{first_project_id}/review/session").json()["messages"]
+
+    api.projects.clear()
+    api._proposal_store = api.ProposalStore()
+    second_project_id = open_project()
+    restored = client.get(f"/projects/{second_project_id}/review/session").json()["messages"]
+    accepted = client.post(f"/projects/{second_project_id}/proposals/{applied['proposal_id']}/accept")
+
+    assert [message["script"] for message in restored] == [message["script"] for message in saved]
+    assert [message["script"]["error"] and message["script"]["error"]["kind"] for message in restored] == [
+        None, "runtime", "syntax", "operation", "limit",
+    ]
+    assert restored[1]["script"]["log"] == ["checking"]
+    assert restored[1]["script"]["error"]["line"] == 2
+    assert restored[3]["script"]["error"]["line"] == 2
+    assert accepted.status_code == 200
+    assert [i["source_clip_id"] for i in accepted.json()["document"]["items"]] == ["clip-1"]
+
+
+@pytest.mark.asyncio
+async def test_a_slow_script_does_not_block_other_requests(monkeypatch, tmp_path):
+    _client, project_id = _script_project(monkeypatch, tmp_path)
+    started = threading.Event()
+
+    def slow_run_script(source, *, document, **_kwargs):
+        started.set()
+        time.sleep(1.0)
+        return ScriptResult(operations=[], document=document, log=["done"], error=None)
+
+    monkeypatch.setattr(review_agent, "run_script", slow_run_script)
+    finished = []
+    transport = httpx.ASGITransport(app=api.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+
+        async def run_slow_script():
+            response = await http.post(f"/projects/{project_id}/review/script", json={"source": "x = 1"})
+            finished.append("script")
+            return response
+
+        async def read_timeline():
+            await asyncio.to_thread(started.wait, 5)
+            response = await http.get(f"/projects/{project_id}/timeline/document")
+            finished.append("timeline")
+            return response
+
+        script, timeline = await asyncio.gather(run_slow_script(), read_timeline())
+
+    assert script.status_code == timeline.status_code == 200
+    assert finished == ["timeline", "script"]
+
+
+@pytest.mark.asyncio
+async def test_staging_a_large_script_recording_does_not_block_the_event_loop(monkeypatch, tmp_path):
+    _client, project_id = _script_project(monkeypatch, tmp_path)
+    controller = api.get_timeline_controller(project_id)
+    controller._document = TimelineDocument(
+        items=[
+            TimelineItem(item_id=f"item-{n}", source_clip_id="clip-1", start_sec=1.0, end_sec=4.0)
+            for n in range(1000)
+        ]
+    )
+    recording = [
+        {"operation": "set_speed", "args": {"item_id": f"item-{n}", "speed": 2.0}} for n in range(1000)
+    ]
+
+    def instant_run_script(source, *, document, **_kwargs):
+        return ScriptResult(operations=recording, document=document, log=[], error=None)
+
+    monkeypatch.setattr(review_agent, "run_script", instant_run_script)
+    longest_stall = 0.0
+    transport = httpx.ASGITransport(app=api.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+        request = asyncio.ensure_future(
+            http.post(f"/projects/{project_id}/review/script", json={"source": "x = 1"})
+        )
+        while not request.done():
+            tick = time.monotonic()
+            await asyncio.sleep(0.01)
+            longest_stall = max(longest_stall, time.monotonic() - tick)
+        response = await request
+
+    assert response.status_code == 200
+    assert response.json()["proposal"]["operations"] == recording
+    assert longest_stall < 0.5
 
 
 def diagnostic_result(found=True, detail="", model="gpt-5.4-mini", provider="openai-codex"):

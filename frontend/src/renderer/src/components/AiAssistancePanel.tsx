@@ -21,15 +21,6 @@ const scoringEngines = [
     facts: ['≈4s per clip', 'billed to your provider', 'needs network'],
     disabled: false,
   },
-  {
-    id: 'local_qwen',
-    name: 'Local model · Qwen 3-VL',
-    badge: 'POSTPONED',
-    description:
-      'Semantic scoring with no network, via Ollama or MLX. Disabled in this build — the endpoint is not selectable yet.',
-    facts: [],
-    disabled: true,
-  },
 ] as const;
 
 const scoringEngineNames = Object.fromEntries(

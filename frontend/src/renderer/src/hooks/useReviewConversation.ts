@@ -71,6 +71,7 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
   const [staleProposalIds, setStaleProposalIds] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingProposalIds, setPendingProposalIds] = useState<ReadonlySet<string>>(() => new Set());
   const [applied, setApplied] = useState<{ proposalId: string; revision: number } | null>(null);
+  const [sessionProjectId, setSessionProjectId] = useState(projectId);
   const activeProject = useRef<string | null>(projectId);
   // Every conversation mutation runs after the previous one settles, so a
   // slower response can never apply an older session over a newer one.
@@ -94,20 +95,21 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     setVersionSet(latestVersionSet(session.messages));
   }, []);
 
-  useEffect(() => {
-    activeProject.current = projectId;
+  if (sessionProjectId !== projectId) {
+    setSessionProjectId(projectId);
     setMessages([]);
     setVersionSet(null);
     setError(null);
     setStaleProposalIds(new Set());
     setPendingProposalIds(new Set());
     setApplied(null);
-    if (!projectId) {
-      setBusy(false);
-      return;
-    }
+    setBusy(Boolean(projectId));
+  }
+
+  useEffect(() => {
+    activeProject.current = projectId;
+    if (!projectId) return;
     let alive = true;
-    setBusy(true);
     void serialize(() =>
       getReviewSession(projectId)
         .then((session) =>

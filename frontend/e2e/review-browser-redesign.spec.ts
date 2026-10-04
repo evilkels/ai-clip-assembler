@@ -422,6 +422,7 @@ test('Review has one view-only smoothness control and hides nothing by default',
   await expect(page.getByLabel('Display filter')).toHaveCount(0);
   await expect(page.getByRole('spinbutton', { name: /smoothness/i })).toHaveCount(1);
   await expect(page.getByRole('slider', { name: /smoothness/i })).toHaveCount(0);
+  await expect(page.getByLabel('Minimum Smoothness')).toHaveValue('0');
 
   await expect(page.getByTestId('review-header-count')).toHaveText('4 / 4');
   await page.getByTestId('source-clips-panel').getByRole('button', { name: 'List' }).click();

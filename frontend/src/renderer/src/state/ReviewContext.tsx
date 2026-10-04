@@ -6,6 +6,7 @@ import {
   // react-doctor-disable-next-line react-doctor/no-react19-deprecated-apis
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -159,6 +160,11 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const documentRef = useRef<TimelineDocument | null>(null);
   const didAutoOpenProject = useRef(false);
   const openStartedRef = useRef(false);
+  // The project currently open, so an in-flight response for a previous one is not applied.
+  const activeProjectRef = useRef(projectId);
+  useLayoutEffect(() => {
+    activeProjectRef.current = projectId;
+  }, [projectId]);
 
   // Reconcile local review state from the authoritative Timeline Document. The
   // backend document is the source of truth; the GUI mirrors it.
@@ -582,10 +588,12 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const undo = useCallback(
     async (expectedRevision?: number) => {
       if (!projectId) return;
+      const requested = projectId;
       try {
-        reconcileTimelineSnapshot(await undoTimeline(projectId, expectedRevision));
+        const snapshot = await undoTimeline(requested, expectedRevision);
+        if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
       } catch (reason: unknown) {
-        if (reason instanceof TimelineRevisionConflictError) {
+        if (reason instanceof TimelineRevisionConflictError && activeProjectRef.current === requested) {
           reconcileTimelineSnapshot(reason.detail.current_snapshot);
         }
         throw reason;

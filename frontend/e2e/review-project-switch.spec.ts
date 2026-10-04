@@ -276,6 +276,25 @@ test('a late session response for the previous project never lands', async ({ pa
   await expect(log).toHaveAttribute('aria-busy', 'false');
 });
 
+test("an Undo resolving after a project switch never rewrites the new project's Timeline", async ({ page }) => {
+  const undo = gate();
+  await stubTwoProjects(page, { alphaProposal: true, undo });
+
+  await page.goto('/#/review');
+  const rail = page.getByTestId('ask-ai-rail');
+  await rail.getByTestId('proposal-accept').click();
+  await expect(page.getByLabel('1 timeline items')).toBeVisible();
+  await rail.getByRole('button', { name: 'Undo' }).click();
+
+  await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+  undo.release();
+  // Bravo's conversation loads only after Alpha's queued Undo has settled.
+  await expect(rail).toContainText('BRAVO-MARKER');
+
+  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+});
+
 test('a message queued in the previous project is dropped, not delivered to the next', async ({ page }) => {
   const accept = gate();
   await stubTwoProjects(page, { alphaProposal: true, accept });

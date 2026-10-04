@@ -292,11 +292,13 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
 
   const undoProposal = useCallback(async () => {
     if (!applied) return;
-    await actOnProposal(applied.proposalId, async () => {
+    await actOnProposal(applied.proposalId, async (id) => {
       try {
         await undo(applied.revision);
+        if (activeProject.current !== id) return;
         setApplied(null);
       } catch (reason: unknown) {
+        if (activeProject.current !== id) return;
         // A newer edit landed first: the backend refused, so this Undo is spent.
         if (reason instanceof TimelineRevisionConflictError) setApplied(null);
         else setError('Could not undo that change.');

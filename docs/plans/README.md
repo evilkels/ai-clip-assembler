@@ -17,10 +17,10 @@ docs.
 
 ## Active
 
-16 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
+17 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
 not taken from each plan's own header. [032](032-valid-fcpxml-and-nle-verification.md)
 was added 2026-09-11 from the first outside bug report, and
-[033](033-in-app-updates-and-a-trusted-build.md) the same day. 017, 030 and
+[033](033-in-app-updates-and-a-trusted-build.md) the same day. 017 and
 react-doctor-triage closed 2026-10-04.
 
 | | Plan | What's left |
@@ -34,6 +34,7 @@ react-doctor-triage closed 2026-10-04.
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
+| 🟡 | [030](030-truthful-ai-usage.md) | Phases 1–4 shipped and gated 2026-10-04; consent is not discoverable — the no-consent chat stub doesn't say how to grant it and Settings can't grant or revoke. Owner wants default-on (needs ADR 0001 change) or an intro dialog/wizard; overlaps 031 Phase 5 |
 | 🟡 | [031](031-app-restyle-conformance.md) | Step gating, Phase 7 audit and all of Settings Phase 3 shipped (PRs #72, #74, #75, #78); shell/Import, buttons, popover/consent, tokens and workflow-screen deltas remain |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); real-footage measurement and Phase 5 analysis-written posters remain |
 | 🟡 | [agent-operable-timeline](agent-operable-timeline.md) | Full pan/crop preview, chat token streaming and propose→accept E2E await visual QA |
@@ -65,7 +66,7 @@ the plan remains unstarted.
 
 ## Closed
 
-45 plans.
+44 plans.
 
 | | Plan | Outcome |
 |---|---|---|
@@ -94,7 +95,6 @@ the plan remains unstarted.
 | 🟢 | [024 notes](done/024-implementation-notes.md) | Implementation notes for 024 |
 | 🟢 | [026](done/026-preview-audio-in-app.md) | Done 2026-08-13 · PR #65 |
 | 🟢 | [028](done/028-find-more-clips-from-source-video.md) | Superseded 2026-09-02 → 019 Phase 2 · **not built** |
-| 🟢 | [030](done/030-truthful-ai-usage.md) | Done 2026-10-04 · Phases 1–3 PR #76, 4.1 PR #78, full gate on the small-plans batch |
 | 🟢 | [034](done/034-review-chat-timeline-scripting.md) | Done 2026-10-02 · S5 merged after review; S6 guide, verified examples and smoke checks |
 | 🟢 | [backend-timeline-workflow](done/2026-05-12-backend-timeline-workflow.md) | Done |
 | 🟢 | [review-timeline-video-preview](done/2026-06-10-review-timeline-video-preview-playwright.md) | Done |

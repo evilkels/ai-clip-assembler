@@ -84,7 +84,7 @@ Two deliberate deviations, both recorded rather than silently taken:
   warning notice and stays live, which is the behavioural half of the rule. The
   button needs to know a Harness Fallback happened, and the backend's
   `metadata.used_ai` is still dropped by the client — that is
-  [plan 030](done/030-truthful-ai-usage.md) Phase 3, Step 3.1. Wire the button there.
+  [plan 030](030-truthful-ai-usage.md) Phase 3, Step 3.1. Wire the button there.
 
 ## Phase 2 — Shell and Import element deltas
 
@@ -127,7 +127,7 @@ Do these together and re-cut the baselines once, with Phase 3.
       a right-aligned `11 / 16 CLIPS KEPT` in `--txd`. The build has no middle
       field at all, no uppercase, no tracking, and `padding:0 12px; gap:16px`.
       The harness variant of the middle fact needs the **Effective Harness**, so
-      it depends on [plan 030](done/030-truthful-ai-usage.md) Phase 1; ship
+      it depends on [plan 030](030-truthful-ai-usage.md) Phase 1; ship
       `BACKEND … · LOCAL` first rather than blocking the whole step on it.
 
 **Import (`1d`)**
@@ -233,7 +233,7 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
       Pi Agent · cloud (`OPT-IN`, nested account row, consent state). The
       local model card was dropped: the local Qwen harness was removed on
       2026-09-29. Copy is in the handoff and is final. This is where the **Selected Harness** setting belongs, so
-      do it after [plan 030](done/030-truthful-ai-usage.md) Phase 1 persists it —
+      do it after [plan 030](030-truthful-ai-usage.md) Phase 1 persists it —
       otherwise the panel writes to component state that resets on navigation.
       Implemented persisted radio cards and effective scoring fallback feedback in Settings › AI assistance.
 - [ ] **Step 3.3** Move the model account out of Connections into the account
@@ -317,7 +317,7 @@ and the Timeline/Export empty states. Settle each with the design owner before
 a worker touches it.
 
 **Sequencing.** Review's fallback notice and agent copy depend on
-[plan 030](done/030-truthful-ai-usage.md) Phases 2–4. Timeline and Export have no
+[plan 030](030-truthful-ai-usage.md) Phases 2–4. Timeline and Export have no
 plan 030 dependency and can be done together with Phases 2, 3 and 6 under the
 same single baseline re-cut.
 

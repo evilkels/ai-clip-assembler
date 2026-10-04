@@ -371,7 +371,6 @@ test('projects seeded scores, decisions, Timeline membership, and Version labels
   const { timelineFile, timelineClipId } = await setupSeededReview(page);
   const browser = page.locator('[data-review-browser]');
 
-  await page.getByLabel('Minimum Smoothness').fill('0');
   await page.getByTestId('source-clips-panel').getByRole('button', { name: 'Grid' }).click();
   await expect(browser).toHaveAttribute('data-view-mode', 'grid');
   const combinedFills = await browser.locator('.clip-card .score-chip[data-score-label="combined"]')

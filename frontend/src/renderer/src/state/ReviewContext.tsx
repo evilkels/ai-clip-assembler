@@ -74,8 +74,6 @@ interface ReviewState {
   timelineItems: TimelineItem[];
   /** One atomic authoritative document + identity snapshot. */
   timelineSnapshot: TimelineSnapshot | null;
-  smoothnessThreshold: number;
-  setSmoothnessThreshold: (v: number) => void;
   profile: AssemblyProfile;
   setProfile: (profile: AssemblyProfile) => void;
   targetDuration: number;
@@ -149,7 +147,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [trims, setTrims] = useState<Record<string, Trim>>({});
   const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
   const [timelineSnapshot, setTimelineSnapshot] = useState<TimelineSnapshot | null>(null);
-  const [smoothnessThreshold, setSmoothnessThreshold] = useState(7);
   const [profile, setProfile] = useState<AssemblyProfile>('cinematic_highlight');
   const [targetDuration, setTargetDuration] = useState(120);
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
@@ -643,8 +640,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       trims,
       timelineItems,
       timelineSnapshot,
-      smoothnessThreshold,
-      setSmoothnessThreshold,
       profile,
       setProfile: selectProfile,
       targetDuration,
@@ -699,7 +694,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       trims,
       timelineItems,
       timelineSnapshot,
-      smoothnessThreshold,
       profile,
       targetDuration,
       generationStats,

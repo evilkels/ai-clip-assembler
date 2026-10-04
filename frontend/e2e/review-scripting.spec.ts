@@ -127,7 +127,6 @@ test('runs a pasted Script, applies its Proposal as one step, and undoes it', as
   expect(await readTimeline(page.request, projectApi())).toEqual(before);
 
   await page.getByRole('button', { name: 'List' }).click();
-  await page.getByLabel('Minimum Smoothness').fill('0');
   const position = (id: string) => page.locator(`[data-review-clip="${id}"]`);
 
   await proposal.getByRole('button', { name: 'Apply' }).click();

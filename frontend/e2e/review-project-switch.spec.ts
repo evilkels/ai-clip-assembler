@@ -1,12 +1,13 @@
 /**
  * Switching projects on Review must never paint the previous project's
- * conversation, not even for a single commit while the new one loads.
+ * conversation, not even for a single commit while the new one loads, and a
+ * request still in flight for the previous project must not touch the new one.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const PROJECTS = [
-  { id: 'switch-alpha', folder: '/tmp/ai-clip-assembler/ALPHA', name: 'Alpha Project', marker: 'ALPHA-MARKER', delayMs: 0 },
-  { id: 'switch-bravo', folder: '/tmp/ai-clip-assembler/BRAVO', name: 'Bravo Project', marker: 'BRAVO-MARKER', delayMs: 1_500 },
+  { id: 'switch-alpha', folder: '/tmp/ai-clip-assembler/ALPHA', name: 'Alpha Project', marker: 'ALPHA-MARKER' },
+  { id: 'switch-bravo', folder: '/tmp/ai-clip-assembler/BRAVO', name: 'Bravo Project', marker: 'BRAVO-MARKER' },
 ];
 
 const sourceVideo = {
@@ -50,7 +51,53 @@ const clip = {
   source_duration_sec: 10,
 };
 
-test('switching projects never paints the previous conversation', async ({ page }) => {
+const timelineItem = (itemId: string) => ({
+  item_id: itemId,
+  source_clip_id: 'switch-clip',
+  start_sec: 1,
+  end_sec: 4,
+  speed: 1,
+  transform: { scale: 1, x: 0, y: 0 },
+});
+
+const snapshotOf = (revision: number, itemIds: string[]) => ({
+  document: {
+    version: 1,
+    revision,
+    items: itemIds.map(timelineItem),
+    profile: null,
+    target_duration_sec: null,
+    decisions: {},
+  },
+  sequence_fingerprint: '',
+  review_context_fingerprint: '',
+});
+
+/** A promise the test releases by hand, to hold a stubbed response open. */
+function gate() {
+  let release = () => {};
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { opened, release };
+}
+
+interface StubOptions {
+  /** Delay Bravo's session response, so Alpha's conversation could linger on screen. */
+  bravoSessionDelayMs?: number;
+  /** Hold Alpha's first session GET open until released. */
+  alphaSession?: ReturnType<typeof gate>;
+  /** Alpha's session carries a pending Proposal; Accept applies it (one item, revision 1). */
+  alphaProposal?: boolean;
+  /** Hold Alpha's Accept response open until released. */
+  accept?: ReturnType<typeof gate>;
+  /** Hold Alpha's Undo response open until released; it resolves to an item Bravo does not have. */
+  undo?: ReturnType<typeof gate>;
+}
+
+const BRAVO_ITEMS = ['bravo-item-1', 'bravo-item-2'];
+
+async function stubTwoProjects(page: Page, options: StubOptions = {}) {
   const recents = PROJECTS.map((project) => ({
     folderPath: project.folder,
     lastOpenedAt: '2026-08-11T10:00:00Z',
@@ -70,6 +117,43 @@ test('switching projects never paints the previous conversation', async ({ page 
       },
     });
   }, recents);
+
+  let proposalStatus: 'pending' | 'accepted' = 'pending';
+  let alphaItems: string[] = [];
+  let alphaRevision = 0;
+  let alphaSessionServed = false;
+
+  const messageOf = (text: string, id: string, role: 'agent' | 'editor' = 'agent') => ({
+    message_id: id,
+    role,
+    text,
+    created_at: '2026-08-11T10:00:00Z',
+    reply_to_message_id: null,
+    proposal: null,
+    payload: {},
+  });
+  const alphaProposal = () => ({
+    proposal_id: 'alpha-proposal',
+    project_id: PROJECTS[0].id,
+    message: 'Add the ridge push',
+    operations: [],
+    summary: ['Add the ridge push'],
+    before_item_count: 0,
+    after_item_count: 1,
+    based_on_timeline_revision: 0,
+    status: proposalStatus,
+  });
+  const sessionOf = (project: (typeof PROJECTS)[number]) => ({
+    schema_version: 1,
+    session_id: `${project.id}-session`,
+    updated_at: '2026-08-11T10:00:00Z',
+    messages: [
+      messageOf(`Opening note ${project.marker}`, `${project.id}-message`),
+      ...(options.alphaProposal && project === PROJECTS[0]
+        ? [{ ...messageOf('Proposal ready', 'alpha-proposal-message'), proposal: alphaProposal() }]
+        : []),
+    ],
+  });
 
   await page.route('http://127.0.0.1:8000/**', async (route) => {
     const url = new URL(route.request().url());
@@ -100,32 +184,40 @@ test('switching projects never paints the previous conversation', async ({ page 
 
     const projectId = /^\/projects\/([^/]+)\//.exec(url.pathname)?.[1];
     const project = PROJECTS.find((candidate) => candidate.id === projectId);
+    const isAlpha = project === PROJECTS[0];
     if (project && url.pathname.endsWith('/review/session')) {
-      if (project.delayMs) await new Promise((resolve) => setTimeout(resolve, project.delayMs));
-      return json({
-        schema_version: 1,
-        session_id: `${project.id}-session`,
-        updated_at: '2026-08-11T10:00:00Z',
-        messages: [
-          {
-            message_id: `${project.id}-message`,
-            role: 'agent',
-            text: `Opening note ${project.marker}`,
-            created_at: '2026-08-11T10:00:00Z',
-            reply_to_message_id: null,
-            proposal: null,
-            payload: {},
-          },
-        ],
-      });
+      if (isAlpha && options.alphaSession && !alphaSessionServed) {
+        alphaSessionServed = true;
+        await options.alphaSession.opened;
+      }
+      if (!isAlpha && options.bravoSessionDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.bravoSessionDelayMs));
+      }
+      return json(sessionOf(project));
+    }
+    if (project && url.pathname.endsWith('/review/turn')) {
+      const { message, client_message_id: id } = route.request().postDataJSON() as {
+        message: string;
+        client_message_id: string;
+      };
+      const session = sessionOf(project);
+      session.messages.push(messageOf(message, id, 'editor'));
+      return json({ message: '', proposal: null, agent_message: session.messages[0], session });
+    }
+    if (project && url.pathname.endsWith('/proposals/alpha-proposal/accept')) {
+      await options.accept?.opened;
+      proposalStatus = 'accepted';
+      alphaItems = ['alpha-item'];
+      alphaRevision = 1;
+      return json(snapshotOf(alphaRevision, alphaItems));
+    }
+    if (project && url.pathname.endsWith('/timeline/undo')) {
+      await options.undo?.opened;
+      return json(snapshotOf(2, ['alpha-undone-item']));
     }
     if (project && url.pathname.endsWith('/clips')) return json({ clips: [clip] });
-    if (url.pathname.endsWith('/timeline/document')) {
-      return json({
-        document: { version: 1, revision: 0, items: [], profile: null, target_duration_sec: null, decisions: {} },
-        sequence_fingerprint: '',
-        review_context_fingerprint: '',
-      });
+    if (project && url.pathname.endsWith('/timeline/document')) {
+      return json(isAlpha ? snapshotOf(alphaRevision, alphaItems) : snapshotOf(5, BRAVO_ITEMS));
     }
     if (url.pathname === '/harnesses') {
       return json({ harnesses: [{ id: 'manual', name: 'Manual / Rule-based', type: 'rule', enabled: true }] });
@@ -133,11 +225,10 @@ test('switching projects never paints the previous conversation', async ({ page 
     if (url.pathname === '/') return json({ version: '0.2.0' });
     return route.fulfill({ status: 204, body: '' });
   });
+}
 
-  await page.goto('/#/review');
-  const rail = page.getByTestId('ask-ai-rail');
-  await expect(rail).toContainText('ALPHA-MARKER');
-
+/** Record every node added to the Ask the AI rail, so a one-commit flash is still seen. */
+async function watchRail(page: Page) {
   await page.evaluate(() => {
     const added: string[] = [];
     Object.assign(window, { __added: added });
@@ -149,10 +240,38 @@ test('switching projects never paints the previous conversation', async ({ page 
       }
     }).observe(rail, { childList: true, subtree: true });
   });
+  return () => page.evaluate(() => (window as unknown as { __added: string[] }).__added);
+}
+
+test('switching projects never paints the previous conversation', async ({ page }) => {
+  await stubTwoProjects(page, { bravoSessionDelayMs: 1_500 });
+
+  await page.goto('/#/review');
+  const rail = page.getByTestId('ask-ai-rail');
+  await expect(rail).toContainText('ALPHA-MARKER');
+
+  const railAdditions = await watchRail(page);
 
   await page.getByRole('button', { name: 'Open Bravo Project' }).click();
   await expect(rail).toContainText('BRAVO-MARKER');
 
-  const added = await page.evaluate(() => (window as unknown as { __added: string[] }).__added);
-  expect(added.filter((text) => text.includes('ALPHA-MARKER'))).toEqual([]);
+  expect((await railAdditions()).filter((text) => text.includes('ALPHA-MARKER'))).toEqual([]);
+});
+
+test('a late session response for the previous project never lands', async ({ page }) => {
+  const alphaSession = gate();
+  await stubTwoProjects(page, { alphaSession });
+
+  await page.goto('/#/review');
+  const rail = page.getByTestId('ask-ai-rail');
+  const log = page.getByTestId('review-chat-log');
+  await expect(log).toHaveAttribute('aria-busy', 'true');
+  const railAdditions = await watchRail(page);
+
+  await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  alphaSession.release();
+  await expect(rail).toContainText('BRAVO-MARKER');
+
+  expect((await railAdditions()).filter((text) => text.includes('ALPHA-MARKER'))).toEqual([]);
+  await expect(log).toHaveAttribute('aria-busy', 'false');
 });

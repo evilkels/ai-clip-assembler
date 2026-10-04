@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   acceptProposal,
   clearReviewSession,
@@ -106,8 +106,13 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     setBusy(Boolean(projectId));
   }
 
-  useEffect(() => {
+  // Updated at commit, not in the passive fetch effect, so a response that lands
+  // between the commit and its passive effects is already seen as stale.
+  useLayoutEffect(() => {
     activeProject.current = projectId;
+  }, [projectId]);
+
+  useEffect(() => {
     if (!projectId) return;
     let alive = true;
     void serialize(() =>

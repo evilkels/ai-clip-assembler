@@ -93,6 +93,8 @@ interface StubOptions {
   accept?: ReturnType<typeof gate>;
   /** Hold Alpha's Undo response open until released; it resolves to an item Bravo does not have. */
   undo?: ReturnType<typeof gate>;
+  /** Hold Alpha's first timeline operation open until released; it resolves to an item Bravo does not have. */
+  op?: ReturnType<typeof gate>;
 }
 
 const BRAVO_ITEMS = ['bravo-item-1', 'bravo-item-2'];
@@ -211,6 +213,10 @@ async function stubTwoProjects(page: Page, options: StubOptions = {}) {
       alphaRevision = 1;
       return json(snapshotOf(alphaRevision, alphaItems));
     }
+    if (project && url.pathname.endsWith('/timeline/op')) {
+      await options.op?.opened;
+      return json(snapshotOf(3, ['alpha-edited-item']));
+    }
     if (project && url.pathname.endsWith('/timeline/undo')) {
       await options.undo?.opened;
       return json(snapshotOf(2, ['alpha-undone-item']));
@@ -293,6 +299,39 @@ test("an Undo resolving after a project switch never rewrites the new project's 
   await expect(rail).toContainText('BRAVO-MARKER');
 
   await expect(page.getByLabel('2 timeline items')).toBeVisible();
+});
+
+/** The Timeline Item ids the Timeline page currently shows, in order. */
+async function timelineItemIds(page: Page) {
+  await page.evaluate(() => {
+    window.location.hash = '#/timeline';
+  });
+  const clips = page.getByTestId('timeline-clip');
+  await expect(clips.first()).toBeVisible();
+  return clips.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-timeline-item-id')));
+}
+
+test("a timeline edit resolving after a project switch never rewrites the new project's Timeline", async ({
+  page,
+}) => {
+  const op = gate();
+  await stubTwoProjects(page, { op });
+
+  await page.goto('/#/review');
+  const rail = page.getByTestId('ask-ai-rail');
+  await expect(rail).toContainText('ALPHA-MARKER');
+  await page.getByRole('button', { name: 'Add to working timeline' }).click();
+
+  await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  await expect(rail).toContainText('BRAVO-MARKER');
+  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+
+  const settled = page.waitForResponse((response) => response.url().endsWith('/timeline/op'));
+  op.release();
+  await settled;
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
 });
 
 test('a message queued in the previous project is dropped, not delivered to the next', async ({ page }) => {

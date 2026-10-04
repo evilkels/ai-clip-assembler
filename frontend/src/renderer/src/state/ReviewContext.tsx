@@ -212,17 +212,21 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       expectedRevision?: number,
     ): Promise<void> => {
       if (!projectId) return;
+      const requested = projectId;
       try {
-        const snapshot = await applyTimelineOp(projectId, operation, args, expectedRevision);
-        reconcileTimelineSnapshot(snapshot);
+        const snapshot = await applyTimelineOp(requested, operation, args, expectedRevision);
+        if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
         return;
       } catch (reason: unknown) {
+        const stillActive = activeProjectRef.current === requested;
         if (reason instanceof TimelineRevisionConflictError) {
-          reconcileTimelineSnapshot(reason.detail.current_snapshot);
+          if (stillActive) reconcileTimelineSnapshot(reason.detail.current_snapshot);
           if (expectedRevision !== undefined) throw reason;
         }
-        setError(reason instanceof Error ? reason.message : 'Timeline operation failed');
-        getTimelineDocument(projectId).then(reconcileTimelineSnapshot).catch(() => {});
+        if (stillActive) {
+          setError(reason instanceof Error ? reason.message : 'Timeline operation failed');
+          getTimelineDocument(requested).then(reconcileTimelineSnapshot).catch(() => {});
+        }
         return;
       }
     },
@@ -604,7 +608,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const redo = useCallback(async () => {
     if (!projectId) return;
-    reconcileTimelineSnapshot(await redoTimeline(projectId));
+    const requested = projectId;
+    const snapshot = await redoTimeline(requested);
+    if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
   }, [projectId, reconcileTimelineSnapshot]);
 
   const setCloudAiConsent = useCallback(

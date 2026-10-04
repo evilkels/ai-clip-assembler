@@ -275,3 +275,20 @@ test('a late session response for the previous project never lands', async ({ pa
   expect((await railAdditions()).filter((text) => text.includes('ALPHA-MARKER'))).toEqual([]);
   await expect(log).toHaveAttribute('aria-busy', 'false');
 });
+
+test('a message queued in the previous project is dropped, not delivered to the next', async ({ page }) => {
+  const accept = gate();
+  await stubTwoProjects(page, { alphaProposal: true, accept });
+
+  await page.goto('/#/review');
+  const rail = page.getByTestId('ask-ai-rail');
+  await rail.getByTestId('proposal-accept').click();
+  await rail.getByLabel('Message the AI').fill('ALPHA-QUEUED');
+  await rail.getByRole('button', { name: 'Send' }).click();
+
+  await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  accept.release();
+  await expect(rail).toContainText('BRAVO-MARKER');
+
+  await expect(rail).not.toContainText('ALPHA-QUEUED');
+});

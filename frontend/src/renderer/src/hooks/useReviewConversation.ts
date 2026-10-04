@@ -149,7 +149,8 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
       failure: string,
     ) =>
       serialize(async () => {
-        if (!projectId) return;
+        // The Editor left this project while the message waited in the queue.
+        if (!projectId || activeProject.current !== projectId) return;
         const messageId = optimistic.message_id;
         setMessages((current) => {
           const exists = current.some((message) => message.message_id === messageId);

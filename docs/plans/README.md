@@ -110,7 +110,7 @@ the plan remains unstarted.
 | 🟢 | [review-model-sign-in-followups](done/review-model-sign-in-followups.md) | Done 2026-09-10 · plan/spec record reconciled |
 | 🟢 | [seo-plan](done/seo-plan.md) | Closed 2026-09-02 · Search Console → landing plan |
 | 🟢 | [project-folder-model](done/project-folder-model.md) | Closed 2026-09-03 · code + automated QA done; manual check → Release QA |
-| 🟢 | [react-doctor-triage](done/react-doctor-triage.md) | Done 2026-10-04 · four defects + two project-switch races fixed; architecture calls stay open as decisions |
+| 🟢 | [react-doctor-triage](done/react-doctor-triage.md) | Done 2026-10-04 · four defects + the project-switch races review found; architecture calls stay open as decisions |
 | 🟢 | [project-sidebar](done/project-sidebar.md) | Closed 2026-09-03 · superseded by shell-followups; kept as the sidebar's decision record |
 | 🟢 | [settings-page](done/settings-page.md) | Done 2026-07-03 |
 | 🟢 | [ui-polish-modern-shell](done/ui-polish-modern-shell.md) | Superseded 2026-09-02 → shell-followups |

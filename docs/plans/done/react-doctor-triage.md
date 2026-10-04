@@ -1,8 +1,8 @@
 # React Doctor Triage
 
 Status: **DONE 2026-10-04.** All four defects are fixed (branch
-`feat/small-plans-batch`), and so are two further project-switch races that
-the closing review found in the same hook. The judgment calls below stay
+`feat/small-plans-batch`), and so are the further project-switch races that
+the closing reviews found in the conversation hook and `ReviewContext`. The judgment calls below stay
 architecture decisions, not open work. Originally re-triaged 2026-09-02 against
 v0.2.0 (`6d79c1b`) with react-doctor 0.2.14; every finding group was read in the
 source before being classified, and the large majority of the 94 findings are
@@ -69,10 +69,11 @@ finding here blocks a build.
    guard. `e2e/review-project-switch.spec.ts` failed 3/3 before the fix. The
    closing review also disproved the claim below that the async race was fully
    guarded: a proposal Undo resolving after a switch reconciled the old
-   project's Timeline into the new one (`ReviewContext.undo` now reconciles only
-   for the project that asked), and a message queued behind a pending request
-   was delivered into the next project (`deliver` now drops it). Both have red
-   tests in the same spec. Original finding:
+   project's Timeline into the new one, and so did a timeline edit, a Redo, or
+   the recovery fetch after a failed edit (`ReviewContext` now reconciles a
+   snapshot only for the project that asked for it); and a message queued
+   behind a pending request was delivered into the next project (`deliver` now
+   drops it). Each has a test in the same spec that was red before its fix. Original finding:
    `useReviewConversation` clears `messages`, `versionSet` and
    `error` inside an effect keyed on `projectId` (`useReviewConversation.ts:58-62`)
    rather than during render, so stale review data can paint briefly. The

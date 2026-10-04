@@ -249,6 +249,22 @@ async function watchRail(page: Page) {
   return () => page.evaluate(() => (window as unknown as { __added: string[] }).__added);
 }
 
+/** The Timeline Item ids the Timeline page currently shows, in order. */
+async function timelineItemIds(page: Page) {
+  await page.evaluate(() => {
+    window.location.hash = '#/timeline';
+  });
+  const clips = page.getByTestId('timeline-clip');
+  await expect(clips.first()).toBeVisible();
+  return clips.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-timeline-item-id')));
+}
+
+/** Bravo is the open project once its header and Timeline are showing. */
+async function expectBravoCommitted(page: Page) {
+  await expect(page.locator('.project-header-name')).toHaveText('Bravo Project');
+  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+}
+
 test('switching projects never paints the previous conversation', async ({ page }) => {
   await stubTwoProjects(page, { bravoSessionDelayMs: 1_500 });
 
@@ -275,6 +291,7 @@ test('a late session response for the previous project never lands', async ({ pa
   const railAdditions = await watchRail(page);
 
   await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+  await expectBravoCommitted(page);
   alphaSession.release();
   await expect(rail).toContainText('BRAVO-MARKER');
 
@@ -293,23 +310,13 @@ test("an Undo resolving after a project switch never rewrites the new project's 
   await rail.getByRole('button', { name: 'Undo' }).click();
 
   await page.getByRole('button', { name: 'Open Bravo Project' }).click();
-  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+  await expectBravoCommitted(page);
   undo.release();
   // Bravo's conversation loads only after Alpha's queued Undo has settled.
   await expect(rail).toContainText('BRAVO-MARKER');
 
-  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+  expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
 });
-
-/** The Timeline Item ids the Timeline page currently shows, in order. */
-async function timelineItemIds(page: Page) {
-  await page.evaluate(() => {
-    window.location.hash = '#/timeline';
-  });
-  const clips = page.getByTestId('timeline-clip');
-  await expect(clips.first()).toBeVisible();
-  return clips.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-timeline-item-id')));
-}
 
 test("a timeline edit resolving after a project switch never rewrites the new project's Timeline", async ({
   page,
@@ -324,7 +331,7 @@ test("a timeline edit resolving after a project switch never rewrites the new pr
 
   await page.getByRole('button', { name: 'Open Bravo Project' }).click();
   await expect(rail).toContainText('BRAVO-MARKER');
-  await expect(page.getByLabel('2 timeline items')).toBeVisible();
+  await expectBravoCommitted(page);
 
   const settled = page.waitForResponse((response) => response.url().endsWith('/timeline/op'));
   op.release();
@@ -337,6 +344,10 @@ test("a timeline edit resolving after a project switch never rewrites the new pr
 test('a message queued in the previous project is dropped, not delivered to the next', async ({ page }) => {
   const accept = gate();
   await stubTwoProjects(page, { alphaProposal: true, accept });
+  const alphaTurns: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes(`/projects/${PROJECTS[0].id}/review/turn`)) alphaTurns.push(request.url());
+  });
 
   await page.goto('/#/review');
   const rail = page.getByTestId('ask-ai-rail');
@@ -349,4 +360,8 @@ test('a message queued in the previous project is dropped, not delivered to the 
   await expect(rail).toContainText('BRAVO-MARKER');
 
   await expect(rail).not.toContainText('ALPHA-QUEUED');
+  expect(alphaTurns).toEqual([]);
+
+  await rail.getByLabel('Message the AI').fill('BRAVO-FOLLOW-UP');
+  await expect(rail.getByRole('button', { name: 'Send' })).toBeEnabled();
 });

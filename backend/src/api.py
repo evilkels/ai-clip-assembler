@@ -93,7 +93,7 @@ logger = logging.getLogger("uvicorn.error")
 
 # Kept in step with frontend/package.json so the status bar and the update
 # check report the same release.
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.4.0"
 
 app = FastAPI(
     title="AI Clip Assembler API",

@@ -43,6 +43,12 @@ const COLUMNS: Array<{ key: ColumnKey; label: string }> = [
   { key: 'analysis', label: 'Analysis' },
 ];
 
+const VIEW_OPTIONS = [
+  { value: 'table' as const, label: 'Table' },
+  { value: 'thumbs' as const, label: 'Thumbs' },
+  { value: 'compact' as const, label: 'Compact' },
+];
+
 function formatResolution(metadata: NonNullable<UploadedVideo['metadata']>): string {
   const display = metadata.display_resolution;
   const hasUsableDisplay = Array.isArray(display) && display.length === 2 && display.every((value) => Number.isFinite(value) && value > 0);
@@ -90,11 +96,6 @@ export function SourceVideoBrowser({
   );
   const allSelected = videos.length > 0 && selectedIds.length === videos.length;
   const someSelected = videos.some((video) => !deselected.has(video.file_id));
-  const viewOptions = [
-    { value: 'table' as const, label: 'Table' },
-    { value: 'thumbs' as const, label: 'Thumbs' },
-    { value: 'compact' as const, label: 'Compact' },
-  ];
 
   const toggleColumn = (key: ColumnKey) =>
     setColumns((current) => ({ ...current, [key]: !current[key] }));
@@ -181,7 +182,7 @@ export function SourceVideoBrowser({
         </div>
         <ViewModeSwitcher
           value={viewMode}
-          options={viewOptions}
+          options={VIEW_OPTIONS}
           onChange={setViewMode}
           ariaLabel="Source video view"
         />

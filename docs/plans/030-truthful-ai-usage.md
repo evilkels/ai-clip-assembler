@@ -1,6 +1,6 @@
 # Plan 030: Truthful AI usage — selected vs effective harness, and an independent Review Agent
 
-Status: TODO · Priority P1 · Effort M · Risk MED · Category correctness + trust
+Status: PHASES 1–3 AND STEP 4.1 DONE (PR #76, PR #78) · Step 4.2 (full-gate run) open · Priority P1 · Effort M · Risk MED · Category correctness + trust
 Created 2026-09-03 against `48a0f8b`. Implements
 [ADR 0005](../adr/0005-harness-and-review-agent-are-independent.md).
 
@@ -60,45 +60,45 @@ paths.
 
 ## Phase 1 — Model the two harnesses
 
-- [ ] **Step 1.1** Persist **Selected Harness** on the project and in the
+- [x] **Step 1.1** Persist **Selected Harness** on the project and in the
       manifest (`ProjectManifest.harness` already exists and is unused). It
       must survive navigation, reopen, and re-derive.
-- [ ] **Step 1.2** Write **Effective Harness** wherever a Candidate Clip
+- [x] **Step 1.2** Write **Effective Harness** wherever a Candidate Clip
       library is produced: analysis, and `/clips/rederive`. Re-derive writes
       `manual`; analysis writes the harness that actually ran, which is
       `manual` on a Harness Fallback.
-- [ ] **Step 1.3** Backend tests: analysis with `pi_agent` and a working CLI
+- [x] **Step 1.3** Backend tests: analysis with `pi_agent` and a working CLI
       records both as `pi_agent`; with the CLI missing, Selected stays
       `pi_agent` while Effective becomes `manual`; re-derive changes Effective
       only; both survive a project reopen.
 
 ## Phase 2 — Decouple the Review Agent
 
-- [ ] **Step 2.1** Choose the In-App Review Agent from its own setting rather
+- [x] **Step 2.1** Choose the In-App Review Agent from its own setting rather
       than `harness_id`, keeping the existing cloud-AI consent check as the
       single gate. Removing the coupling must not weaken ADR 0001: without
       consent, no provider call for either surface.
-- [ ] **Step 2.2** Default the agent setting so existing projects behave
+- [x] **Step 2.2** Default the agent setting so existing projects behave
       sensibly: consent granted implies the agent is available regardless of
       Selected Harness.
-- [ ] **Step 2.3** Retire the "Manual analysis is ready." stub message. If a
+- [x] **Step 2.3** Retire the "Manual analysis is ready." stub message. If a
       stub agent is still needed for the no-consent case, it must describe the
       *agent's* state, not the harness — e.g. that conversational suggestions
       need cloud AI consent for this project, with the way to grant it.
-- [ ] **Step 2.4** Tests: rule-based Selected Harness plus consent yields a
+- [x] **Step 2.4** Tests: rule-based Selected Harness plus consent yields a
       real agent; no consent yields the stub for both surfaces.
 
 ## Phase 3 — Make fallback visible
 
-- [ ] **Step 3.1** Carry `metadata` through the client: declare it in the
+- [x] **Step 3.1** Carry `metadata` through the client: declare it in the
       response type and map it (`client.ts:386-404`).
-- [ ] **Step 3.2** Surface a **Harness Fallback** in Review where the Editor
+- [x] **Step 3.2** Surface a **Harness Fallback** in Review where the Editor
       will see it, naming the reason and the affected Source Videos. The
       backend already supplies `used_ai`, the per-video `warning`, and
       `models_used`.
-- [ ] **Step 3.3** Say it in the regenerate confirm dialog too: re-deriving
+- [x] **Step 3.3** Say it in the regenerate confirm dialog too: re-deriving
       discards AI enhancement and returns the library to rule-based.
-- [ ] **Step 3.4** E2E: a run whose harness falls back shows the notice and
+- [x] **Step 3.4** E2E: a run whose harness falls back shows the notice and
       names the reason; a fully successful agentic run shows none.
 
 ## Phase 4 — Show the Selected Harness
@@ -112,12 +112,12 @@ paths.
 
 ## Done criteria
 
-- [ ] Selecting the Manual Harness leaves the In-App Review Agent working.
-- [ ] The Selected Harness survives navigation, reopen and re-derive.
-- [ ] A Harness Fallback is visible in the UI with its reason.
-- [ ] Re-derive changes the Effective Harness only, and says what it discards.
-- [ ] No user-facing string says "manual mode".
-- [ ] Without cloud-AI consent, neither scoring nor chat calls a provider.
+- [x] Selecting the Manual Harness leaves the In-App Review Agent working.
+- [x] The Selected Harness survives navigation, reopen and re-derive.
+- [x] A Harness Fallback is visible in the UI with its reason.
+- [x] Re-derive changes the Effective Harness only, and says what it discards.
+- [x] No user-facing string says "manual mode".
+- [x] Without cloud-AI consent, neither scoring nor chat calls a provider.
 
 ## Stop and report instead of improvising if
 

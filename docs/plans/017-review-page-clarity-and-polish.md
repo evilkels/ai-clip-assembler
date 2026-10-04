@@ -1,8 +1,9 @@
 # Plan 017: Review-page clarity and polish
 
 Status: Step 1 DONE (2026-07-20). Remaining item 5 (design-system adoption)
-DONE via `2026-08-14-studio-workflow-redesign.md`; items 1–4 still TODO, and
-item 2 got *worse* — see "Reconciled 2026-08-31" below. Priority P1, effort M,
+DONE via `2026-08-14-studio-workflow-redesign.md`. Item 1 (poster-first cards)
+MOVED to 029 and shipped; items 3–4 MOVED to 027. Only item 2 (one smoothness
+model) remains, and it got *worse* — see "Reconciled 2026-08-31" below. Priority P1, effort M,
 risk LOW/MED. Planned at `6fc6c6d`; depends on plans 012 and 016.
 
 ## Reconciled 2026-08-31 against `redesign/studio-workflows`
@@ -89,15 +90,14 @@ on 2026-09-02, since both depend on All Clips being the stated Candidate Clip
 authority. Item 5 (design-system adoption) is DONE — delivered by the studio
 redesign (`6d79c1b`), not by the retired modern-shell plan.
 
-What remains here is presentation-only. Verified still outstanding on
-2026-09-02: grid cards still mount `<video>` directly (`ClipCard.tsx:138-160`),
-and both smoothness controls are still present (`Review.tsx:137-155` and
-`SourceClipsPanel.tsx:250-260`).
+What remains here is presentation-only. Grid cards no longer mount `<video>`
+directly: `ClipCard.tsx` creates it on first play (029, shipped). Both
+smoothness controls are still present (`Review.tsx:153-161` and
+`SourceClipsPanel.tsx:242-253`).
 
 ## Verification and constraints
 
-- Poster work must reuse existing samples, not rerun FFmpeg. Manually verify a
-  24-clip Electron project has no multi-stream stutter.
+- Poster work must reuse existing samples, not rerun FFmpeg.
 - Backend: `cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q && .venv/bin/ruff check src tests`.
 - Frontend: `cd frontend && npm run typecheck && npm run lint:frontend`.
 - Add focused backend tests for preference semantics and preserve generated

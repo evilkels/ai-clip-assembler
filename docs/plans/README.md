@@ -17,10 +17,11 @@ docs.
 
 ## Active
 
-19 plans. Statuses verified against the code on 2026-09-10 at release v0.3.0,
-not taken from each plan's own header. [032](032-valid-fcpxml-and-nle-verification.md)
-was added 2026-09-11 from the first outside bug report, and
-[033](033-in-app-updates-and-a-trusted-build.md) the same day.
+19 plans. Statuses re-verified against the code on 2026-10-04 at release v0.4.0
+by two independent audits, not taken from each plan's own header.
+[032](032-valid-fcpxml-and-nle-verification.md) was added 2026-09-11 from the
+first outside bug report, and [033](033-in-app-updates-and-a-trusted-build.md)
+the same day.
 
 | | Plan | What's left |
 |---|---|---|
@@ -33,8 +34,8 @@ was added 2026-09-11 from the first outside bug report, and
 | 🔴 | [023](023-macos-app-icon-geometry.md) | Re-cut the icon to Apple's 824/1024 grid |
 | 🔴 | [shell-followups](shell-followups.md) | Cmd-K, sidebar context menu, keyboard pass, score verification |
 | 🔴 | [seo-content-pilot](seo-content-pilot.md) | Gated on query evidence and editorial input |
-| 🟡 | [030](030-truthful-ai-usage.md) | Phases 1–3 (PR #76) and Step 4.1 (PR #78) shipped; only the Phase 4 full-gate run remains. The Phase 1–3 checkboxes in the file are stale, not unshipped |
-| 🟡 | [031](031-app-restyle-conformance.md) | Step gating, Phase 7 audit and all of Settings Phase 3 shipped (PRs #72, #74, #75, #78); shell/Import, buttons, popover/consent, tokens and workflow-screen deltas remain |
+| 🟡 | [030](030-truthful-ai-usage.md) | Phases 1–3 (PR #76) and Step 4.1 (PR #78) shipped; only the Phase 4 full-gate run remains |
+| 🟡 | [031](031-app-restyle-conformance.md) | Step gating, Phase 7 audit and all of Settings Phase 4 shipped (PRs #72, #74, #75, #78); shell/Import, buttons, popover/consent, tokens and workflow-screen deltas remain |
 | 🟡 | [029](029-review-clip-posters-and-playback.md) | Phases 1–3 shipped (PR #72); real-footage measurement and Phase 5 analysis-written posters remain |
 | 🟡 | [react-doctor-triage](react-doctor-triage.md) | 3 defects left: keyboard trim, project-switch reset, rail preference persisted in a state updater |
 | 🟡 | [017](017-review-page-clarity-and-polish.md) | Collapse the generation and view-only smoothness controls; posters remain in 029 |
@@ -58,12 +59,13 @@ the plan remains unstarted.
 
 | | Check |
 |---|---|
-| 🔴 | Packaged DMG on a clean Mac, past Gatekeeper, backend starts unaided |
-| 🔴 | Import, Review and Timeline on real footage and real input hardware |
-| 🔴 | Open Resolve XML, FCPXML and EDL in their real NLEs — scheduled and scoped by [032](032-valid-fcpxml-and-nle-verification.md) Phase 5. FCPXML is known invalid until that plan lands |
 | 🔴 | Review scripting — the checklist in [`MANUAL_QA_GUIDE.md`](../MANUAL_QA_GUIDE.md#review-scripting) on the packaged app |
-| 🔴 | Keyboard-only pass — note trim is a known dead end |
-| 🔴 | Move or rename a project folder, reopen it, and export again — inherited from [project-folder-model](done/project-folder-model.md), whose code and automated QA are complete |
+
+The other release checks live in their owning plans: clean-Mac DMG →
+[self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4; NLE
+import and moved project folder → [032](032-valid-fcpxml-and-nle-verification.md)
+Phase 5; keyboard pass → [shell-followups](shell-followups.md); real footage →
+[drone-workflow-qa-flows](drone-workflow-qa-flows.md).
 
 ## Closed
 
@@ -109,7 +111,7 @@ the plan remains unstarted.
 | 🟢 | [review-model-sign-in](done/review-model-sign-in.md) | Done 2026-07-19 |
 | 🟢 | [review-model-sign-in-followups](done/review-model-sign-in-followups.md) | Done 2026-09-10 · plan/spec record reconciled |
 | 🟢 | [seo-plan](done/seo-plan.md) | Closed 2026-09-02 · Search Console → landing plan |
-| 🟢 | [project-folder-model](done/project-folder-model.md) | Closed 2026-09-03 · code + automated QA done; manual check → Release QA |
+| 🟢 | [project-folder-model](done/project-folder-model.md) | Closed 2026-09-03 · code + automated QA done; manual check → 032 Phase 5 |
 | 🟢 | [project-sidebar](done/project-sidebar.md) | Closed 2026-09-03 · superseded by shell-followups; kept as the sidebar's decision record |
 | 🟢 | [settings-page](done/settings-page.md) | Done 2026-07-03 |
 | 🟢 | [ui-polish-modern-shell](done/ui-polish-modern-shell.md) | Superseded 2026-09-02 → shell-followups |

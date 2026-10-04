@@ -22,8 +22,7 @@ not review themselves, and “done” requires command evidence.
    continuously rather than claiming completed drafts.
 4. **Architecture debt:** generated FE/BE contracts and analysis extraction
    shipped in PR #35; take later debt only through scoped advisor plans.
-5. **Launch/monetize:** soft-launch to the drone niche after phases 1–3. Paid
-   hypothesis: MIT core + signed build ($29–59) + optional hosted-AI upsell;
-   validate rather than treating this as a decided tier.
+5. **Monetization hypothesis (not decided):** MIT core + signed build ($29–59)
+   + optional hosted-AI upsell.
 
 New findings enter `docs/plans/README.md`; they do not expand the current task.

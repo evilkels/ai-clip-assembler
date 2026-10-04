@@ -29,8 +29,7 @@ steps, and explain these truths:
 - Examples and claims come from maintainer evidence, not invented authority.
 
 Add correct metadata, JSON-LD, date, one product link, accessible imagery, and
-rendered-layout verification. Run `python3 scripts/tests/test_site_contract.py -v`
-and manually confirm Search Console after deploy.
+rendered-layout verification. Run `python3 scripts/tests/test_site_contract.py -v`.
 
 ## Measurement
 

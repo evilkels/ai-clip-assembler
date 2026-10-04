@@ -646,6 +646,46 @@ test('persists one speed-correct trim operation for the selected repeated item',
   });
 });
 
+/** Press Tab until the focused element satisfies `isTarget`, failing after 80 presses. */
+async function tabUntilFocused(page: Page, isTarget: (element: Element | null) => boolean) {
+  for (let presses = 0; presses < 80; presses++) {
+    if (await page.evaluate(`(${isTarget.toString()})(document.activeElement)`)) return;
+    await page.keyboard.press('Tab');
+  }
+  throw new Error('Keyboard focus never reached the target within 80 Tab presses');
+}
+
+test('trims a clip with the keyboard alone', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const first = items[0];
+  const newStart = first.start_sec + 1;
+
+  await tabUntilFocused(
+    page,
+    (element) =>
+      element instanceof HTMLButtonElement &&
+      element.classList.contains('tl-clip-select') &&
+      element.closest('.tl-clip') === document.querySelector('.tl-clip'),
+  );
+  await page.keyboard.press('Enter');
+  const inspector = page.getByTestId('timeline-inspector');
+  await expect(inspector).toContainText(first.item_id);
+
+  await tabUntilFocused(
+    page,
+    (element) => element instanceof HTMLElement && element.dataset.testid === 'item-start',
+  );
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type(String(newStart));
+  await page.keyboard.press('Tab');
+
+  await expect(inspector.getByTestId('item-start')).toHaveValue(String(newStart));
+  await expect(inspector.locator('.timeline-inspector-values')).toContainText(
+    `${newStart.toFixed(1)} → ${first.end_sec.toFixed(1)}s`,
+  );
+});
+
 test('removes the selected repeated Timeline Item', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA()]);
   const items = await replaceWithRepeatedItems(page, projectId);

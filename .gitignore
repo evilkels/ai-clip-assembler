@@ -200,3 +200,6 @@ frontend/skills/
 
 # Supplied design reference export (Claude Design). Read-only reference, never staged.
 AI CLIP ASSEMBLER Redesign APP + Landing page/
+
+# Agent worktrees
+.claude/worktrees/

@@ -1,55 +1,31 @@
 # AGENTS.md — AI Clip Assembler
 
-Source of truth for agent behavior in this repo.
+Local-first desktop video editor: Electron + React in `frontend/`, FastAPI +
+Python in `backend/`. Vocabulary: `GLOSSARY.md`. System design:
+`docs/ARCHITECTURE.md`. Harness contract: `docs/HARNESS_SPEC.md`. Docs map:
+`docs/README.md`.
 
 ## Agent skills
 
 ### Issue tracker
 
-GitHub. Use `gh` CLI for all issue/PR operations. See `docs/agents/issue-tracker.md`.
+Plans in `docs/plans/` are the tracker; GitHub Issues are only the inbox for
+outside reports. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default Matt Pocock vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+Default vocabulary, on inbox issues only. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
 Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
 
-## Project Context
+## Working here
 
-- **Name**: AI Clip Assembler
-- **Type**: Local-first desktop video editor (Electron + React frontend, FastAPI + Python backend)
-- **Purpose**: Auto-assemble clips from raw MP4 footage using modular AI harnesses
-- **Privacy**: Local by default. Cloud AI is opt-in per project via user-chosen provider.
-- **Export**: FCPXML (Final Cut Pro), EDL (universal), Resolve XML
-
-## Architecture Quick Ref
-
-- Frontend: Electron + React + Vite + Tailwind
-- Backend: FastAPI + FFmpeg + OpenCV + PySceneDetect
-- AI: Modular harness system (Claude, Codex, Pi, Manual)
-- Data: JSON files + FFmpeg metadata (no database)
-
-## Development Workflow
-
-1. GitHub Issues for tasks and PRDs
-2. GitHub PRs for code changes
-3. Main branch is protected — PRs required
-4. Local testing before PR
-
-### Plans and docs layout
-
-All written plans live in `docs/plans/` (index + statuses in
-`docs/plans/README.md`; completed plans in `docs/plans/done/`). Design specs go
-in `docs/specs/`, review records in `docs/reviews/`, design mockups in
-`docs/designs/`. Do not create plan folders elsewhere — if a tool writes to a
-repo-root `plans/` or `docs/superpowers/plans/`, merge the contents back into
-`docs/plans/`. See `docs/README.md` for the full docs map.
-
-## Key Files
-
-- `docs/ARCHITECTURE.md` — Full system design
-- `docs/HARNESS_SPEC.md` — AI harness interface specification
-- `backend/src/api.py` — FastAPI entry point
-- `frontend/package.json` — Frontend dependencies
+- `main` accepts only merged PRs: branch, PR, merge, then tag.
+- The PR gate is `.github/workflows/test.yml`; its `npm run` scripts run the
+  same checks locally from `frontend/`.
+- Releases: `docs/UPDATING.md`.
+- Specs go in `docs/specs/`, review records in `docs/reviews/`, mockups in
+  `docs/designs/`. A tool that writes plans to `plans/` or
+  `docs/superpowers/plans/` gets them merged into `docs/plans/`.

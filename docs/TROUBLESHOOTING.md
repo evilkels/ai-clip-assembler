@@ -15,6 +15,16 @@ The desktop app cannot reach the backend at `http://127.0.0.1:8000`.
 While offline the app loads a few **mock clips** so you can still explore the
 Review/Timeline/Export UI — these are not from your footage.
 
+## Electron crashes on launch with `reading 'isPackaged'`
+
+Symptom: `npm run dev` fails with `TypeError: Cannot read properties of
+undefined (reading 'isPackaged')`, and `node_modules/.bin/electron --version`
+prints a Node version.
+
+The shell has `ELECTRON_RUN_AS_NODE=1` set, usually because it was started by
+another Electron app such as an AI coding tool, so Electron runs as plain Node.
+Launch with it removed: `env -u ELECTRON_RUN_AS_NODE npm run dev:with-backend`.
+
 ## Analyze fails with a 503 about motion analysis / vidstab
 
 Symptom: `Analyze` errors, or the backend logs `FFmpegVidstabUnavailableError`.

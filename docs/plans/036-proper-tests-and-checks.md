@@ -94,6 +94,12 @@ Decisions:
   prints a PATH only when invoked as an interactive login shell. Done when
   dropping the login flags fails the test.
 
+- [ ] 2.7 Delete `scripts/tests/test_release_workflow.py` and its CI step. Its
+  four tests are whitespace-exact regexes over `build-dmg.yml`, and one only
+  checks that CI runs this same file. Replace them with an `actionlint` step
+  in `.github/workflows/test.yml` that validates every workflow. Done when a
+  workflow with an invalid expression fails that step.
+
 ## Phase 3: An e2e suite the owner can review
 
 - [ ] 3.1 Write `frontend/e2e/README.md` and add a pointer to it in

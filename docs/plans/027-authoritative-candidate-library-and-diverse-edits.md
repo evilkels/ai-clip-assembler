@@ -31,7 +31,7 @@ TypeScript, Playwright.
 ## Global Constraints
 
 - Use the domain terms **Source Video**, **Candidate Clip**, **Version**, and
-  **Working Timeline** from `UBIQUITOUS_LANGUAGE.md`; never call a Candidate
+  **Working Timeline** from `GLOSSARY.md`; never call a Candidate
   Clip alternative a “Version.”
 - All Clips is the complete persisted Candidate Clip library currently known to
   the project. Chat reads this library and never adds, removes, or silently

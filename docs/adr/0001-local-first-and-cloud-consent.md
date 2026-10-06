@@ -35,7 +35,6 @@ responsibility, not a guarantee this app makes on the provider's behalf.
 
 ## References
 
-- [CONTEXT.md](../../CONTEXT.md)
 - [README.md](../../README.md) — Privacy model
 - `backend/src/api.py` — `PUT /projects/{project_id}/cloud-ai-consent`
 - [docs/HARNESS_SPEC.md](../HARNESS_SPEC.md) — Pi Coding-Agent Harness

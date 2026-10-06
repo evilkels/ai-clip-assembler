@@ -2,7 +2,7 @@
 
 Source of truth for agent behavior in this repo.
 
-## Agent Skills
+## Agent skills
 
 ### Issue tracker
 
@@ -14,7 +14,7 @@ Default Matt Pocock vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`,
 
 ### Domain docs
 
-Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for decisions. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
 
 ## Project Context
 

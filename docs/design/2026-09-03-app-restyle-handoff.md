@@ -622,7 +622,7 @@ The mock is fixed at 1440px. In the app:
 
 These are open questions, not instructions — check with the design owner:
 
-1. **Terminology.** The designs use product-facing words that `UBIQUITOUS_LANGUAGE.md` lists as
+1. **Terminology.** The designs use product-facing words that `GLOSSARY.md` lists as
    aliases to avoid: "Suggested cuts" and "Your clips" (spec: **Candidate Clips**), the Review
    screen (spec: **Review Board**), "Rule-based · local" (spec: **Manual Harness**). The design's
    position is that the editor-facing UI should not speak the code's vocabulary. Keep the design copy

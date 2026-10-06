@@ -36,5 +36,5 @@ accept before it replays through the Operations core.
 ## References
 
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — Agent-Operable Timeline
-- [UBIQUITOUS_LANGUAGE.md](../../UBIQUITOUS_LANGUAGE.md) — Timeline Document, Timeline Item, Operation, Proposal
+- [GLOSSARY.md](../../GLOSSARY.md) — Timeline Document, Timeline Item, Operation, Proposal
 - [docs/MCP_SERVER.md](../MCP_SERVER.md)

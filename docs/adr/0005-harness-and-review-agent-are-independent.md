@@ -6,7 +6,7 @@ Accepted (2026-09-03).
 
 ## Context
 
-`UBIQUITOUS_LANGUAGE.md` defines two separate concepts. A **Harness** is "a
+`GLOSSARY.md` defines two separate concepts. A **Harness** is "a
 pluggable scoring or reasoning implementation" that produces Candidate Clips
 during analysis. The **In-App Review Agent** is "the hosted conversational
 agent inside the app", an MCP client that runs in propose mode and composes
@@ -64,7 +64,7 @@ When the two differ, the app says so, with the reason.
   about the cut, which was previously impossible to express.
 - Rule-based analysis is no longer conflated with an absent agent, so the word
   "manual" stops carrying two meanings in the same sentence — the ambiguity
-  `UBIQUITOUS_LANGUAGE.md` already flagged.
+  `GLOSSARY.md` already flagged.
 - A fallback becomes visible. The backend already computes `used_ai`, a
   per-video warning and `models_used`; these become part of the contract the
   UI renders rather than metadata dropped at the client boundary.

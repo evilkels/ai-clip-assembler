@@ -3,7 +3,7 @@
 The AI Clip Assembler backend embeds a local **MCP Server** (Model Context
 Protocol) while it runs, so an **External Agent** — Claude Code, Cursor, Codex —
 can drive the *same* live **Timeline Document** the GUI is editing. Every edit
-goes through the one reversible [operations core](../UBIQUITOUS_LANGUAGE.md), so
+goes through the one reversible [operations core](../GLOSSARY.md), so
 the GUI and an agent never drift, and every change lands in the **Undo History**.
 
 > External agents **apply Operations directly** (you are driving them from the

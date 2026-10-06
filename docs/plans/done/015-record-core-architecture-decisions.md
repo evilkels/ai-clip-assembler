@@ -24,7 +24,7 @@ ADRs state a durable decision and consequences, then link to implementation
 detail. They use `Status`, `Context`, `Decision`, `Consequences`, and
 `References`; they do not reopen scope, duplicate architecture docs, or record
 unresolved feature choices. Use the exact domain language from
-`UBIQUITOUS_LANGUAGE.md`.
+`GLOSSARY.md`.
 
 Artifacts: `docs/adr/README.md` and ADRs `0001`–`0004`. Create future ADRs only
 for similarly cross-cutting, settled decisions.

@@ -257,7 +257,7 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
 - [ ] **Step 4.2** Enforce the handoff's copy rule: toolbar, status bar,
       Settings and Diagnostics all say **"Pi Agent · cloud"**. Never "harness",
       never `pi_agent`, never "AI review model" for the same thing. Use the
-      spec terms from `UBIQUITOUS_LANGUAGE.md` in code identifiers only.
+      spec terms from `GLOSSARY.md` in code identifiers only.
 - [ ] **Step 4.3** Replace `window.confirm` for cloud consent
       (`Import.tsx:266-275`) with the designed gate from `5b` card 2: what is
       sent ("up to 4 sampled frames per candidate clip — never whole videos,
@@ -341,7 +341,7 @@ Carried from the handoff's own "Known deltas" section; none of them block a
 phase, but Phase 4 and Phase 5 write user-facing copy, so settle them first.
 
 1. **Terminology.** The designs use "Suggested cuts", "Your clips",
-   "Rule-based · local" — all listed in `UBIQUITOUS_LANGUAGE.md` as aliases to
+   "Rule-based · local" — all listed in `GLOSSARY.md` as aliases to
    avoid. The handoff's position is that the editor-facing UI should not speak
    the code's vocabulary. Default: keep the design copy verbatim, use the spec
    terms in identifiers. Confirm.

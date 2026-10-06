@@ -5,7 +5,7 @@ complete. The one thing left was never plan work: a human has to move or rename
 a real project folder and reopen it. That is a release-QA check, so it now lives
 in the Release QA table in [`README.md`](../README.md) instead of holding a
 finished plan open.
-Owner: Elvijs / Codex. Related: `UBIQUITOUS_LANGUAGE.md` (defines Project), `docs/PRD.md`.
+Owner: Elvijs / Codex. Related: `GLOSSARY.md` (defines Project), `docs/PRD.md`.
 
 ## Problem
 

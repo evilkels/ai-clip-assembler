@@ -27,7 +27,7 @@ generating straight from Pydantic was the lower-touch path. Generated output
 (`frontend/src/renderer/src/types/generated.ts`) is committed, not built on
 the fly, with a `check:types-fresh` diff-based drift check wired into
 `typecheck`. Renaming backend Pydantic classes (`ClipSuggestion`,
-`CreativeVersion`) to match `UBIQUITOUS_LANGUAGE.md` vocabulary was explicitly
+`CreativeVersion`) to match `GLOSSARY.md` vocabulary was explicitly
 out of scope (touches ~10 backend files, persisted-JSON-adjacent) — only the
 frontend-facing names/aliases were aligned to vocabulary. A compile-time
 "exhaustiveness" assertion (`_ScoreKeysCovered`) was added so a new backend

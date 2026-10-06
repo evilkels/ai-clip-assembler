@@ -42,7 +42,7 @@ Why, constraints, decisions already made, links. Optional.
 | Status | Rule |
 |---|---|
 | 🔴 TODO | no box ticked |
-| 🟡 IN PROGRESS | some phase tasks ticked |
+| 🟡 IN PROGRESS | a box ticked, a phase task open |
 | 🟣 HUMAN | every phase task ticked, a human task open |
 | 🟢 DONE | every box ticked; the file belongs in `done/` |
 | ⚪ SUPERSEDED | has a `Superseded by:` line; the file belongs in `done/` |

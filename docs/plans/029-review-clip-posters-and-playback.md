@@ -1,6 +1,6 @@
 # Plan 029: Poster-first Candidate Clip cards and play-once previews
 
-Status: PHASES 1-3 DONE (2026-09-03) · PHASE 5 TODO · Priority P1 · Effort M · Risk LOW · Category performance + UX
+Status: PHASES 1-3 DONE (2026-09-03) · STEPS 4.3-4.4 AND PHASE 5 TODO · Priority P1 · Effort M · Risk LOW · Category performance + UX
 Written against `9ee7ee4`, 2026-09-02. Absorbs item 1 of
 [`017-review-page-clarity-and-polish.md`](done/017-review-page-clarity-and-polish.md),
 which now keeps only its smoothness-controls item.

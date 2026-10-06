@@ -105,8 +105,7 @@ tracked in plan 029.
 
 ## Verification and constraints
 
-- Poster work must reuse existing samples, not rerun FFmpeg. Manually verify a
-  24-clip Electron project has no multi-stream stutter.
+- Poster work must reuse existing samples, not rerun FFmpeg.
 - Backend: `cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q && .venv/bin/ruff check src tests`.
 - Frontend: `cd frontend && npm run typecheck && npm run lint:frontend`.
 - Add focused backend tests for preference semantics and preserve generated

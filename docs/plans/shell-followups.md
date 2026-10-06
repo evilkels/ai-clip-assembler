@@ -20,9 +20,7 @@ task, which is why they sit at P3 behind the correctness plans.
 
 2. **Score verification.** The Review score chips (`ScoreChip.tsx`) render
    overall and smoothness values on a 0-10 scale with tier colouring. Confirm
-   the displayed numbers match what the backend computes, and that the tier
-   thresholds (>=8 green, >=5 yellow) are the intended product boundaries
-   rather than inherited placeholders.
+   the displayed numbers match what the backend computes.
 
 3. ~~**Settings and Diagnostics surfaces.**~~ **MOVED 2026-09-03** to
    [plan 031](031-app-restyle-conformance.md) Phase 4, which is no longer the

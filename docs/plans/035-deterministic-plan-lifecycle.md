@@ -49,16 +49,16 @@ The plan format and status rules are in
 
 ## Phase 1: Tooling and spec
 
-- [ ] 1.1 Write the tracker spec in `docs/agents/issue-tracker.md`. Done when
+- [x] 1.1 Write the tracker spec in `docs/agents/issue-tracker.md`. Done when
   it defines the format, the five statuses, the lifecycle, and how each skill
-  operation maps onto plans.
-- [ ] 1.2 Add `scripts/plans.py` with `status`, `sync` and `check` as decided
+  operation maps onto plans (PR #92).
+- [x] 1.2 Add `scripts/plans.py` with `status`, `sync` and `check` as decided
   above. Done when `python3 scripts/tests/test_plans.py -v` passes and covers
   every status rule, MALFORMED, the move with link rewrite, idempotent `sync`,
-  missing markers, and each `check` failure.
-- [ ] 1.3 Run the script's tests in CI next to the release-workflow contract
+  missing markers, and each `check` failure (PR #92).
+- [x] 1.3 Run the script's tests in CI next to the release-workflow contract
   step in `.github/workflows/test.yml`. Done when that step runs in CI and
-  passes.
+  passes (PR #92).
 
 ## Phase 2: Migrate the active plans (after PR #91 merges)
 

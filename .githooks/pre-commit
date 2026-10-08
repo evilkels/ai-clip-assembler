@@ -99,6 +99,12 @@ if [ -n "$ruff_paths" ]; then
 fi
 
 if [ "$has_plans" = true ]; then
+  # plans.py reads the working tree, so it checks the staged plans only when
+  # nothing under docs/plans/ is left unstaged.
+  if ! git diff --quiet -- docs/plans || [ -n "$(git ls-files --others --exclude-standard -- docs/plans)" ]; then
+    printf 'pre-commit: docs/plans/ has unstaged changes; stage or discard them first.\n' >&2
+    exit 1
+  fi
   python3 scripts/plans.py check || failed=true
 fi
 

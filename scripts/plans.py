@@ -153,7 +153,8 @@ def sync(root: Path, plans: list[Plan], readme: Path, content: str) -> None:
     moves = {plan.path: plan.path.parent / "done" / plan.path.name
              for plan in plans if plan.status in ("DONE", "SUPERSEDED")}
     tracked = [root / name for name in git(root, "ls-files", "-z", "*.md").split("\0") if name]
-    documents = {path: path.read_text(encoding="utf-8") for path in tracked if path.is_file()}
+    documents = {path: path.read_text(encoding="utf-8")
+                 for path in [*tracked, *moves] if path.is_file()}
     for source, destination in moves.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
         if source in tracked:

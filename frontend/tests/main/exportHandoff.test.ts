@@ -1,23 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  handleRevealExportFile,
-  validateRevealExportPath,
-} from '../../src/main/exportHandoff.js';
-
-test('validateRevealExportPath accepts a non-empty absolute path', () => {
-  assert.equal(
-    validateRevealExportPath('/Users/example/project/exports/timeline.xml'),
-    '/Users/example/project/exports/timeline.xml',
-  );
-});
-
-test('validateRevealExportPath rejects empty and relative paths', () => {
-  assert.throws(() => validateRevealExportPath(''), /absolute export file path/i);
-  assert.throws(() => validateRevealExportPath('exports/timeline.xml'), /absolute export file path/i);
-  assert.throws(() => validateRevealExportPath('   '), /absolute export file path/i);
-  assert.throws(() => validateRevealExportPath(null), /absolute export file path/i);
-});
+import { handleRevealExportFile } from '../../src/main/exportHandoff.js';
 
 test('handleRevealExportFile checks the trusted sender and reveals a valid path once', async () => {
   const calls: string[] = [];
@@ -32,15 +15,17 @@ test('handleRevealExportFile checks the trusted sender and reveals a valid path 
   assert.deepEqual(result, { revealed: true });
 });
 
-test('handleRevealExportFile rejects invalid input without revealing', async () => {
+test('handleRevealExportFile rejects invalid paths without revealing', async () => {
   const calls: string[] = [];
-  await assert.rejects(
-    handleRevealExportFile('trusted-window', 'timeline.edl', {
-      assertSender: () => {},
-      showItemInFolder: (path) => calls.push(path),
-    }),
-    /absolute export file path/i,
-  );
+  for (const value of ['', '   ', null, 'timeline.edl']) {
+    await assert.rejects(
+      handleRevealExportFile('trusted-window', value, {
+        assertSender: () => {},
+        showItemInFolder: (path) => calls.push(path),
+      }),
+      /absolute export file path/i,
+    );
+  }
   assert.deepEqual(calls, []);
 });
 

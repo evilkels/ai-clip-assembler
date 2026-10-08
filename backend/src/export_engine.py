@@ -1,5 +1,6 @@
 import math
 from pathlib import Path
+from fractions import Fraction
 from typing import Dict, List, Optional
 from urllib.parse import quote
 import xml.etree.ElementTree as ET
@@ -19,18 +20,41 @@ def seconds_to_timecode(seconds: float, fps: float = 30) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}:{frames:02d}"
 
 
-def seconds_to_fcpx_duration(seconds: float) -> str:
-    milliseconds = int(round(seconds * 1000))
-    return f"{milliseconds}/1000s"
-
-
-def fcpx_frame_duration(fps: float) -> str:
-    if abs(fps - 29.97) < 0.02:
-        return "1001/30000s"
-    if abs(fps - 59.94) < 0.02:
-        return "1001/60000s"
+def _fcpx_frame_duration_parts(fps: float) -> tuple[int, int]:
+    for rate, numerator, denominator in (
+        (23.976, 1001, 24000),
+        (29.97, 1001, 30000),
+        (47.952, 1001, 48000),
+        (59.94, 1001, 60000),
+        (119.88, 1001, 120000),
+    ):
+        if abs(fps - rate) < 0.02:
+            return numerator, denominator
     rounded = int(round(fps or 30))
-    return f"100/{rounded * 100}s"
+    return 100, 100 * rounded
+
+
+def fcpx_frame_duration(fps: float) -> Fraction:
+    numerator, denominator = _fcpx_frame_duration_parts(fps)
+    return Fraction(numerator, denominator)
+
+
+def _fcpx_frame_duration_text(fps: float) -> str:
+    numerator, denominator = _fcpx_frame_duration_parts(fps)
+    return f"{numerator}/{denominator}s"
+
+
+def fps_exact(fps: float) -> Fraction:
+    numerator, denominator = _fcpx_frame_duration_parts(fps)
+    return Fraction(denominator, numerator)
+
+
+def fcpx_time(seconds: float, fps: float) -> str:
+    if seconds == 0:
+        return "0s"
+    numerator, denominator = _fcpx_frame_duration_parts(fps)
+    frames = int(round(seconds * float(fps_exact(fps))))
+    return f"{frames * numerator}/{denominator}s"
 
 
 def choose_timeline_fps(videos_by_id: Dict[str, dict]) -> float:
@@ -408,22 +432,45 @@ def generate_fcpxml(
         "format",
         {
             "id": "r1",
-            "name": f"FFVideoFormat{width}x{height}p{round(fps, 2)}",
-            "frameDuration": fcpx_frame_duration(fps),
+            "frameDuration": _fcpx_frame_duration_text(fps),
             "width": str(width),
             "height": str(height),
         },
     )
 
+    format_ids = {(width, height, fcpx_frame_duration(fps)): "r1"}
+    source_fps_by_id = {}
+    format_by_id = {}
     for file_id, video in videos_by_id.items():
         metadata = video.get("metadata") or {}
+        source_fps = float(metadata.get("fps") or fps)
+        display = metadata.get("display_resolution") or metadata.get("resolution") or [width, height]
+        source_shape = (int(display[0]), int(display[1]), fcpx_frame_duration(source_fps))
+        if source_shape not in format_ids:
+            format_ids[source_shape] = f"r{len(format_ids) + 1}"
+            ET.SubElement(resources, "format", {
+                "id": format_ids[source_shape],
+                "frameDuration": _fcpx_frame_duration_text(source_fps),
+                "width": str(source_shape[0]),
+                "height": str(source_shape[1]),
+            })
+        source_fps_by_id[file_id] = source_fps
+        format_by_id[file_id] = format_ids[source_shape]
+
+    asset_ids = {}
+    for index, (file_id, video) in enumerate(videos_by_id.items(), start=1):
+        metadata = video.get("metadata") or {}
         duration = float(metadata.get("duration_sec", 0) or 0)
+        source_fps = source_fps_by_id[file_id]
+        asset_id = f"a{index}"
+        asset_ids[file_id] = asset_id
         asset_attributes = {
-            "id": f"asset-{file_id}",
+            "id": asset_id,
             "name": video["file_name"],
-            "src": path_to_file_url(video["file_path"]),
-            "duration": seconds_to_fcpx_duration(duration),
+            "start": "0s",
+            "duration": fcpx_time(duration, source_fps),
             "hasVideo": "1",
+            "format": format_by_id[file_id],
         }
         audio_channels = source_audio_channels(video)
         if audio_channels:
@@ -435,33 +482,44 @@ def generate_fcpxml(
                     "audioRate": str(source_audio_sample_rate(video)),
                 }
             )
-        ET.SubElement(
+        asset = ET.SubElement(
             resources,
             "asset",
             asset_attributes,
         )
+        ET.SubElement(asset, "media-rep", {
+            "kind": "original-media",
+            "src": path_to_file_url(video["file_path"]),
+        })
 
     library = ET.SubElement(fcpxml, "library")
     event = ET.SubElement(library, "event", {"name": title})
     project = ET.SubElement(event, "project", {"name": title})
-    sequence = ET.SubElement(project, "sequence", {"format": "r1", "tcStart": "0s", "tcFormat": "NDF"})
+    sequence_attributes = {"format": "r1", "tcStart": "0s", "tcFormat": "NDF"}
+    channel_count = max((source_audio_channels(video) for video in videos_by_id.values()), default=0)
+    if channel_count:
+        sequence_attributes["audioLayout"] = "mono" if channel_count == 1 else "stereo" if channel_count == 2 else "surround"
+    sequence = ET.SubElement(project, "sequence", sequence_attributes)
     spine = ET.SubElement(sequence, "spine")
 
     timeline_cursor = 0.0
     for clip in clips:
         speed = max(0.01, float(clip.get("suggested_speed", 1.0) or 1.0))
         timeline_duration = clip["duration_sec"] / speed
+        source_fps = source_fps_by_id[clip["file_id"]]
         asset_clip = ET.SubElement(
             spine,
             "asset-clip",
             {
                 "name": clip["file_name"],
-                "ref": f"asset-{clip['file_id']}",
-                "offset": seconds_to_fcpx_duration(timeline_cursor),
-                "start": seconds_to_fcpx_duration(clip["start_sec"]),
-                "duration": seconds_to_fcpx_duration(timeline_duration),
+                "ref": asset_ids[clip["file_id"]],
+                "offset": fcpx_time(timeline_cursor, fps),
+                "start": fcpx_time(clip["start_sec"], source_fps),
+                "duration": fcpx_time(timeline_duration, fps),
             },
         )
+        if format_by_id[clip["file_id"]] != "r1":
+            asset_clip.set("format", format_by_id[clip["file_id"]])
         if source_audio_channels(videos_by_id.get(clip["file_id"], {})):
             asset_clip.set("audioRole", "dialogue")
         if speed != 1.0:
@@ -469,14 +527,14 @@ def generate_fcpxml(
             ET.SubElement(
                 time_map,
                 "timept",
-                {"time": "0s", "value": seconds_to_fcpx_duration(clip["start_sec"])},
+                {"time": "0s", "value": fcpx_time(clip["start_sec"], source_fps)},
             )
             ET.SubElement(
                 time_map,
                 "timept",
                 {
-                    "time": seconds_to_fcpx_duration(timeline_duration),
-                    "value": seconds_to_fcpx_duration(clip["end_sec"]),
+                    "time": fcpx_time(timeline_duration, fps),
+                    "value": fcpx_time(clip["end_sec"], source_fps),
                 },
             )
         transform = clip_transform(clip)
@@ -493,4 +551,5 @@ def generate_fcpxml(
             )
         timeline_cursor += timeline_duration
 
+    ET.indent(fcpxml, space="  ")
     return ET.tostring(fcpxml, encoding="unicode")

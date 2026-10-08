@@ -1,0 +1,23 @@
+<fcpxml version="1.10">
+  <resources>
+    <format id="r1" frameDuration="1001/24000s" width="1920" height="1080" />
+    <asset id="a1" name="A001_C001.MOV" start="0s" duration="1440439/24000s" hasVideo="1" format="r1">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/Cinema/A001_C001.MOV" />
+    </asset>
+    <asset id="a2" name="A001_C002.MOV" start="0s" duration="1248247/24000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="1" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/Cinema/A001_C002.MOV" />
+    </asset>
+  </resources>
+  <library>
+    <event name="Cinema 23.976">
+      <project name="Cinema 23.976">
+        <sequence format="r1" tcStart="0s" tcFormat="NDF" audioLayout="mono">
+          <spine>
+            <asset-clip name="A001_C001.MOV" ref="a1" offset="0s" start="24024/24000s" duration="144144/24000s" />
+            <asset-clip name="A001_C002.MOV" ref="a2" offset="144144/24000s" start="288288/24000s" duration="144144/24000s" audioRole="dialogue" />
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

@@ -1,10 +1,17 @@
 import xml.etree.ElementTree as ET
+from fractions import Fraction
+import difflib
+from pathlib import Path
 from urllib.parse import quote
+from tests.support import assert_valid_fcpxml
+from tests.fixtures.export.inputs import CINEMA, ESTEPONA, IPHONE_MIXED
 
 from src.export_engine import (
     generate_resolve_xml,
     choose_timeline_fps,
     fcpx_frame_duration,
+    fcpx_time,
+    fps_exact,
     generate_edl,
     generate_fcpxml,
     edl_flatten_warnings,
@@ -78,12 +85,45 @@ def test_generate_fcpxml_references_assets_and_timeline_clips():
     assert root.attrib["version"] == "1.10"
     asset = root.find(".//asset")
     assert asset is not None
-    assert asset.attrib["src"] == "file:///Users/me/DJI_0001.MP4"
+    assert "src" not in asset.attrib
+    media_rep = asset.find("media-rep")
+    assert media_rep is not None
+    assert media_rep.attrib["src"] == "file:///Users/me/DJI_0001.MP4"
     asset_clip = root.find(".//asset-clip")
     assert asset_clip is not None
-    assert asset_clip.attrib["ref"] == "asset-file-1"
-    assert asset_clip.attrib["start"] == "10000/1000s"
-    assert asset_clip.attrib["duration"] == "4000/1000s"
+    assert asset_clip.attrib["ref"] == "a1"
+    assert asset_clip.attrib["start"] == "30000/3000s"
+    assert asset_clip.attrib["duration"] == "12000/3000s"
+
+
+def test_generate_fcpxml_validates_against_the_1_10_dtd():
+    assert_valid_fcpxml(generate_fcpxml(ESTEPONA["title"], ESTEPONA["clips"], ESTEPONA["videos"]))
+
+
+def test_generate_fcpxml_asset_has_media_rep_and_no_src():
+    root = ET.fromstring(generate_fcpxml(ESTEPONA["title"], ESTEPONA["clips"], ESTEPONA["videos"]))
+    assets = root.findall("./resources/asset")
+    assert [asset.attrib["id"] for asset in assets] == ["a1", "a2", "a3", "a4"]
+    for asset, video in zip(assets, ESTEPONA["videos"].values()):
+        assert "src" not in asset.attrib
+        assert asset.attrib["start"] == "0s"
+        assert asset.find("media-rep").attrib == {
+            "kind": "original-media",
+            "src": f"file://{quote(video['file_path'])}",
+        }
+    assert all("name" not in fmt.attrib for fmt in root.findall("./resources/format"))
+
+
+def test_generate_fcpxml_ids_are_valid_for_file_names_with_spaces():
+    videos = {"My clip.MOV": {
+        "file_id": "My clip.MOV", "file_name": "My clip.MOV",
+        "file_path": "/Users/me/My clip.MOV",
+        "metadata": {"duration_sec": 12, "fps": 30, "resolution": [1920, 1080]},
+    }}
+    clips = [{"file_id": "My clip.MOV", "file_name": "My clip.MOV", "start_sec": 0, "end_sec": 4, "duration_sec": 4}]
+    xml = generate_fcpxml("IDs", clips, videos)
+    assert_valid_fcpxml(xml)
+    assert ET.fromstring(xml).find("./resources/asset").attrib["id"] == "a1"
 
 
 def test_generate_fcpxml_emits_audio_attributes_only_for_audio_assets():
@@ -126,8 +166,8 @@ def test_generate_fcpxml_emits_audio_attributes_only_for_audio_assets():
 
     root = ET.fromstring(generate_fcpxml("Audio", clips, videos))
     assets = {asset.attrib["id"]: asset for asset in root.findall("./resources/asset")}
-    audio_asset = assets["asset-stereo"]
-    silent_asset = assets["asset-silent"]
+    audio_asset = assets["a1"]
+    silent_asset = assets["a2"]
 
     assert {
         key: audio_asset.attrib[key]
@@ -147,7 +187,7 @@ def test_generate_fcpxml_emits_audio_attributes_only_for_audio_assets():
     assert asset_clips[0].attrib["audioRole"] == "dialogue"
     assert "audioRole" not in asset_clips[1].attrib
     assert asset_clips[1].find("./audio") is None
-    assert [clip.attrib["ref"] for clip in asset_clips] == ["asset-stereo", "asset-silent"]
+    assert [clip.attrib["ref"] for clip in asset_clips] == ["a1", "a2"]
 
 
 def test_generate_fcpxml_emits_retime_for_suggested_speed():
@@ -181,12 +221,12 @@ def test_generate_fcpxml_emits_retime_for_suggested_speed():
     root = ET.fromstring(generate_fcpxml("Drone MVP", clips, videos))
     asset_clip = root.find(".//asset-clip")
     assert asset_clip is not None
-    assert asset_clip.attrib["duration"] == "8000/1000s"
+    assert asset_clip.attrib["duration"] == "24000/3000s"
     assert asset_clip.attrib["audioRole"] == "dialogue"
     assert asset_clip.find("timeMap/timept") is not None
     assert [timept.attrib["value"] for timept in asset_clip.findall("./timeMap/timept")] == [
-        "10000/1000s",
-        "14000/1000s",
+        "30000/3000s",
+        "42000/3000s",
     ]
 
 
@@ -215,7 +255,7 @@ def test_generate_fcpxml_links_media_by_absolute_file_url(tmp_path):
 
     asset = root.find(".//asset")
     assert asset is not None
-    assert asset.attrib["src"] == f"file://{quote(str(source_video.absolute()))}"
+    assert asset.find("media-rep").attrib["src"] == f"file://{quote(str(source_video.absolute()))}"
 
 
 def test_generate_fcpxml_uses_source_fps_and_vertical_display_dimensions():
@@ -270,11 +310,89 @@ def test_generate_edl_uses_timeline_fps_for_5994_sources():
     assert "00:00:01:00 00:00:02:00 00:00:00:00 00:00:01:00" in edl
 
 
-def test_fcp_frame_duration_handles_common_rates():
-    assert fcpx_frame_duration(29.97) == "1001/30000s"
-    assert fcpx_frame_duration(59.94) == "1001/60000s"
-    assert fcpx_frame_duration(30) == "100/3000s"
-    assert fcpx_frame_duration(60) == "100/6000s"
+def test_fcpx_frame_duration_covers_the_rate_table():
+    expected = {
+        23.976: (Fraction(1001, 24000), "1001/24000s", Fraction(24000, 1001)),
+        24: (Fraction(1, 24), "100/2400s", Fraction(24)),
+        25: (Fraction(1, 25), "100/2500s", Fraction(25)),
+        29.97: (Fraction(1001, 30000), "1001/30000s", Fraction(30000, 1001)),
+        30: (Fraction(1, 30), "100/3000s", Fraction(30)),
+        47.952: (Fraction(1001, 48000), "1001/48000s", Fraction(48000, 1001)),
+        50: (Fraction(1, 50), "100/5000s", Fraction(50)),
+        59.94: (Fraction(1001, 60000), "1001/60000s", Fraction(60000, 1001)),
+        60: (Fraction(1, 60), "100/6000s", Fraction(60)),
+        119.88: (Fraction(1001, 120000), "1001/120000s", Fraction(120000, 1001)),
+    }
+    from src.export_engine import _fcpx_frame_duration_text
+    for rate, (duration, duration_text, exact_rate) in expected.items():
+        assert fcpx_frame_duration(rate) == duration
+        assert _fcpx_frame_duration_text(rate) == duration_text
+        assert fps_exact(rate) == exact_rate
+
+
+def test_fcpx_time_is_frame_aligned():
+    assert fcpx_time(10, 23.976) == "240240/24000s"
+    assert fcpx_time(0, 23.976) == "0s"
+
+
+def test_generate_fcpxml_23976_source_exports_24000_1001():
+    video = {"cinema": {"file_id": "cinema", "file_name": "cinema.mov", "file_path": "/Users/me/cinema.mov",
+                        "metadata": {"duration_sec": 30, "fps": 23.976, "resolution": [1920, 1080]}}}
+    clips = [{"file_id": "cinema", "file_name": "cinema.mov", "start_sec": 1.0, "end_sec": 4.0, "duration_sec": 3.0,
+              "suggested_speed": 0.5}]
+    root = ET.fromstring(generate_fcpxml("Cinema", clips, video))
+    assert root.find("./resources/format").attrib["frameDuration"] == "1001/24000s"
+    timepoints = root.findall(".//timept")
+    assert [point.attrib["value"] for point in timepoints] == ["24024/24000s", "96096/24000s"]
+
+
+def test_generate_fcpxml_mixed_30_and_60_sources_get_their_own_formats():
+    root = ET.fromstring(generate_fcpxml(IPHONE_MIXED["title"], IPHONE_MIXED["clips"], IPHONE_MIXED["videos"]))
+    formats = root.findall("./resources/format")
+    assert [fmt.attrib["frameDuration"] for fmt in formats] == ["100/6000s", "100/3000s"]
+    clips = root.findall(".//sequence/spine/asset-clip")
+    assert clips[1].attrib["format"] == "r2"
+    assert clips[1].attrib["start"] == "30000/3000s"
+    assert clips[1].attrib["offset"] == "36000/6000s"
+    assert_valid_fcpxml(ET.tostring(root, encoding="unicode"))
+
+
+def test_generate_fcpxml_sequence_audio_layout_follows_sources():
+    for channels, expected in ((2, "stereo"), (1, "mono"), (6, "surround"), (0, None)):
+        case = {"layout": {"file_id": "layout", "file_name": "layout.mov", "file_path": "/Users/me/layout.mov",
+                            "metadata": {"duration_sec": 12, "fps": 30, "resolution": [1920, 1080],
+                                         "has_audio": channels > 0, "audio_channels": channels or None}}}
+        clip = [{"file_id": "layout", "file_name": "layout.mov", "start_sec": 0, "end_sec": 4, "duration_sec": 4}]
+        root = ET.fromstring(generate_fcpxml("Audio", clip, case))
+        sequence = root.find(".//sequence")
+        assert sequence.attrib.get("audioLayout") == expected
+        assert_valid_fcpxml(ET.tostring(root, encoding="unicode"))
+
+
+def test_fcpxml_golden_fixtures_are_unchanged(request):
+    fixture_dir = Path(__file__).parent / "fixtures" / "export"
+    cases = (
+        ("estepona-1080p5994.fcpxml", ESTEPONA),
+        ("iphone-4k60-mixed.fcpxml", IPHONE_MIXED),
+        ("cinema-23976-silent.fcpxml", CINEMA),
+    )
+    for filename, case in cases:
+        generated = generate_fcpxml(case["title"], case["clips"], case["videos"])
+        assert_valid_fcpxml(generated)
+        path = fixture_dir / filename
+        if request.config.getoption("--update-export-fixtures"):
+            path.write_text(generated)
+            continue
+        expected = path.read_text()
+        if generated != expected:
+            diff = difflib.unified_diff(
+                expected.splitlines(keepends=True),
+                generated.splitlines(keepends=True),
+                fromfile=str(path),
+                tofile="generated",
+            )
+            import pytest
+            pytest.fail("FCPXML golden fixture mismatch:\n" + "".join(diff))
 
 
 def test_choose_timeline_fps_uses_highest_source_rate():

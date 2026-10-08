@@ -6,6 +6,7 @@ import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { PreviewAudioControl } from '../components/PreviewAudioControl';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { StatusSurface } from '../components/StatusSurface';
+import { FinishAiScoring } from '../components/FinishAiScoring';
 import { WorkflowHeader } from '../components/WorkflowHeader';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
@@ -38,9 +39,6 @@ export function ReviewPage() {
     exclude,
     generationStats,
     harnessMetadata,
-    resumingAiScoring,
-    resumeError,
-    resumeAiScoring,
     include,
     loading,
     projectId,
@@ -224,17 +222,7 @@ export function ReviewPage() {
                       </ul>
                     </div>
                   ) : null}
-                  {(harnessMetadata.clips_left ?? 0) > 0 ? (
-                    <button
-                      type="button"
-                      className="btn subtle"
-                      disabled={resumingAiScoring}
-                      onClick={() => void resumeAiScoring()}
-                    >
-                      {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
-                    </button>
-                  ) : null}
-                  {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
+                  <FinishAiScoring clipsLeft={harnessMetadata.clips_left ?? 0} />
                 </StatusSurface>
               </output>
             ) : null}

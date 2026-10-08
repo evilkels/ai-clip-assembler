@@ -98,13 +98,19 @@ def test_rejects_invalid_or_duplicate_image_names(tmp_path):
 
 
 def test_strip_paths_replaces_embedded_absolute_paths_but_keeps_relative_text():
-    text = 'print("/tmp/secret-folder/DJI_0001.MP4") Opened /Users/x/Movies/a.mov file:///Users/x/a.mp4 '
-    assert strip_paths(text) == 'print("DJI_0001.MP4") Opened a.mov file://a.mp4 '
-    assert strip_paths("clip.mov 14:00 5/5 k/v") == "clip.mov 14:00 5/5 k/v"
+    text = ('print("/Users/editor/My Project/private-folder/DJI_0001.MP4") '
+            'Opened /Users/editor/My Project/DJI_0002.MOV now '
+            'file:///Users/editor/My Project/a.mp4')
+    assert strip_paths(text) == 'print("DJI_0001.MP4") Opened DJI_0002.MOV now file://a.mp4'
+    unchanged = (
+        "https://claude.ai/download 5/5 k/v cut A / B / C 14:00 "
+        "clips/a.mp4 frame-01.jpg"
+    )
+    assert strip_paths(unchanged) == unchanged
 
 
 def test_text_has_no_paths(tmp_path):
-    project_folder = tmp_path / "secret-folder-fixture"
+    project_folder = tmp_path / "secret folder fixture"
     samples = project_folder / "clipassembler" / "samples"
     sample_folder = samples / "DJI_0001.MP4"
     sample_folder.mkdir(parents=True)
@@ -158,10 +164,10 @@ def test_text_has_no_paths(tmp_path):
         "/projects/from-folder", json={"folder_path": str(project_folder)}
     ).json()["project_id"]
     api.projects[project_id]["clips"] = [clip.model_dump()]
-    candidates, candidate_frames, _agent = api._review_inputs(project_id)
+    candidates, candidate_frames, _agent, _fallback_versions = api._review_inputs(project_id)
     review = engine_review_agent(recorder)(
         {
-            "user_message": "Please review /tmp/secret-folder/DJI_0001.MP4",
+            "user_message": f"Please review {project_folder / 'DJI_0001.MP4'}",
             "candidates": candidates,
             "candidate_frames": candidate_frames,
             "samples_dir": samples,
@@ -172,6 +178,7 @@ def test_text_has_no_paths(tmp_path):
     )
     assert review["message"] == "Ready."
     assert "secret-folder" not in recorder.requests[-1].text
+    assert "secret folder fixture" not in recorder.requests[-1].text
     assert "/tmp/" not in recorder.requests[-1].text
     assert "DJI_0001.MP4" in recorder.requests[-1].text
     requests = [recorder.requests[0], recorder.requests[-1]]

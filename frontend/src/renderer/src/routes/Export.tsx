@@ -192,7 +192,7 @@ export function ExportPage() {
       <WorkflowHeader
         title="Export"
         step="Step 04 / 04"
-        description={`${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} in the Timeline · ${formatDuration(effectiveDuration)} total. Media paths stay relative to the project folder.`}
+        description={`${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} in the Timeline · ${formatDuration(effectiveDuration)} total. Exports link to your original files by their full path. Keep the footage where it is, or export again after moving it.`}
         actions={Object.values(exportResults).some(Boolean) ? (
           <button
             type="button"

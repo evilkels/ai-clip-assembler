@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   acceptProposal,
   clearReviewSession,
@@ -71,6 +71,7 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
   const [staleProposalIds, setStaleProposalIds] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingProposalIds, setPendingProposalIds] = useState<ReadonlySet<string>>(() => new Set());
   const [applied, setApplied] = useState<{ proposalId: string; revision: number } | null>(null);
+  const [sessionProjectId, setSessionProjectId] = useState(projectId);
   const activeProject = useRef<string | null>(projectId);
   // Every conversation mutation runs after the previous one settles, so a
   // slower response can never apply an older session over a newer one.
@@ -94,20 +95,26 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     setVersionSet(latestVersionSet(session.messages));
   }, []);
 
-  useEffect(() => {
-    activeProject.current = projectId;
+  if (sessionProjectId !== projectId) {
+    setSessionProjectId(projectId);
     setMessages([]);
     setVersionSet(null);
     setError(null);
     setStaleProposalIds(new Set());
     setPendingProposalIds(new Set());
     setApplied(null);
-    if (!projectId) {
-      setBusy(false);
-      return;
-    }
+    setBusy(Boolean(projectId));
+  }
+
+  // Updated at commit, not in the passive fetch effect, so a response that lands
+  // between the commit and its passive effects is already seen as stale.
+  useLayoutEffect(() => {
+    activeProject.current = projectId;
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
     let alive = true;
-    setBusy(true);
     void serialize(() =>
       getReviewSession(projectId)
         .then((session) =>
@@ -142,7 +149,8 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
       failure: string,
     ) =>
       serialize(async () => {
-        if (!projectId) return;
+        // The Editor left this project while the message waited in the queue.
+        if (!projectId || activeProject.current !== projectId) return;
         const messageId = optimistic.message_id;
         setMessages((current) => {
           const exists = current.some((message) => message.message_id === messageId);
@@ -284,11 +292,13 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
 
   const undoProposal = useCallback(async () => {
     if (!applied) return;
-    await actOnProposal(applied.proposalId, async () => {
+    await actOnProposal(applied.proposalId, async (id) => {
       try {
         await undo(applied.revision);
+        if (activeProject.current !== id) return;
         setApplied(null);
       } catch (reason: unknown) {
+        if (activeProject.current !== id) return;
         // A newer edit landed first: the backend refused, so this Undo is spent.
         if (reason instanceof TimelineRevisionConflictError) setApplied(null);
         else setError('Could not undo that change.');

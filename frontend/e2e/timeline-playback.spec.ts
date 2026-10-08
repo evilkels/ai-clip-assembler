@@ -648,6 +648,57 @@ test('persists one speed-correct trim operation for the selected repeated item',
   });
 });
 
+/**
+ * Press Tab until the focused element satisfies `isTarget`, failing after 80 presses.
+ * `isTarget` runs in the page, so anything it needs from the test goes through `arg`.
+ */
+async function tabUntilFocused<Arg = undefined>(
+  page: Page,
+  isTarget: (element: Element | null, arg: Arg) => boolean,
+  arg?: Arg,
+) {
+  for (let presses = 0; presses < 80; presses++) {
+    if (await page.evaluate(`(${isTarget.toString()})(document.activeElement, ${JSON.stringify(arg)})`)) return;
+    await page.keyboard.press('Tab');
+  }
+  throw new Error('Keyboard focus never reached the target within 80 Tab presses');
+}
+
+test('trims a clip with the keyboard alone', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithRepeatedItems(page, projectId);
+  const first = items[0];
+  const newStart = first.start_sec + 1;
+
+  // The replacement POST returns before SSE hydration does; Tabbing earlier can
+  // land on the original item's Select button, which is then removed.
+  await expect(page.locator(`[data-timeline-item-id="${first.item_id}"]`)).toBeVisible();
+  await tabUntilFocused(
+    page,
+    (element, itemId) =>
+      element instanceof HTMLButtonElement &&
+      element.classList.contains('tl-clip-select') &&
+      element.closest('[data-timeline-item-id]')?.getAttribute('data-timeline-item-id') === itemId,
+    first.item_id,
+  );
+  await page.keyboard.press('Enter');
+  const inspector = page.getByTestId('timeline-inspector');
+  await expect(inspector).toContainText(first.item_id);
+
+  await tabUntilFocused(
+    page,
+    (element) => element instanceof HTMLElement && element.dataset.testid === 'item-start',
+  );
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type(String(newStart));
+  await page.keyboard.press('Tab');
+
+  await expect(inspector.getByTestId('item-start')).toHaveValue(String(newStart));
+  await expect(inspector.locator('.timeline-inspector-values')).toContainText(
+    `${newStart.toFixed(1)} → ${first.end_sec.toFixed(1)}s`,
+  );
+});
+
 test('removes the selected repeated Timeline Item', async ({ page }) => {
   const { projectId } = await setupTimeline(page, [fixtureA()]);
   const items = await replaceWithRepeatedItems(page, projectId);

@@ -373,7 +373,6 @@ test('projects seeded scores, decisions, Timeline membership, and Version labels
   const { timelineFile, timelineClipId } = await setupSeededReview(page);
   const browser = page.locator('[data-review-browser]');
 
-  await page.getByLabel('Minimum Smoothness').fill('0');
   await page.getByTestId('source-clips-panel').getByRole('button', { name: 'Grid' }).click();
   await expect(browser).toHaveAttribute('data-view-mode', 'grid');
   const combinedFills = await browser.locator('.clip-card .score-chip[data-score-label="combined"]')
@@ -416,4 +415,24 @@ test('projects seeded scores, decisions, Timeline membership, and Version labels
   await expect(browser.locator('[data-review-clip]')).toHaveCount(1);
   await expect(browser.locator(`[data-review-clip="${timelineClipId}"]`)).toContainText(timelineFile);
   await expect(browser.locator(`[data-review-clip="${timelineClipId}"]`)).not.toContainText(/Timeline #/);
+});
+
+test('Review has one view-only smoothness control and hides nothing by default', async ({ page }) => {
+  await setupSeededReview(page);
+  const browser = page.locator('[data-review-browser]');
+
+  await expect(page.getByLabel('Display filter')).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: /smoothness/i })).toHaveCount(1);
+  await expect(page.getByRole('slider', { name: /smoothness/i })).toHaveCount(0);
+  await expect(page.getByLabel('Minimum Smoothness')).toHaveValue('0');
+
+  await expect(page.getByTestId('review-header-count')).toHaveText('4 / 4');
+  await page.getByTestId('source-clips-panel').getByRole('button', { name: 'List' }).click();
+  // seed-low has the lowest seeded smoothness (3), well under the old default of 7.
+  await expect(browser.locator('[data-review-clip="seed-low"]')).toBeVisible();
+  await expect(
+    page.getByText(
+      'These filters only hide clips from this list; which clips exist is set by How clips are found on the Import step.',
+    ),
+  ).toBeVisible();
 });

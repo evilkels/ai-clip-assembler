@@ -752,6 +752,7 @@ export function Timeline({
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => startTrim(e, seg, 'left')}
                     title="Trim start"
+                    aria-hidden="true"
                   />
                   <div
                     className="tl-clip-body"
@@ -795,6 +796,7 @@ export function Timeline({
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => startTrim(e, seg, 'right')}
                     title="Trim end"
+                    aria-hidden="true"
                   />
                 </div>
               );

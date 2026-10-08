@@ -2,9 +2,12 @@
 
 Status: ACTIVE. The v0.1.3 editorial refresh shipped; proof, distribution,
 release-account work, demo media, and measured content expansion remain.
-**New debt as of 2026-08-31: the landing page no longer depicts the shipped app.**
+The landing-page drift recorded on 2026-08-31 was fixed: the restyle shipped in
+`6d79c1b` (2026-09-02).
 
 ## Landing drift after the studio redesign (verified 2026-08-31)
+
+Historical: delivered by the restyle in `6d79c1b` (2026-09-02); kept for the record.
 
 `redesign/studio-workflows` restyled the whole app but excluded the landing page
 by constraint, so `git diff main...redesign/studio-workflows -- site/` is empty.
@@ -88,13 +91,11 @@ Console → one gated culling guide → one audience launch loop → measurement
 - Choose 8–15 rights-cleared clips; remove private names, locations, faces,
   notifications, keys, and history. Prove Import → Analyse → Review → visible
   edit → editable export → target NLE on the distributable build.
-- Test Gatekeeper, first launch, bundled tools, restart, export, and NLE import
-  on a clean Mac; file every workaround. Approve claims, version, URL, privacy,
-  exports, screenshots, demo, and article against the shipped build.
+- Approve claims, version, URL, privacy, exports, screenshots, demo, and article
+  against the shipped build. The clean-Mac install check is owned by
+  [self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4.
 - Supply first-hand culling lessons, mistakes, a concrete example, and usable
   screenshots; verify Search Console and record the query baseline.
-- Publish transparently where the target audience already gathers, answer
-  replies, and collect their language. Do not automate posts or engagement.
 
 ## Agent-owned work and demo contract
 
@@ -136,13 +137,3 @@ Google account:
 
 `seo-content-pilot.md` stays a separate plan: it is gated on query evidence
 from this baseline plus human editorial input.
-
-## Undrawn-in-plan designs: reference screens `2a`, `2b`, `2c` (found 2026-09-03)
-
-The app restyle export (`docs/design/2026-09-03-app-restyle-handoff.md`, companion
-`app-reference.dc.html`) carries three landing-page designs its README does not list:
-`2a` "Contact Sheet" (dark; scored frames and kept-versus-cut examples as the hero),
-`2c` "Contact Sheet · light" (same layout on light paper surfaces) and `2b` "Cutting
-Room" (light editorial page closing on a dark app screenshot). They are new marketing
-directions, not recreations of the current site. Decide whether one of them
-supersedes the 2026-09-01 landing-page restyle before spending on the launch backlog.

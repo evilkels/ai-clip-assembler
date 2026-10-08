@@ -1,0 +1,91 @@
+#!/bin/sh
+
+set -u
+
+repo_root=$(git rev-parse --show-toplevel) || exit 1
+cd "$repo_root" || exit 1
+
+staged_paths=$(git diff --cached --name-only --diff-filter=ACMR) || exit 1
+eslint_paths=
+ruff_paths=
+has_frontend_ts=false
+has_frontend_tsx=false
+
+for path in $staged_paths; do
+  case "$path" in
+    frontend/src/*)
+      case "$path" in
+        *.js|*.mjs|*.ts|*.tsx) ;;
+        *) continue ;;
+      esac
+      if ! git diff --quiet -- "$path"; then
+        printf 'pre-commit: %s has unstaged changes; stage or discard them first.\n' "$path" >&2
+        exit 1
+      fi
+      eslint_paths="$eslint_paths
+$path"
+      case "$path" in
+        *.ts|*.tsx) has_frontend_ts=true ;;
+      esac
+      case "$path" in
+        *.tsx) has_frontend_tsx=true ;;
+      esac
+      ;;
+    backend/*.py)
+      if ! git diff --quiet -- "$path"; then
+        printf 'pre-commit: %s has unstaged changes; stage or discard them first.\n' "$path" >&2
+        exit 1
+      fi
+      ruff_paths="$ruff_paths
+$path"
+      ;;
+  esac
+done
+
+failed=false
+
+if [ -n "$eslint_paths" ]; then
+  if [ ! -x frontend/node_modules/.bin/eslint ]; then
+    printf 'pre-commit: missing ESLint; run npm ci in frontend.\n' >&2
+    exit 1
+  fi
+  set --
+  for path in $eslint_paths; do
+    [ -n "$path" ] && set -- "$@" "$path"
+  done
+  frontend/node_modules/.bin/eslint "$@" --max-warnings=0 --ignore-pattern src/renderer/src/types/generated.ts || failed=true
+fi
+
+if [ "$has_frontend_tsx" = true ]; then
+  if [ ! -x frontend/node_modules/.bin/react-doctor ]; then
+    printf 'pre-commit: missing react-doctor; run npm ci in frontend.\n' >&2
+    exit 1
+  fi
+  # react-doctor prints a score banner even when clean; show it only on failure.
+  if ! doctor_output=$(cd frontend && ./node_modules/.bin/react-doctor --staged --fail-on warning 2>&1); then
+    printf '%s\n' "$doctor_output"
+    failed=true
+  fi
+fi
+
+if [ "$has_frontend_ts" = true ]; then
+  if [ ! -x frontend/node_modules/.bin/tsc ]; then
+    printf 'pre-commit: missing TypeScript compiler; run npm ci in frontend.\n' >&2
+    exit 1
+  fi
+  (cd frontend && ./node_modules/.bin/tsc --noEmit -p tsconfig.json) || failed=true
+fi
+
+if [ -n "$ruff_paths" ]; then
+  if [ ! -x backend/.venv/bin/ruff ]; then
+    printf 'pre-commit: missing Ruff; create backend/.venv and install backend requirements.\n' >&2
+    exit 1
+  fi
+  set --
+  for path in $ruff_paths; do
+    [ -n "$path" ] && set -- "$@" "$path"
+  done
+  backend/.venv/bin/ruff check --no-cache "$@" || failed=true
+fi
+
+[ "$failed" = false ]

@@ -34,7 +34,8 @@
     "test:e2e:headed": "playwright test --headed",
     "postinstall": "electron-builder install-app-deps",
     "dist": "npm run build:backend && npm run build && electron-builder",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "react-doctor",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.80.10",

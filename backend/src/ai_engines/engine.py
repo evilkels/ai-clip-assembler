@@ -7,6 +7,10 @@ from typing import Optional, Protocol, Union
 
 from .types import AiFailure, AiReply, AiRequest, EngineStatus, Provider
 
+REVIEW_TIMEOUT_SEC = 240.0
+SCORING_TIMEOUT_PER_CLIP_SEC = 120.0
+PING_TIMEOUT_SEC = 30.0
+
 
 class AiEngine(Protocol):
     provider: Provider

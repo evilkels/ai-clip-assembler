@@ -2828,7 +2828,6 @@ def test_review_turn_uses_consented_agent_for_manual_selected_harness(monkeypatc
     def consented_agent(_context):
         return {"message": "The review agent is ready.", "operations": [], "versions": []}
 
-    monkeypatch.setattr(api, "default_review_agent", consented_agent)
     monkeypatch.setattr(api, "_review_agent", consented_agent)
 
     turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
@@ -2846,8 +2845,10 @@ def test_review_turn_requires_consent_for_both_surfaces(monkeypatch, tmp_path):
     def cloud_agent_must_not_run(_context):
         raise AssertionError("default review agent must not run without cloud AI consent")
 
-    monkeypatch.setattr(api, "default_review_agent", cloud_agent_must_not_run)
-    monkeypatch.setattr(api, "_review_agent", cloud_agent_must_not_run)
+    monkeypatch.setattr(api, "_review_agent", api._DEFAULT_ENGINE_AGENT)
+    monkeypatch.setattr(
+        api, "get_engine", lambda: (_ for _ in ()).throw(AssertionError("engine must not run"))
+    )
 
     turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
 
@@ -3066,7 +3067,6 @@ def _script_project(monkeypatch, tmp_path):
     def agent_must_not_run(_context):
         raise AssertionError("running a script must not call the review agent")
 
-    monkeypatch.setattr(api, "default_review_agent", agent_must_not_run)
     monkeypatch.setattr(api, "_review_agent", agent_must_not_run)
     return client, project_id
 
@@ -3369,42 +3369,36 @@ async def test_staging_a_large_script_recording_does_not_block_the_event_loop(mo
     assert longest_stall < 0.5
 
 
-def diagnostic_result(found=True, detail="", model="gpt-5.4-mini", provider="openai-codex"):
-    return {
-        "binary": {"configured": "pi", "resolved": "/usr/local/bin/pi" if found else None, "found": found},
-        "provider": provider,
-        "model": model,
-        "reachable": False,
-        "elapsed_sec": 0.2,
-        "detail": detail,
-    }
+def test_diagnostics_reachable(tmp_path, monkeypatch):
+    binary, _log = fake_engine(tmp_path, reply='{"reply":"OK"}')
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(binary), "openai-codex", "fake"))
+
+    response = TestClient(api.app).get("/diagnostics")
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "chatgpt"
+    assert response.json()["reachable"] is True
+    assert "review_model" not in response.json()
 
 
-def test_diagnostics_guides_a_missing_binary_towards_the_gui_path_gap(monkeypatch):
-    """The packaged app inherits a minimal PATH, so this is the likeliest failure."""
-    monkeypatch.setattr(api, "_ping_review_model", lambda settings: diagnostic_result(found=False))
-    guidance = TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"]
+def test_diagnostics_signed_out(tmp_path, monkeypatch):
+    binary, _log = fake_engine(tmp_path, scenario="signed_out")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(binary), "openai-codex", "fake"))
 
-    assert any("which pi" in step for step in guidance)
-    assert any("/opt/homebrew/bin/pi" in step for step in guidance)
-    assert any("PI_BIN=" in step for step in guidance)
+    response = TestClient(api.app).get("/diagnostics")
 
-
-def test_diagnostics_guidance_matches_the_failure_kind(monkeypatch):
-    cases = {
-        "No API key found for openai-codex": "Connections",
-        "unknown model gpt-9": "Settings",
-        "getaddrinfo ENOTFOUND api.openai.com": "network",
-        "No response within 45s": "again",
-    }
-    for detail, expected in cases.items():
-        monkeypatch.setattr(api, "_ping_review_model", lambda settings, d=detail: diagnostic_result(detail=d))
-        guidance = TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"]
-        assert guidance, detail
-        assert any(expected in step for step in guidance), (detail, guidance)
+    assert response.status_code == 200
+    assert response.json()["reachable"] is False
+    assert response.json()["failure"]["kind"] == "signed_out"
 
 
-def test_diagnostics_omits_guidance_when_the_model_is_reachable(monkeypatch):
-    reachable = {**diagnostic_result(), "reachable": True, "detail": "OK"}
-    monkeypatch.setattr(api, "_ping_review_model", lambda settings: reachable)
-    assert TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"] == []
+def test_diagnostics_timed_out(tmp_path, monkeypatch):
+    binary, _log = fake_engine(tmp_path, scenario="hang")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(binary), "openai-codex", "fake"))
+    monkeypatch.setattr(api, "PING_TIMEOUT_SEC", 1.0)
+
+    response = TestClient(api.app).get("/diagnostics")
+
+    assert response.status_code == 200
+    assert response.json()["reachable"] is False
+    assert response.json()["failure"]["kind"] == "timed_out"

@@ -39,6 +39,8 @@ from .export_engine import (
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
 from .ai_engines import get_engine
+from .ai_engines.engine import PING_TIMEOUT_SEC
+from .ai_engines.types import AiFailure, AiRequest, AiReply
 from .frame_extraction import extract_frames
 from .models import FrameScore
 from .motion_analysis import (
@@ -73,7 +75,7 @@ from .mcp_server import TimelineMCPServer
 from .review_agent import (
     ProposalStore,
     ReviewAgentError,
-    default_review_agent,
+    engine_review_agent,
     run_editor_script,
     run_review_turn,
 )
@@ -137,7 +139,8 @@ _motion_analysis_capability = FFmpegVidstabCapability(available=True)
 # testable/overridable; proposals are staged here and replayed through the
 # operations core on accept.
 _proposal_store = ProposalStore()
-_review_agent = default_review_agent
+_DEFAULT_ENGINE_AGENT = object()
+_review_agent = _DEFAULT_ENGINE_AGENT
 _review_locks: dict[str, asyncio.Lock] = {}
 
 # --- Analysis cancellation -------------------------------------------------
@@ -1284,9 +1287,10 @@ def _review_inputs(
         if len(candidate_frames) >= 12:
             break
     agent = _review_agent
+    is_default_engine_agent = agent is _DEFAULT_ENGINE_AGENT
     project = projects[project_id]
     default_agent_requires_consent = not project.get("cloud_ai_consent")
-    if default_agent_requires_consent and agent is default_review_agent:
+    if default_agent_requires_consent and is_default_engine_agent:
         def consent_required_review_agent(_context):
             return {
                 "message": (
@@ -1298,6 +1302,8 @@ def _review_inputs(
             }
 
         agent = consent_required_review_agent
+    elif is_default_engine_agent:
+        agent = engine_review_agent(get_engine())
     return candidates, candidate_frames, agent
 
 
@@ -1322,6 +1328,7 @@ async def _run_review_turn(
         client_message_id=client_message_id,
         # Scripts read the whole library, excluded clips included (Script API v1).
         library=get_mcp_server()._list_candidates(project_id),
+        samples_dir=samples_dir(project_id),
     )
 
 
@@ -1558,159 +1565,30 @@ async def write_settings(request: SettingsUpdateRequest):
     return _settings_payload()
 
 
-# Diagnostic ping is intentionally short so the UI gets a quick verdict; a slow
-# model is itself a signal worth surfacing rather than blocking on the full
-# per-call timeout.
-_DIAGNOSTIC_TIMEOUT_SEC = 45.0
-
-
-# Failure detail is provider text we do not control, so the guidance below is
-# keyed off coarse substrings and always ends with a step that works regardless.
-_AUTH_MARKERS = (
-    "no api key", "not authenticated", "unauthenticated", "unauthorized",
-    "401", "403", "sign in", "log in", "login", "credential", "token",
-)
-_MODEL_MARKERS = ("unknown model", "model not found", "invalid model", "404", "no such model")
-_NETWORK_MARKERS = (
-    "enotfound", "econnrefused", "getaddrinfo", "network", "dns", "proxy",
-    "connection", "socket", "tls", "certificate",
-)
-
-_PI_INSTALL_STEP = (
-    "Install Pi if it is missing: npm install -g @earendil-works/pi-coding-agent"
-)
-
-
-def _missing_binary_guidance(pi_bin: str) -> list:
-    """Steps for the common case: pi works in Terminal but not inside the app.
-
-    macOS starts Finder/Dock launches with a minimal PATH, so anything a version
-    manager (nvm, volta, asdf) adds from ~/.zshrc is invisible to the app even
-    though the same shell finds it interactively.
-    """
-    return [
-        f"Confirm the CLI exists: run  which {pi_bin}  in Terminal.",
-        _PI_INSTALL_STEP,
-        "macOS launches apps with a minimal PATH, so a pi installed by nvm, "
-        "volta, or asdf is invisible here even when Terminal finds it. Link it "
-        "somewhere the app always looks:  sudo ln -sf \"$(which pi)\" /opt/homebrew/bin/pi  "
-        "(use /usr/local/bin/pi on Intel Macs).",
-        "Then run this check again — no restart needed, /opt/homebrew/bin and "
-        "/usr/local/bin are always searched.",
-        "Alternative: quit the app and relaunch it with the path supplied "
-        "explicitly:  open --env PI_BIN=\"$(which pi)\" -a \"AI Clip Assembler\"",
-    ]
-
-
-def _reachability_guidance(result: dict, pi_bin: str, timeout_sec: float) -> list:
-    """Actionable next steps for a failed reachability check, most likely first."""
-    if not result["binary"]["found"]:
-        return _missing_binary_guidance(pi_bin)
-
-    detail = (result["detail"] or "").lower()
-    if any(marker in detail for marker in _AUTH_MARKERS):
-        return [
-            "Open Settings > Connections and sign in to the review model account.",
-            "Or authenticate the CLI directly:  pi /login  then retry "
-            "(the app reads the same credentials from ~/.pi/agent/auth.json).",
-            "If a different provider is configured, make sure Pi has credentials "
-            "for it, or switch the provider in Settings.",
-        ]
-    if any(marker in detail for marker in _MODEL_MARKERS):
-        return [
-            f"The provider rejected model \"{result['model']}\". Check the spelling "
-            "in Settings against the models your account can use.",
-            "Try the default model to confirm the account works at all, then "
-            "change it back.",
-        ]
-    if any(marker in detail for marker in _NETWORK_MARKERS):
-        return [
-            "Check network access — the provider call never completed.",
-            "If you are behind a VPN or proxy, allow outbound HTTPS for the CLI, "
-            "then run this check again.",
-        ]
-    if "no response within" in detail:
-        return [
-            f"The provider did not answer within {timeout_sec:.0f}s. Run the check "
-            "again — a cold or busy model often clears on a retry.",
-            "If it keeps timing out, raise the per-call timeout in Settings or "
-            "pick a faster model.",
-        ]
-    return [
-        f"Reproduce it in Terminal to see the full error:  {pi_bin} --provider "
-        f"{result['provider']} --model {result['model']} --print \"Reply with OK.\"",
-        "Check Settings > Connections for the account state, and confirm the "
-        "provider and model names are valid.",
-    ]
-
-
-def _ping_review_model(settings: dict) -> dict:
-    """Run a trivial pi turn to confirm the review model is reachable.
-
-    Mirrors how the review agent invokes pi (same provider/model/cwd/env) but
-    with no frames and a tiny prompt, so it isolates binary/auth/model
-    reachability from project-specific failures.
-    """
-    pi_bin = settings["pi_bin"]
-    resolved = shutil.which(pi_bin)
-    binary = {"configured": pi_bin, "resolved": resolved, "found": resolved is not None}
-    result = {
-        "binary": binary,
-        "provider": settings["pi_provider"],
-        "model": settings["pi_model"],
-        "reachable": False,
-        "elapsed_sec": None,
-        "detail": "",
-    }
-    if resolved is None:
-        result["detail"] = f"pi CLI not found on PATH ({pi_bin})"
-        return result
-
-    command = [
-        pi_bin, "--provider", settings["pi_provider"], "--model", settings["pi_model"],
-        "--print", "--mode", "text", "--no-session", "--no-context-files",
-        "--no-skills", "--no-extensions",
-        "Reply with the single word OK.",
-    ]
+def _ping_ai(engine) -> dict:
     started = time.monotonic()
-    try:
-        completed = subprocess.run(
-            command, capture_output=True, stdin=subprocess.DEVNULL, text=True,
-            timeout=_DIAGNOSTIC_TIMEOUT_SEC, cwd=str(REPO_ROOT), env=os.environ.copy(),
-        )
-    except subprocess.TimeoutExpired:
-        result["elapsed_sec"] = round(time.monotonic() - started, 1)
-        result["detail"] = f"No response within {_DIAGNOSTIC_TIMEOUT_SEC:.0f}s"
-        return result
-    except OSError as exc:
-        result["elapsed_sec"] = round(time.monotonic() - started, 1)
-        result["detail"] = str(exc)
-        return result
-
-    result["elapsed_sec"] = round(time.monotonic() - started, 1)
-    stdout = (completed.stdout or "").strip()
-    if completed.returncode == 0 and stdout:
-        result["reachable"] = True
-        result["detail"] = stdout[:200]
-    else:
-        result["detail"] = (
-            (completed.stderr or completed.stdout or "pi CLI returned no output").strip()[:500]
-        )
+    reply = engine.run(AiRequest(
+        images=[],
+        text="Reply with the single word OK",
+        schema={
+            "type": "object", "required": ["reply"],
+            "properties": {"reply": {"type": "string"}},
+        },
+        timeout_sec=PING_TIMEOUT_SEC,
+    ))
+    result = {
+        "provider": engine.provider,
+        "reachable": isinstance(reply, AiReply),
+        "elapsed_sec": round(time.monotonic() - started, 1),
+    }
+    if isinstance(reply, AiFailure):
+        result["failure"] = reply.model_dump(exclude_none=True)
     return result
 
 
 @app.get("/diagnostics")
 async def diagnostics():
-    settings = get_settings()
-    review_model = await asyncio.to_thread(_ping_review_model, settings)
-    review_model["guidance"] = (
-        []
-        if review_model["reachable"]
-        else _reachability_guidance(
-            review_model, settings["pi_bin"], _DIAGNOSTIC_TIMEOUT_SEC
-        )
-    )
-    return {"review_model": review_model}
+    return await asyncio.to_thread(_ping_ai, get_engine())
 
 
 @app.get("/harnesses")

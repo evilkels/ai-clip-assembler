@@ -2,6 +2,7 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .ai_engines.types import AiFailure
 
 # Bump when the on-disk Timeline Document shape changes. The legacy
 # `{clip_id, start_sec, end_sec}` timeline is treated as version 1.
@@ -51,6 +52,13 @@ class FrameScore(BaseModel):
     scene_id: int = 0
     is_keyframe: bool = True
     turn_rate_deg_per_sec: float = 0.0
+
+
+class DiagnosticsResult(BaseModel):
+    provider: str
+    reachable: bool
+    elapsed_sec: float
+    failure: Optional[AiFailure] = None
 
 
 class ClipSuggestion(BaseModel):

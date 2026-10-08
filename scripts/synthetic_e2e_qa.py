@@ -227,8 +227,8 @@ def main() -> int:
         check(f"{export_format} export written", ok, str(expected_path))
     fcpxml_text = expected_files["fcpxml"].read_text(encoding="utf-8") if expected_files["fcpxml"].exists() else ""
     resolve_text = expected_files["resolve_xml"].read_text(encoding="utf-8") if expected_files["resolve_xml"].exists() else ""
-    check("FCPXML references media relative to export dir", 'src="../../' in fcpxml_text)
-    check("DaVinci XML references media relative to export dir", "<pathurl>../../" in resolve_text)
+    check("FCPXML references media by absolute file URL", 'src="file:///' in fcpxml_text)
+    check("DaVinci XML references media by absolute localhost file URL", "<pathurl>file://localhost/" in resolve_text)
     check("DaVinci XML is XMEML v5", '<xmeml version="5">' in resolve_text)
 
     print("\nFlow: operations core (HTTP) — include, speed, split, undo/redo")

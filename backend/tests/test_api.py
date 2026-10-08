@@ -1404,7 +1404,7 @@ def test_export_folder_project_writes_inside_project_exports(tmp_path):
     body = response.json()
     export_path = Path(body["file_path"])
     assert export_path == project_folder / "exports" / "fcp" / "timeline.fcpxml"
-    assert 'src="../../DJI_0042.MP4"' in export_path.read_text(encoding="utf-8")
+    assert f'src="file://{quote(str(source_video.absolute()))}"' in export_path.read_text(encoding="utf-8")
 
 
 def test_export_folder_project_resolve_xml_writes_davinci_timeline(tmp_path):
@@ -1443,7 +1443,7 @@ def test_export_folder_project_resolve_xml_writes_davinci_timeline(tmp_path):
     assert export_path == project_folder / "exports" / "davinci" / "timeline.xml"
     content = export_path.read_text(encoding="utf-8")
     assert '<xmeml version="5">' in content
-    assert "<pathurl>../../DJI_0042.MP4</pathurl>" in content
+    assert f"<pathurl>file://localhost{quote(str((project_folder / 'DJI_0042.MP4').absolute()))}</pathurl>" in content
 
 
 def test_export_folder_project_requires_overwrite_flag_for_existing_export(tmp_path):
@@ -2255,6 +2255,23 @@ def test_export_timeline_keeps_present_but_empty_edited_timeline_empty(monkeypat
     assert body["clip_count"] == 0
     assert body["total_duration_sec"] == 0
     assert Path(body["file_path"]).read_text() == "TITLE: AI Clip Assembler\nFCM: NON-DROP FRAME\n"
+
+
+def test_export_empty_timeline_document_does_not_fall_back_to_legacy_clips(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+    assert _op(client, project_id, "remove_item", item_id=item_id).status_code == 200
+    assert api.get_timeline_controller(project_id).document.items == []
+
+    empty_warning = "The Timeline is empty, so this export has no clips."
+    for export_format in ("fcpxml", "resolve_xml", "edl"):
+        response = client.post(f"/projects/{project_id}/export?format={export_format}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["clip_count"] == 0
+        assert empty_warning in body["warnings"]
 
 
 def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path):

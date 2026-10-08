@@ -17,7 +17,7 @@ A Project had no concrete on-disk representation. Users want to point the app at
 
 **Why visible `clipassembler/` (no leading dot):** user explicitly chose visible over hidden so project state is discoverable in Finder — accepted trade-off of slightly more clutter.
 
-**Why exports live next to footage:** DaVinci/FCP resolve relative media paths from the timeline file's directory; with `exports/davinci/x.xml` referencing `../../DJI_0042.MP4`, opening triggers zero relink prompts. This was called out as the single biggest UX win in the whole plan.
+**Why exports live next to footage:** Exports remain in the project folder for discoverability. FCPXML and Resolve XML link to original media with absolute `file://` URLs, so moving the project folder breaks links in an existing export by design. Reopen the moved folder in the app and export again to create a timeline with updated links.
 
 `source_videos[].filename` in `project.json` is always relative to the project folder (never absolute) — this is what makes the folder portable across machines/drives.
 
@@ -27,7 +27,7 @@ Non-recursive scan only (MVP); recursive scan deferred. iCloud/Dropbox/OneDrive 
 
 ## Implementation status (branch `feature/project-folder-model`)
 
-All 6 phases done in branch: backend project loader/writer, relocated analysis output paths, folder-scoped exports (EDL/FCPXML/DaVinci XML with relative paths), frontend create/open flow + sidebar, project-scoped views (app starts with no open project; legacy upload is an explicit fallback), MANUAL_QA_GUIDE.md extended. Later (`t3code/190b754e`): analysis + saved timeline persisted to `clipassembler/analysis/results.json` so reopening restores state; DaVinci XMEML v5 export added; folder-project videos are ffprobed on open (fixes a crash where `metadata: None` broke FCPXML export); rescan no longer discards existing clips/timeline.
+All 6 phases done in branch: backend project loader/writer, relocated analysis output paths, folder-scoped exports (EDL/FCPXML/DaVinci XML), frontend create/open flow + sidebar, project-scoped views (app starts with no open project; legacy upload is an explicit fallback), MANUAL_QA_GUIDE.md extended. Later (`t3code/190b754e`): analysis + saved timeline persisted to `clipassembler/analysis/results.json` so reopening restores state; DaVinci XMEML v5 export added; folder-project videos are ffprobed on open (fixes a crash where `metadata: None` broke FCPXML export); rescan no longer discards existing clips/timeline.
 
 **Verified:** backend 131 tests pass; frontend typecheck/build pass; Playwright e2e passes; `scripts/synthetic_e2e_qa.py` passes full folder→export→reopen cycle.
 

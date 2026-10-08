@@ -86,7 +86,8 @@ backend/.venv/bin/python scripts/synthetic_e2e_qa.py
 
 Generates synthetic smooth/shaky/mixed footage and runs the whole folder
 workflow in-process: create-from-folder, analysis, smooth-vs-shaky clip
-discrimination, timeline edit, all three exports (relative media paths), and
+discrimination, timeline edit, all three exports (absolute `file://` media
+URLs), and
 close/reopen state restore. Takes about a minute.
 
 ## Frontend (Electron + React + Vite)

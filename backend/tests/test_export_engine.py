@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+from urllib.parse import quote
 
 from src.export_engine import (
     generate_resolve_xml,
@@ -189,16 +190,12 @@ def test_generate_fcpxml_emits_retime_for_suggested_speed():
     ]
 
 
-def test_generate_fcpxml_can_reference_assets_relative_to_export_dir(tmp_path):
-    project_folder = tmp_path / "footage"
-    export_dir = project_folder / "exports" / "fcp"
-    source_video = project_folder / "DJI_0001.MP4"
-    export_dir.mkdir(parents=True)
-    source_video.write_bytes(b"video")
+def test_generate_fcpxml_links_media_by_absolute_file_url(tmp_path):
+    source_video = tmp_path / "footage" / "Māris clip.MP4"
     videos = {
         "file-1": {
             "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
+            "file_name": source_video.name,
             "file_path": str(source_video),
             "metadata": {"duration_sec": 120, "fps": 30, "resolution": [3840, 2160]},
         }
@@ -207,18 +204,18 @@ def test_generate_fcpxml_can_reference_assets_relative_to_export_dir(tmp_path):
         {
             "clip_id": "clip-1",
             "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
+            "file_name": source_video.name,
             "start_sec": 10.0,
             "end_sec": 14.0,
             "duration_sec": 4.0,
         }
     ]
 
-    root = ET.fromstring(generate_fcpxml("Drone MVP", clips, videos, media_base_path=export_dir))
+    root = ET.fromstring(generate_fcpxml("Drone MVP", clips, videos))
 
     asset = root.find(".//asset")
     assert asset is not None
-    assert asset.attrib["src"] == "../../DJI_0001.MP4"
+    assert asset.attrib["src"] == f"file://{quote(str(source_video.absolute()))}"
 
 
 def test_generate_fcpxml_uses_source_fps_and_vertical_display_dimensions():
@@ -602,19 +599,15 @@ def test_generate_resolve_xml_defines_each_source_file_once():
     assert files[0].attrib["id"] == files[2].attrib["id"]
     assert files[0].find("pathurl") is not None
     assert len(files[2]) == 0  # repeat reference carries only the id
-    assert files[0].find("pathurl").text == "file:///Users/me/footage/DJI_0001.MP4"
+    assert files[0].find("pathurl").text == "file://localhost/Users/me/footage/DJI_0001.MP4"
 
 
-def test_generate_resolve_xml_uses_relative_pathurl_for_folder_projects(tmp_path):
-    project_folder = tmp_path / "footage"
-    export_dir = project_folder / "exports" / "davinci"
-    export_dir.mkdir(parents=True)
-    source_video = project_folder / "DJI_0001.MP4"
-    source_video.write_bytes(b"video")
+def test_generate_resolve_xml_pathurl_is_absolute_localhost_url(tmp_path):
+    source_video = tmp_path / "footage" / "Māris clip.MP4"
     videos = {
         "file-1": {
             "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
+            "file_name": source_video.name,
             "file_path": str(source_video),
             "metadata": {"duration_sec": 120, "fps": 30, "resolution": [3840, 2160]},
         }
@@ -623,20 +616,18 @@ def test_generate_resolve_xml_uses_relative_pathurl_for_folder_projects(tmp_path
         {
             "clip_id": "clip-1",
             "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
+            "file_name": source_video.name,
             "start_sec": 10.0,
             "end_sec": 14.0,
             "duration_sec": 4.0,
         }
     ]
 
-    root = ET.fromstring(
-        generate_resolve_xml("Drone MVP", clips, videos, media_base_path=export_dir).split("?>", 1)[1]
-    )
+    root = ET.fromstring(generate_resolve_xml("Drone MVP", clips, videos).split("?>", 1)[1])
 
     pathurl = root.find(".//clipitem/file/pathurl")
     assert pathurl is not None
-    assert pathurl.text == "../../DJI_0001.MP4"
+    assert pathurl.text == f"file://localhost{quote(str(source_video.absolute()))}"
 
 
 # --- A2.5: Speed + Transform in exports ------------------------------------

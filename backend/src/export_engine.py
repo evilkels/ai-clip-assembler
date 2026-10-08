@@ -1,4 +1,3 @@
-import os
 import math
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -62,10 +61,8 @@ def path_to_file_url(path: str) -> str:
     return "file://" + quote(str(Path(path).absolute()))
 
 
-def path_to_asset_src(path: str, media_base_path: Optional[Path] = None) -> str:
-    if media_base_path is None:
-        return path_to_file_url(path)
-    return Path(os.path.relpath(Path(path).resolve(), media_base_path.resolve())).as_posix()
+def path_to_fcp7_pathurl(path: str) -> str:
+    return "file://localhost" + quote(str(Path(path).absolute()))
 
 
 def effective_duration(clip: dict) -> float:
@@ -246,13 +243,8 @@ def generate_resolve_xml(
     title: str,
     clips: List[dict],
     videos_by_id: Dict[str, dict],
-    media_base_path: Optional[Path] = None,
 ) -> str:
-    """FCP7 XMEML v5 timeline for DaVinci Resolve's XML importer.
-
-    With media_base_path set, pathurl is written relative to the export
-    directory so the project folder stays portable (QA Flow C).
-    """
+    """FCP7 XMEML v5 timeline for DaVinci Resolve's XML importer."""
     fps = choose_timeline_fps(videos_by_id)
     width, height = timeline_dimensions(videos_by_id)
     total_frames = seconds_to_frames(sum(effective_duration(clip) for clip in clips), fps)
@@ -320,11 +312,7 @@ def generate_resolve_xml(
             defined_file_ids.add(file_id)
             ET.SubElement(file_element, "name").text = clip["file_name"]
             pathurl = ET.SubElement(file_element, "pathurl")
-            pathurl.text = (
-                path_to_asset_src(source["file_path"], media_base_path)
-                if source.get("file_path")
-                else clip["file_name"]
-            )
+            pathurl.text = path_to_fcp7_pathurl(source["file_path"])
             append_xmeml_rate(file_element, fps)
             ET.SubElement(file_element, "duration").text = str(
                 seconds_to_frames(source_duration, fps)
@@ -410,7 +398,6 @@ def generate_fcpxml(
     title: str,
     clips: List[dict],
     videos_by_id: Dict[str, dict],
-    media_base_path: Optional[Path] = None,
 ) -> str:
     fcpxml = ET.Element("fcpxml", {"version": "1.10"})
     resources = ET.SubElement(fcpxml, "resources")
@@ -434,7 +421,7 @@ def generate_fcpxml(
         asset_attributes = {
             "id": f"asset-{file_id}",
             "name": video["file_name"],
-            "src": path_to_asset_src(video["file_path"], media_base_path),
+            "src": path_to_file_url(video["file_path"]),
             "duration": seconds_to_fcpx_duration(duration),
             "hasVideo": "1",
         }

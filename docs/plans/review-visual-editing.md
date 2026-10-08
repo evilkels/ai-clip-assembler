@@ -211,7 +211,7 @@ agent-operable-timeline was marked superseded by this plan on 2026-10-08.
   sheets per call; the backend logs `review turn: N calls, M sheets, K bytes`.
   Done when `test_turn_never_exceeds_four_calls` passes with a fake that always
   asks to look and always fails.
-- [ ] 3.7 Stop minting Versions: remove the `version_set` branch from
+- [ ] 3.7 (after H3) Stop minting Versions: remove the `version_set` branch from
   `run_review_turn`, `deterministic_versions`, `_FALLBACK_RECIPES`,
   `_validate_versions`; delete their tests. Done when no test or source in
   `backend/` references `deterministic_versions` and `test_api.py` asserts a
@@ -244,7 +244,8 @@ agent-operable-timeline was marked superseded by this plan on 2026-10-08.
 - [ ] 4.5 `e2e/review-ai-turn.spec.ts` with 038's fake engine fixture: ask for
   a 40-second story cut → fake fails once then fixes → card shows the 4.1
   strings → Preview plays → Apply → Timeline route shows the items → one Undo
-  restores the previous item list and revision. Done when it passes in
+  restores the previous item list (the revision number goes up; undo is a
+  new revision, `TimelineController.undo`). Done when it passes in
   `.github/workflows/test.yml` and is listed in `frontend/e2e/README.md`.
 - [ ] 4.6 Verify Apply is one undo step (it is:
   `test_accepting_a_script_proposal_is_one_revision_and_one_undo`,
@@ -253,7 +254,7 @@ agent-operable-timeline was marked superseded by this plan on 2026-10-08.
 
 ## Phase 5: Retire Versions, document
 
-- [ ] 5.1 Frontend: delete `VersionGallery`, `VersionCard`,
+- [ ] 5.1 (after H3) Frontend: delete `VersionGallery`, `VersionCard`,
   `VersionApplyDialog`, `state/versionState.ts`, `types/version.ts`, the
   "Suggested cuts" zone and "Refresh suggestions" in `routes/Review.tsx`;
   rename `VersionPlayer` → `SequencePlayer` (props `items`, `title`) and
@@ -261,7 +262,7 @@ agent-operable-timeline was marked superseded by this plan on 2026-10-08.
   and its README row. Done when `npm run lint`, `npm run typecheck` and
   `npm run test:e2e` pass with no `Version` identifier left in
   `frontend/src/renderer/src` (`grep -rn "VersionSet\|CreativeVersion"` empty).
-- [ ] 5.2 Backend: remove `CreativeVersionItem`, `CreativeVersion`,
+- [ ] 5.2 (after H3) Backend: remove `CreativeVersionItem`, `CreativeVersion`,
   `VersionSet` from `models.py`, `review_context_fingerprint` from
   `review_state.py`; the review-session loader drops `payload.version_set`
   from old messages and bumps `schema_version` to 3; `gen:types` regenerated.
@@ -285,3 +286,7 @@ agent-operable-timeline was marked superseded by this plan on 2026-10-08.
 - [ ] H2 The same with ChatGPT as the Active Provider, including one run that
   hits the usage limit, to confirm the failure message and that earlier
   Proposals survive.
+- [ ] H3 Confirm that the "Suggested cuts" Versions gallery is retired (D7).
+  Tasks 3.7, 5.1 and 5.2 wait for this answer; if the answer is no, they are
+  rewritten to keep Versions as Editor-requested alternatives and never mint
+  them on a failed or chat-only turn.

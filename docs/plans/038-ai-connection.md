@@ -84,7 +84,14 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
   500-char sanitised detail), `cancelled`. `AiFailure` =
   `{kind, provider, message, action, detail?, resets_at?, retry_after_sec?}`
   where `action` is one of `open_providers`, `sign_in`, `retry`, `wait`,
-  `none`. The code shows `incompatible_version`, `network`, `engine_error` and
+  `none`. Two more kinds come from the gate (D15), not from an engine:
+  `ai_not_connected` (AI Access not granted or no Active Provider;
+  `provider` null; action `open_providers`; message "No AI connected yet.
+  Connect Claude or ChatGPT in Settings › AI.") and `ai_off_for_project`
+  (`provider` = the Active Provider; action `open_providers`; message "AI is
+  off for this project. Turn it on in Settings › AI."). An Active Provider
+  that is not ready yields that engine's own failure (`not_installed`,
+  `incompatible_version` or `signed_out`). The code shows `incompatible_version`, `network`, `engine_error` and
   `cancelled` are needed beyond the ADR's six (version check in
   `reviewModelAuth.ts`, `_NETWORK_MARKERS`, non-zero exits, analysis cancel).
 - **D4 Messages** live in `ai_engines/messages.py`, Provider-named, format
@@ -107,6 +114,20 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
   run keeps the rule-based ranking, Effective Harness `manual`, and carries the
   `AiFailure` in `metadata.per_video[].failure` instead of a warning string.
   Scoring is still all-or-nothing per run; it stops at the first failure.
+- **D6b Batched and resumable scoring** (ADR 0008). One scoring request
+  carries up to **5 Candidate Clips** with up to 4 Frame Samples each (≤ 20
+  images; D7's scoring limit is per clip). Frames are staged as
+  `clip-K-frame-N.jpg` with K = 1..5 in request order, and the prompt lists
+  `K → clip label`; the reply schema is
+  `{"scores": [{"k": int, "visual_interest": number, "reason": string}]}`.
+  Scores are matched by `k`; a missing or duplicate `k` leaves that clip
+  unscored and it is retried once in the next batch, then kept rule-based.
+  Each scored clip is cached as today (keyed per Candidate Clip and its frame
+  set, plus the Active Provider). After a failure the clips already scored
+  stay cached and applied; `POST /projects/{id}/ai-scoring/resume` scores only
+  the uncached Candidate Clips from the existing library (no FFmpeg, no
+  vidstab), and the Import page shows **Finish AI scoring (N clips left)**
+  next to the failure message.
 - **D7 Payload lockdown** is one function, `payload.build(request)`, and one
   invariant tested directly: an `AiRequest` is `{images: list[Path], text:
   str, schema: dict, timeout_sec: float}`; every image must be a `.jpg` under
@@ -137,7 +158,16 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
   line's `structured_output`; `rate_limit_event` lines and the assistant
   `error` field (`authentication_failed`, `rate_limit`, `billing_error`,
   `overloaded`) map to D3.
-- **D9 Codex invocation** is `codex app-server` over stdio (one process per
+- **D9 Codex invocation** is `codex app-server` started with every tool-bearing
+  feature off and no user MCP servers:
+  `--disable shell_tool --disable unified_exec --disable browser_use
+  --disable browser_use_external --disable computer_use --disable apps
+  --disable plugins --disable multi_agent --disable hooks --disable
+  image_generation --disable code_mode_host --disable skill_search --disable
+  skill_mcp_dependency_install --disable in_app_browser --disable
+  in_app_local_automation -c mcp_servers={} -c web_search="disabled"`
+  (feature names from `codex features list` on 0.159.3; a name the installed
+  version does not know is dropped after 3.1 checks it). It runs over stdio (one process per
   request, not a daemon; `--no-daemon` is not needed for app-server) with the
   JSON-RPC methods verified in `codex app-server generate-json-schema` of
   0.159.3: `initialize` {clientInfo}, `initialized`, `thread/start`
@@ -150,8 +180,9 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
   `item/permissions/requestApproval` and `tool/requestUserInput` is answered
   with the decline decision, and the first `item/started` of type
   `commandExecution` makes the client send `turn/interrupt` and report
-  `unusable_reply` — the read-only sandbox can still read any file, so a
-  command is never allowed to run. `codex exec --json` is rejected because it
+  `unusable_reply` — the read-only sandbox can still read any file, so the
+  tools are switched off first and a command that still starts is never
+  allowed to finish (second guard, not the boundary). `codex exec --json` is rejected because it
   runs model-chosen commands with no client veto. Model: none passed (the
   Editor's Codex default); `effort: "low"` for scoring requests (one call per
   Candidate Clip, so cost matters most there) and the engine default for
@@ -218,8 +249,12 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
   (`claude-code-vm/` is skipped and any file starting with `\x7fELF` is
   rejected); ChatGPT → `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`,
   then `/Applications/Codex.app/Contents/Resources/codex`. A candidate counts
-  only when `--version` matches `^(\d+\.\d+\.\d+)` and the vendor word
-  ("Claude Code" / "codex-cli"). `EngineStatus` =
+  only when its `--version` output matches its engine's parser: Claude
+  `^(\d+\.\d+\.\d+) \(Claude Code\)$` (e.g. `2.1.293 (Claude Code)`),
+  Codex `^codex-cli (\d+\.\d+\.\d+)(-[0-9A-Za-z.]+)?$` (e.g.
+  `codex-cli 0.159.3`, `codex-cli 0.162.0-alpha.2`; a pre-release counts as
+  its base version). The discovery tests use these exact strings as fixture
+  output. `EngineStatus` =
   `{provider, installed, version, path, source: "chosen" | "path" | "desktop_app",
   signed_in, ready, failure?}` where `ready = installed and version ok and signed_in`.
 - **D17 Setup surfaces.** `WelcomeWizard.tsx`, shown on first launch while
@@ -297,17 +332,18 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
   decision literal for each approval request (schema lists `decision`
   objects; the exact deny value is to be read from `CommandExecutionRequestApprovalResponse.json`).
 - Whether `codex app-server` honours `approvalPolicy: "untrusted"` for `cat`-class
-  commands or runs them unprompted; if it runs them, 3.4's interrupt-on-command
+  commands or runs them unprompted; if it runs them, 3.5's interrupt-on-command
   rule is the only guard and the plan notes it.
 
 ## Phase 1: One AI seam with typed failures (on today's Pi engine)
 
 - [ ] 1.1 Create `backend/src/ai_engines/` with `types.py` (`AiRequest`, `AiReply`, `AiFailure`, `AiFailureKind` per D3), `engine.py` (`AiEngine` protocol) and `pi.py` (`PiEngine.run` wrapping today's `_call_pi_cli` command line). Done when `backend/tests/test_ai_engine_pi.py` runs the fake `pi` fixture in each `ACA_FAKE_ENGINE` scenario and asserts the `AiFailureKind` it yields (`signed_out`, `usage_limit` with `resets_at`, `rate_limited`, `timed_out`, `unusable_reply`, `engine_error`, `not_installed` for a missing path).
 - [ ] 1.2 Add `ai_engines/messages.py` with the D4 copy and `format_failure(failure, now, tz)`. Done when `test_ai_messages.py` checks each kind for both Provider names, the three reset-time forms, and that no message contains "harness", "Pi", "consent" or "model".
-- [ ] 1.3 Route scoring through the seam: `enhance_clips_with_pi_cli` becomes `enhance_clips(engine, …)` in a new `backend/src/ai_scoring.py` (cache, blend and re-rank code moved as is), and a failure writes `AiFailure` to `metadata.per_video[].failure` with Effective Harness `manual` (D6). Done when `test_analysis_service.py` shows a `usage_limit` run keeps the rule-based ranking, records the failure dict, and `test_api.py::test_analyze_…` exposes `metadata.per_video[].failure` in the `/analyze` response and on reopen.
-- [ ] 1.4 Route Review turns through the seam: `default_review_agent` becomes `engine_review_agent(engine)` returning either `AiReply` or `AiFailure`; `run_review_turn` stores a failed turn as an agent message with `payload.failure` and no `version_set` (D5). Done when `test_review_agent.py` asserts a failed turn mints no Versions, the previous message's `version_set` remains the latest, and the stored text equals `format_failure(...)`.
-- [ ] 1.5 Carry the failure through the client: add `failure?: AiFailure` to `ReviewMessage.payload` and `metadata.per_video[]` types in `frontend/src/renderer/src/api/client.ts` (regenerate `types/generated.ts`), render it in `ReviewChatPanel.tsx` as a `chat-failure` card with the message and an action button mapped from `failure.action` (`open_providers` → Settings › AI, `sign_in` → Settings › AI, `retry` → the existing Retry), and replace the Harness Fallback notice text in `routes/Review.tsx` with the same message. Done when `e2e/review-ai-failures.spec.ts` (stubbed) shows the ChatGPT limit message with "resets at", keeps the earlier Versions visible, and the Import notice names the Provider.
-- [ ] 1.6 Diagnostics use the seam: `_ping_review_model` becomes `engine.run(AiRequest(images=[], text="Reply with the single word OK"))` and returns `{reachable, failure?, elapsed_sec}`; `_reachability_guidance` and the `_*_MARKERS` tables are deleted in favour of `format_failure`. Done when `test_api.py::test_diagnostics_*` cover reachable, `signed_out` and `timed_out`, and `DiagnosticsTabPanel.tsx` renders `failure.message` and `failure.action` (E2E in `settings-connections.spec.ts` updated).
+- [ ] 1.3 Route scoring through the seam, batched per D6b: `enhance_clips_with_pi_cli` becomes `enhance_clips(engine, …)` in a new `backend/src/ai_scoring.py` (cache, blend and re-rank code moved as is), and a failure writes `AiFailure` to `metadata.per_video[].failure` with Effective Harness `manual` (D6). Done when `test_analysis_service.py` shows a `usage_limit` run keeps the rule-based ranking, records the failure dict, and `test_api.py::test_analyze_…` exposes `metadata.per_video[].failure` in the `/analyze` response and on reopen; `test_ai_scoring.py` shows 12 clips take 3 engine calls, a reply missing one `k` leaves only that clip for the next batch, and a `usage_limit` on call 2 keeps call 1's five scores applied and cached.
+- [ ] 1.4 Add `POST /projects/{id}/ai-scoring/resume` and the **Finish AI scoring (N clips left)** button (D6b). Done when `test_api.py::test_ai_scoring_resume_scores_only_uncached_clips` shows the fake engine receives only the uncached clips and `run_vidstabdetect`/`extract_frames` are never called, and `e2e/review-ai-failures.spec.ts` (stubbed) shows the button with the right count after a stubbed usage-limit analysis. (after 1.3)
+- [ ] 1.5 Route Review turns through the seam: `default_review_agent` becomes `engine_review_agent(engine)` returning either `AiReply` or `AiFailure`; `run_review_turn` stores a failed turn as an agent message with `payload.failure` and no `version_set` (D5). Done when `test_review_agent.py` asserts a failed turn mints no Versions, the previous message's `version_set` remains the latest, and the stored text equals `format_failure(...)`.
+- [ ] 1.6 Carry the failure through the client: add `failure?: AiFailure` to `ReviewMessage.payload` and `metadata.per_video[]` types in `frontend/src/renderer/src/api/client.ts` (regenerate `types/generated.ts`), render it in `ReviewChatPanel.tsx` as a `chat-failure` card with the message and an action button mapped from `failure.action` (`open_providers` → Settings › AI, `sign_in` → Settings › AI, `retry` → the existing Retry), and replace the Harness Fallback notice text in `routes/Review.tsx` with the same message. Done when `e2e/review-ai-failures.spec.ts` (stubbed) shows the ChatGPT limit message with "resets at", keeps the earlier Versions visible, and the Import notice names the Provider.
+- [ ] 1.7 Diagnostics use the seam: `_ping_review_model` becomes `engine.run(AiRequest(images=[], text="Reply with the single word OK"))` and returns `{reachable, failure?, elapsed_sec}`; `_reachability_guidance` and the `_*_MARKERS` tables are deleted in favour of `format_failure`. Done when `test_api.py::test_diagnostics_*` cover reachable, `signed_out` and `timed_out`, and `DiagnosticsTabPanel.tsx` renders `failure.message` and `failure.action` (E2E in `settings-connections.spec.ts` updated).
 
 ## Phase 2: Payload lockdown
 
@@ -322,13 +358,14 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
 - [ ] 3.1 [research] Probe the assumed facts on the installed engines, read-only, and record the answers as sub-bullets here: (a) the stream-json `user` message image block accepted by `claude -p --input-format stream-json` (try `{type: "image", source: {type: "base64", media_type: "image/jpeg", data}}`), (b) whether `structured_output` is on the stream-json `result` line, (c) the `rate_limit_event` shape (`claude -p --output-format stream-json --verbose` on a trivial prompt), (d) whether `claude auth login` / `codex login` finish with stdin closed and no TTY (use `CLAUDE_CONFIG_DIR` / `CODEX_HOME` pointing at a temp dir so the real login is untouched; cancel at the browser), (e) the exact decline value in `CommandExecutionRequestApprovalResponse.json` and the item notification for a command start, (f) whether `approvalPolicy: "untrusted"` prompts for `cat`. Done when each of (a)–(f) has a one-line answer with the command used, and D8–D10 are amended in the same PR if an answer differs.
 - [ ] 3.2 Generalise the login-shell probe: rename `frontend/src/main/piExecutable.ts` to `userShellPath.ts` exporting `captureLoginShellPath()` (the `PATH` of `/bin/zsh -lic`), pass it to the backend as `ACA_LOGIN_SHELL_PATH`, and delete the `pi`-specific candidate list. Done when `tests/main/userShellPath.test.ts` covers the marker parsing and the fallback to `process.env.PATH`, and `backendLifecycle.test.ts` shows the variable in the spawn env.
 - [ ] 3.3 Add `ai_engines/discovery.py` (D16) and `GET /ai/connection` returning `{active_provider, ai_access_granted_at, providers: {claude: EngineStatus, chatgpt: EngineStatus}, usage?: …}`. Done when `test_ai_discovery.py` builds fixture trees under `tmp_path` (chosen path wins over PATH; PATH wins over the desktop app; newest nvm version first; `claude-code-vm` and an ELF decoy are skipped; a missing `--version` word is "not installed"; a version below minimum is `incompatible_version`) and `/ai/connection` reflects them with `ACA_AI_ENGINE_SEARCH_ROOTS`.
-- [ ] 3.4 Add `ai_engines/claude_code.py` per D8 and `ai_engines/codex.py` per D9 (JSON-RPC client with request ids, notification loop, approval decline, interrupt-on-command, `account/rateLimits/read`). Done when `test_ai_engine_claude.py` and `test_ai_engine_codex.py` run every `ACA_FAKE_ENGINE` scenario against the fake fixtures and assert the `AiFailureKind` (including `usage_limit` with `resets_at` from `usageLimitExceeded` + rate limits for Codex, `signed_out` from `unauthorized` / `authentication_failed`, `unusable_reply` for `runs_command`), the parsed `AiReply` for `ok`, and that the argv/JSON-RPC params match D8/D9 verbatim.
-- [ ] 3.5 Add sign-in and re-check routes: `POST /ai/connection/check` (re-run discovery and status), `POST /ai/connection/sign-in {provider}` (D10; returns `{state: "waiting"}` and later statuses show `signed_in`), `POST /ai/connection/sign-in/cancel`, `PUT /ai/connection/engine-path {provider, path | null}`. Done when `test_api.py::test_ai_sign_in_*` show the fake login command writing its marker turns `signed_in` true on the next check, a 300 s deadline reports `timed_out`, cancel kills the child, and a chosen path that fails `--version` is rejected with 422 and leaves the setting unchanged.
-- [ ] 3.6 Wire the engines into the seam: `get_engine(active_provider)` returns the Claude or Codex engine; scoring, Review and Diagnostics call it; `ai_model_override` is passed through. Done when `test_api.py::test_analyze_with_fake_claude` and `…_fake_codex` enhance clips, and `test_review_turn_with_fake_codex_usage_limit` returns the ChatGPT message with the reset time taken from the fake's rate-limit snapshot.
+- [ ] 3.4 Prove the boundary on the real engines: add `scripts/ai_boundary_probe.py`, which writes a canary file with a random token under `$TMPDIR`, then runs one Claude and one Codex request with the exact D8 and D9 command lines as subprocesses (scratch cwd, D8 env) asking the model to read that file and quote it. Done when, run locally on a Mac with both engines signed in, the output shows for each engine that the token is absent from the reply and no tool or command item was started, and the run's output is pasted as a sub-bullet here. If either engine reads the canary, stop and report to the orchestrator before 3.5 (the fallback is a `sandbox-exec` profile denying file reads outside the scratch dir and the engine's own install and auth paths). (after 3.1)
+- [ ] 3.5 Add `ai_engines/claude_code.py` per D8 and `ai_engines/codex.py` per D9 (JSON-RPC client with request ids, notification loop, approval decline, interrupt-on-command, `account/rateLimits/read`). Done when `test_ai_engine_claude.py` and `test_ai_engine_codex.py` run every `ACA_FAKE_ENGINE` scenario against the fake fixtures and assert the `AiFailureKind` (including `usage_limit` with `resets_at` from `usageLimitExceeded` + rate limits for Codex, `signed_out` from `unauthorized` / `authentication_failed`, `unusable_reply` for `runs_command`), the parsed `AiReply` for `ok`, and that the argv/JSON-RPC params match D8/D9 verbatim.
+- [ ] 3.6 Add sign-in and re-check routes: `POST /ai/connection/check` (re-run discovery and status), `POST /ai/connection/sign-in {provider}` (D10; returns `{state: "waiting"}` and later statuses show `signed_in`), `POST /ai/connection/sign-in/cancel`, `PUT /ai/connection/engine-path {provider, path | null}`. Done when `test_api.py::test_ai_sign_in_*` show the fake login command writing its marker turns `signed_in` true on the next check, a 300 s deadline reports `timed_out`, cancel kills the child, and a chosen path that fails `--version` is rejected with 422 and leaves the setting unchanged.
+- [ ] 3.7 Wire the engines into the seam: `get_engine(active_provider)` returns the Claude or Codex engine; scoring, Review and Diagnostics call it; `ai_model_override` is passed through. Done when `test_api.py::test_analyze_with_fake_claude` and `…_fake_codex` enhance clips, and `test_review_turn_with_fake_codex_usage_limit` returns the ChatGPT message with the reset time taken from the fake's rate-limit snapshot.
 
 ## Phase 4: AI Access, Active Provider and AI: On / Off
 
-- [ ] 4.1 Add the D14 keys to `app_settings.py` (`EDITABLE_KEYS` and validation: `active_provider` ∈ {claude, chatgpt, null}; `engine_paths` values absolute or null) and `backend/src/ai_connection.py` with `gate(project_id)` (D15). Done when `test_app_settings.py` round-trips the new keys and `test_ai_connection.py` returns the right `AiFailure` for: access not granted, no Active Provider, provider not ready, project off; and `None` when all four hold.
+- [ ] 4.1 Add the D14 keys to `app_settings.py` (`EDITABLE_KEYS` and validation: `active_provider` ∈ {claude, chatgpt, null}; `engine_paths` values absolute or null) and `backend/src/ai_connection.py` with `gate(project_id)` (D15). Done when `test_app_settings.py` round-trips the new keys and `test_ai_connection.py` returns `ai_not_connected` (provider null) for access not granted and for no Active Provider, the engine's own kind (`signed_out` with the provider) for a provider that is not ready, `ai_off_for_project` for project off, and `None` when all four hold.
 - [ ] 4.2 Add `POST /ai/connection/connect {provider}` (sets `active_provider` and `ai_access_granted_at`; 409 if the provider is not ready), `POST /ai/connection/disconnect`, `PUT /ai/connection/active-provider {provider}` (409 unless ready). Done when `test_api.py::test_ai_connect_*` cover each status code and show Disconnect clears both keys.
 - [ ] 4.3 Migrate the manifest (D15): `PROJECT_SCHEMA_VERSION = 2`, `ai_enabled: bool = True`, the loader accepts version 1 and rewrites it, `pi_agent` maps to `ai` (D13), and `PUT /projects/{id}/ai-enabled` replaces the consent route. Done when `test_project_store.py` opens a saved v1 manifest with `cloud_ai_consent: false` and `harness: pi_agent` and gets `schema_version 2`, `ai_enabled true`, `harness ai`, with the file rewritten; and `test_api.py` shows the new route persists and survives reopen.
 - [ ] 4.4 Replace the consent checks with the gate: `/analyze` with `harness_id == "ai"`, `_review_inputs`, and `/diagnostics` call `gate()`; the Review stub for a gated project returns `payload.failure` with `action: "open_providers"` and the text "AI is off for this project. Turn it on in Settings › AI." or "No AI connected yet. Connect Claude or ChatGPT in Settings › AI." Done when `test_api.py` shows a project with `ai_enabled false` never spawns the fake engine for scoring, Review or Diagnostics (the fake's call log stays empty), and the stub text matches.
@@ -345,7 +382,7 @@ in the selection bar) stays in 031 but takes its trigger label from D13.
 
 ## Phase 6: Remove Pi
 
-- [ ] 6.1 Delete `backend/src/pi_cli_harness.py`, `ai_engines/pi.py`, `backend/tests/test_pi_cli_harness.py`, `test_ai_engine_pi.py`, the `pi` fixture, `scripts/spike_pi_scaling_benchmark.py`, the `PI_*` settings keys and `/harnesses` entries, `load_dotenv` of `PI_*`, and `.env.example` lines. Done when `grep -ri "pi_agent\|pi_bin\|PI_PROVIDER\|earendil" backend scripts .env.example` returns nothing and `npm run test:backend` passes.
+- [ ] 6.1 Delete `backend/src/pi_cli_harness.py`, `ai_engines/pi.py`, `backend/tests/test_pi_cli_harness.py`, `test_ai_engine_pi.py`, the `pi` fixture, `scripts/spike_pi_scaling_benchmark.py`, the `PI_*` settings keys and `/harnesses` entries, `load_dotenv` of `PI_*`, and `.env.example` lines. Done when `grep -ri "pi_agent\|pi_bin\|PI_PROVIDER\|earendil" backend scripts .env.example` returns only the D13 `pi_agent` → `ai` manifest mapping in `backend/src/project_store.py` and its regression fixture in `backend/tests/test_project_store.py` and `npm run test:backend` passes.
 - [ ] 6.2 Delete `frontend/src/main/reviewModelAuth.ts`, `frontend/src/shared/reviewModelAuth.ts`, `tests/main/reviewModelAuth.test.ts`, `piExecutable.test.ts`, the `review-model-auth:*` IPC handlers and preload methods, `PiRoutingSettings` in `SettingsTabPanel.tsx`, and the `@earendil-works/*` dependencies. Done when `grep -ri "pi-ai\|pi-coding-agent\|review-model-auth\|reviewModel" frontend/src frontend/tests frontend/e2e frontend/package.json` returns nothing and `npm run lint && npm run typecheck && npm run test:main && npm run test:e2e` pass.
 - [ ] 6.3 Verify the packaged app no longer needs Pi: `frontend/scripts/stage-runtime-tools.mjs` and `verify-packaged-backend.mjs` reference no `pi`, and the Diagnostics panel on a Mac with no engines shows "not installed" guidance with download links instead of `npm install` steps. Done when `npm run dist` (local) produces a build whose `Resources` contain no Pi package and the manual check is recorded as a sub-bullet.
 

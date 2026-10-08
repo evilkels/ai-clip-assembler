@@ -295,11 +295,13 @@ Same script and columns; the per-file column lists the 13 counts in
     saved, then `POST /projects/{id}/draft` with `{"format": "long"}`.
   - Assert `GET /projects/{id}/timeline/document` has profile
     `long_scenic`, the draft's `target_duration_sec`, and item
-    `source_clip_id`s equal to the draft response's clips in order; after a
-    simulated reload (drop the in-memory project and controller, load from
-    disk, as the existing reload tests do) the document is the same; one
-    `undo` restores the previous document.
-- [ ] 5.2 Route the draft through the operations core. Done when 5.1 and
+    `source_clip_id`s equal to the draft response's clips in order, and one
+    `undo` on the live controller restores the previous items. A separate
+    test, `test_draft_format_switch_survives_reload`, drops the in-memory
+    project and controller, loads from disk (as the existing reload tests
+    do), and asserts the switched document is what loads (reload starts a
+    fresh Undo History, so undo is not checked there).
+- [ ] 5.2 Route the draft through the operations core. Done when both 5.1 tests and
   `tests/test_api.py` pass. (after 5.1)
   - In `regenerate_draft`, after `build_draft_timeline`, get the controller
     (`TimelineLifecycle.get_controller`) and call `apply_batch` with three

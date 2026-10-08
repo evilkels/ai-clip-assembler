@@ -10,7 +10,7 @@ for v0.4.0.
 The other release checks live in their owning plans: clean-Mac DMG →
 [self-contained-runtime-tools](self-contained-runtime-tools.md) H1; NLE
 import and moved project folder → [032](032-valid-fcpxml-and-nle-verification.md)
-Phase 5; real footage →
+H2–H4; real footage →
 [drone-workflow-qa-flows](drone-workflow-qa-flows.md).
 
 ## Human tasks

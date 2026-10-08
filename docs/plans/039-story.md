@@ -163,7 +163,7 @@ has one ruler and one clip track; exports carry items only.
 - [ ] 1.5 Undo covers markers and sections through the unchanged controller.
   Done when `test_api.py::test_marker_and_section_ops_undo_and_redo` passes
   (add marker, set section, undo twice, redo twice, document equal at each
-  step) and the MCP tool list exposes the six Operations
+  step ignoring `revision`, which undo and redo advance) and the MCP tool list exposes the six Operations
   (`test_mcp_server.py::test_marker_operations_are_listed`).
 - [ ] 1.6 `_describe` lines for the six Operations and the `(n markers
   dropped)` suffix on trims (D2, D8). Done when

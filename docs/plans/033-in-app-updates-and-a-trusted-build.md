@@ -83,19 +83,12 @@ notarizing **without** auto-update pays the same 99 USD and the same per-release
 notarization wait, skips Phases 2–5 entirely, and still removes the Privacy &
 Security prompt. Most of the user-visible benefit for a fraction of the work.
 
-## Phase 0 — Decide whether to buy in (owner)
+## Phase 0 — Decided (2026-10-08)
 
-- [ ] 0.1 Decide, and record the reason here:
-      - *Sign + notarize + auto-update* — 99 USD a year, a certificate to store
-        as a CI secret, and a longer, more fragile release. Buys a normal
-        desktop-app install and update.
-      - *Sign + notarize only* — same 99 USD, kills the Privacy & Security
-        prompt, keeps `app-wizard.sh` as the installer. Most of the benefit,
-        none of Phases 2–5.
-      - *Neither* — keep today's behaviour and stop maintaining this plan.
-      Note that [going-public-codex-flow](done/going-public-codex-flow.md) already
-      assumes a signed build in its phase-1 trust work, so this decision is not
-      only about convenience.
+The roadmap decides *sign + notarize + auto-update* (milestone 7: "opens on a
+clean Mac with no Privacy & Security detour; updates install themselves").
+Apple Developer Program enrollment is the owner's (H1) and comes before
+Phase 1.
 
 ## Phase 1 — Gate: a build macOS opens without being asked twice
 
@@ -103,12 +96,11 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
       `CSC_KEY_PASSWORD`; hardened runtime enabled; entitlements for the nested
       Python and FFmpeg binaries.
 - [ ] 1.2 Notarize and staple in `build-dmg.yml`, both arches.
-- [ ] 1.3 Verify on a Mac that has never seen the app: `spctl -a -vv`
-      and `stapler validate` pass, and a double-click opens it with no Privacy &
-      Security detour. **If this step fails, stop — the rest of the plan is
-      unreachable.** This is the same clean-machine evidence
-      [self-contained-runtime-tools](self-contained-runtime-tools.md) H1 asks
-      for; do it once and cite it in both plans.
+- [ ] 1.3 Check the notarized DMGs from CI. Done when `spctl -a -vvv -t install`
+      reports `accepted` with `source=Notarized Developer ID` and
+      `xcrun stapler validate` passes for the arm64 and x64 DMGs, output pasted
+      as a sub-bullet here. The clean-Mac double-click check is H2; **if H2
+      fails, stop — the rest of the plan is unreachable.**
 
 ## Phase 2 — Publish an update feed, not just installers
 
@@ -204,3 +196,13 @@ each pass in this table; an unrecorded pass did not happen.
 - [Electron — autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater) — the same requirement stated against the API, and a pointer to Squirrel.Mac's server support for feed shape.
 - [electron-builder — Auto Update](https://www.electron.build/docs/features/auto-update/) and [macOS targets](https://www.electron.build/docs/mac/) — the mac default is `dmg` + `zip`; disabling `zip` breaks auto-update in the DMG build because `latest-mac.yml` cannot be generated.
 - [Apple Developer Program enrollment](https://developer.apple.com/programs/enroll/) — 99 USD per membership year, local currency at enrollment, waivers for nonprofit/education/government only. Checked 2026-09-11.
+
+## Human tasks
+
+- [ ] H1 Enroll in the Apple Developer Program (99 USD a year) and add the
+  Developer ID Application certificate to CI as `CSC_LINK` /
+  `CSC_KEY_PASSWORD`. Blocks Phase 1.
+- [ ] H2 On a Mac that has never seen the app, double-click the notarized DMG
+  build: it opens with no Privacy & Security detour. Same evidence as
+  [self-contained-runtime-tools](self-contained-runtime-tools.md) H1; do it
+  once and cite it in both plans. (after 1.3)

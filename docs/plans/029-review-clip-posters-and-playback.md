@@ -174,8 +174,8 @@ changed a model — stop and report.
   ```
   All must pass.
 
-- [x] **Step 4.2 — Visual baselines: no change needed. This step's premise was
-      wrong.** It predicted the `review-grid` fixtures would fail. They do not:
+- [x] 4.2 Visual baselines: no change needed. This step's premise was
+      wrong. It predicted the `review-grid` fixtures would fail. They do not:
       31/31 visual tests pass untouched. Opening
       `review-grid-1440x1000-light-chromium-darwin.png` shows why — the
       fixture's viewport stops at the "Your clips" filter row, so **the
@@ -294,17 +294,17 @@ ticking Step 4.3.
 
 ## Done criteria
 
-- [x] Grid view mounts zero `<video>` elements before any play interaction,
+- ✓ Grid view mounts zero `<video>` elements before any play interaction,
       asserted by E2E.
-- [x] Posters render from existing sampled frames with no new FFmpeg work.
-- [x] A clip with no sampled frames still renders and still plays.
-- [x] Previews play once by default; the loop toggle works, is labelled, and is
+- ✓ Posters render from existing sampled frames with no new FFmpeg work.
+- ✓ A clip with no sampled frames still renders and still plays.
+- ✓ Previews play once by default; the loop toggle works, is labelled, and is
       keyboard reachable.
-- [ ] Backend, ruff, lint, typecheck, `test:main` and the full Playwright suite
+- open: Backend, ruff, lint, typecheck, `test:main` and the full Playwright suite
       pass, including exact-count filter assertions at
       `review-browser-redesign.spec.ts:290-313`, which must remain unchanged.
-- [x] Visual baselines need no update — they never covered these cards (see Step 4.2).
-- [x] `generated.ts` unchanged.
+- ✓ Visual baselines need no update — they never covered these cards (see Step 4.2).
+- ✓ `generated.ts` unchanged.
 
 ## Stop and report instead of improvising if
 

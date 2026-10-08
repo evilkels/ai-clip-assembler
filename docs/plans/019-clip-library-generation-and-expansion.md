@@ -129,7 +129,9 @@ What the code does today (verified 2026-10-08):
 - **D10 State.** `api/client.ts` gets
   `findMoreClips(projectId, fileId, mode): Promise<FindMoreClipsResponse>`.
   `ReviewContext` gets `findMoreClips(fileId, mode): Promise<number>` and
-  `findMorePendingFileId: string | null`. On success it calls a new
+  `findMorePendingFileIds: ReadonlySet<string>` (one entry per running
+  request, so two rows can be busy at once and each clears only its own).
+  On success it calls a new
   `applyClipLibrary(clips, generationStats)` that replaces only `clips` and
   `generationStats` (unlike `setClips`, which resets decisions, order, trims
   and Timeline Items), then `refreshTimelineDocument()`.
@@ -143,12 +145,14 @@ What the code does today (verified 2026-10-08):
   not exist.
   - Fixture: 61 frames 0–60 s, smoothness 9.0 except 20–25 s at 4.0 (two
     steady runs), `scene_bounds={0: (0.0, 61.0)}`, preferences min 3 / max
-    10. `existing` is the library's ranges from `assemble_smooth_clips` on
-    the same frames.
+    10 / `max_clips_per_scene=1` (a cap of 2 for this 61 s Scene under 037
+    D4, so steady footage is left over). `existing` is the library's ranges
+    from `assemble_smooth_clips` on the same frames; compute the exact
+    expected ranges from that library when writing the test and assert them
+    literally.
   - `test_find_more_returns_up_to_three_ranges_outside_the_library`:
-    `mode="more"` → exactly three clips with ranges `(10, 19)` and `(56, 60)`
-    from the steady leftovers and `(19, 26)` tagged `fallback` from tier 2;
-    none overlaps `existing` or another result; `file_id` and `file_name` as
+    `mode="more"` → exactly three clips, steady leftovers first (untagged)
+    and tier 2 `fallback` clips only for the remainder; none overlaps `existing` or another result; `file_id` and `file_name` as
     given; a second call returns the same ids.
   - `test_find_more_tops_up_with_honest_fallback_windows`:
     `exclude=[(0.0, 20.0), (25.0, 61.0)]` (every steady second is taken) →
@@ -213,8 +217,10 @@ What the code does today (verified 2026-10-08):
     `No longer steady stretches in find-more-a.mp4 — try More clips` and the
     button is enabled again.
 - [ ] 2.2 Add the client call and Review state. Done when
-  `npm run typecheck` passes with `findMoreClips`, `findMorePendingFileId`
-  and `applyClipLibrary` in place per D10. (after 2.1)
+  `npm run typecheck` passes with `findMoreClips`, `findMorePendingFileIds`
+  and `applyClipLibrary` in place per D10, and the 2.1 spec gains
+  `Two rows can find more at once`: hold both routed requests, release the
+  second first, and assert only the second row's button is enabled again. (after 2.1)
 - [ ] 2.3 Add the strip and copy. Done when 2.1 passes and
   `npx playwright test e2e/review-browser-redesign.spec.ts` still passes.
   (after 2.2)

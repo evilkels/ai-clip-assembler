@@ -86,6 +86,11 @@ Two deliberate deviations, both recorded rather than silently taken:
   `metadata.used_ai` is still dropped by the client — that is
   [plan 030](done/030-truthful-ai-usage.md) Phase 3, Step 3.1. Wire the button there.
 
+> **Not ready for an implementer as a whole (2026-10-08).** Steps 2.7, 2.12,
+> 2.15 and Phase 7 leave UI choices to the design owner (see "Open questions
+> for the design owner" below). Implement only steps whose Design line fixes
+> the result; ask the orchestrator before starting one of those four.
+
 ## Phase 2 — Shell and Import element deltas
 
 The screens are on the right tokens and the right components, and still do not
@@ -159,7 +164,7 @@ Do these together and re-cut the baselines once, with Phase 3.
       (`Import.tsx:449-462`, `SourceVideoBrowser.tsx:191`), which is what makes
       that row read as crowded. Design puts the `6c` trigger in the selection
       bar behind a 1px divider, before `Unanalyzed only`. Same work as
-      Phase 5 Step 5.1 — do it once, there.
+      [038](038-ai-connection.md) task 5.4 — do it once, there.
 - [ ] 2.12 The primary reads `Analyze all 13`, `Analyze 13 of 13` or
       `Regenerate clips` (`SourceVideoSelectionBar.tsx:24-32`). Design:
       `Analyze 10` — the selected count, nothing else. **`Regenerate clips` has
@@ -200,21 +205,21 @@ Phase 1 fixed this inside `.workflow-footer` only, deliberately: a global change
 rewrites every committed visual baseline, and that is a decision to take on
 purpose rather than as a side effect.
 
-- [ ] 2.1 Split `.btn` into the design's named variants rather than
+- [ ] 3.1 Split `.btn` into the design's named variants rather than
       overloading one class: Toolbar/inline (`6px 12px`–`8px 13px`, radius 8,
       `--bg-2`, 1px `--border`, 12.5–13px) is what today's `.btn` base already
       approximates; add Primary (`11px 22px`, radius 10, solid `--accent`, ink
       `--accent-ink`, 600, 13.5px), Secondary (`11px 18px`, `--bg-2`,
       1px `--border`, `--text-dim`) and Ghost (`11px 18px`, transparent).
-- [ ] 2.2 Destructive is an accent *tint* with accent text and a 40%
+- [ ] 3.2 Destructive is an accent *tint* with accent text and a 40%
       accent border — **never solid accent, and never red**. Today
       `.btn.destructive` uses `--red` and fills solid red on hover
       (`styles.css:1651-1660`), which the design explicitly rules out.
-- [ ] 2.3 Audit the 13 `btn primary` call sites. Every screen must end
+- [ ] 3.3 Audit the 13 `btn primary` call sites. Every screen must end
       with exactly one solid accent. `Import.tsx:381` currently renders
       `Create / Open Folder Project` as a primary in the screen *header*, which
       would be a second solid accent beside the action bar's.
-- [ ] 2.4 Re-cut the visual baselines for **both** platforms — see the
+- [ ] 3.4 Re-cut the visual baselines for **both** platforms — see the
       `snapshotPathTemplate` note in `playwright.config.ts`. A macOS-only
       re-cut turns CI red.
 
@@ -226,13 +231,13 @@ purpose rather than as a side effect.
 rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
 (green dot), `General`.
 
-- [x] 3.1 Rebuild the dialog as a rail + panel grid.
+- [x] 4.1 Rebuild the dialog as a rail + panel grid.
       `settingsPanel: 'ai' | 'connections' | 'diagnostics' | 'general'` replaces
       `SettingsTab`. The active rail item is the **one** place a left bar is
       allowed in this design (`--accent-dim` + `inset 2px 0 0 var(--accent)`),
       because it is a rail item and not a selection. Rail footnote, verbatim:
       "Settings are per machine. Cloud consent is per project."
-- [x] 3.2 Build the `AI assistance` panel — the screen the app has
+- [x] 4.2 Build the `AI assistance` panel — the screen the app has
       never had. Radio cards under `SCORING ENGINE` with their
       consequences in a Mono facts row: Rule-based · local (`DEFAULT`) and
       Pi Agent · cloud (`OPT-IN`, nested account row, consent state). The
@@ -241,14 +246,14 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
       do it after [plan 030](done/030-truthful-ai-usage.md) Phase 1 persists it —
       otherwise the panel writes to component state that resets on navigation.
       Implemented persisted radio cards and effective scoring fallback feedback in Settings › AI assistance.
-- [x] 3.3 Move the model account out of Connections into the account
+- [x] 4.3 Move the model account out of Connections into the account
       row of `AI assistance`; Connections becomes MCP desktop clients only.
-- [x] 3.4 Give the Diagnostics failure branch its designed form. The
+- [x] 4.4 Give the Diagnostics failure branch its designed form. The
       substance is already there — both branches and the ordered guidance steps
       (`DiagnosticsTabPanel.tsx`) — but not the green/red ring cards, the
       `RAN 2 MIN AGO` stamp, the `150px | 1fr` `<dl>`, or the closing note that
       environment-variable steps need an app restart.
-- [x] 3.5 E2E: each panel reachable, the deep link still lands on the
+- [x] 4.5 E2E: each panel reachable, the deep link still lands on the
       right one, and the failure card renders from a failing diagnostics
       response.
 
@@ -263,15 +268,15 @@ plus AI: On / Off (ADR 0007, 038 Phases 4–5).
 Four values differ from the handoff. Each is small, and each is a real
 difference on screen, so fix them together and re-cut the baselines once.
 
-- [ ] 5.1 `--surf` is a **distinct** token in the design
+- [ ] 6.1 `--surf` is a **distinct** token in the design
       (`#101317` dark), used for the rail and side panels. The build maps it
       onto `--bg-surface: #12151a`, i.e. the same value as `--bg-2`, so the rail
       and the inner cards on it are the same surface. Split them.
-- [ ] 5.2 Dark `--accent-dim` is `rgba(255,77,109,.14)` in the design
+- [ ] 6.2 Dark `--accent-dim` is `rgba(255,77,109,.14)` in the design
       and `0.12` in the build.
-- [ ] 5.3 Light `--accd` is the solid `#ffe4ea` in the design, not a
+- [ ] 6.3 Light `--accd` is the solid `#ffe4ea` in the design, not a
       10% rose alpha.
-- [ ] 5.4 Light `--border` is `#dcdee2` in the design; the build has
+- [ ] 6.4 Light `--border` is `#dcdee2` in the design; the build has
       `#dcdce2` (transposed).
 
 ## Phase 7 — Review, Timeline and Export element deltas (audited 2026-09-03)

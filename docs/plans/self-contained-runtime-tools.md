@@ -37,8 +37,8 @@ Settings. Development keeps system `PATH`; provider CLIs are never bundled.
 
 - [ ] 2.1 Commit pinned FFmpeg/libvidstab revisions, SHA-256 checksums, exact configure line, GPLv3 text, build config, and durable source offer. Done when staging rejects missing or placeholder compliance files.
 - [ ] 2.2 Add fixture tests for the complete staged tree and missing `ffprobe`; enforce staging in local distribution commands; record arm64 and x64 evidence. Done when the fixture tests pass in `npm run test:main` and arm64 and x64 evidence is recorded.
-- [ ] 2.3 Persist startup status and expose read-only IPC/preload diagnostics. Done when diagnostics show the persisted startup status; if no renderer component-test runner exists, stop and select one before UI changes.
-- [ ] 2.4 Build, sign and notarize matching DMGs for arm64 and x64. Done when `cd frontend && npm run test:main && npm run typecheck && npm run build` exits 0 and the packaged resources contain both tools and compliance files.
+- [ ] 2.3 Persist startup status and expose read-only IPC/preload diagnostics. Done when a Playwright spec in `frontend/e2e/` (the renderer has no unit runner) opens Settings › Diagnostics and asserts the persisted startup status for a ready and a missing-vidstab start, and `npm run test:main` covers the IPC handler.
+- [ ] 2.4 Build, sign and notarize matching DMGs for arm64 and x64. Done when `build-dmg.yml` produces arm64 and x64 DMGs whose packaged resources contain both tools and the compliance files, and for each DMG `spctl -a -vvv -t install` reports `accepted` (`source=Notarized Developer ID`) and `xcrun stapler validate` passes. Needs [033](033-in-app-updates-and-a-trusted-build.md) H1 (enrollment).
 
 ## Human tasks
 

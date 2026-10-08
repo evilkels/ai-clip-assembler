@@ -299,6 +299,7 @@ def test_generate_fcpxml_clips_butt_exactly():
     ]
     root = ET.fromstring(generate_fcpxml("Three clips", clips, videos))
     asset_clips = root.findall(".//sequence/spine/asset-clip")
+    assert len(asset_clips) == 3
     for previous, current in zip(asset_clips, asset_clips[1:]):
         previous_end = Fraction(previous.attrib["offset"][:-1]) + Fraction(
             previous.attrib["duration"][:-1]
@@ -307,7 +308,7 @@ def test_generate_fcpxml_clips_butt_exactly():
 
 
 @pytest.mark.parametrize("fps,expected_timebase", [(47.952, "48"), (119.88, "120")])
-def test_xmeml_rate_matches_frame_counting(fps, expected_timebase):
+def test_xmeml_declares_ntsc_for_high_ntsc_rates(fps, expected_timebase):
     videos = {
         "file-1": {
             "file_id": "file-1",

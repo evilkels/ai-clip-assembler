@@ -23,6 +23,6 @@ a project folder breaks links in an export already created from that folder.
 
 - Existing exports stop resolving media after their project folder moves.
 - Folder-project portability QA is Flow C, tracked as H4 in
-  `docs/plans/drone-workflow-qa-flows.md`.
+  [plan 032](../plans/032-valid-fcpxml-and-nle-verification.md).
 - The folder-project plan's rationale for placing exports next to footage is
   discoverability; export location no longer makes the media links portable.

@@ -27,6 +27,11 @@ def assert_well_formed_xmeml(xml_text: str) -> None:
     if video_track is None:
         raise AssertionError("XMEML sequence must contain a video track")
     video_clipitems = video_track.findall("clipitem")
+    for clipitem in root.findall(".//clipitem"):
+        if any(clipitem.find(field) is None for field in ("rate", "start", "end", "in", "out")):
+            raise AssertionError("Every clipitem must have rate, start, end, in and out")
+    if sequence.find("rate") is None or sequence.findtext("duration") is None:
+        raise AssertionError("XMEML sequence must have a rate and duration")
     if video_clipitems and sequence.findtext("duration") != video_clipitems[-1].findtext("end"):
         raise AssertionError("Sequence duration must equal the last video clip end")
 
@@ -49,11 +54,12 @@ def assert_well_formed_xmeml(xml_text: str) -> None:
             raise AssertionError(f"File {file_id} must have a localhost file URL")
 
     for clipitem in root.findall(".//clipitem"):
-        has_time_remap = any(
-            effect.findtext("name") == "Time Remap"
-            for effect in clipitem.findall("filter/effect")
+        is_retimed = any(
+            float(parameter.findtext("value")) != 100.0
+            for parameter in clipitem.findall("filter/effect/parameter")
+            if parameter.findtext("parameterid") == "speed"
         )
-        if not has_time_remap and clipitem.findtext("end") is not None:
+        if not is_retimed:
             if int(clipitem.findtext("end")) - int(clipitem.findtext("start")) != int(clipitem.findtext("out")) - int(clipitem.findtext("in")):
                 raise AssertionError("Normal-speed clipitem duration must match its source range")
 

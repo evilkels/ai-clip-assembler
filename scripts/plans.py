@@ -136,9 +136,9 @@ def rewrite_links(content: str, source: Path, destination: Path,
         if parts.scheme or parts.netloc or not parts.path or parts.path.startswith("/"):
             return match.group()
         old_target = (source.parent / unquote(parts.path)).resolve()
-        if old_target not in moves:
+        if old_target not in moves and source == destination:
             return match.group()
-        new_path = os.path.relpath(moves[old_target], destination.parent)
+        new_path = os.path.relpath(moves.get(old_target, old_target), destination.parent)
         new_url = urlunsplit(("", "", quote(new_path, safe="/.-_~()"), parts.query, parts.fragment))
         if angled:
             new_url = f"<{new_url}>"
@@ -153,7 +153,8 @@ def sync(root: Path, plans: list[Plan], readme: Path, content: str) -> None:
     moves = {plan.path: plan.path.parent / "done" / plan.path.name
              for plan in plans if plan.status in ("DONE", "SUPERSEDED")}
     tracked = [root / name for name in git(root, "ls-files", "-z", "*.md").split("\0") if name]
-    documents = {path: path.read_text(encoding="utf-8") for path in tracked if path.is_file()}
+    documents = {path: path.read_text(encoding="utf-8")
+                 for path in [*tracked, *moves] if path.is_file()}
     for source, destination in moves.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
         if source in tracked:

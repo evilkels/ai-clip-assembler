@@ -50,7 +50,7 @@ re-enable looping per card.
 
 ## Phase 1 — Serve sampled frames
 
-- [x] **Step 1.1 — Write the failing backend test.**
+- [x] 1.1 Write the failing backend test.
   Add to the existing backend API tests (follow the nearest existing route test
   as the pattern for client construction and project fixtures). Assert:
   - `GET /projects/{project_id}/videos/{file_id}/poster?at_ms=0` returns `200`
@@ -65,7 +65,7 @@ re-enable looping per card.
   Verify: `cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q` fails on
   exactly these new tests and nothing else.
 
-- [x] **Step 1.2 — Implement the route.**
+- [x] 1.2 Implement the route.
   Add `GET /projects/{project_id}/videos/{file_id}/poster` to
   `backend/src/api.py`, placed next to the existing media route at
   `api.py:398` and mirroring its shape (`registered_video()` for the 404 path,
@@ -89,7 +89,7 @@ re-enable looping per card.
   Verify: the Phase 1 tests pass; `cd backend && .venv/bin/ruff check src tests`
   is clean.
 
-- [x] **Step 1.3 — Add the client URL builder.**
+- [x] 1.3 Add the client URL builder.
   Add `buildClipPosterUrl(projectId, fileId, atMs)` to
   `frontend/src/renderer/src/api/client.ts`, directly beside
   `buildVideoMediaUrl` (`client.ts:79-81`) and following its exact style,
@@ -103,7 +103,7 @@ changed a model — stop and report.
 
 ## Phase 2 — Poster-first cards
 
-- [x] **Step 2.1 — Write the failing E2E assertions.**
+- [x] 2.1 Write the failing E2E assertions.
   Extend `frontend/e2e/review-browser-redesign.spec.ts`. In the Grid view,
   assert:
   - `browser.locator('video')` has count `0` on first paint.
@@ -113,7 +113,7 @@ changed a model — stop and report.
   Verify: `cd frontend && npx playwright test e2e/review-browser-redesign.spec.ts`
   fails only on the new assertions.
 
-- [x] **Step 2.2 — Render a poster instead of a video.**
+- [x] 2.2 Render a poster instead of a video.
   In `ClipCard.tsx`, replace the unconditional `<video>` with an `<img>`:
   - `src` from `buildClipPosterUrl(projectId, clip.file_id, clip.start_sec * 1000)`.
   - `loading="lazy"` and `decoding="async"` so off-screen deferral comes from
@@ -125,7 +125,7 @@ changed a model — stop and report.
     not use an empty string as a sentinel. A clip with no poster (analysis not
     run, or a 404) must still render the card and stay playable.
 
-- [x] **Step 2.3 — Mount the video only on first play.**
+- [x] 2.3 Mount the video only on first play.
   Keep a local `activated` boolean. The `<video>` is rendered only once
   `activated` is true; the play control sets it and then plays. Once activated,
   the element stays mounted for that card so the existing pause/seek and
@@ -139,21 +139,21 @@ changed a model — stop and report.
 
 ## Phase 3 — Play once by default, with an opt-in loop
 
-- [x] **Step 3.1 — Write the failing E2E assertions.**
+- [x] 3.1 Write the failing E2E assertions.
   In `review-browser-redesign.spec.ts`, assert that after a preview reaches
   `clip.end_sec` the video is paused rather than restarted, and that the loop
   control's `aria-pressed` reflects its state and survives a pause/play cycle.
   Drive playback deterministically by setting `currentTime` close to `end_sec`
   rather than waiting out the clip.
 
-- [x] **Step 3.2 — Change the default to play-once.**
+- [x] 3.2 Change the default to play-once.
   In `ClipCard.tsx`, the `onTimeUpdate` handler currently resets
   `currentTime` to `clip.start_sec` when `currentTime >= clip.end_sec`
   (`ClipCard.tsx:146-152`), which loops forever. Change it so that on reaching
   `clip.end_sec` it **pauses** and resets `currentTime` to `clip.start_sec`, so
   the next press replays from the start.
 
-- [x] **Step 3.3 — Add the loop toggle.**
+- [x] 3.3 Add the loop toggle.
   A small icon button on the card, following the existing
   `.clip-play-btn` pattern for placement and styling and reusing the repo's
   hand-authored inline SVG convention (see `Sidebar.tsx` for examples — do not
@@ -167,15 +167,15 @@ changed a model — stop and report.
 
 ## Phase 4 — Full gates and visual baselines
 
-- [x] **Step 4.1 — Run every gate.**
+- [x] 4.1 Run every gate.
   ```
   cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q && .venv/bin/ruff check src tests
   cd frontend && npm run lint && npm run typecheck && npm run test:main
   ```
   All must pass.
 
-- [x] **Step 4.2 — Visual baselines: no change needed. This step's premise was
-      wrong.** It predicted the `review-grid` fixtures would fail. They do not:
+- [x] 4.2 Visual baselines: no change needed. This step's premise was
+      wrong. It predicted the `review-grid` fixtures would fail. They do not:
       31/31 visual tests pass untouched. Opening
       `review-grid-1440x1000-light-chromium-darwin.png` shows why — the
       fixture's viewport stops at the "Your clips" filter row, so **the
@@ -185,12 +185,12 @@ changed a model — stop and report.
       look at Candidate Clip media, so it neither validates nor guards this
       change. Do not cite "31/31 green" as evidence the cards render correctly.
 
-- [ ] **Step 4.3 — Confirm the win, with numbers.**
+- [ ] 4.3 Confirm the win, with numbers.
   On a project with at least 60 candidate clips, record in the PR: the count of
   `<video>` elements in Grid on first paint (expected `0`), and the count of
   network requests for media versus posters. State the clip count used.
 
-- [ ] **Step 4.4 — Reconcile the plans.**
+- [ ] 4.4 Reconcile the plans.
   Mark item 1 in `017-review-page-clarity-and-polish.md` as delivered by this
   plan, and update the `react-doctor-triage.md` note if the `ClipCard` change
   resolves any finding cited there. Update `docs/plans/README.md`: this plan
@@ -214,32 +214,32 @@ already recorded below and in the review of PR #72:
 **Decision:** a Candidate Clip's poster becomes a real artifact produced when
 the clip is analysed, not something derived per request.
 
-- [ ] **Step 5.1 — Write a poster per Candidate Clip during analysis.**
+- [ ] 5.1 Write a poster per Candidate Clip during analysis.
       After clip assembly, persist one poster for each Candidate Clip from the
       already-sampled frame nearest that clip's `start_sec`. This must be a copy
       of an existing sample — **no new FFmpeg work**, which is the same
       constraint plan 017 carried. Suggested location:
       `<project work dir>/posters/{clip_id}.jpg`, beside `samples/`.
 
-- [ ] **Step 5.2 — Regenerate posters on re-derive.**
+- [ ] 5.2 Regenerate posters on re-derive.
       Re-deriving clips from cached Frame Scores produces different ranges, and
       `clip_id` is a uuid5 of file plus range, so the ids change and stale
       posters would accumulate. Rewrite the poster set whenever the Candidate
       Clip library is rebuilt, and remove posters whose `clip_id` is no longer
       in the library.
 
-- [ ] **Step 5.3 — Serve posters by `clip_id`.**
+- [ ] 5.3 Serve posters by `clip_id`.
       Add the clip-scoped route and prefer it. Keep the existing
       file-plus-`at_ms` route as a fallback so projects analysed before this
       change still show posters instead of regressing to the placeholder;
       remove it only once no supported project predates Phase 5.
 
-- [ ] **Step 5.4 — Simplify the client.**
+- [ ] 5.4 Simplify the client.
       With a `clip_id` route the renderer no longer sends a timestamp at all,
       so `buildClipPosterUrl`'s rounding guard and the float/integer mismatch
       disappear rather than being defended against.
 
-- [ ] **Step 5.5 — Cover the artifact, not just the endpoint.**
+- [ ] 5.5 Cover the artifact, not just the endpoint.
       Assert that analysing a project writes exactly one poster per Candidate
       Clip, that re-deriving replaces them, and that a poster is a readable
       JPEG. The Phase 1-3 tests prove the renderer contract with mocked
@@ -294,17 +294,17 @@ ticking Step 4.3.
 
 ## Done criteria
 
-- [x] Grid view mounts zero `<video>` elements before any play interaction,
+- ✓ Grid view mounts zero `<video>` elements before any play interaction,
       asserted by E2E.
-- [x] Posters render from existing sampled frames with no new FFmpeg work.
-- [x] A clip with no sampled frames still renders and still plays.
-- [x] Previews play once by default; the loop toggle works, is labelled, and is
+- ✓ Posters render from existing sampled frames with no new FFmpeg work.
+- ✓ A clip with no sampled frames still renders and still plays.
+- ✓ Previews play once by default; the loop toggle works, is labelled, and is
       keyboard reachable.
-- [ ] Backend, ruff, lint, typecheck, `test:main` and the full Playwright suite
+- open: Backend, ruff, lint, typecheck, `test:main` and the full Playwright suite
       pass, including exact-count filter assertions at
       `review-browser-redesign.spec.ts:290-313`, which must remain unchanged.
-- [x] Visual baselines need no update — they never covered these cards (see Step 4.2).
-- [x] `generated.ts` unchanged.
+- ✓ Visual baselines need no update — they never covered these cards (see Step 4.2).
+- ✓ `generated.ts` unchanged.
 
 ## Stop and report instead of improvising if
 

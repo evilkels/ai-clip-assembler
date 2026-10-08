@@ -95,7 +95,7 @@ confusing smoothness controls, and excluded clips still entering AI proposals.
    `review-browser-redesign.spec.ts` "Review has one view-only smoothness control
    and hides nothing by default"; darwin Review baselines re-cut.
 Items 3 (included-means-preferred) and 4 (onboarding explainer) moved to
-[`027-authoritative-candidate-library-and-diverse-edits.md`](../027-authoritative-candidate-library-and-diverse-edits.md)
+[`027-authoritative-candidate-library-and-diverse-edits.md`](../later/027-authoritative-candidate-library-and-diverse-edits.md)
 on 2026-09-02, since both depend on All Clips being the stated Candidate Clip
 authority. Item 5 (design-system adoption) is DONE — delivered by the studio
 redesign (`6d79c1b`), not by the retired modern-shell plan.

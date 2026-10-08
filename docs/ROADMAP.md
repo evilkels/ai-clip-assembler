@@ -44,13 +44,13 @@ Sizes: S = hours, M = days, L = a week or more of agent work.
 | # | Milestone | What the owner sees | Size | Plan |
 |---|---|---|---|---|
 | 0 | **Baseline** | Plans, glossary and decision records match the product; open PRs merged | S | 035 Phase 2, this file |
-| 1 | **A first cut worth keeping, without AI** | More and longer Candidate Clips per Source Video; Medium and Long edits fill their target | S–M | new extraction-quality plan; 027 for the cross-video quota fix |
+| 1 | **A first cut worth keeping, without AI** | More and longer Candidate Clips per Source Video; Medium and Long edits fill their target | S–M | [037](plans/037-extraction-quality.md) (includes the cross-video quota fix from 027) |
 | 1b | **Exports that open** (alongside 1) | FCPXML opens in Final Cut, Resolve XML in Resolve, without relinking; automated checks guard both | M | [032](plans/032-valid-fcpxml-and-nle-verification.md) |
-| 2 | **Honest AI errors** | "ChatGPT limit reached, resets 14:00 — your earlier suggestions are kept"; nothing beyond Frame Samples and text leaves the Mac | M | new AI-connection plan, phase 1 (replaces [030](plans/030-truthful-ai-usage.md)'s remainder) |
-| 3 | **Connect Claude or ChatGPT** | A welcome wizard and a Providers screen like T3 Code's: installed → signed in → ready, with Download, Sign in and Check again; Connect and allow; AI On / Off per project | L | new AI-connection plan, phase 2 |
-| 4 | **The AI edits like a Resolve console** | Ask for a story cut; the AI looks across the whole library, runs its Script, fixes its own errors, and shows one Proposal; Apply puts it on the Timeline | L | [review-visual-editing](plans/review-visual-editing.md), rewritten; absorbs agent-operable-timeline |
-| 5 | **Story in the edit** | The AI and the Editor add Markers, notes and Story Sections; they export as markers to Resolve and Final Cut | M–L | new story plan |
-| 6 | **Find more clips** | A button beside each Source Video: More clips / Longer clips; the Timeline stays as it is | M | [019](plans/019-clip-library-generation-and-expansion.md), rewritten |
+| 2 | **Honest AI errors** | "ChatGPT limit reached, resets 14:00 — your earlier suggestions are kept"; nothing beyond Frame Samples and text leaves the Mac | M | [038](plans/038-ai-connection.md) Phases 1–2 (replaces [030](plans/done/030-truthful-ai-usage.md)'s remainder) |
+| 3 | **Connect Claude or ChatGPT** | A welcome wizard and a Providers screen like T3 Code's: installed → signed in → ready, with Download, Sign in and Check again; Connect and allow; AI On / Off per project | L | [038](plans/038-ai-connection.md) Phases 3–6 |
+| 4 | **The AI edits like a Resolve console** | Ask for a story cut; the AI looks across the whole library, runs its Script, fixes its own errors, and shows one Proposal; Apply puts it on the Timeline | L | [review-visual-editing](plans/review-visual-editing.md) (absorbs agent-operable-timeline) |
+| 5 | **Story in the edit** | The AI and the Editor add Markers, notes and Story Sections; they export as markers to Resolve and Final Cut | M–L | [039](plans/039-story.md) |
+| 6 | **Find more clips** | A button beside each Source Video: More clips / Longer clips; the Timeline stays as it is | M | [019](plans/019-clip-library-generation-and-expansion.md) |
 | 7 | **Trusted release** | Opens on a clean Mac with no Privacy & Security detour; updates install themselves; **v1.0.0** | L | [033](plans/033-in-app-updates-and-a-trusted-build.md), [self-contained-runtime-tools](plans/self-contained-runtime-tools.md) |
 
 ### Why this order
@@ -90,8 +90,8 @@ Sizes: S = hours, M = days, L = a week or more of agent work.
 - Windows ([#88](https://github.com/evilkels/ai-clip-assembler/issues/88)) and
   Linux ([#89](https://github.com/evilkels/ai-clip-assembler/issues/89)).
 - API keys as an advanced option.
-- Bundled SigLIP and diverse edits ([025](plans/025-bundle-siglip-embedding-model.md),
-  [027](plans/027-authoritative-candidate-library-and-diverse-edits.md) beyond the quota fix).
+- Bundled SigLIP and diverse edits ([025](plans/later/025-bundle-siglip-embedding-model.md),
+  [027](plans/later/027-authoritative-candidate-library-and-diverse-edits.md) beyond the quota fix).
 - A playable preview of a Proposal before Apply, if it does not fit milestone 4.
 
 ## Not in v1.0.0

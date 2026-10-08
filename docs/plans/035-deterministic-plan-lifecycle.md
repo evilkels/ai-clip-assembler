@@ -61,19 +61,20 @@ The plan format and status rules are in
 
 ## Phase 2: Migrate the active plans (after PR #91 merges)
 
-- [ ] 2.1 Convert every active plan to the format, keeping all content: status
+- [x] 2.1 Convert every active plan to the format, keeping all content: status
   prose and "Reconciled" notes go into `## Context`, remaining work becomes
   tasks, and shipped work is ticked with its PR number, using the statuses
   re-verified in PR #91. Done when `python3 scripts/plans.py status` shows no
-  MALFORMED plan.
-- [ ] 2.2 Move the README's "Release QA — v0.4.0" checks into the Human tasks
+  MALFORMED plan. (PR #98)
+- [x] 2.2 Move the README's "Release QA — v0.4.0" checks into the Human tasks
   of a `release-qa` plan. Done when the README has no hand-written status
-  table.
-- [ ] 2.3 Replace the README's hand-written Active table and "In flight"
+  table. (PR #98)
+- [x] 2.3 Replace the README's hand-written Active table and "In flight"
   section with the index markers, then run `sync`. Done when `check` passes.
-- [ ] 2.4 Run `python3 scripts/plans.py check` in CI and in the versioned
+  (PR #98)
+- [x] 2.4 Run `python3 scripts/plans.py check` in CI and in the versioned
   pre-commit hook when `docs/plans/` is staged (hook from plan 036). Done when
-  a hand-edited index row fails CI.
+  a hand-edited index row fails CI. (PR #98)
 
 ## Human tasks
 

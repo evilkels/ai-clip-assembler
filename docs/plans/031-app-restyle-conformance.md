@@ -84,7 +84,12 @@ Two deliberate deviations, both recorded rather than silently taken:
   warning notice and stays live, which is the behavioural half of the rule. The
   button needs to know a Harness Fallback happened, and the backend's
   `metadata.used_ai` is still dropped by the client — that is
-  [plan 030](030-truthful-ai-usage.md) Phase 3, Step 3.1. Wire the button there.
+  [plan 030](done/030-truthful-ai-usage.md) Phase 3, Step 3.1. Wire the button there.
+
+> **Not ready for an implementer as a whole (2026-10-08).** Steps 2.7, 2.12,
+> 2.15 and Phase 7 leave UI choices to the design owner (see "Open questions
+> for the design owner" below). Implement only steps whose Design line fixes
+> the result; ask the orchestrator before starting one of those four.
 
 ## Phase 2 — Shell and Import element deltas
 
@@ -97,29 +102,31 @@ Do these together and re-cut the baselines once, with Phase 3.
 
 **Shell**
 
-- [ ] **Step 2.1** The rail brand has no version line. Design: 34×34 mark +
+- [ ] 2.1 The rail brand has no version line. Design: 34×34 mark +
       `AI Clip Assembler` (14/600) + `local first · v0.2.0` (Mono 10px `+.12em`
       uppercase `--txm`). Build: 32×32 mark + name only
       (`Sidebar.tsx:146-149`).
-- [ ] **Step 2.2** The rail footer is wrong in both directions
+- [ ] 2.2 The rail footer is wrong in both directions
       (`Sidebar.tsx:288-295`). Design: `◈ AI assistance` with `pi · cloud` in
       Mono 10px green, then `⚙ Settings`. Build: `⚙ Settings` and
       `◇ Diagnostics`. **Diagnostics is not a rail item in this design** — it is
       a Settings panel (`6b`), so this step deletes that row, and the
       `AI assistance` row it replaces it with is the deep link into Phase 4's
       new panel. Sequence it after Phase 4 or the link has nowhere to go.
-- [ ] **Step 2.3** Project rows carry a count only on the active row, and it
+  - The AI row's label and badge come from [038](038-ai-connection.md) 5.2
+    (rail label "AI", Active Provider badge), not `pi · cloud`.
+- [ ] 2.3 Project rows carry a count only on the active row, and it
       reads `13 sources` (`Sidebar.tsx:191-193`). Design: a Mono 10px count on
       **every** row — `22`, `16`, `31`, `44`, `18` — the number alone.
-- [ ] **Step 2.4** The workflow step marker holds only a number or a check, and
+- [ ] 2.4 The workflow step marker holds only a number or a check, and
       the 24px line icon sits in the label beside it instead
       (`Sidebar.tsx:252-259`). Design: the icon goes **inside** the 26×26
       marker for the active/expanded step, with `✓` or the number otherwise.
       This is why the rail reads as a list of checkboxes rather than as the
       design's four marked steps.
-- [ ] **Step 2.5** The Export step carries a count (`acceptedCount`,
+- [ ] 2.5 The Export step carries a count (`acceptedCount`,
       `Sidebar.tsx:262-263`). Design gives Export no count.
-- [ ] **Step 2.6** The status bar is a two-field sentence-case line
+- [ ] 2.6 The status bar is a two-field sentence-case line
       (`StatusBar.tsx:26-32`, `styles.css:769-779`). Design: 34px tall,
       `padding:0 20px; gap:22px`, Mono 11px `+.04em` **uppercase**, and **three**
       fields — a 7px state dot + state text, a middle fact
@@ -127,35 +134,38 @@ Do these together and re-cut the baselines once, with Phase 3.
       a right-aligned `11 / 16 CLIPS KEPT` in `--txd`. The build has no middle
       field at all, no uppercase, no tracking, and `padding:0 12px; gap:16px`.
       The harness variant of the middle fact needs the **Effective Harness**, so
-      it depends on [plan 030](030-truthful-ai-usage.md) Phase 1; ship
+      it depends on [plan 030](done/030-truthful-ai-usage.md) Phase 1; ship
       `BACKEND … · LOCAL` first rather than blocking the whole step on it.
+  - The harness variant of the middle fact is [038](038-ai-connection.md)
+    5.5 (`AI: CLAUDE` / `AI: CHATGPT` / `AI: OFF`); this step ships the
+    `BACKEND … · LOCAL` variant only.
 
 **Import (`1d`)**
 
-- [ ] **Step 2.7** There is no `Frame` column. The second cell is an `👁`
+- [ ] 2.7 There is no `Frame` column. The second cell is an `👁`
       preview button (`SourceVideoBrowser.tsx:250,267`). Design: a 74px `Frame`
       column holding a 48×28 radius-5 hatched placeholder — the same hatch used
       as the loading/empty state everywhere else. Decide deliberately where the
       preview affordance goes once the frame is clickable.
-- [ ] **Step 2.8** The File cell is the bare filename
+- [ ] 2.8 The File cell is the bare filename
       (`SourceVideoBrowser.tsx:268`). Design: a 6×6 per-source identity colour
       chip + the name at weight 500 + an `hevc` pill. The identity colour
       already exists — `lib/reviewView.ts` `reviewFileAccentStyle` is what
       Review's clip cards use — so reuse it rather than inventing a second
       palette, which is the whole point of a per-source colour.
-- [ ] **Step 2.9** Codec is its own column (`SourceVideoBrowser.tsx:274`).
+- [ ] 2.9 Codec is its own column (`SourceVideoBrowser.tsx:274`).
       Design folds it into the File cell as the pill from Step 2.8, and uses
       that column budget for `Frame`.
-- [ ] **Step 2.10** The selection bar's count reads `0 of 13 selected` in Sans
+- [ ] 2.10 The selection bar's count reads `0 of 13 selected` in Sans
       (`SourceVideoSelectionBar.tsx:42`). Design: `10 SELECTED` in Mono 11px
       `+.1em` 600 `--acc`, then the sentence. The sentence copy already matches.
-- [ ] **Step 2.11** The selection bar has no harness trigger, and the bare
+- [ ] 2.11 The selection bar has no harness trigger, and the bare
       `Harness` `<select>` sits in the toolbar row instead
       (`Import.tsx:449-462`, `SourceVideoBrowser.tsx:191`), which is what makes
       that row read as crowded. Design puts the `6c` trigger in the selection
       bar behind a 1px divider, before `Unanalyzed only`. Same work as
-      Phase 5 Step 5.1 — do it once, there.
-- [ ] **Step 2.12** The primary reads `Analyze all 13`, `Analyze 13 of 13` or
+      [038](038-ai-connection.md) task 5.4 — do it once, there.
+- [ ] 2.12 The primary reads `Analyze all 13`, `Analyze 13 of 13` or
       `Regenerate clips` (`SourceVideoSelectionBar.tsx:24-32`). Design:
       `Analyze 10` — the selected count, nothing else. **`Regenerate clips` has
       no counterpart anywhere in the reference**; it is a real capability
@@ -163,14 +173,14 @@ Do these together and re-cut the baselines once, with Phase 3.
       where it belongs instead of quietly leaving it in the accent slot. Note
       the gated action bar already renders `Analyze N videos` (Phase 1), so
       whatever is decided here has to agree with that label.
-- [ ] **Step 2.13** The action bar has no `Add more footage` secondary; the
+- [ ] 2.13 The action bar has no `Add more footage` secondary; the
       design carries one in states 03 and 06 of `5a`.
-- [ ] **Step 2.14** The rules card is always open and spans the content width
+- [ ] 2.14 The rules card is always open and spans the content width
       when idle. Design: a 340px card beside the analysis card showing the six
       values in a 3-column grid behind an `Edit rules and re-scan` action. The
       side-by-side layout is already correct *while analysing* — this is the
       idle state only.
-- [ ] **Step 2.15** The toolbar row carries five controls the design's three
+- [ ] 2.15 The toolbar row carries five controls the design's three
       have to share space with, which is the other half of why it reads as
       crowded (`SourceVideoBrowser.tsx:140-192`). Design: `Source videos` + the
       Mono count line on the left; `Search files`, the
@@ -181,7 +191,7 @@ Do these together and re-cut the baselines once, with Phase 3.
       leaves in Step 2.11 — decide whether the filter and the count earn their
       place before restoring the design's order, rather than deleting working
       affordances to match a drawing.
-- [ ] **Step 2.16** Re-cut both baseline sets and re-run the suite. Expect the
+- [ ] 2.16 Re-cut both baseline sets and re-run the suite. Expect the
       `shell` and `import-analyzing` fixtures to move substantially.
 
 ## Phase 3 — The button system
@@ -195,21 +205,21 @@ Phase 1 fixed this inside `.workflow-footer` only, deliberately: a global change
 rewrites every committed visual baseline, and that is a decision to take on
 purpose rather than as a side effect.
 
-- [ ] **Step 2.1** Split `.btn` into the design's named variants rather than
+- [ ] 3.1 Split `.btn` into the design's named variants rather than
       overloading one class: Toolbar/inline (`6px 12px`–`8px 13px`, radius 8,
       `--bg-2`, 1px `--border`, 12.5–13px) is what today's `.btn` base already
       approximates; add Primary (`11px 22px`, radius 10, solid `--accent`, ink
       `--accent-ink`, 600, 13.5px), Secondary (`11px 18px`, `--bg-2`,
       1px `--border`, `--text-dim`) and Ghost (`11px 18px`, transparent).
-- [ ] **Step 2.2** Destructive is an accent *tint* with accent text and a 40%
+- [ ] 3.2 Destructive is an accent *tint* with accent text and a 40%
       accent border — **never solid accent, and never red**. Today
       `.btn.destructive` uses `--red` and fills solid red on hover
       (`styles.css:1651-1660`), which the design explicitly rules out.
-- [ ] **Step 2.3** Audit the 13 `btn primary` call sites. Every screen must end
+- [ ] 3.3 Audit the 13 `btn primary` call sites. Every screen must end
       with exactly one solid accent. `Import.tsx:381` currently renders
       `Create / Open Folder Project` as a primary in the screen *header*, which
       would be a second solid accent beside the action bar's.
-- [ ] **Step 2.4** Re-cut the visual baselines for **both** platforms — see the
+- [ ] 3.4 Re-cut the visual baselines for **both** platforms — see the
       `snapshotPathTemplate` note in `playwright.config.ts`. A macOS-only
       re-cut turns CI red.
 
@@ -221,67 +231,52 @@ purpose rather than as a side effect.
 rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
 (green dot), `General`.
 
-- [x] **Step 3.1** Rebuild the dialog as a rail + panel grid.
+- [x] 4.1 Rebuild the dialog as a rail + panel grid.
       `settingsPanel: 'ai' | 'connections' | 'diagnostics' | 'general'` replaces
       `SettingsTab`. The active rail item is the **one** place a left bar is
       allowed in this design (`--accent-dim` + `inset 2px 0 0 var(--accent)`),
       because it is a rail item and not a selection. Rail footnote, verbatim:
       "Settings are per machine. Cloud consent is per project."
-- [x] **Step 3.2** Build the `AI assistance` panel — the screen the app has
+- [x] 4.2 Build the `AI assistance` panel — the screen the app has
       never had. Radio cards under `SCORING ENGINE` with their
       consequences in a Mono facts row: Rule-based · local (`DEFAULT`) and
       Pi Agent · cloud (`OPT-IN`, nested account row, consent state). The
       local model card was dropped: the local Qwen harness was removed on
       2026-09-29. Copy is in the handoff and is final. This is where the **Selected Harness** setting belongs, so
-      do it after [plan 030](030-truthful-ai-usage.md) Phase 1 persists it —
+      do it after [plan 030](done/030-truthful-ai-usage.md) Phase 1 persists it —
       otherwise the panel writes to component state that resets on navigation.
       Implemented persisted radio cards and effective scoring fallback feedback in Settings › AI assistance.
-- [x] **Step 3.3** Move the model account out of Connections into the account
+- [x] 4.3 Move the model account out of Connections into the account
       row of `AI assistance`; Connections becomes MCP desktop clients only.
-- [x] **Step 3.4** Give the Diagnostics failure branch its designed form. The
+- [x] 4.4 Give the Diagnostics failure branch its designed form. The
       substance is already there — both branches and the ordered guidance steps
       (`DiagnosticsTabPanel.tsx`) — but not the green/red ring cards, the
       `RAN 2 MIN AGO` stamp, the `150px | 1fr` `<dl>`, or the closing note that
       environment-variable steps need an app restart.
-- [x] **Step 3.5** E2E: each panel reachable, the deep link still lands on the
+- [x] 4.5 E2E: each panel reachable, the deep link still lands on the
       right one, and the failure card renders from a failing diagnostics
       response.
 
 ## Phase 5 — Harness choice as a popover, and consent as a designed gate
 
-- [ ] **Step 4.1** Replace the bare `<select>` labelled `Harness`
-      (`Import.tsx:450-462`) with the `6c` popover: trigger `Scored by Pi Agent`
-      with a green dot on an accent tint, panel headed `WHO SCORES THIS
-      ANALYSIS`, one row per option carrying its consequences in Mono 10.5px,
-      footer "Applies to this analysis run." + `Open AI settings`.
-- [ ] **Step 4.2** Enforce the handoff's copy rule: toolbar, status bar,
-      Settings and Diagnostics all say **"Pi Agent · cloud"**. Never "harness",
-      never `pi_agent`, never "AI review model" for the same thing. Use the
-      spec terms from `GLOSSARY.md` in code identifiers only.
-- [ ] **Step 4.3** Replace `window.confirm` for cloud consent
-      (`Import.tsx:266-275`) with the designed gate from `5b` card 2: what is
-      sent ("up to 4 sampled frames per candidate clip — never whole videos,
-      never audio"), the route, the boundary ("smoothness stays local"),
-      `Keep it local` / `Allow for this project`, and `REVOCABLE IN SETTINGS`.
-      Ungranted consent reveals this **inline in the popover**, before the
-      Analyze click, not as a modal after it.
-- [ ] **Step 4.4** E2E: choosing the cloud harness without consent shows the
-      gate and calls no provider; declining leaves the Selected Harness alone.
+Moved to [038](038-ai-connection.md) on 2026-10-08: the popover is 038 5.4,
+the copy rule is 038 D4/D13, and the consent gate became Connect and allow
+plus AI: On / Off (ADR 0007, 038 Phases 4–5).
 
 ## Phase 6 — Token deltas
 
 Four values differ from the handoff. Each is small, and each is a real
 difference on screen, so fix them together and re-cut the baselines once.
 
-- [ ] **Step 5.1** `--surf` is a **distinct** token in the design
+- [ ] 6.1 `--surf` is a **distinct** token in the design
       (`#101317` dark), used for the rail and side panels. The build maps it
       onto `--bg-surface: #12151a`, i.e. the same value as `--bg-2`, so the rail
       and the inner cards on it are the same surface. Split them.
-- [ ] **Step 5.2** Dark `--accent-dim` is `rgba(255,77,109,.14)` in the design
+- [ ] 6.2 Dark `--accent-dim` is `rgba(255,77,109,.14)` in the design
       and `0.12` in the build.
-- [ ] **Step 5.3** Light `--accd` is the solid `#ffe4ea` in the design, not a
+- [ ] 6.3 Light `--accd` is the solid `#ffe4ea` in the design, not a
       10% rose alpha.
-- [ ] **Step 5.4** Light `--border` is `#dcdee2` in the design; the build has
+- [ ] 6.4 Light `--border` is `#dcdee2` in the design; the build has
       `#dcdce2` (transposed).
 
 ## Phase 7 — Review, Timeline and Export element deltas (audited 2026-09-03)
@@ -317,14 +312,14 @@ and the Timeline/Export empty states. Settle each with the design owner before
 a worker touches it.
 
 **Sequencing.** Review's fallback notice and agent copy depend on
-[plan 030](030-truthful-ai-usage.md) Phases 2–4. Timeline and Export have no
+[plan 030](done/030-truthful-ai-usage.md) Phases 2–4. Timeline and Export have no
 plan 030 dependency and can be done together with Phases 2, 3 and 6 under the
 same single baseline re-cut.
 
-- [ ] **Step 7.2** Timeline deltas 1–9.
-- [ ] **Step 7.3** Export deltas 1–8.
-- [ ] **Step 7.4** Review deltas 1–5, after plan 030 Phases 2–3 land.
-- [ ] **Step 7.5** Re-cut both baseline sets once, with Phases 2, 3 and 6.
+- [ ] 7.2 Timeline deltas 1–9.
+- [ ] 7.3 Export deltas 1–8.
+- [ ] 7.4 Review deltas 1–5, after plan 030 Phases 2–3 land.
+- [ ] 7.5 Re-cut both baseline sets once, with Phases 2, 3 and 6.
 
 **Not part of this plan.** Reference screens `2a` (`Contact Sheet`, dark),
 `2c` (`Contact Sheet · light`) and `2b` (`Cutting Room`) are new marketing /

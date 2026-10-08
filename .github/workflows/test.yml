@@ -46,6 +46,9 @@ jobs:
       - name: Verify plan lifecycle contract
         run: python3 scripts/tests/test_plans.py -v
 
+      - name: Check plan index
+        run: python3 scripts/plans.py check
+
       # Analysis degrades gracefully without vidstab, but the browser tests
       # exercise the normal path — fail loudly rather than silently testing the
       # degraded one. Ubuntu's ffmpeg ships with libvidstab.

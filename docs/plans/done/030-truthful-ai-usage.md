@@ -1,12 +1,14 @@
 # Plan 030: Truthful AI usage — selected vs effective harness, and an independent Review Agent
 
+Superseded by: [038](../038-ai-connection.md) (its open step 2.3, discoverable consent, is 038 Phases 4–5).
+
 Status: **IN PROGRESS** — one gap left (Step 2.3, below) · Priority P1 · Effort M · Risk MED · Category correctness + trust
 Created 2026-09-03 against `48a0f8b`. Phases 1–3 shipped in `bbad130` (PR #76),
 Step 4.1 in PR #78; the boxes below were ticked on 2026-10-04 after each was
 re-verified against the code, and Step 4.2 is the full-gate run on
 `feat/small-plans-batch`. Step 2.3 was found only half done during owner QA the
 same day; see "Remaining" below. Implements
-[ADR 0005](../adr/0005-harness-and-review-agent-are-independent.md).
+[ADR 0005](../../adr/0005-harness-and-review-agent-are-independent.md).
 
 > **For agentic workers:** phases are ordered; each step has its own
 > verification. Use the vocabulary in `GLOSSARY.md` exactly —
@@ -135,11 +137,11 @@ Owner direction (2026-10-04): this must be much clearer to the Editor — either
 **consent enabled by default**, or a **prominent introduction dialog / wizard**
 that explains cloud AI and asks once.
 
-- Default-enabled consent contradicts [ADR 0001](../adr/0001-local-first-and-cloud-consent.md)
+- Default-enabled consent contradicts [ADR 0001](../../adr/0001-local-first-and-cloud-consent.md)
   ("explicit per-project consent", opt-in) and the AGENTS.md privacy line, so
   choosing it means superseding that ADR first.
 - An introduction dialog fits ADR 0001 as written. It overlaps
-  [plan 031](031-app-restyle-conformance.md) Phase 5, which already replaces
+  [plan 031](../031-app-restyle-conformance.md) Phase 5, which already replaces
   the `window.confirm` with a designed consent gate; build one consent surface,
   not two.
 
@@ -173,6 +175,6 @@ and an E2E grants consent from that surface and sees the real agent.
 
 Which provider counts as "the AI harness" for the Flow D signal test
 (`drone-workflow-qa-flows.md`, still unresolved), per-project versus global
-harness override UX ([`done/project-folder-model.md`](done/project-folder-model.md),
+harness override UX ([`done/project-folder-model.md`](project-folder-model.md),
 still unresolved), and any
 change to what the harnesses actually score.

@@ -47,6 +47,12 @@ Why, constraints, decisions already made, links. Optional.
 | 🟢 DONE | every box ticked; the file belongs in `done/` |
 | ⚪ SUPERSEDED | has a `Superseded by:` line; the file belongs in `done/` |
 
+## Parked plans
+
+A plan the roadmap puts after v1.0.0 lives in `docs/plans/later/`.
+`scripts/plans.py` does not read that folder, so parked plans have no index row
+and no status. To un-park one, `git mv` it back to `docs/plans/` and run `sync`.
+
 ## Lifecycle
 
 - Tick a task in the same PR that ships it, with the PR number, e.g.

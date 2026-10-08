@@ -1,7 +1,9 @@
 # Agent-Operable Timeline
 
+Superseded by: [review-visual-editing](../review-visual-editing.md) (pan preview and propose → apply E2E carried over; chat token streaming dropped for v1.0.0).
+
 Design spec (source of truth for behaviour):
-[`docs/specs/2026-06-19-agent-operable-timeline-design.md`](../specs/2026-06-19-agent-operable-timeline-design.md).
+[`docs/specs/2026-06-19-agent-operable-timeline-design.md`](../../specs/2026-06-19-agent-operable-timeline-design.md).
 
 ## Status
 

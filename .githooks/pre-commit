@@ -15,6 +15,7 @@ IFS=$(printf '\n_')
 IFS=${IFS%_}
 set -f
 has_frontend_ts=false
+has_plans=false
 
 for path in $staged_paths; do
   case "$path" in
@@ -48,6 +49,7 @@ done
 for path in $ts_paths; do
   case "$path" in
     frontend/*.ts|frontend/*.tsx|frontend/*.mts|frontend/*.cts) has_frontend_ts=true ;;
+    docs/plans/*) has_plans=true ;;
   esac
 done
 
@@ -94,6 +96,16 @@ if [ -n "$ruff_paths" ]; then
   # shellcheck disable=SC2086
   [ -n "$ruff_paths" ] && set -- $ruff_paths
   backend/.venv/bin/ruff check --no-cache "$@" || failed=true
+fi
+
+if [ "$has_plans" = true ]; then
+  # plans.py reads the working tree, so it checks the staged plans only when
+  # nothing under docs/plans/ is left unstaged.
+  if ! git diff --quiet -- docs/plans || [ -n "$(git ls-files --others --exclude-standard -- docs/plans)" ]; then
+    printf 'pre-commit: docs/plans/ has unstaged changes; stage or discard them first.\n' >&2
+    exit 1
+  fi
+  python3 scripts/plans.py check || failed=true
 fi
 
 IFS=$old_ifs

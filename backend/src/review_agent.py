@@ -8,8 +8,8 @@ through the operations core (so they land in Undo History); rejecting discards
 them. Read access runs normally (provided here as context).
 
 The actual model call is injected as an ``agent`` callable so the loop is
-deterministic and testable; the default implementation reuses
-``pi_cli_harness``'s provider/model env-config.
+deterministic and testable; the default implementation uses the configured
+provider and model.
 """
 
 from __future__ import annotations
@@ -40,7 +40,6 @@ from .models import (
 )
 from .app_settings import get_settings
 from .assembly_profiles import PROFILE_DEFAULTS, capture_order_key
-from .pi_cli_harness import REPO_ROOT
 from .project_store import read_review_session, write_review_session
 from .review_state import review_context_fingerprint, sequence_fingerprint
 from .timeline_ops import (
@@ -55,6 +54,7 @@ from .timeline_script import API_REFERENCE, run_script
 
 
 logger = logging.getLogger("uvicorn.error")
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReviewAgentError(Exception):
@@ -579,7 +579,7 @@ def _turn_result(agent_message: ReviewMessage, session: ReviewSession) -> dict:
     }
 
 
-# --- Default model-backed agent (reuses pi_cli_harness env-config) ----------
+# --- Default model-backed agent -----------------------------------------------
 #
 # Not unit-tested (needs the pi CLI + network); tests inject a stub `agent`.
 # Degrades gracefully to a chat-only reply on any failure so the app never

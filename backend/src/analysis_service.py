@@ -14,14 +14,19 @@ from .clip_assembly import AssemblyPreferences, assemble_smooth_clips
 from .clip_diversity import assign_look_groups
 from .embeddings import EmbeddingProvider, default_embedding_provider, embed_candidate
 from .frame_extraction import FFmpegError, FFmpegUnavailableError, extract_frames
-from .models import FrameSample
+from .harness_utils import sample_frames_for_clip
+from .models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
 from .motion_analysis import (
     FFmpegVidstabError,
     FFmpegVidstabUnavailableError,
     parse_trf,
     run_vidstabdetect,
 )
-from .pi_cli_harness import enhance_clips_with_pi_cli
+from .ai_engines import get_engine
+from .ai_engines.engine import AiEngine
+from .ai_engines.messages import provider_name
+from .ai_engines.types import AiFailure
+from .ai_scoring import ScoringOutcome, enhance_clips
 from .quality_scoring import score_samples_from_images
 from .scene_detection import assign_scene_ids, detect_scenes
 
@@ -127,11 +132,12 @@ def run_analysis_pipeline(
     assign_scene_ids_fn: Callable = assign_scene_ids,
     score_samples_fn: Callable = None,
     assemble_clips_fn: Callable = assemble_smooth_clips,
-    enhance_clips_fn: Callable = enhance_clips_with_pi_cli,
+    enhance_clips_fn: Callable = enhance_clips,
     parse_transforms_fn: Callable = parse_trf,
     motion_analysis_enabled: bool = True,
     motion_analysis_unavailable_reason: Optional[str] = None,
     embedding_provider_fn: Callable[[], Optional[EmbeddingProvider]] = default_embedding_provider,
+    engine_fn: Callable[[], AiEngine] = get_engine,
 ) -> AnalysisPipelineResult:
     pipeline_started = time.monotonic()
     per_video_results = []
@@ -147,6 +153,7 @@ def run_analysis_pipeline(
         embedding_provider = None
     videos_to_analyze = selected_videos(project, request)
     total_videos = len(videos_to_analyze)
+    scoring_failure: Optional[AiFailure] = None
     for index, video in enumerate(videos_to_analyze, start=1):
         check_cancelled()
         video_started = time.monotonic()
@@ -300,12 +307,19 @@ def run_analysis_pipeline(
         )
         video_metadata = {}
         if request.harness_id == "pi_agent":
+            engine = None
+            if scoring_failure:
+                provider = provider_name(scoring_failure.provider)
+            else:
+                engine = engine_fn()
+                provider = provider_name(engine.provider)
             logger.info(
-                "Analyze %d/%d %s: scoring %d clip(s) with pi - one CLI call per clip, can take minutes",
+                "Analyze %d/%d %s: scoring %d clip(s) with %s",
                 index,
                 total_videos,
                 video["file_name"],
                 len(result.clips),
+                provider,
             )
             set_progress(
                 step="scoring_clips",
@@ -313,32 +327,40 @@ def run_analysis_pipeline(
                 clip_total=len(result.clips),
                 message=(
                     f"Video {index}/{total_videos}: scoring {len(result.clips)} clip(s) "
-                    "with Pi"
+                    f"with {provider}"
                 ),
             )
             phase_started = time.monotonic()
 
-            def pi_progress(done, total, _index=index):
+            def scoring_progress(done, total, _index=index, _provider=provider):
                 check_cancelled()
                 set_progress(
                     clip_index=done,
                     clip_total=total,
-                    message=f"Video {_index}/{total_videos}: Pi scored {done}/{total} clip(s)",
+                    message=f"Video {_index}/{total_videos}: {_provider} scored {done}/{total} clip(s)",
                 )
-
-            result, used_ai = enhance_clips_fn(
-                result,
-                frame_scores,
-                progress_callback=pi_progress,
-                cache_dir=analysis_path / "ai-scores",
-            )
+            if scoring_failure:
+                outcome = ScoringOutcome(
+                    result=result, used_ai=False, failure=scoring_failure,
+                    clips_scored=0,
+                    clips_left=sum(bool(sample_frames_for_clip(clip, frame_scores)) for clip in result.clips),
+                )
+            else:
+                outcome = enhance_clips_fn(
+                    engine, result, frame_scores, samples_dir=samples_path,
+                    progress_callback=scoring_progress,
+                    cache_dir=analysis_path / "ai-scores",
+                )
+            result = outcome.result
+            scoring_failure = outcome.failure
             video_timing["ai_scoring_sec"] = round(time.monotonic() - phase_started, 2)
-            video_metadata["used_ai"] = used_ai
+            video_metadata["used_ai"] = outcome.used_ai
             video_metadata["model_used"] = result.metadata.get("model_used")
             video_metadata["file_id"] = video["file_id"]
             video_metadata["file_name"] = video["file_name"]
-            if result.metadata.get("warning"):
-                video_metadata["warning"] = result.metadata["warning"]
+            video_metadata["clips_left"] = outcome.clips_left
+            if outcome.failure:
+                video_metadata["failure"] = outcome.failure.model_dump(exclude_none=True)
             if result.metadata.get("scoring_seconds_per_clip"):
                 video_metadata["scoring_seconds_per_clip"] = result.metadata[
                     "scoring_seconds_per_clip"
@@ -548,3 +570,54 @@ def score_samples_rule_based(samples: list, transforms=None) -> list:
         for sample in samples
     ]
     return score_samples_from_images(frame_samples, transforms=transforms)
+
+
+def resume_ai_scoring(
+    project: dict,
+    *,
+    samples_path: Path,
+    cache_dir: Path,
+    engine_fn: Callable[[], AiEngine],
+    enhance_clips_fn: Callable = enhance_clips,
+) -> tuple[list[dict], list[dict]]:
+    """Score previously analyzed clips from their saved frame samples."""
+    ai_scoring = project.get("ai_scoring") or {}
+    failed_files = {
+        item.get("file_id"): item for item in ai_scoring.get("per_video", [])
+        if item.get("failure") or int(item.get("clips_left", 0)) > 0
+    }
+    stored_frames = (project.get("frame_scores") or {}).get("per_file", {})
+    generation = (project.get("generation_stats") or {}).get("per_file", {})
+    results, metadata = [], []
+    clips_by_file = {}
+    for clip in project.get("clips", []):
+        clips_by_file.setdefault(clip.get("file_id"), []).append(clip)
+    videos_by_id = {video["file_id"]: video for video in project.get("videos", [])}
+    for file_id, _previous in failed_files.items():
+        video = videos_by_id.get(file_id)
+        if not video:
+            continue
+        clips = [ClipSuggestion.model_validate(clip) for clip in clips_by_file.get(file_id, [])]
+        frames = [FrameScore.model_validate(frame) for frame in stored_frames.get(file_id, {}).get("frames", [])]
+        manual = AssemblyResult(
+            clips=clips,
+            sequence=TimelineSequence(total_duration_sec=sum(c.duration_sec for c in clips), clips=[c.clip_id for c in clips]),
+            metadata={"generation_stats": generation.get(file_id, {})},
+        )
+        outcome = enhance_clips_fn(
+            engine_fn(), manual, frames, samples_dir=samples_path,
+            cache_dir=cache_dir, only_clip_ids={clip.clip_id for clip in clips},
+        )
+        clips_by_file[file_id] = [clip.model_dump() for clip in outcome.result.clips]
+        entry = {
+            "used_ai": outcome.used_ai,
+            "model_used": outcome.result.metadata.get("model_used"),
+            "file_id": file_id,
+            "file_name": video["file_name"],
+            "clips_left": outcome.clips_left,
+        }
+        if outcome.failure:
+            entry["failure"] = outcome.failure.model_dump(exclude_none=True)
+        metadata.append(entry)
+        results.append({"file_id": file_id, "clips": clips_by_file[file_id], "result": outcome.result})
+    return results, metadata

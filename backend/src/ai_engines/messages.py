@@ -15,6 +15,10 @@ _PROVIDER = {"claude": "Claude", "chatgpt": "ChatGPT"}
 _ENGINE = {"claude": "Claude Code", "chatgpt": "Codex"}
 
 
+def provider_name(provider: Optional[Provider]) -> str:
+    return _PROVIDER.get(provider, "AI")
+
+
 def default_action(kind: AiFailureKind) -> AiFailureAction:
     return _ACTIONS[kind]
 

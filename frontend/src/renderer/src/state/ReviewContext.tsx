@@ -104,6 +104,8 @@ interface ReviewState {
   setCloudAiConsent: (consented: boolean) => Promise<void>;
   applyAnalysisResult: (result: AnalysisResult) => void;
   resumeAiScoring: () => Promise<void>;
+  resumingAiScoring: boolean;
+  resumeError: string | null;
   recommendation: AssemblyRecommendation | null;
   generationStats: ClipGenerationStats | null;
   harnessMetadata: HarnessUsageMetadata | null;
@@ -155,6 +157,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [recommendation, setRecommendation] = useState<AssemblyRecommendation | null>(null);
   const [generationStats, setGenerationStats] = useState<ClipGenerationStats | null>(null);
   const [harnessMetadata, setHarnessMetadata] = useState<HarnessUsageMetadata | null>(null);
+  const [resumingProjectIds, setResumingProjectIds] = useState<Set<string>>(() => new Set());
+  const [resumeError, setResumeError] = useState<string | null>(null);
   const [draftFormat, setDraftFormat] = useState<FormatName | null>(null);
 
   // The latest authoritative document, kept in a ref so operation handlers can
@@ -164,6 +168,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const openStartedRef = useRef(false);
   // The project currently open, so an in-flight response for a previous one is not applied.
   const activeProjectRef = useRef(projectId);
+  const resumePromisesRef = useRef<Map<string, Promise<void>>>(new Map());
   useLayoutEffect(() => {
     activeProjectRef.current = projectId;
   }, [projectId]);
@@ -442,11 +447,32 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     [refreshTimelineDocument, setClips],
   );
 
-  const resumeAiScoring = useCallback(async () => {
-    if (!projectId) return;
+  const resumeAiScoring = useCallback(() => {
+    if (!projectId) return Promise.resolve();
     const requestedProjectId = projectId;
-    const result = await requestAiScoringResume(requestedProjectId);
-    if (activeProjectRef.current === requestedProjectId) applyAnalysisResult(result);
+    const activeRequest = resumePromisesRef.current.get(requestedProjectId);
+    if (activeRequest) return activeRequest;
+    setResumeError(null);
+    setResumingProjectIds((current) => new Set(current).add(requestedProjectId));
+    const request = (async () => {
+      try {
+        const result = await requestAiScoringResume(requestedProjectId);
+        if (activeProjectRef.current === requestedProjectId) applyAnalysisResult(result);
+      } catch (reason: unknown) {
+        if (activeProjectRef.current === requestedProjectId) {
+          setResumeError(reason instanceof Error ? reason.message : 'Unable to finish AI scoring');
+        }
+      } finally {
+        resumePromisesRef.current.delete(requestedProjectId);
+        setResumingProjectIds((current) => {
+          const next = new Set(current);
+          next.delete(requestedProjectId);
+          return next;
+        });
+      }
+    })();
+    resumePromisesRef.current.set(requestedProjectId, request);
+    return request;
   }, [applyAnalysisResult, projectId]);
 
   const regenerateDraft = useCallback(
@@ -689,6 +715,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setCloudAiConsent,
       applyAnalysisResult,
       resumeAiScoring,
+      resumingAiScoring: Boolean(projectId && resumingProjectIds.has(projectId)),
+      resumeError,
       recommendation,
       generationStats,
       harnessMetadata,
@@ -727,6 +755,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       targetDuration,
       generationStats,
       harnessMetadata,
+      resumingProjectIds,
+      resumeError,
       selectProfile,
       selectTargetDuration,
       include,

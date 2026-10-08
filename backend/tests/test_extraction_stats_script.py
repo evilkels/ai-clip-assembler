@@ -82,9 +82,18 @@ def test_reports_candidates_steady_seconds_and_drafts_for_a_folder_project(tmp_p
         ("SHAKY.MP4", 1),
     ]
     assert stats["total"] == 2
+    assert stats["median_sec"] == 21.5
+    assert stats["p90_sec"] == 29
     assert stats["steady_sec"] == 45
-    for format_name in ("short", "medium", "long"):
-        assert isinstance(stats["drafts"][format_name]["total_duration_sec"], (int, float))
+    # 0-29 s and 0-14 s are in different files, so their seconds add up.
+    assert stats["covered_sec"] == 43
+    # Cut cycles: Short 7, 4; Medium 18, 10; Long 35 (29 available), 22 (14 available).
+    assert {name: (draft["total_duration_sec"], draft["clips"]) for name, draft in stats["drafts"].items()} == {
+        "short": (11, 2),
+        "medium": (28, 2),
+        "long": (43, 2),
+    }
+    assert stats["recommended"] == "medium"
 
 
 def test_prints_one_markdown_row_without_json_flag(tmp_path, capsys):

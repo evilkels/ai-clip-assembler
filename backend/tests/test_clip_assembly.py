@@ -246,9 +246,11 @@ def test_windows_in_one_run_never_overlap():
         source_duration_sec=30.0,
     )
 
-    spans = sorted((clip.start_sec, clip.end_sec) for clip in result.clips)
-    assert spans == [(0, 10), (10, 20), (20, 30)]
-    assert all(earlier[1] <= later[0] for earlier, later in zip(spans, spans[1:]))
+    assert sorted((clip.start_sec, clip.end_sec) for clip in result.clips) == [
+        (0, 10),
+        (10, 20),
+        (20, 30),
+    ]
 
 
 def test_candidate_pool_skips_scene_shorter_than_minimum_duration():
@@ -317,5 +319,6 @@ def test_scene_cap_scales_with_scene_length():
     )
 
     assert len(result.clips) == 12
+    assert result.metadata["generation_stats"]["scenes_at_cap"] == 1
     spans = sorted((clip.start_sec, clip.end_sec) for clip in result.clips)
     assert all(earlier[1] <= later[0] for earlier, later in zip(spans, spans[1:]))

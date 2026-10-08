@@ -8,6 +8,12 @@ video files, scores frames for quality/stability, and generates clip
 recommendations through the selected harness. Source videos remain local.
 An opt-in cloud harness may send sampled frames only after explicit saved
 per-project consent.
+The default **Selected Harness** is the rule-based **Manual Harness**
+(`manual`); the optional `pi_agent` harness drives the `pi` CLI to add
+visual-interest scoring. The **Effective Harness** can differ from the selected
+one after a **Harness Fallback** or a re-derive from cached Frame Scores. The
+**In-App Review Agent** is configured independently but shares the same consent
+gate ([ADR 0005](adr/0005-harness-and-review-agent-are-independent.md)).
 
 ## Data Flow
 

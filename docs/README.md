@@ -14,6 +14,7 @@ Map of this directory. One folder per document kind — no nesting beyond this.
 
 Top-level guides:
 
+- [GLOSSARY.md](../GLOSSARY.md) — domain vocabulary; use these terms in code, docs and issues
 - [PRD.md](PRD.md) — product requirements
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design
 - [HARNESS_SPEC.md](HARNESS_SPEC.md) — pluggable AI-harness contract

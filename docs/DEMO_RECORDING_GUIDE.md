@@ -116,4 +116,4 @@ the original; labels, score chips, and timecodes blur first.
 Agent scope: compress/generate missing derivatives and embed a lightweight,
 non-render-blocking video with poster, controls, captions, muted loop, and
 reduced-motion fallback. Related truth sources: `USER_GUIDE.md`,
-`MANUAL_QA_GUIDE.md`, `TROUBLESHOOTING.md`, and `UBIQUITOUS_LANGUAGE.md`.
+`MANUAL_QA_GUIDE.md`, `TROUBLESHOOTING.md`, and `GLOSSARY.md`.

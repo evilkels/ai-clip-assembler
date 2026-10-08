@@ -9,7 +9,7 @@ same day; see "Remaining" below. Implements
 [ADR 0005](../adr/0005-harness-and-review-agent-are-independent.md).
 
 > **For agentic workers:** phases are ordered; each step has its own
-> verification. Use the vocabulary in `UBIQUITOUS_LANGUAGE.md` exactly —
+> verification. Use the vocabulary in `GLOSSARY.md` exactly —
 > **Selected Harness**, **Effective Harness**, **Harness Fallback**,
 > **In-App Review Agent**. Do not write "manual mode" in user-facing copy.
 

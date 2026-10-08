@@ -21,7 +21,7 @@ literal conformance to the approved designs.
 - Landing: `docs/design/2026-09-01-landing-page-handoff.md` and
   `docs/design/2026-09-01-landing-page-reference.html`.
 - Behavior: existing React route behavior and automated functional tests.
-- Product architecture: `CONTEXT.md`, `docs/ARCHITECTURE.md`, and applicable ADRs.
+- Product architecture: `docs/ARCHITECTURE.md` and applicable ADRs.
 
 If the fixed-width prototype conflicts with responsive operation, preserve its
 hierarchy and relationships at 1440px and adapt them at narrower widths without

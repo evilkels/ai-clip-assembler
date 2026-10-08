@@ -39,4 +39,4 @@ which edits did not survive.
 
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — Export (`export_engine.py`)
 - [docs/QA.md](../QA.md) — Section 5, Export
-- [UBIQUITOUS_LANGUAGE.md](../../UBIQUITOUS_LANGUAGE.md) — Speed, Transform, EDL, FCPXML, Resolve XML
+- [GLOSSARY.md](../../GLOSSARY.md) — Speed, Transform, EDL, FCPXML, Resolve XML

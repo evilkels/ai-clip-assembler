@@ -280,12 +280,10 @@ def assemble_smooth_clips(
         )
         limit = scene_caps[run[0].scene_id]
         selected_windows = select_windows(windows, limit=limit)
-        if len(selected_windows) >= limit and any(
-            not any(
-                window.start_sec < chosen.end_sec and window.end_sec > chosen.start_sec
-                for chosen in selected_windows
-            )
-            for window in windows
+        if len(selected_windows) >= limit and select_windows(
+            windows,
+            limit=1,
+            exclude=[(window.start_sec, window.end_sec) for window in selected_windows],
         ):
             scenes_truncated_by_cap.add(run[0].scene_id)
         for chosen in selected_windows:

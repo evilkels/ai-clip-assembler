@@ -143,9 +143,9 @@ Same script and columns; the per-file column lists the 13 counts in
 
 ## Phase 1: Measure the current library
 
-- [ ] 1.1 Add `scripts/extraction_stats.py` with a test. Done when
+- [x] 1.1 Add `scripts/extraction_stats.py` with a test. Done when
   `cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_extraction_stats_script.py -q`
-  passes and the script prints one Markdown table row for a folder project.
+  passes and the script prints one Markdown table row for a folder project. (PR #99)
   - Usage: `cd backend && PYTHONPATH=. .venv/bin/python ../scripts/extraction_stats.py <folder> [--max-clip-sec N] [--json]`.
   - Reads `<folder>/clipassembler/project.json` (for folder projects
     `file_id` is the file name, `backend/src/api.py:1654`) and
@@ -172,9 +172,9 @@ Same script and columns; the per-file column lists the 13 counts in
     naming two files and a schema-3 `frame_scores.json` with 30 synthetic
     frames each (one steady, one half shaky); assert the per-file counts, the
     steady seconds and that the three draft totals are numbers.
-- [ ] 1.2 Produce `frame_scores.json` for Estepona on `main`. Done when
+- [x] 1.2 Produce `frame_scores.json` for Estepona on `main`. Done when
   `~/Movies/DRONE_VIDEO/ESTEPONA_03-05-26/clipassembler/analysis/frame_scores.json`
-  exists with four `per_file` entries. (after 1.1)
+  exists with four `per_file` entries. (after 1.1) (PR #99)
   - Start the backend from `frontend/` with `npm run dev:backend`, then:
     `curl -s -X POST http://127.0.0.1:8000/projects/from-folder -H 'Content-Type: application/json' -d '{"folder_path":"<absolute folder>"}'`
     and
@@ -183,16 +183,16 @@ Same script and columns; the per-file column lists the 13 counts in
   - This replaces the folder's old `results.json` (Pi-scored, pre-v0.4.0) with
     a rule-based library. That is intended; the copy on the implementer's
     machine is the measurement fixture.
-- [ ] 1.3 Record the "main before Phase 2" rows. Done when the first row of
+- [x] 1.3 Record the "main before Phase 2" rows. Done when the first row of
   both tables (Estepona and Detox hike) is filled from the script output at
-  `--max-clip-sec 10` and committed in the Phase 1 PR. (after 1.2)
+  `--max-clip-sec 10` and committed in the Phase 1 PR. (after 1.2) (PR #99)
   - Produce Detox hike's `frame_scores.json` the same way as 1.2.
 
 ## Phase 2: Draft counts keyed per Source Video
 
-- [ ] 2.1 Add the regression test. Done when
+- [x] 2.1 Add the regression test. Done when
   `test_draft_scene_cap_counts_each_source_video_separately` in
-  `backend/tests/test_assembly_profiles.py` fails on `main`.
+  `backend/tests/test_assembly_profiles.py` fails on `main`. (PR #99)
   - Fixture: 20 Source Videos `file-0` … `file-19`, one candidate each,
     range 0–10 s, `scene_id=1`, `overall_score = 9.0 - i / 100`, no
     `look_group`. `build_draft_timeline(clips, profile="cinematic_highlight", target_duration_sec=120)`.
@@ -200,17 +200,17 @@ Same script and columns; the per-file column lists the 13 counts in
     `total_duration_sec >= 108` (the cut cycle 10, 10, 10, 7, 10, 10 gives
     114 s in 12 clips, then the 6 s remainder is below the 7 s shortest cut).
     On `main` the draft stops at 4 clips and 37 s.
-- [ ] 2.2 Key the counts on the Source Video. Done when 2.1 and
-  `tests/test_assembly_profiles.py` pass. (after 2.1)
+- [x] 2.2 Key the counts on the Source Video. Done when 2.1 and
+  `tests/test_assembly_profiles.py` pass. (after 2.1) (PR #99)
   - In `build_draft_timeline`, `scene_key = (clip.get("file_id"), scene_id)`
     for both the read at `assembly_profiles.py:176` and the write at `:211`.
 
 ## Phase 3: Several windows per steady run
 
-- [ ] 3.1 Add selector tests. Done when the four tests below and D4's
+- [x] 3.1 Add selector tests. Done when the four tests below and D4's
   `test_scene_cap_scales_with_scene_length` exist in
   `backend/tests/test_clip_assembly.py` and fail because `select_windows`
-  does not exist.
+  does not exist. (PR #99)
   - All build windows with `candidate_windows(frames, 3, 10)` and call
     `select_windows` directly; the `frame()` helper gives sharpness,
     exposure and contrast 8.0 and visual interest 0.
@@ -226,8 +226,8 @@ Same script and columns; the per-file column lists the 13 counts in
   - `test_select_windows_keeps_short_peak_when_longer_windows_fall_outside_tolerance`:
     same shape with the surround at 5.0, `limit=1` → one window shorter than
     10 s whose range contains 10–13 s.
-- [ ] 3.2 Implement `select_windows` and use it everywhere. Done when 3.1
-  passes and `rg -n best_window backend` prints nothing. (after 3.1)
+- [x] 3.2 Implement `select_windows` and use it everywhere. Done when 3.1
+  passes and `rg -n best_window backend` prints nothing. (after 3.1) (PR #99)
   - `backend/src/clip_assembly.py`: add `LONGER_WINDOW_SCORE_TOLERANCE = 0.5`
     and `select_windows` per D2; in `assemble_smooth_clips` replace
     `chosen = best_window(windows)` with
@@ -238,9 +238,9 @@ Same script and columns; the per-file column lists the 13 counts in
   - Add `scene_cap` per D4 and use it in `_bounded_scene_pool`.
   - `candidates_generated` in `generation_stats` now counts every window
     kept per run.
-- [ ] 3.3 Update the tests that pin one window per run. Done when
+- [x] 3.3 Update the tests that pin one window per run. Done when
   `cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q` passes with
-  these edits and no other count assertion loosened. (after 3.2)
+  these edits and no other count assertion loosened. (after 3.2) (PR #99)
   - `test_one_best_window_per_run_no_overlaps` → rename
     `test_windows_in_one_run_never_overlap`: 31 frames 0–30 s,
     `source_duration_sec=30`, `max_clip_duration_sec=10.0` as today, default
@@ -259,19 +259,19 @@ Same script and columns; the per-file column lists the 13 counts in
     and the `test_api.py` analyze tests (5–8 frame fixtures, per-scene cap 1 or
     runs that one window fills) keep their assertions; if one fails, re-read
     its fixture rather than widen the assertion.
-- [ ] 3.4 Run the PR gate. Done when `npm run test:backend`, `npm run lint`,
-  `npm run typecheck` and `npm run test:e2e` pass from `frontend/`. (after 3.3)
+- [x] 3.4 Run the PR gate. Done when `npm run test:backend`, `npm run lint`,
+  `npm run typecheck` and `npm run test:e2e` pass from `frontend/`. (after 3.3) (PR #99)
 
 ## Phase 4: Align the longest-clip default
 
-- [ ] 4.1 Measure the four options. Done when the four "after Phase 3" rows
+- [x] 4.1 Measure the four options. Done when the four "after Phase 3" rows
   are filled from `scripts/extraction_stats.py --max-clip-sec 10|15|20|30`
-  on the merged Phase 3 code.
-- [ ] 4.2 Adopt the value D6 selects and make the defaults agree. Done when
+  on the merged Phase 3 code. (PR #99)
+- [x] 4.2 Adopt the value D6 selects and make the defaults agree. Done when
   `test_default_preferences_match_dataclass` in `backend/tests/test_api.py`
   (`api.preferences_from_request({}) == AssemblyPreferences()`) passes and
   `rg -n "max_clip_duration_sec" backend/src frontend/src/renderer/src/lib scripts` shows
-  one value. (after 4.1)
+  one value. (after 4.1) (PR #99)
   - D6 reads the Estepona counts.
   - Change `backend/src/clip_assembly.py:14`, `backend/src/api.py:1929`,
     `frontend/src/renderer/src/lib/clipGenerationPreferences.ts:5` and
@@ -282,16 +282,16 @@ Same script and columns; the per-file column lists the 13 counts in
     count at 10 s) in a sub-bullet here.
   - Adopted **20 s**: Estepona gives 13 candidates at 20 s against 20 at
     10 s, and 13 is not below half of 20 (10).
-- [ ] 4.3 Record the adopted rows and refresh the index. Done when the last
+- [x] 4.3 Record the adopted rows and refresh the index. Done when the last
   row of both tables is filled, `../USER_GUIDE.md`'s "How clips are found" text names
   the new default, and `python3 scripts/plans.py sync` leaves
-  `docs/plans/README.md` consistent. (after 4.2)
+  `docs/plans/README.md` consistent. (after 4.2) (PR #99)
 
 ## Phase 5: A format switch reaches the Timeline
 
-- [ ] 5.1 Add the regression test. Done when
+- [x] 5.1 Add the regression test. Done when
   `test_draft_format_switch_replaces_saved_timeline_document` in
-  `backend/tests/test_api.py` fails on `main`.
+  `backend/tests/test_api.py` fails on `main`. (PR #99)
   - Folder project analyzed with stubbed media (as the existing folder-project
     analyze tests do), one `include` Operation applied so `timeline.json` is
     saved, then `POST /projects/{id}/draft` with `{"format": "long"}`.
@@ -303,8 +303,8 @@ Same script and columns; the per-file column lists the 13 counts in
     project and controller, loads from disk (as the existing reload tests
     do), and asserts the switched document is what loads (reload starts a
     fresh Undo History, so undo is not checked there).
-- [ ] 5.2 Route the draft through the operations core. Done when both 5.1 tests and
-  `tests/test_api.py` pass. (after 5.1)
+- [x] 5.2 Route the draft through the operations core. Done when both 5.1 tests and
+  `tests/test_api.py` pass. (after 5.1) (PR #99)
   - In `regenerate_draft`, after `build_draft_timeline`, get the controller
     (`TimelineLifecycle.get_controller`) and call `apply_batch` with three
     Operations as one undo step: `replace_timeline` (items: each draft clip's
@@ -312,8 +312,11 @@ Same script and columns; the per-file column lists the 13 counts in
     `set_profile`, `set_target_duration`. Persist through the controller's
     normal save path. Keep writing `project["timeline"]` for the response and
     legacy readers; remove the `invalidate_timeline_controller` call.
-- [ ] 5.3 Run the PR gate. Done when `npm run test:backend`, `npm run lint`,
-  `npm run typecheck` and `npm run test:e2e` pass from `frontend/`. (after 5.2)
+- [x] 5.3 Run the PR gate. Done when `npm run test:backend`, `npm run lint`,
+  `npm run typecheck` and `npm run test:e2e` pass from `frontend/`. (after 5.2) (PR #99)
+  - CI (Linux, Node 24) passes. On the implementer's Mac (Node 26), 6 Review
+    list/grid screenshots in `visual-conformance.spec.ts` miss their darwin
+    baselines; the same 6 fail on unchanged `main` there.
 
 ## Human tasks
 

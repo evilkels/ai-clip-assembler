@@ -129,7 +129,7 @@ def _markdown_row(stats: dict) -> str:
         str(stats["total"]),
         f"{stats['median_sec']:.1f}",
         f"{stats['p90_sec']:.1f}",
-        f"{stats['steady_sec']:.1f}",
+        str(stats["steady_sec"]),
         f"{stats['covered_sec']:.1f}",
         f"{drafts['short']['total_duration_sec']:.1f}",
         f"{drafts['medium']['total_duration_sec']:.1f}",

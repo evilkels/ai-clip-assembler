@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { checkForAppUpdate } from '../api/client';
 import { AiAssistancePanel } from './AiAssistancePanel';
 import { ConnectionsTabPanel } from './ConnectionsTabPanel';
 import { DiagnosticsTabPanel } from './DiagnosticsTabPanel';
@@ -50,20 +49,6 @@ export function SettingsModal({ initialPanel = 'ai', initialTab, onClose }: Sett
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>(
     initialTab ? legacyPanel[initialTab] : initialPanel,
   );
-  const [appVersion, setAppVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    checkForAppUpdate()
-      .then((status) => {
-        if (active) setAppVersion(status.currentVersion);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -93,7 +78,7 @@ export function SettingsModal({ initialPanel = 'ai', initialTab, onClose }: Sett
         <aside className="settings-rail">
           <div className="settings-rail-heading">
             <strong>Settings</strong>
-            <span>local first · v{appVersion ?? '…'}</span>
+            <span>local first · v{__APP_VERSION__}</span>
           </div>
           <div className="settings-rail-items" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
             {panels.map((panel) => (

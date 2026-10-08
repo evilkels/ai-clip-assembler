@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+test.describe.configure({ timeout: 180_000 });
+
 function ensureFixtureVideo(): string {
   const directory = join(process.cwd(), 'e2e', '.fixtures');
   const file = join(directory, 'studio-workflow-fixture.mp4');

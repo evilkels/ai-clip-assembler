@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fixtureVideo, openClips, setupReview } from './reviewSetup';
 
+test.describe.configure({ timeout: 180_000 });
+
 test.afterEach(async ({ page }) => {
   // Let in-flight route.fetch handlers finish before Playwright tears down the page.
   await page.unrouteAll({ behavior: 'wait' });

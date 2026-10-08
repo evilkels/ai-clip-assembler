@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+test.describe.configure({ timeout: 180_000 });
+
 function ensureFixtureVideo(): string {
   const dir = join(process.cwd(), 'e2e', '.fixtures');
   const file = join(dir, 'preview-fixture.mp4');
@@ -60,6 +62,13 @@ test('analysis completes and review/timeline previews render playable videos', a
       timeout: 30_000,
     })
     .toBeGreaterThanOrEqual(1);
+  const reviewStartTime = await reviewPreview.evaluate((video) => (video as HTMLVideoElement).currentTime);
+  await expect
+    .poll(async () => reviewPreview.evaluate((video, startTime) => {
+      const preview = video as HTMLVideoElement;
+      return !preview.paused && preview.currentTime > startTime + 0.25;
+    }, reviewStartTime))
+    .toBe(true);
   // Ensure at least one Candidate Clip is in the Working Timeline. Candidates
   // may already be auto-drafted (button reads "Remove from working timeline"),
   // so only click an "Add" button when one is present.

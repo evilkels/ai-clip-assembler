@@ -23,6 +23,7 @@ import {
   getTimelineDocument,
   listRecentProjects,
   redoTimeline,
+  resumeAiScoring as requestAiScoringResume,
   relocateRecentProject,
   renameRecentProject as renameRecentProjectEntry,
   removeRecentProject,
@@ -102,6 +103,7 @@ interface ReviewState {
   setAnalysisStatus: (status: AnalysisStatus) => void;
   setCloudAiConsent: (consented: boolean) => Promise<void>;
   applyAnalysisResult: (result: AnalysisResult) => void;
+  resumeAiScoring: () => Promise<void>;
   recommendation: AssemblyRecommendation | null;
   generationStats: ClipGenerationStats | null;
   harnessMetadata: HarnessUsageMetadata | null;
@@ -360,6 +362,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setSelectedHarnessState(result.selected_harness ?? result.project.harness ?? 'manual');
         setEffectiveHarnessState(result.effective_harness ?? null);
         setGenerationStats(result.generation_stats ?? null);
+        setHarnessMetadata(result.metadata ?? null);
         setRecentProjects(await addRecentProject(result.project_folder, result.project.name));
       } finally {
         setLoading(false);
@@ -438,6 +441,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     },
     [refreshTimelineDocument, setClips],
   );
+
+  const resumeAiScoring = useCallback(async () => {
+    if (!projectId) return;
+    const requestedProjectId = projectId;
+    const result = await requestAiScoringResume(requestedProjectId);
+    if (activeProjectRef.current === requestedProjectId) applyAnalysisResult(result);
+  }, [applyAnalysisResult, projectId]);
 
   const regenerateDraft = useCallback(
     async (
@@ -678,6 +688,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setAnalysisStatus,
       setCloudAiConsent,
       applyAnalysisResult,
+      resumeAiScoring,
       recommendation,
       generationStats,
       harnessMetadata,
@@ -732,6 +743,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setCloudAiConsent,
       selectHarness,
       applyAnalysisResult,
+      resumeAiScoring,
       recommendation,
       draftFormat,
       regenerateDraft,

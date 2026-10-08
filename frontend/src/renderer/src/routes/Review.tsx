@@ -38,6 +38,7 @@ export function ReviewPage() {
     exclude,
     generationStats,
     harnessMetadata,
+    resumeAiScoring,
     include,
     loading,
     projectId,
@@ -51,6 +52,7 @@ export function ReviewPage() {
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
   const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 320, 240, 560);
+  const [resumingScoring, setResumingScoring] = useState(false);
   const availableClipIds = useMemo(
     () => new Set(clips.map((clip) => clip.clip_id)),
     [clips],
@@ -97,7 +99,7 @@ export function ReviewPage() {
   }, [clips]);
 
   const fallbackVideos = useMemo(
-    () => harnessMetadata?.per_video?.filter((video) => video.warning) ?? [],
+    () => harnessMetadata?.per_video?.filter((video) => video.failure) ?? [],
     [harnessMetadata],
   );
 
@@ -206,11 +208,11 @@ export function ReviewPage() {
                 </StatusSurface>
               </div>
             ) : null}
-            {harnessMetadata?.warning ? (
+            {harnessMetadata?.failure ? (
               <output data-testid="harness-fallback-notice" className="harness-fallback-notice">
                 <StatusSurface tone="warning" className="harness-fallback-banner">
-                  <strong>Harness Fallback</strong>
-                  <p>{harnessMetadata.warning}</p>
+                  <strong>AI scoring stopped</strong>
+                  <p>{harnessMetadata.failure.message}</p>
                   {fallbackVideos.length > 0 ? (
                     <div>
                       <span className="harness-fallback-label">Affected Source Videos</span>
@@ -220,6 +222,19 @@ export function ReviewPage() {
                         ))}
                       </ul>
                     </div>
+                  ) : null}
+                  {(harnessMetadata.clips_left ?? 0) > 0 ? (
+                    <button
+                      type="button"
+                      className="btn subtle"
+                      disabled={resumingScoring}
+                      onClick={() => {
+                        setResumingScoring(true);
+                        void resumeAiScoring().finally(() => setResumingScoring(false));
+                      }}
+                    >
+                      {resumingScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
+                    </button>
                   ) : null}
                 </StatusSurface>
               </output>

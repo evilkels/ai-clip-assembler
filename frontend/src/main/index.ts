@@ -10,7 +10,6 @@ import {
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   cleanupStaleBackend,
@@ -20,12 +19,7 @@ import {
   waitForRuntimeDescriptorPort,
 } from './backendLifecycle';
 import { connectMcpClient, detectMcpClients, type McpClientId } from './mcpConnect';
-import {
-  firstExecutableCandidate,
-  piExecutableCandidates,
-  PI_SHELL_PROBE_ARGUMENTS,
-  resolvePiExecutableFromShellOutput,
-} from './piExecutable';
+import { resolvePiBinFromLoginShell as resolvePiExecutableFromLoginShell } from './piExecutable';
 import { inspectPiInstallation, ReviewModelAuthController } from './reviewModelAuth';
 import { normalizeRecentProjectName } from './projectRecents';
 import { handleRevealExportFile } from './exportHandoff';
@@ -307,31 +301,10 @@ function resolveOptionalAssetPath(filename: string): string | undefined {
   return existsSync(assetPath) ? assetPath : undefined;
 }
 
-function probeShellForPiBin(args: readonly string[]): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    // An interactive rc file can exit non-zero after still printing the marker,
-    // so the output is parsed whenever there is any, error or not.
-    execFile('/bin/zsh', [...args], { timeout: 5000 }, (error, stdout) => {
-      if (error && !stdout) {
-        resolve(undefined);
-        return;
-      }
-      void resolvePiExecutableFromShellOutput(stdout).then(resolve);
-    });
-  });
-}
-
 async function resolvePiBinFromLoginShell(): Promise<string | undefined> {
   if (process.env.PI_BIN) return process.env.PI_BIN;
   if (process.platform !== 'darwin') return undefined;
-
-  for (const args of PI_SHELL_PROBE_ARGUMENTS) {
-    const probed = await probeShellForPiBin(args);
-    if (probed) return probed;
-  }
-  // Shells that refuse to cooperate (custom $SHELL, rc file that hangs) still
-  // leave the executable on disk, so fall back to the usual install locations.
-  return firstExecutableCandidate(await piExecutableCandidates(homedir()));
+  return resolvePiExecutableFromLoginShell();
 }
 
 function buildPackagedBackendPath(piBin: string | undefined): string {

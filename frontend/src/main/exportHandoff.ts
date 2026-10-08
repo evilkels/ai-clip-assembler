@@ -6,7 +6,7 @@ export interface RevealExportDependencies<TEvent = unknown> {
 }
 
 /** Validate renderer input before handing a path to Electron's shell API. */
-export function validateRevealExportPath(value: unknown): string {
+function validateRevealExportPath(value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0 || !isAbsolute(value)) {
     throw new Error('A non-empty absolute export file path is required');
   }

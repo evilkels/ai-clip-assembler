@@ -11,7 +11,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src import api, review_agent
-from src.embeddings import FakeEmbeddingProvider
 from src.frame_extraction import FFmpegUnavailableError
 from src.models import (
     AssemblyResult,
@@ -23,6 +22,7 @@ from src.models import (
     TimelineSequence,
     VideoMetadata,
 )
+from support import FakeEmbeddingProvider
 from src.review_state import sequence_fingerprint
 from src.timeline_script import ScriptResult
 

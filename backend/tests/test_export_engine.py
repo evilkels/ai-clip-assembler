@@ -670,7 +670,9 @@ def test_generate_fcpxml_emits_adjust_transform_for_non_identity_transform():
     root = ET.fromstring(generate_fcpxml("T", clips, _transform_videos()))
     adjust = root.find(".//asset-clip/adjust-transform")
     assert adjust is not None
-    assert adjust.get("scale", "").startswith("1.5")
+    # 0.1 * 1920 = 192; -0.2 * 1080 = -216; scale is preserved on both axes.
+    assert adjust.get("position") == "192.0 -216.0"
+    assert adjust.get("scale") == "1.5 1.5"
 
 
 def test_generate_fcpxml_omits_adjust_transform_for_identity():
@@ -685,12 +687,20 @@ def test_generate_resolve_xml_emits_basic_motion_for_transform():
     root = ET.fromstring(xml.split("?>", 1)[1])
     effect_names = [e.text for e in root.findall(".//clipitem/filter/effect/name")]
     assert "Basic Motion" in effect_names
-    scale_values = [
-        p.find("value").text
+    scale = next(
+        p.find("value")
         for p in root.findall(".//clipitem/filter/effect/parameter")
         if p.find("parameterid") is not None and p.find("parameterid").text == "scale"
-    ]
-    assert scale_values  # a scale parameter was written
+    )
+    center = next(
+        p.find("value")
+        for p in root.findall(".//clipitem/filter/effect/parameter")
+        if p.find("parameterid") is not None and p.find("parameterid").text == "center"
+    )
+    # 1.5 * 100 = 150%; the normalized center offsets remain 0.1 and -0.2.
+    assert scale.text == "150.0"
+    assert center.find("horiz").text == "0.1"
+    assert center.find("vert").text == "-0.2"
 
 
 def test_edl_flatten_warnings_flags_speed_and_transform():

@@ -555,7 +555,7 @@ def test_rederive_clips_reuses_cached_frame_scores_and_changes_generation_stats(
     )
 
     assert changed.status_code == 200
-    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 1
+    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 3
 
 
 def test_rederive_clips_returns_422_without_cached_frame_scores(tmp_path):

@@ -1,11 +1,18 @@
+import math
 import uuid
 from dataclasses import asdict
 from dataclasses import dataclass
 from statistics import median
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .models import AssemblyResult, ClipSuggestion, FrameScore, TimelineSequence
 from .scoring_weights import DRONE_SCORE_WEIGHTS
+
+# Overall-score points (0-10 scale) a longer window may trail the best one by
+# and still be preferred: one smoothness point moves the overall score by 0.54.
+LONGER_WINDOW_SCORE_TOLERANCE = 0.5
+# A Scene keeps max_clips_per_scene candidates per started minute of footage.
+SCENE_CAP_WINDOW_SEC = 60.0
 
 
 @dataclass(frozen=True)
@@ -74,15 +81,42 @@ def candidate_windows(
     return windows
 
 
-def best_window(windows: List[CandidateWindow]) -> Optional[CandidateWindow]:
-    """The single strongest window for a run: highest weighted overall score,
-    ties broken by the longer (more usable) span."""
-    if not windows:
-        return None
-    return max(
-        windows,
-        key=lambda w: (weighted_overall(w.frames), w.end_sec - w.start_sec),
-    )
+def select_windows(
+    windows: List[CandidateWindow],
+    *,
+    limit: int,
+    exclude: Sequence[Tuple[float, float]] = (),
+    score_tolerance: float = LONGER_WINDOW_SCORE_TOLERANCE,
+) -> List[CandidateWindow]:
+    """Up to `limit` non-overlapping windows, sorted by start. Each pick is the
+    longest free window scoring within `score_tolerance` of the best free one.
+    Windows may not overlap `exclude` ranges; touching is allowed."""
+    claimed = list(exclude)
+    scored = [(window, weighted_overall(window.frames)) for window in windows]
+    picked: List[CandidateWindow] = []
+    while len(picked) < limit:
+        free = [
+            (window, score)
+            for window, score in scored
+            if not any(window.start_sec < c_end and window.end_sec > c_start for c_start, c_end in claimed)
+        ]
+        if not free:
+            break
+        best = max(score for _, score in free)
+        window, _ = min(
+            (item for item in free if item[1] >= best - score_tolerance),
+            key=lambda item: (-(item[0].end_sec - item[0].start_sec), -item[1], item[0].start_sec),
+        )
+        picked.append(window)
+        claimed.append((window.start_sec, window.end_sec))
+    return sorted(picked, key=lambda window: window.start_sec)
+
+
+def scene_cap(preferences: AssemblyPreferences, scene_duration_sec: float) -> int:
+    """Candidates one Scene may keep: the per-scene cap for every started
+    minute of footage, bounded by the per-video cap."""
+    minutes = max(1, math.ceil(scene_duration_sec / SCENE_CAP_WINDOW_SEC))
+    return min(preferences.max_clips_per_scene * minutes, preferences.max_candidates_per_video)
 
 
 def candidate_runs(
@@ -166,6 +200,7 @@ def _rank_clips(clips: List[ClipSuggestion]) -> List[ClipSuggestion]:
 def _bounded_scene_pool(
     clips: List[ClipSuggestion],
     preferences: AssemblyPreferences,
+    scene_caps: Dict[int, int],
 ) -> List[ClipSuggestion]:
     by_scene: Dict[int, List[ClipSuggestion]] = {}
     for clip in _rank_clips(clips):
@@ -189,7 +224,7 @@ def _bounded_scene_pool(
             break
         if clip.clip_id in selected_ids:
             continue
-        if scene_counts.get(clip.scene_id, 0) >= preferences.max_clips_per_scene:
+        if scene_counts.get(clip.scene_id, 0) >= scene_caps[clip.scene_id]:
             continue
         selected.append(clip)
         selected_ids.add(clip.clip_id)
@@ -208,6 +243,25 @@ def assemble_smooth_clips(
     source_duration_sec: Optional[float] = None,
 ) -> AssemblyResult:
     bounds = scene_bounds or {}
+    frames_by_scene: Dict[int, List[FrameScore]] = {}
+    for frame in sorted(frames, key=lambda item: item.timestamp):
+        frames_by_scene.setdefault(frame.scene_id, []).append(frame)
+
+    def scene_span(scene_id: int) -> Tuple[float, float]:
+        scene_frames = frames_by_scene[scene_id]
+        scene_start, scene_end = bounds.get(
+            scene_id,
+            (scene_frames[0].timestamp, source_duration_sec or scene_frames[-1].timestamp),
+        )
+        if source_duration_sec is not None:
+            scene_end = min(scene_end, source_duration_sec)
+        return scene_start, scene_end
+
+    scene_caps = {}
+    for scene_id in frames_by_scene:
+        scene_start, scene_end = scene_span(scene_id)
+        scene_caps[scene_id] = scene_cap(preferences, scene_end - scene_start)
+
     clips: List[ClipSuggestion] = []
     for run in candidate_runs(
         frames,
@@ -223,23 +277,14 @@ def assemble_smooth_clips(
             preferences.max_clip_duration_sec,
             scene_end_sec=scene_end if scene_end != float("inf") else None,
         )
-        chosen = best_window(windows)
-        if chosen is not None:
+        for chosen in select_windows(windows, limit=scene_caps[run[0].scene_id]):
             clips.append(make_clip(file_id, file_name, chosen))
 
     scenes_with_candidates = {clip.scene_id for clip in clips}
-    frames_by_scene: Dict[int, List[FrameScore]] = {}
-    for frame in sorted(frames, key=lambda item: item.timestamp):
-        frames_by_scene.setdefault(frame.scene_id, []).append(frame)
     for scene_id, scene_frames in frames_by_scene.items():
         if scene_id in scenes_with_candidates:
             continue
-        scene_start, scene_end = bounds.get(
-            scene_id,
-            (scene_frames[0].timestamp, source_duration_sec or scene_frames[-1].timestamp),
-        )
-        if source_duration_sec is not None:
-            scene_end = min(scene_end, source_duration_sec)
+        scene_start, scene_end = scene_span(scene_id)
         if scene_end - scene_start < preferences.min_clip_duration_sec:
             continue
         fallback_windows = candidate_windows(
@@ -248,14 +293,10 @@ def assemble_smooth_clips(
             preferences.max_clip_duration_sec,
             scene_end_sec=scene_end,
         )
-        if fallback_windows:
-            fallback_clips = [
-                make_clip(file_id, file_name, window, fallback=True)
-                for window in fallback_windows
-            ]
-            clips.append(_rank_clips(fallback_clips)[0])
+        for chosen in select_windows(fallback_windows, limit=1):
+            clips.append(make_clip(file_id, file_name, chosen, fallback=True))
 
-    selected = _bounded_scene_pool(clips, preferences)
+    selected = _bounded_scene_pool(clips, preferences, scene_caps)
     kept_by_scene: Dict[int, int] = {}
     generated_by_scene: Dict[int, int] = {}
     for clip in clips:
@@ -265,7 +306,7 @@ def assemble_smooth_clips(
     scenes_at_cap = sum(
         1
         for scene_id, kept_count in kept_by_scene.items()
-        if kept_count >= preferences.max_clips_per_scene
+        if kept_count >= scene_caps[scene_id]
         and generated_by_scene.get(scene_id, 0) > kept_count
     )
 

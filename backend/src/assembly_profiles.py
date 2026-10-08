@@ -172,8 +172,9 @@ def build_draft_timeline(
     for clip in sorted(clips, key=lambda item: float(item.get("overall_score", 0)), reverse=True):
         if max_clips and len(selected) >= max_clips:
             break
-        scene_id = clip.get("scene_id", 0)
-        if scene_counts.get(scene_id, 0) >= max_per_scene:
+        # Scene ids restart at 1 in every Source Video, so count per file too.
+        scene_key = (clip.get("file_id"), clip.get("scene_id", 0))
+        if scene_counts.get(scene_key, 0) >= max_per_scene:
             continue
         look_group = clip.get("look_group")
         if look_group is not None and look_group in claimed_look_groups:
@@ -208,7 +209,7 @@ def build_draft_timeline(
             }
         )
         total += duration
-        scene_counts[scene_id] = scene_counts.get(scene_id, 0) + 1
+        scene_counts[scene_key] = scene_counts.get(scene_key, 0) + 1
         spans.append((start, end))
         if look_group is not None:
             claimed_look_groups.add(look_group)

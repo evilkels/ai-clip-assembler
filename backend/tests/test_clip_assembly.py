@@ -1,4 +1,9 @@
-from src.clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from src.clip_assembly import (
+    AssemblyPreferences,
+    assemble_smooth_clips,
+    candidate_windows,
+    select_windows,
+)
 from src.models import FrameScore
 
 
@@ -83,8 +88,8 @@ def test_assemble_smooth_clips_respects_duration_and_thresholds():
         ),
     )
 
-    assert [clip.duration_sec for clip in result.clips] == [5]
-    assert result.sequence.total_duration_sec == 5
+    assert [clip.duration_sec for clip in result.clips] == [5, 5]
+    assert result.sequence.total_duration_sec == 10
 
 
 def test_clip_ids_are_stable_for_the_same_source_range():
@@ -158,7 +163,7 @@ def test_assembly_picks_highest_scoring_window_in_scene():
     assert (result.clips[0].start_sec, result.clips[0].end_sec) == (2, 4)
 
 
-def test_assembly_caps_clips_per_scene():
+def test_scene_cap_bounds_windows_from_one_run():
     frames = [frame(second, 8 + (second % 3) / 10, scene_id=1) for second in range(20)]
 
     result = assemble_smooth_clips(
@@ -173,7 +178,7 @@ def test_assembly_caps_clips_per_scene():
         ),
     )
 
-    assert len(result.clips) == 1
+    assert len(result.clips) == 2
 
 
 def test_candidate_pool_keeps_each_scene_and_counts_sample_interval_at_boundary():
@@ -228,23 +233,24 @@ def test_candidate_pool_keeps_one_honestly_scored_fallback_for_weak_scene():
     assert "fallback" in result.clips[0].tags
 
 
-def test_one_best_window_per_run_no_overlaps():
-    # A single smooth run 0..10s must yield exactly ONE candidate, not the
-    # O(n^2) family of overlapping windows.
-    frames = [frame(second, 9.0, scene_id=0, turn_rate=1.0) for second in range(11)]
+def test_windows_in_one_run_never_overlap():
+    # A smooth 30 s run yields back-to-back windows, not the O(n^2) family of
+    # overlapping ones.
+    frames = [frame(second, 9.0, scene_id=0, turn_rate=1.0) for second in range(31)]
 
     result = assemble_smooth_clips(
         "file-1",
         "DJI.MP4",
         frames,
         AssemblyPreferences(min_clip_duration_sec=3.0, max_clip_duration_sec=10.0),
-        source_duration_sec=10.0,
+        source_duration_sec=30.0,
     )
 
-    assert len(result.clips) == 1
-    only = result.clips[0]
-    assert only.scene_id == 0
-    assert (only.end_sec - only.start_sec) >= 3.0
+    assert sorted((clip.start_sec, clip.end_sec) for clip in result.clips) == [
+        (0, 10),
+        (10, 20),
+        (20, 30),
+    ]
 
 
 def test_candidate_pool_skips_scene_shorter_than_minimum_duration():
@@ -258,3 +264,61 @@ def test_candidate_pool_skips_scene_shorter_than_minimum_duration():
     )
 
     assert result.clips == []
+
+
+def ranges(windows):
+    return [(window.start_sec, window.end_sec) for window in windows]
+
+
+def test_select_windows_returns_non_overlapping_windows_longest_first():
+    windows = candidate_windows([frame(second, 9.0) for second in range(31)], 3, 10)
+
+    assert ranges(select_windows(windows, limit=4)) == [(0, 10), (10, 20), (20, 30)]
+
+
+def test_select_windows_skips_excluded_ranges():
+    windows = candidate_windows([frame(second, 9.0) for second in range(31)], 3, 10)
+
+    picked = select_windows(windows, limit=4, exclude=[(0.0, 12.0)])
+
+    assert ranges(picked) == [(12, 22), (22, 30)]
+
+
+def test_select_windows_prefers_longer_window_within_tolerance():
+    frames = [frame(second, 9.0 if second in (10, 11, 12) else 8.0) for second in range(21)]
+
+    picked = select_windows(candidate_windows(frames, 3, 10), limit=1)
+
+    assert len(picked) == 1
+    assert picked[0].end_sec - picked[0].start_sec == 10
+    # The 3 s peak is the samples at 10, 11 and 12 s.
+    assert picked[0].start_sec <= 10 and picked[0].end_sec >= 12
+
+
+def test_select_windows_keeps_short_peak_when_longer_windows_fall_outside_tolerance():
+    frames = [frame(second, 9.0 if second in (10, 11, 12) else 5.0) for second in range(21)]
+
+    picked = select_windows(candidate_windows(frames, 3, 10), limit=1)
+
+    assert len(picked) == 1
+    assert picked[0].end_sec - picked[0].start_sec < 10
+    # The 3 s peak is the samples at 10, 11 and 12 s.
+    assert picked[0].start_sec <= 10 and picked[0].end_sec >= 12
+
+
+def test_scene_cap_scales_with_scene_length():
+    frames = [frame(second, 9.0) for second in range(151)]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "DJI_0001.MP4",
+        frames,
+        AssemblyPreferences(max_clip_duration_sec=10),
+        scene_bounds={1: (0.0, 150.0)},
+        source_duration_sec=150.0,
+    )
+
+    assert len(result.clips) == 12
+    assert result.metadata["generation_stats"]["scenes_at_cap"] == 1
+    spans = sorted((clip.start_sec, clip.end_sec) for clip in result.clips)
+    assert all(earlier[1] <= later[0] for earlier, later in zip(spans, spans[1:]))

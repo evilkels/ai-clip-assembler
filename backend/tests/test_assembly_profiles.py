@@ -214,3 +214,20 @@ def test_draft_does_not_emit_sliver_tail_to_hit_target():
 
     assert min(durations) >= 7.0
     assert draft["total_duration_sec"] <= 50
+
+
+def test_draft_scene_cap_counts_each_source_video_separately():
+    # Scene IDs restart per Source Video, so twenty one-scene videos must not
+    # share one per-scene quota.
+    clips = []
+    for i in range(20):
+        entry = clip(f"c{i}", 0, 10, score=9.0 - i / 100, file_name=f"file-{i}.MP4", scene_id=1)
+        entry["file_id"] = f"file-{i}"
+        clips.append(entry)
+
+    draft = build_draft_timeline(clips, profile="cinematic_highlight", target_duration_sec=120)
+
+    assert len(draft["clips"]) >= 12
+    file_ids = [entry["file_id"] for entry in draft["clips"]]
+    assert len(set(file_ids)) == len(file_ids)
+    assert draft["total_duration_sec"] >= 108

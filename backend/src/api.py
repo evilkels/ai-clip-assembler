@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Load repo-root .env before harness imports: PI_* are read at import time.
 load_dotenv()
@@ -205,7 +205,7 @@ class DraftRequest(BaseModel):
     # remain for back-compat with callers predating the format registry.
     format: Optional[FormatName] = None
     profile: Optional[AssemblyProfile] = None
-    target_duration_sec: Optional[float] = None
+    target_duration_sec: Optional[float] = Field(default=None, gt=0)
 
 
 class ProjectFolderRequest(BaseModel):
@@ -810,8 +810,38 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
         profile=profile,
         target_duration_sec=target_duration_sec,
     )
+    controller = _timeline_lifecycle.get_controller(project_id)
+    try:
+        await controller.apply_batch(
+            [
+                {
+                    "operation": "replace_timeline",
+                    "args": {
+                        "items": [
+                            {
+                                "source_clip_id": clip["clip_id"],
+                                "start_sec": clip["start_sec"],
+                                "end_sec": clip["end_sec"],
+                                "speed": 1.0,
+                            }
+                            for clip in timeline["clips"]
+                        ]
+                    },
+                },
+                {"operation": "set_profile", "args": {"profile": profile}},
+                {
+                    "operation": "set_target_duration",
+                    "args": {"target_duration_sec": target_duration_sec},
+                },
+            ],
+            expected_revision=controller.document.revision,
+        )
+    except TimelineRevisionConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=_revision_conflict_detail(project_id, exc, controller),
+        ) from exc
     project["timeline"] = timeline
-    invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
     return {
         "project_id": project_id,
@@ -935,7 +965,7 @@ def build_timeline_sources(project: dict) -> dict[str, SourceClip]:
         if not clip_id:
             continue
         video = videos_by_id.get(clip.get("file_id"))
-        duration = (video or {}).get("metadata", {}).get("duration_sec") if video else None
+        duration = ((video or {}).get("metadata") or {}).get("duration_sec")
         if duration is None:
             duration = clip.get("end_sec", 0.0)
         sources[clip_id] = SourceClip(
@@ -1926,7 +1956,7 @@ def round_edl_fps(fps: float) -> int:
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:
     return AssemblyPreferences(
         min_clip_duration_sec=float(preferences.get("min_clip_duration_sec", 3.0)),
-        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 10.0)),
+        max_clip_duration_sec=float(preferences.get("max_clip_duration_sec", 20.0)),
         smoothness_threshold=float(preferences.get("smoothness_threshold", 6.0)),
         target_duration_sec=float(preferences.get("target_duration_sec", 120.0)),
         max_turn_rate_deg_per_sec=float(preferences.get("max_turn_rate_deg_per_sec", 16.0)),

@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src import api, review_agent
+from src.clip_assembly import AssemblyPreferences
 from src.frame_extraction import FFmpegUnavailableError
 from src.models import (
     AssemblyResult,
@@ -555,7 +556,7 @@ def test_rederive_clips_reuses_cached_frame_scores_and_changes_generation_stats(
     )
 
     assert changed.status_code == 200
-    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 1
+    assert changed.json()["generation_stats"]["totals"]["candidates_kept"] == 3
 
 
 def test_rederive_clips_returns_422_without_cached_frame_scores(tmp_path):
@@ -1244,12 +1245,16 @@ def test_analyze_rejects_invalid_sample_fps(monkeypatch, tmp_path):
     assert "sample_fps" in response.json()["detail"]
 
 
-def test_default_analysis_preferences_cap_candidate_windows_at_ten_seconds():
+def test_default_analysis_preferences_cap_candidate_windows_at_twenty_seconds():
     preferences = api.preferences_from_request({})
 
     assert preferences.min_clip_duration_sec == 3.0
-    assert preferences.max_clip_duration_sec == 10.0
+    assert preferences.max_clip_duration_sec == 20.0
     assert preferences.max_candidates_per_video == 30
+
+
+def test_default_preferences_match_dataclass():
+    assert api.preferences_from_request({}) == AssemblyPreferences()
 
 
 def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_path):
@@ -1911,6 +1916,131 @@ def test_regenerate_draft_requires_format_or_profile(monkeypatch, tmp_path):
     ]
 
     response = client.post(f"/projects/{project_id}/draft", json={})
+
+    assert response.status_code == 422
+
+
+def analyze_folder_project_with_two_scenes(monkeypatch, tmp_path):
+    for existing_project_id in list(api.projects):
+        api._timeline_lifecycle.invalidate(existing_project_id)
+    monkeypatch.setattr(
+        api,
+        "probe_video",
+        lambda path: VideoMetadata(
+            file_id=path.name,
+            file_path=str(path),
+            file_name=path.name,
+            duration_sec=160.0,
+            fps=30,
+            resolution=[1920, 1080],
+            codec="h264",
+        ),
+    )
+    client, project_id, source_video = create_folder_project_with_video(tmp_path)
+    stub_expensive_analysis(
+        monkeypatch,
+        [
+            scored_frame(float(second), smoothness=9.0 - scene / 10, scene_id=scene + 1)
+            for scene in range(2)
+            for second in range(scene * 40, scene * 40 + 26)
+        ],
+    )
+    # Two 25 s candidates: Medium is recommended, and Long's 22 s cut trims one.
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={
+            "project_id": project_id,
+            "harness_id": "manual",
+            "preferences": {"max_clip_duration_sec": 25},
+        },
+    )
+    assert response.status_code == 200
+    first_clip_id = api.projects[project_id]["clips"][0]["clip_id"]
+    assert _op(client, project_id, "include", clip_id=first_clip_id).status_code == 200
+    return client, project_id, source_video.parent
+
+
+def draft_items(document):
+    return [
+        (item["source_clip_id"], item["start_sec"], item["end_sec"], item["speed"])
+        for item in document["items"]
+    ]
+
+
+def test_draft_format_switch_replaces_saved_timeline_document(monkeypatch, tmp_path):
+    client, project_id, _folder = analyze_folder_project_with_two_scenes(monkeypatch, tmp_path)
+    before = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+
+    response = client.post(f"/projects/{project_id}/draft", json={"format": "long"})
+
+    assert response.status_code == 200
+    draft = response.json()["timeline"]
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert document["profile"] == "long_scenic"
+    assert document["target_duration_sec"] == 480
+    assert draft_items(document) == [
+        (clip["clip_id"], clip["start_sec"], clip["end_sec"], 1.0) for clip in draft["clips"]
+    ]
+    assert [clip["duration_sec"] for clip in draft["clips"]] == [25, 22]
+    undone = client.post(f"/projects/{project_id}/timeline/undo").json()["document"]
+    assert undone["items"] == before["items"]
+    assert (undone["profile"], undone["target_duration_sec"]) == (
+        before["profile"],
+        before["target_duration_sec"],
+    )
+
+
+def test_draft_format_switch_survives_reload(monkeypatch, tmp_path):
+    client, project_id, folder = analyze_folder_project_with_two_scenes(monkeypatch, tmp_path)
+    draft = client.post(f"/projects/{project_id}/draft", json={"format": "long"}).json()["timeline"]
+
+    api._timeline_lifecycle.invalidate(project_id)
+    api.projects.clear()
+    reopened_id = client.post("/projects/from-folder", json={"folder_path": str(folder)}).json()[
+        "project_id"
+    ]
+
+    document = client.get(f"/projects/{reopened_id}/timeline/document").json()["document"]
+    assert document["profile"] == "long_scenic"
+    assert document["target_duration_sec"] == 480
+    assert draft_items(document) == [
+        (clip["clip_id"], clip["start_sec"], clip["end_sec"], 1.0) for clip in draft["clips"]
+    ]
+
+
+def test_draft_format_switch_works_when_the_source_video_could_not_be_probed(monkeypatch, tmp_path):
+    client, project_id, source_video = create_folder_project_with_video(tmp_path)
+    analyze_folder_project_with_one_clip(monkeypatch, client, source_video.parent, project_id)
+    assert api.projects[project_id]["videos"][0]["metadata"] is None
+
+    response = client.post(f"/projects/{project_id}/draft", json={"format": "short"})
+
+    assert response.status_code == 200
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert [item["source_clip_id"] for item in document["items"]] == ["clip-1"]
+
+
+def test_regenerate_draft_rejects_a_non_positive_target_duration(monkeypatch, tmp_path):
+    api.projects.clear()
+    monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)
+    client = TestClient(api.app)
+    project_id = client.post("/projects").json()["project_id"]
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 0.0,
+            "end_sec": 20.0,
+            "duration_sec": 20.0,
+            "overall_score": 9,
+        }
+    ]
+
+    response = client.post(
+        f"/projects/{project_id}/draft",
+        json={"profile": "short_social", "target_duration_sec": 0},
+    )
 
     assert response.status_code == 422
 

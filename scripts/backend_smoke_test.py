@@ -127,7 +127,7 @@ def main() -> int:
                     "sample_fps": args.sample_fps,
                     "smoothness_threshold": 7,
                     "min_clip_duration_sec": 3,
-                    "max_clip_duration_sec": 15,
+                    "max_clip_duration_sec": 20,
                     "target_duration_sec": 120,
                 },
             },

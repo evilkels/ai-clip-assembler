@@ -162,7 +162,13 @@ def run_analysis_pipeline(
         # analysis errors; failures in later stages propagate untranslated.
         transforms_path = analysis_path / "motion" / f"{video['file_id']}.trf"
 
-        def skip_motion_analysis(reason: object) -> None:
+        def skip_motion_analysis(
+            reason: object,
+            transforms_path: Path = transforms_path,
+            index: int = index,
+            video: Any = video,
+            video_timing: Any = video_timing,
+        ) -> None:
             if transforms_path.exists():
                 transforms_path.unlink()
             logger.warning(

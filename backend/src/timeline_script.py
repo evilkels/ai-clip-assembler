@@ -310,7 +310,7 @@ _RECEIVER_TITLES = {
 }
 
 
-def _build_reference(limits: ScriptLimits = ScriptLimits()) -> str:
+def _build_reference(limits: ScriptLimits = ScriptLimits()) -> str:  # noqa: B008 - frozen value object
     lines = [
         "# Script API (Lua 5.4)",
         "",
@@ -963,7 +963,7 @@ def run_script_in_process(
     sources: Sources,
     library: List[dict],
     id_seed: str,
-    limits: ScriptLimits = ScriptLimits(),
+    limits: ScriptLimits = ScriptLimits(),  # noqa: B008 - frozen value object
     on_log: Optional[Callable[[str], None]] = None,
     on_ready: Optional[Callable[[], None]] = None,
 ) -> ScriptResult:
@@ -1072,7 +1072,7 @@ def run_script(
     sources: Sources,
     library: List[dict],
     id_seed: str,
-    limits: ScriptLimits = ScriptLimits(),
+    limits: ScriptLimits = ScriptLimits(),  # noqa: B008 - frozen value object
 ) -> ScriptResult:
     """Run a script in a killable worker process, preserving all-or-nothing results."""
     if not isinstance(source, str):

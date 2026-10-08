@@ -202,7 +202,7 @@ def assemble_smooth_clips(
     file_id: str,
     file_name: str,
     frames: List[FrameScore],
-    preferences: AssemblyPreferences = AssemblyPreferences(),
+    preferences: AssemblyPreferences = AssemblyPreferences(),  # noqa: B008 - frozen value object
     *,
     scene_bounds: Optional[Dict[int, Tuple[float, float]]] = None,
     source_duration_sec: Optional[float] = None,

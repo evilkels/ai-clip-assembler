@@ -14,11 +14,12 @@ import pytest
 from src import review_agent
 from src.models import TimelineDocument, VersionSet
 from src.review_state import review_context_fingerprint, sequence_fingerprint
-from src.timeline_ops import SourceClip, TimelineController, apply_operation, seeded_item_ids
+from src.timeline_ops import SourceClip, TimelineController, TimelineOpError, apply_operation, seeded_item_ids
 from src.timeline_script import API_REFERENCE
 from src.timeline_service import TimelineEventBroker
 from src.review_agent import (
     ProposalStore,
+    ReviewAgentError,
     _parse_agent_json,
     _validate_versions,
     deterministic_versions,
@@ -118,7 +119,7 @@ async def test_proposal_trim_line_shows_the_bounds_apply_will_produce():
 def test_create_proposal_rejects_invalid_operations():
     controller = _controller()
     store = ProposalStore()
-    with pytest.raises(Exception):
+    with pytest.raises(TimelineOpError):
         store.create(
             "p1",
             controller,
@@ -264,7 +265,7 @@ async def test_accept_after_reject_is_an_error():
         operations=[{"operation": "include", "args": {"clip_id": "clip-a"}}],
     )
     store.reject(proposal.proposal_id)
-    with pytest.raises(Exception):
+    with pytest.raises(ReviewAgentError):
         await store.accept(proposal.proposal_id, controller)
 
 

@@ -49,7 +49,6 @@ export function SettingsModal({ initialPanel = 'ai', initialTab, onClose }: Sett
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>(
     initialTab ? legacyPanel[initialTab] : initialPanel,
   );
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -79,7 +78,7 @@ export function SettingsModal({ initialPanel = 'ai', initialTab, onClose }: Sett
         <aside className="settings-rail">
           <div className="settings-rail-heading">
             <strong>Settings</strong>
-            <span>local first · v0.4.0</span>
+            <span>local first · v{__APP_VERSION__}</span>
           </div>
           <div className="settings-rail-items" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
             {panels.map((panel) => (

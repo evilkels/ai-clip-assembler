@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import type { ReviewModelAccountStatus } from '../src/shared/reviewModelAuth';
+
+const APP_VERSION: string = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).version;
 
 const READY_PI = { state: 'ready' as const, version: '0.80.10', detail: 'Pi is ready.' };
 
@@ -208,6 +212,7 @@ test('reaches all Settings panels and preserves the legacy Settings deep link', 
   await page.goto('/#/import');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
+  await expect(page.getByText(`local first · v${APP_VERSION}`, { exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'General', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
 

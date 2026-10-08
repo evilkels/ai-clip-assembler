@@ -63,10 +63,7 @@ version was not bumped produces a DMG that still claims the old version, and the
 update check then sees no update. So:
 
 1. Bump `frontend/package.json` (`npm version <x.y.z> --no-git-tag-version`) and
-   `APP_VERSION` in `backend/src/api.py` in the same commit, plus the
-   hardcoded `local first · v<x.y.z>` label in
-   `frontend/src/renderer/src/components/SettingsModal.tsx`, which no check
-   covers.
+   `APP_VERSION` in `backend/src/api.py` in the same commit.
 2. Merge that to `main`.
 3. Tag it: `git tag v<x.y.z> && git push origin v<x.y.z>`.
 4. `.github/workflows/build-dmg.yml` builds both architectures and attaches the

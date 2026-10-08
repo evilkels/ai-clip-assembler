@@ -3,10 +3,14 @@
 // Use: `npm run dev:renderer` and open http://localhost:5173.
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+const appVersion = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version;
 
 export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [react()],
   server: {
     port: 5173,

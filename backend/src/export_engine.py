@@ -227,7 +227,7 @@ def append_xmeml_rate(parent: ET.Element, fps: float) -> None:
 
 
 def seconds_to_frames(seconds: float, fps: float) -> int:
-    return int(round(seconds * xmeml_timebase(fps)))
+    return int(Fraction(str(seconds)) * fps_exact(fps))
 
 
 def append_xmeml_time_remap(clipitem: ET.Element, speed: float, mediatype: str) -> None:
@@ -241,11 +241,17 @@ def append_xmeml_time_remap(clipitem: ET.Element, speed: float, mediatype: str) 
     ET.SubElement(parameter, "value").text = str(round(speed * 100, 3))
 
 
+def xmeml_clip_frames(clip: dict, fps: float) -> int:
+    if float(clip.get("suggested_speed", 1.0) or 1.0) == 1.0:
+        return seconds_to_frames(clip["end_sec"], fps) - seconds_to_frames(clip["start_sec"], fps)
+    return seconds_to_frames(effective_duration(clip), fps)
+
+
 def append_xmeml_clip_timing(
     clipitem: ET.Element,
     clip: dict,
     source_duration: float,
-    timeline_cursor: float,
+    start_frame: int,
     fps: float,
 ) -> None:
     ET.SubElement(clipitem, "name").text = clip["file_name"]
@@ -254,11 +260,8 @@ def append_xmeml_clip_timing(
         seconds_to_frames(source_duration or clip["duration_sec"], fps)
     )
     append_xmeml_rate(clipitem, fps)
-    ET.SubElement(clipitem, "start").text = str(seconds_to_frames(timeline_cursor, fps))
-    timeline_duration = effective_duration(clip)
-    ET.SubElement(clipitem, "end").text = str(
-        seconds_to_frames(timeline_cursor + timeline_duration, fps)
-    )
+    ET.SubElement(clipitem, "start").text = str(start_frame)
+    ET.SubElement(clipitem, "end").text = str(start_frame + xmeml_clip_frames(clip, fps))
     ET.SubElement(clipitem, "in").text = str(seconds_to_frames(clip["start_sec"], fps))
     ET.SubElement(clipitem, "out").text = str(seconds_to_frames(clip["end_sec"], fps))
 
@@ -271,7 +274,7 @@ def generate_resolve_xml(
     """FCP7 XMEML v5 timeline for DaVinci Resolve's XML importer."""
     fps = choose_timeline_fps(videos_by_id)
     width, height = timeline_dimensions(videos_by_id)
-    total_frames = seconds_to_frames(sum(effective_duration(clip) for clip in clips), fps)
+    total_frames = sum(xmeml_clip_frames(clip, fps) for clip in clips)
 
     xmeml = ET.Element("xmeml", {"version": "5"})
     sequence = ET.SubElement(xmeml, "sequence", {"id": "sequence-1"})
@@ -317,7 +320,7 @@ def generate_resolve_xml(
         audio_tracks = [ET.SubElement(audio, "track") for _ in range(max_audio_channels)]
 
     defined_file_ids = set()
-    timeline_cursor = 0.0
+    start_frame = 0
     for index, clip in enumerate(clips, start=1):
         source = videos_by_id.get(clip["file_id"], {})
         source_metadata = source.get("metadata") or {}
@@ -325,7 +328,7 @@ def generate_resolve_xml(
         item_id = f"clipitem-{index}"
 
         clipitem = ET.SubElement(track, "clipitem", {"id": item_id})
-        append_xmeml_clip_timing(clipitem, clip, source_duration, timeline_cursor, fps)
+        append_xmeml_clip_timing(clipitem, clip, source_duration, start_frame, fps)
         sourcetrack = ET.SubElement(clipitem, "sourcetrack")
         ET.SubElement(sourcetrack, "mediatype").text = "video"
         ET.SubElement(sourcetrack, "trackindex").text = "1"
@@ -391,7 +394,7 @@ def generate_resolve_xml(
             ET.SubElement(video_link, "clipindex").text = str(index)
             for channel in range(1, audio_channel_counts[index - 1] + 1):
                 audio_item = ET.SubElement(audio_tracks[channel - 1], "clipitem", {"id": item_id})
-                append_xmeml_clip_timing(audio_item, clip, source_duration, timeline_cursor, fps)
+                append_xmeml_clip_timing(audio_item, clip, source_duration, start_frame, fps)
                 audio_sourcetrack = ET.SubElement(audio_item, "sourcetrack")
                 ET.SubElement(audio_sourcetrack, "mediatype").text = "audio"
                 ET.SubElement(audio_sourcetrack, "trackindex").text = str(channel)
@@ -412,8 +415,9 @@ def generate_resolve_xml(
                     previous_link = clipitem.findall("link")[-2]
                     ET.SubElement(previous_link, "groupindex").text = str((channel + 1) // 2)
 
-        timeline_cursor += effective_duration(clip)
+        start_frame += xmeml_clip_frames(clip, fps)
 
+    ET.indent(xmeml, space="  ")
     body = ET.tostring(xmeml, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n' + body
 

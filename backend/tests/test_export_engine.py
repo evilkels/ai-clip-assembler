@@ -3,7 +3,7 @@ from fractions import Fraction
 import difflib
 from pathlib import Path
 from urllib.parse import quote
-from tests.support import assert_valid_fcpxml
+from tests.support import assert_valid_fcpxml, assert_well_formed_xmeml
 from tests.fixtures.export.inputs import CINEMA, ESTEPONA, IPHONE_MIXED
 
 from src.export_engine import (
@@ -15,6 +15,7 @@ from src.export_engine import (
     generate_edl,
     generate_fcpxml,
     edl_flatten_warnings,
+    seconds_to_frames,
     seconds_to_timecode,
 )
 
@@ -49,6 +50,14 @@ def test_generate_edl_includes_events_for_each_timeline_clip():
     assert "001  AX       V     C        00:00:10:00 00:00:14:00 00:00:00:00 00:00:04:00" in edl
     assert "* FROM CLIP NAME: DJI_0001.MP4" in edl
     assert "002  AX       V     C        00:00:20:00 00:00:23:00 00:00:04:00 00:00:07:00" in edl
+
+
+def test_generate_edl_has_no_media_paths():
+    videos, clips = make_resolve_videos_and_clips()
+    edl = generate_edl("Drone MVP", clips, fps=30, videos_by_id=videos)
+    event_lines = [line for line in edl.splitlines() if line[:3].isdigit()]
+    assert event_lines
+    assert all("file:" not in line and "/" not in line for line in event_lines)
 
 
 def test_generate_fcpxml_references_assets_and_timeline_clips():
@@ -369,16 +378,22 @@ def test_generate_fcpxml_sequence_audio_layout_follows_sources():
         assert_valid_fcpxml(ET.tostring(root, encoding="unicode"))
 
 
-def test_fcpxml_golden_fixtures_are_unchanged(request):
+def test_export_xml_golden_fixtures_are_unchanged(request):
     fixture_dir = Path(__file__).parent / "fixtures" / "export"
     cases = (
         ("estepona-1080p5994.fcpxml", ESTEPONA),
         ("iphone-4k60-mixed.fcpxml", IPHONE_MIXED),
         ("cinema-23976-silent.fcpxml", CINEMA),
+        ("estepona-1080p5994.xml", ESTEPONA),
+        ("cinema-23976-silent.xml", CINEMA),
     )
     for filename, case in cases:
-        generated = generate_fcpxml(case["title"], case["clips"], case["videos"])
-        assert_valid_fcpxml(generated)
+        if filename.endswith(".fcpxml"):
+            generated = generate_fcpxml(case["title"], case["clips"], case["videos"])
+            assert_valid_fcpxml(generated)
+        else:
+            generated = generate_resolve_xml(case["title"], case["clips"], case["videos"])
+            assert_well_formed_xmeml(generated)
         path = fixture_dir / filename
         if request.config.getoption("--update-export-fixtures"):
             path.write_text(generated)
@@ -392,7 +407,12 @@ def test_fcpxml_golden_fixtures_are_unchanged(request):
                 tofile="generated",
             )
             import pytest
-            pytest.fail("FCPXML golden fixture mismatch:\n" + "".join(diff))
+            pytest.fail(f"XML golden fixture mismatch ({filename}):\n" + "".join(diff))
+
+
+def test_seconds_to_frames_uses_exact_ntsc_rate():
+    assert seconds_to_frames(60, 23.976) == 1438
+    assert seconds_to_frames(60, 59.94) == 3596
 
 
 def test_choose_timeline_fps_uses_highest_source_rate():
@@ -706,6 +726,12 @@ def test_generate_resolve_xml_builds_xmeml_timeline():
 
     width = root.find(".//format/samplecharacteristics/width")
     assert width is not None and width.text == "3840"
+
+
+def test_generate_resolve_xml_passes_structure_checks():
+    assert_well_formed_xmeml(
+        generate_resolve_xml(ESTEPONA["title"], ESTEPONA["clips"], ESTEPONA["videos"])
+    )
 
 
 def test_generate_resolve_xml_defines_each_source_file_once():

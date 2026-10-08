@@ -58,7 +58,7 @@ function useReviewModelAccount() {
     try {
       const result = await getDiagnostics();
       if (isCurrent(requestId)) {
-        setDiagnosticState(result.review_model.reachable ? 'reachable' : 'unreachable');
+        setDiagnosticState(result.reachable ? 'reachable' : 'unreachable');
       }
     } catch {
       if (isCurrent(requestId)) setDiagnosticState('unreachable');

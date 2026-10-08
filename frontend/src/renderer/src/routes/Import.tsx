@@ -98,6 +98,8 @@ export function ImportPage() {
     setAnalysisStatus,
     setCloudAiConsent,
     applyAnalysisResult,
+    harnessMetadata,
+    resumeAiScoring,
     rederiveClips,
     openProjectFolder,
     rescanOpenProject,
@@ -118,6 +120,7 @@ export function ImportPage() {
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [resumingScoring, setResumingScoring] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; fileName: string } | null>(null);
   const [sort, setSort] = useState<SourceVideoSort>({
     key: null,
@@ -538,7 +541,7 @@ export function ImportPage() {
                       ) : null}
                       {activeProgress.clip_total ? (
                         <span>
-                          Pi clips {activeProgress.clip_index ?? 0}/{activeProgress.clip_total}
+                          AI clips {activeProgress.clip_index ?? 0}/{activeProgress.clip_total}
                         </span>
                       ) : null}
                     </div>
@@ -581,6 +584,24 @@ export function ImportPage() {
                 {notice.message}
               </p>
             ))}
+            {harnessMetadata?.failure ? (
+              <>
+                <p className="import-status-warning">{harnessMetadata.failure.message}</p>
+                {(harnessMetadata.clips_left ?? 0) > 0 ? (
+                  <button
+                    type="button"
+                    className="btn subtle"
+                    disabled={resumingScoring}
+                    onClick={() => {
+                      setResumingScoring(true);
+                      void resumeAiScoring().finally(() => setResumingScoring(false));
+                    }}
+                  >
+                    {resumingScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
           </div>
         )}
 

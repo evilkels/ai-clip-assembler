@@ -296,21 +296,23 @@ test('renders the Review workstation with Your Clips visible from the first pain
   await expect(page.getByTestId('harness-fallback-notice')).toHaveCount(0);
 });
 
-test('shows a Harness Fallback with its reason and affected Source Videos', async ({ page }) => {
+test('shows the scoring failure and affected Source Videos', async ({ page }) => {
   await setupReview(page, { analysisMetadata: {
-    warning: 'Harness Fallback — review-browser-fixture.mp4 (fixture): Pi Agent timed out',
+    failure: { kind: 'timed_out', provider: 'claude', action: 'retry', message: 'Claude did not answer within 2 minutes. Try again.' },
+    clips_left: 2,
     per_video: [{
       file_id: 'fixture',
       file_name: 'review-browser-fixture.mp4',
-      warning: 'Pi Agent timed out',
+      failure: { kind: 'timed_out', provider: 'claude', action: 'retry', message: 'Claude did not answer within 2 minutes. Try again.' },
     }],
   } });
 
   const notice = page.getByTestId('harness-fallback-notice');
   await expect(notice).toBeVisible();
-  await expect(notice).toContainText('Harness Fallback');
-  await expect(notice).toContainText('Pi Agent timed out');
+  await expect(notice).toContainText('AI scoring stopped');
+  await expect(notice).toContainText('Claude did not answer within 2 minutes. Try again.');
   await expect(notice).toContainText('review-browser-fixture.mp4');
+  await expect(notice.getByRole('button', { name: 'Finish AI scoring (2 clips left)' })).toBeVisible();
 });
 
 test('shows no Harness Fallback notice after a successful agentic run', async ({ page }) => {
@@ -318,11 +320,9 @@ test('shows no Harness Fallback notice after a successful agentic run', async ({
   await setupReview(page, {
     harnessId: 'pi_agent',
     analysisMetadata: {
-      used_ai: true,
       per_video: [{
         file_id: 'fixture',
         file_name: 'review-browser-fixture.mp4',
-        used_ai: true,
       }],
     },
   });

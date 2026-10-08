@@ -1,9 +1,16 @@
-# Plan 025: Export and bundle the SigLIP embedding model
+# 025: Export and bundle the SigLIP embedding model
 
-Status: TODO · Priority P1 · Effort M · Risk MED · Category release correctness
-Depends on Plan 018 (code complete) and `self-contained-runtime-tools.md` · Planned 2026-08-13
+The packaged app ships a checksum-verified SigLIP image-encoder model, so Look
+Groups are real and the diversity constraint in edit assembly stops being a
+no-op.
 
-## Why and current evidence
+## Context
+
+Priority P1 · Effort M · Risk MED · Category release correctness. Planned
+2026-08-13. Status when written: TODO. Depends on Plan 018 (code complete) and
+[self-contained-runtime-tools](self-contained-runtime-tools.md).
+
+### Why and current evidence
 
 Plan 018 shipped every code path for diverse clip generation, but the model it
 depends on has never existed in the repo or the build. `backend/models/`
@@ -20,7 +27,7 @@ exactly as they did before that work landed. `onnxruntime==1.19.2`,
 `backend/requirements.txt`, so nothing is missing but the artifact and its
 provenance.
 
-## Constraints carried forward from Plan 018
+### Constraints carried forward from Plan 018
 
 - **Do not commit the `.onnx` binary to git.** `backend/models/README.md`
   fixes this: fetch at build time from a pinned, checksum-verified location.
@@ -39,10 +46,11 @@ provenance.
   it must not change clip identity or break decision/version provenance
   (plan 009).
 
-## Blockers found 2026-09-02 — resolve before starting
+### Blockers found 2026-09-02 — resolve before starting
 
 Three prerequisites are missing. The first is a maintainer decision and blocks
-the plan outright; the other two are small but would each stop an executor.
+the plan outright (H1); the other two are small but would each stop an executor
+(tasks 1.1 and 1.2).
 
 1. **No hosting location exists for the artifact.** Step 3 says to fetch the
    `.onnx` "from the pinned location", and `backend/models/README.md` says the
@@ -73,47 +81,9 @@ the plan outright; the other two are small but would each stop an executor.
    decision rests on a citation that cannot be produced. Re-derive the analysis
    and commit it under `docs/` before bundling third-party weights, and update
    the README to point at the committed copy rather than a temp path. Fold this
-   into step 4's attribution work.
+   into task 3.2's attribution work.
 
-## Execution steps
-
-1. **Export, reproducibly.** Add a committed export script (not a one-off shell
-   session) that takes the pinned HF revision and emits
-   `siglip_image_encoder.onnx` with the exact runtime contract in
-   `backend/models/README.md`: input `pixel_values` float32 `(batch, 3, 224,
-   224)`, output pooled float32 `(batch, 768)`. Record the SHA-256 of the
-   produced file in `backend/models/` alongside the README.
-2. **Verify the contract against the consumer, not the exporter.** Add a
-   backend test, skipped when the model is absent, that runs
-   `OnnxClipEmbeddingProvider` on two sampled frames and asserts: output shape
-   `(2, 768)`, finite values, and that cosine similarity of a frame with itself
-   is ~1.0 while two visibly different frames score below the 0.92 clustering
-   threshold. A model that exports cleanly but embeds meaninglessly is the
-   failure mode this catches.
-3. **Fetch and stage at build time.** Extend the packaging path alongside
-   `frontend/scripts/stage-runtime-tools.mjs` to fetch the artifact from the
-   pinned location, verify the committed SHA-256, and place it where
-   `default_embedding_provider()` resolves it inside the packaged backend.
-   Staging must **reject the build** on checksum mismatch or a missing file —
-   silently shipping a build with inert diversity is the exact failure this
-   plan exists to end. Mirror the reject-on-missing behaviour that script
-   already applies to `vidstabdetect`.
-4. **Attribute.** Add a `NOTICE` file (none exists in the repo today) carrying
-   the Apache-2.0 attribution for Google's SigLIP, and reference it from the
-   packaging compliance material tracked in `self-contained-runtime-tools.md`
-   step 1, so both bundled-artifact obligations are recorded in one place.
-5. **Prove it is no longer inert.** On a packaged build, analyse a project whose
-   footage contains at least two clearly distinct looks and confirm the
-   resulting library reports more than one Look Group, and that an assembled
-   edit draws at most one clip per group.
-
-## Verification and done criteria
-
-`cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q && .venv/bin/ruff check src tests`
-passes both with and without the model present — the degraded path must stay
-green. `frontend && npm run build` plus the packaging step produce a DMG whose
-backend resources contain the verified `.onnx`, and step 5's real-footage check
-shows more than one Look Group.
+### Stop conditions
 
 Stop and report rather than broadening scope if: the export cannot reproduce the
 documented input/output contract; the pinned revision has moved or its license
@@ -121,8 +91,64 @@ terms have changed; or hosting the artifact requires a distribution channel
 nobody owns. Any of those is a redistribution decision for the maintainer, not
 an implementation detail.
 
-## Out of scope
+### Out of scope
 
 Re-embedding existing analysed projects (sidecars stay v1–v3 as-is; a project
 re-derives on next analysis), swapping the clustering algorithm or its 0.92
 threshold, GPU execution providers, and any change to the HTTP/JSON contract.
+
+## Phase 1: Prerequisites
+
+- [ ] 1.1 Give the export script its own requirements file and throwaway venv
+  (`torch`, `transformers`), kept out of `backend/requirements.txt`. Done when
+  the script's header says so and `backend/requirements.txt` is unchanged.
+- [ ] 1.2 Re-derive the SigLIP redistribution analysis and commit it under
+  `docs/`. Done when `backend/models/README.md` links the committed copy
+  instead of `/tmp/plan018-claude-license-report.md`.
+
+## Phase 2: Export and verify (after H1)
+
+- [ ] 2.1 Export, reproducibly: add a committed export script that takes the
+  pinned HF revision and emits `siglip_image_encoder.onnx` with the runtime
+  contract in `backend/models/README.md`: input `pixel_values` float32 `(batch,
+  3, 224, 224)`, output pooled float32 `(batch, 768)`. Done when the SHA-256 of
+  the produced file is recorded in `backend/models/` alongside the README.
+- [ ] 2.2 Verify the contract against the consumer, not the exporter: add a
+  backend test, skipped when the model is absent, that runs
+  `OnnxClipEmbeddingProvider` on two sampled frames. Done when it asserts output
+  shape `(2, 768)`, finite values, cosine similarity of a frame with itself ~1.0,
+  and two visibly different frames scoring below the 0.92 clustering threshold.
+  (A model that exports cleanly but embeds meaninglessly is the failure mode
+  this catches.)
+
+## Phase 3: Package and prove (after H1)
+
+- [ ] 3.1 Fetch and stage at build time: extend the packaging path alongside
+  `frontend/scripts/stage-runtime-tools.mjs` to fetch the artifact from the
+  pinned location, verify the committed SHA-256, and place it where
+  `default_embedding_provider()` resolves it inside the packaged backend. Done
+  when staging rejects the build on checksum mismatch or a missing file,
+  mirroring the reject-on-missing behaviour already applied to `vidstabdetect`
+  (silently shipping a build with inert diversity is the exact failure this plan
+  exists to end).
+- [ ] 3.2 Attribute: add a `NOTICE` file (none exists in the repo today)
+  carrying the Apache-2.0 attribution for Google's SigLIP, and reference it from
+  the packaging compliance material tracked in
+  [self-contained-runtime-tools](self-contained-runtime-tools.md) task 2.1. Done
+  when both bundled-artifact obligations are recorded in one place.
+- [ ] 3.3 Prove it is no longer inert: on a packaged build, analyse a project
+  whose footage contains at least two clearly distinct looks. Done when the
+  resulting library reports more than one Look Group and an assembled edit draws
+  at most one clip per group.
+- [ ] 3.4 Keep the degraded path green. Done when
+  `cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q && .venv/bin/ruff check src tests`
+  passes both with and without the model present, and `frontend && npm run build`
+  plus the packaging step produce a DMG whose backend resources contain the
+  verified `.onnx`.
+
+## Human tasks
+
+- [ ] H1 Decide where the `.onnx` is hosted (GitHub Release of this repo fetched
+  by tag, Hugging Face at the pinned revision at build time, or a first-run
+  download, which the graceful-degradation invariant currently forbids). Blocks
+  Phases 2 and 3.

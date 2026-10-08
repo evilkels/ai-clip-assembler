@@ -1,13 +1,25 @@
-# Plan: QA Flows For The Drone Clip Extraction Workflow
+# QA flows for the drone clip extraction workflow
 
-**Status: partially automated; real-footage, performance, DaVinci, and signal QA remain.**
-Owner: Elvijs / Codex. Related: `docs/QA.md` (per-feature pass/fail), `docs/MANUAL_QA_GUIDE.md` (launch/smoke test), [`done/project-folder-model.md`](done/project-folder-model.md) (folder layout these flows assume).
+The end-to-end flows that decide whether the app takes several long drone files
+and produces a clip selection usable in DaVinci are defined and run, so the
+folder-model, sidebar and AI-collaboration work can be called "done".
 
-## Why this doc exists
+## Context
 
-Neither `docs/QA.md` nor `docs/MANUAL_QA_GUIDE.md` answers the real question: does the app take several long drone files and produce a clip selection usable in DaVinci? This doc defines the end-to-end flows that are the acceptance bar for folder-model + sidebar + AI-collaboration work to be called "done."
+Partially automated; real-footage, performance, DaVinci, and signal QA remain.
+Owner: Elvijs / Codex. Related: `docs/QA.md` (per-feature pass/fail),
+`docs/MANUAL_QA_GUIDE.md` (launch/smoke test),
+[`done/project-folder-model.md`](done/project-folder-model.md) (folder layout
+these flows assume).
 
-## The three success criteria
+### Why this doc exists
+
+Neither `docs/QA.md` nor `docs/MANUAL_QA_GUIDE.md` answers the real question:
+does the app take several long drone files and produce a clip selection usable
+in DaVinci? This doc defines the end-to-end flows that are the acceptance bar for
+folder-model + sidebar + AI-collaboration work to be called "done."
+
+### The three success criteria
 
 1. **Speed**: <15 min from "drop folder" to candidate clips visible on Review Board, for 30 min of 4K/60fps footage on the test machine.
 2. **Signal**: ≥70% of accepted clips would have been picked by manual review of the same footage (measured against the user's own ground truth, Flow D).
@@ -21,7 +33,7 @@ beyond 1–2 are dropped.
 
 If any of these three fails, the workflow is not solved regardless of which feature shipped.
 
-## Flows (A–E)
+### Flows (A–E)
 
 - **A — Cold start**: folder → auto-detected videos → analysis with per-file progress → Review Board ranked by Overall Score → accept/reject/reorder → export → open in DaVinci. Watch for: Review Board empty despite "done" analysis (scoring threshold too high), folder picker demanding a separate output location (folder-model regression), "Media offline" in DaVinci (absolute vs. relative paths bug), drag-reorder losing state.
 - **B — Iterate**: reopen project, change smoothness threshold (must filter instantly, no full re-analysis), reject/trim clips, re-export without touching `clipassembler/analysis/` mtimes.
@@ -29,17 +41,30 @@ If any of these three fails, the workflow is not solved regardless of which feat
 - **D — Signal test (the important one)**: manually pick ground-truth timecodes first, then compare Manual-harness vs. AI-harness (e.g. Pi Agent) suggestions against that ground truth. Recall ≥0.70, precision ≥0.50, ≥1 "surprise win" per session, ≤10% obvious-reject false positives (2-clip overlap rule: time ranges intersect ≥50% of either duration). Decision rule: if AI harness doesn't beat Manual by ≥10pp recall or ≥2 surprise wins, **default to Manual until the harness improves** — tracked as a finding, not a blocker.
 - **E — Stress (optional)**: same as Flow A on 2+hr footage; analysis budget extends to 60 min, UI must stay responsive (no freezes >1s), renderer memory <1.5GB.
 
-## Explicitly out of scope
+### Explicitly out of scope
 
 Multi-track timeline, color grading/transitions/effects, Windows/Linux support
 (macOS-only for now), per-rule regression tests (already in `docs/QA.md`).
 
-## Automation status
+### Automation status
 
 **Implemented**: `scripts/synthetic_e2e_qa.py` generates synthetic smooth/shaky/mixed footage and drives the real backend pipeline — verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with relative paths, and close/reopen restore. Playwright covers upload, analysis completion, Review/Timeline video preview, inclusion.
 
 **Still manual** (not automatable): real-footage timing targets, renderer responsiveness under real load, actual DaVinci/FCP import with zero relink prompts and linked-audio verification, project move/Locate through the packaged app, and the Flow D AI-vs-Manual human judgment call.
 
-## Open questions
+### Open questions
 
 Test-machine hardware baseline for timing targets — unnamed/unresolved. Which harness counts as "the AI harness" for Flow D — Pi Agent; the local Qwen harness was removed on 2026-09-29.
+
+## Phase 1: Automated coverage
+
+- [x] 1.1 Synthetic end-to-end QA: `scripts/synthetic_e2e_qa.py` drives the real backend pipeline on generated smooth/shaky/mixed footage. Done when it verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with relative paths, and close/reopen restore (shipped before v0.4.0)
+- [x] 1.2 Playwright coverage of upload, analysis completion, Review/Timeline video preview and inclusion (shipped before v0.4.0)
+
+## Human tasks
+
+- [ ] H1 Flow A on real footage: 30 min of 4K/60fps on the test machine reaches candidate clips on the Review Board in <15 min.
+- [ ] H2 Flow E (optional): Flow A on 2+hr footage stays responsive (no freezes >1s, renderer memory <1.5GB, analysis within 60 min).
+- [ ] H3 Import the exported timeline into DaVinci and Final Cut Pro: zero relink prompts and linked source audio on audio-bearing clips. Flow C (move the project folder, export again) is tracked in [032](032-valid-fcpxml-and-nle-verification.md) Step 5.4.
+- [ ] H4 Flow D on real footage: manual ground-truth timecodes first, then Manual vs. AI harness suggestions; recall ≥0.70 and precision ≥0.50 recorded as a finding.
+- [ ] H5 Project move/Locate through the packaged app.

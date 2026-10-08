@@ -1,11 +1,17 @@
 # Landing page polish and launch backlog
 
-Status: ACTIVE. The v0.1.3 editorial refresh shipped; proof, distribution,
+The landing page carries proof, a release-matched download and a measured launch
+loop, so five target users can download the current build and explain its value
+without live support.
+
+## Context
+
+Active. The v0.1.3 editorial refresh shipped; proof, distribution,
 release-account work, demo media, and measured content expansion remain.
 The landing-page drift recorded on 2026-08-31 was fixed: the restyle shipped in
 `6d79c1b` (2026-09-02).
 
-## Landing drift after the studio redesign (verified 2026-08-31)
+### Landing drift after the studio redesign (verified 2026-08-31)
 
 Historical: delivered by the restyle in `6d79c1b` (2026-09-02); kept for the record.
 
@@ -77,31 +83,15 @@ responsive and contrast pass. Screenshot capture stays **maintainer-owned** (it
 needs real footage in a running build); everything else is agent-executable.
 See [2026-09-01-landing-page-restyle.md](done/2026-09-01-landing-page-restyle.md).
 
-
-
-## Delivered and launch order
+### Delivered and launch order
 
 The page now uses the cover's paper/graphite/navy/red system, a copy-first hero,
 larger workflow imagery, and accurate local-default/optional-AI wording. Next:
 version-aligned DMG → clean-machine proof → real demo → technical SEO/Search
 Console → one gated culling guide → one audience launch loop → measurement.
 
-## Maintainer-owned work
+### Demo contract
 
-- Choose 8–15 rights-cleared clips; remove private names, locations, faces,
-  notifications, keys, and history. Prove Import → Analyse → Review → visible
-  edit → editable export → target NLE on the distributable build.
-- Approve claims, version, URL, privacy, exports, screenshots, demo, and article
-  against the shipped build. The clean-Mac install check is owned by
-  [self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4.
-- Supply first-hand culling lessons, mistakes, a concrete example, and usable
-  screenshots; verify Search Console and record the query baseline.
-
-## Agent-owned work and demo contract
-
-- Finish technical SEO, add the release-matched DMG URL, implement the guide
-  only after its evidence gate, and turn clean-machine/search findings into
-  scoped issues rather than broadening the launch change.
 - Produce a truthful 45–60s proof: unsorted footage → project/import → analysis
   and Candidate Clips → include/exclude or proposal → Working Timeline → export
   opened in Resolve/FCP → product/URL. Cuts may remove waits, not invent behavior.
@@ -109,13 +99,13 @@ Console → one gated culling guide → one audience launch loop → measurement
   motion/static fallback, 16:9 poster, transcript, and source/rights notes.
   Capture at 1440p/1080p with notifications off; prefer MP4 over GIF.
 
-## Exit signal
+### Exit signal
 
 Five target users can download the current build, create an editable export
 from their footage, and explain its value without live support. Expand content
 only after the first 28-day review or meaningful impression sample.
 
-## Absorbed from the technical SEO plan (2026-09-02)
+### Absorbed from the technical SEO plan (2026-09-02)
 
 Technical SEO shipped: the site contract harness, truthful metadata and
 structured data, the sitemap, corrected privacy and export copy, and the
@@ -126,14 +116,34 @@ decisions taken — no `meta keywords`, no FAQ schema, no fabricated ratings, no
 [`done/seo-plan.md`](done/seo-plan.md).
 
 One item remains, and it is maintainer-owned because it needs an authenticated
-Google account:
-
-- Verify the Search Console property, submit the sitemap, run the Rich Results
-  Test and URL Inspection, and capture a 28-day query baseline. Supply a real
-  verification file; do not commit a placeholder or guessed filename.
-- The 28-day measurement follow-up wants a dated GitHub issue ("Review landing
-  SEO after 28 days"). Creating it is an external-state change and needs
-  explicit authorization.
+Google account: the Search Console verification and 28-day baseline (H4).
+Supply a real verification file; do not commit a placeholder or guessed
+filename. The 28-day measurement follow-up wants a dated GitHub issue ("Review
+landing SEO after 28 days"); creating it is an external-state change and needs
+explicit authorization (H5).
 
 `seo-content-pilot.md` stays a separate plan: it is gated on query evidence
 from this baseline plus human editorial input.
+
+## Phase 1: Shipped
+
+- [x] 1.1 v0.1.3 editorial refresh of the landing page (PR #54)
+- [x] 1.2 Restyle `site/` to the app's dark tokens with self-hosted fonts and re-captured workflow shots (PR #68)
+- [x] 1.3 Technical SEO: site contract harness, truthful metadata and structured data, sitemap, corrected privacy and export copy, and the PR-time `test-site.yml` gate (shipped before v0.4.0)
+
+## Phase 2: Agent-owned launch work
+
+- [ ] 2.1 Add the release-matched DMG URL to the page. Done when the site download link points at the current release's DMG and `python3 scripts/tests/test_site_contract.py -v` passes.
+  - `7d1972a` already makes the site's download links follow `frontend/package.json`; confirm that covers this before closing.
+- [ ] 2.2 Produce the truthful proof video per the demo contract in Context (after H1). Done when the H.264 MP4 with captions, the 15–25s muted web cut with controls and reduced-motion/static fallback, the 16:9 poster, the transcript and the source/rights notes exist.
+- [ ] 2.3 Implement the culling guide only after its evidence gate (see [seo-content-pilot](seo-content-pilot.md); after H3 and H4). Done when the guide ships under that plan's implementation contract.
+- [ ] 2.4 Turn clean-machine and search findings into scoped issues rather than broadening the launch change. Done when each finding from H1 and H4 is a separate issue or plan task.
+
+## Human tasks
+
+- [ ] H1 Choose 8–15 rights-cleared clips; remove private names, locations, faces, notifications, keys, and history. Prove Import → Analyse → Review → visible edit → editable export → target NLE on the distributable build. The clean-Mac install check is owned by [self-contained-runtime-tools](self-contained-runtime-tools.md) H1.
+- [ ] H2 Approve claims, version, URL, privacy, exports, screenshots, demo, and article against the shipped build.
+- [ ] H3 Supply first-hand culling lessons, mistakes, a concrete example, and usable screenshots.
+- [ ] H4 Verify the Search Console property, submit the sitemap, run the Rich Results Test and URL Inspection, and record the 28-day query baseline.
+- [ ] H5 Authorize creating the dated GitHub issue "Review landing SEO after 28 days".
+- [ ] H6 Exit signal: five target users download the current build, create an editable export from their footage, and explain its value without live support.

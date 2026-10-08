@@ -1,7 +1,7 @@
 # Agent-Operable Timeline Design
 
 Date: 2026-06-19 · Status: Approved · Owner: Elvijs · Implementation plan:
-[`agent-operable-timeline.md`](../plans/agent-operable-timeline.md)
+[`agent-operable-timeline.md`](../plans/done/agent-operable-timeline.md)
 
 ## Goal and product stance
 

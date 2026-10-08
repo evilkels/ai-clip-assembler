@@ -1,5 +1,7 @@
 # Going-public roadmap — Codex CLI flow
 
+Superseded by: [ROADMAP](../../ROADMAP.md) (2026-10-08; trust and installability now live in plans 038, 033 and self-contained-runtime-tools).
+
 Status: ACTIVE (2026-07-02). Owner: Elvijs. Move from local success to public
 release in order; do not market phase 3 while phase-1 trust is open.
 

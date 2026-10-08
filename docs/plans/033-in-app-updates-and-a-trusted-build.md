@@ -85,7 +85,7 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
 
 ## Phase 0 — Decide whether to buy in (owner)
 
-- [ ] **Step 0.1** Decide, and record the reason here:
+- [ ] 0.1 Decide, and record the reason here:
       - *Sign + notarize + auto-update* — 99 USD a year, a certificate to store
         as a CI secret, and a longer, more fragile release. Buys a normal
         desktop-app install and update.
@@ -93,17 +93,17 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
         prompt, keeps `app-wizard.sh` as the installer. Most of the benefit,
         none of Phases 2–5.
       - *Neither* — keep today's behaviour and stop maintaining this plan.
-      Note that [going-public-codex-flow](going-public-codex-flow.md) already
+      Note that [going-public-codex-flow](done/going-public-codex-flow.md) already
       assumes a signed build in its phase-1 trust work, so this decision is not
       only about convenience.
 
 ## Phase 1 — Gate: a build macOS opens without being asked twice
 
-- [ ] **Step 1.1** Developer ID Application certificate in CI as `CSC_LINK` /
+- [ ] 1.1 Developer ID Application certificate in CI as `CSC_LINK` /
       `CSC_KEY_PASSWORD`; hardened runtime enabled; entitlements for the nested
       Python and FFmpeg binaries.
-- [ ] **Step 1.2** Notarize and staple in `build-dmg.yml`, both arches.
-- [ ] **Step 1.3** Verify on a Mac that has never seen the app: `spctl -a -vv`
+- [ ] 1.2 Notarize and staple in `build-dmg.yml`, both arches.
+- [ ] 1.3 Verify on a Mac that has never seen the app: `spctl -a -vv`
       and `stapler validate` pass, and a double-click opens it with no Privacy &
       Security detour. **If this step fails, stop — the rest of the plan is
       unreachable.** This is the same clean-machine evidence
@@ -112,25 +112,25 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
 
 ## Phase 2 — Publish an update feed, not just installers
 
-- [ ] **Step 2.1** Add `zip` back to the mac targets. electron-builder's default
+- [ ] 2.1 Add `zip` back to the mac targets. electron-builder's default
       is `dmg` + `zip` precisely because Squirrel.Mac needs the zip and
       `latest-mac.yml` cannot be generated without it — and
       `frontend/package.json` explicitly narrows `build.mac.target` to `"dmg"`,
       which overrides that default. **The current config would break auto-update
       even after signing**, and the failure surfaces as a missing feed rather
       than as a target problem. The DMG stays for first-time human downloads.
-- [ ] **Step 2.2** Publish `latest-mac.yml` and the zips to the same release as
+- [ ] 2.2 Publish `latest-mac.yml` and the zips to the same release as
       the DMGs. Two concrete blockers in `build-dmg.yml` today: it packages with
       `--publish never`, and its release step uploads `frontend/dist/*.dmg`, a
       glob that excludes both the zip and the feed. Verify the two architectures
       do not overwrite each other's feed — they run as independent matrix jobs
       that each publish.
-- [ ] **Step 2.3** Fetch the feed from a machine and confirm it names the version,
+- [ ] 2.3 Fetch the feed from a machine and confirm it names the version,
       the files and their hashes.
 
 ## Phase 3 — Download and install from inside the app
 
-- [ ] **Step 3.1** Adopt electron-updater in the main process for download and
+- [ ] 3.1 Adopt electron-updater in the main process for download and
       install. Note for whoever picks this up: Electron's own docs route people
       to Electron Forge and its `@electron/osx-sign` / `@electron/notarize`
       packages, while this project packages with electron-builder, which carries
@@ -139,31 +139,31 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
       question mid-implementation. Keep one checker, not two: `updateCheck.ts` already owns the check,
       the six-hour cache and per-version dismissal, so route the updater through
       it rather than letting both poll.
-- [ ] **Step 3.2** Surface progress as state the renderer can render — downloading
+- [ ] 3.2 Surface progress as state the renderer can render — downloading
       with a percentage, ready-to-install, failed with a reason.
-- [ ] **Step 3.3** Install on explicit consent only, via `quitAndInstall`.
+- [ ] 3.3 Install on explicit consent only, via `quitAndInstall`.
 
 ## Phase 4 — The Editor stays in control
 
-- [ ] **Step 4.1** Banner and General panel gain the new states; "Restart to
+- [ ] 4.1 Banner and General panel gain the new states; "Restart to
       install" is a deliberate click, never an ambush.
-- [ ] **Step 4.2** Refuse to install while analysis or export is running — those
+- [ ] 4.2 Refuse to install while analysis or export is running — those
       are long jobs and a restart throws the work away. Offer to install after.
-- [ ] **Step 4.3** Any failure falls back to the browser download and the wizard,
+- [ ] 4.3 Any failure falls back to the browser download and the wizard,
       with the reason shown. The Editor must never be left with a broken app and
       no route forward.
 
 ## Phase 5 — Prove it upgrades, then tell the truth about it
 
-- [ ] **Step 5.1** Real upgrade test on both arches: install N-1, let the app find
+- [ ] 5.1 Real upgrade test on both arches: install N-1, let the app find
       N, download, restart, confirm the new version reports itself and the backend
       still starts.
-- [ ] **Step 5.2** Test the ugly paths: no network mid-download, a corrupted
+- [ ] 5.2 Test the ugly paths: no network mid-download, a corrupted
       download, and a refused install.
-- [ ] **Step 5.3** Rewrite `docs/UPDATING.md` — the paragraph that says the notice
+- [ ] 5.3 Rewrite `docs/UPDATING.md` — the paragraph that says the notice
       "does not download or install anything" — and `UpdateSection.tsx:52`.
       Keep `app-wizard.sh` working and documented as the manual path.
-- [ ] **Step 5.4** Full gates: backend, ruff, lint, typecheck, `test:main`,
+- [ ] 5.4 Full gates: backend, ruff, lint, typecheck, `test:main`,
       Playwright.
 
 ## How this gets verified

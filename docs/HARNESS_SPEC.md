@@ -7,6 +7,22 @@
 3. **Pluggable at runtime** — switch harnesses without restarting the app
 4. **Graceful degradation** — if a harness fails, fall back to manual/rule-based
 
+## Payload boundary
+
+This is the shipped payload contract; the rest of this file remains the older design. The full
+specification rewrite is task 7.1.
+
+AI requests send Frame Samples as JPEG, file names (never folder paths), clip timings and scores,
+the Timeline, and Review chat, including Scripts and their results. Video and audio files and
+folder paths are never sent.
+
+Only `.jpg` files inside the project's samples folder are accepted: at most 12 for a Review turn,
+4 per clip and 20 per scoring request. Each request copies those images into a fresh empty scratch
+folder used as the engine's working directory, then deletes it. Text names images by file name
+only. The engine runs without tools and with a minimal environment.
+
+`backend/tests/test_ai_boundary.py` and `backend/tests/test_ai_payload.py` prove this boundary.
+
 ## Input Format
 
 Harness input is a JSON payload keyed by `project_id` and `harness_id`, carrying

@@ -1986,6 +1986,18 @@ def test_draft_format_switch_survives_reload(monkeypatch, tmp_path):
     ]
 
 
+def test_draft_format_switch_works_when_the_source_video_could_not_be_probed(monkeypatch, tmp_path):
+    client, project_id, source_video = create_folder_project_with_video(tmp_path)
+    analyze_folder_project_with_one_clip(monkeypatch, client, source_video.parent, project_id)
+    assert api.projects[project_id]["videos"][0]["metadata"] is None
+
+    response = client.post(f"/projects/{project_id}/draft", json={"format": "short"})
+
+    assert response.status_code == 200
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert [item["source_clip_id"] for item in document["items"]] == ["clip-1"]
+
+
 def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)

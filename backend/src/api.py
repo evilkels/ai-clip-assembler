@@ -810,8 +810,32 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
         profile=profile,
         target_duration_sec=target_duration_sec,
     )
+    controller = _timeline_lifecycle.get_controller(project_id)
+    await controller.apply_batch(
+        [
+            {
+                "operation": "replace_timeline",
+                "args": {
+                    "items": [
+                        {
+                            "source_clip_id": clip["clip_id"],
+                            "start_sec": clip["start_sec"],
+                            "end_sec": clip["end_sec"],
+                            "speed": 1.0,
+                        }
+                        for clip in timeline["clips"]
+                    ]
+                },
+            },
+            {"operation": "set_profile", "args": {"profile": profile}},
+            {
+                "operation": "set_target_duration",
+                "args": {"target_duration_sec": target_duration_sec},
+            },
+        ],
+        expected_revision=controller.document.revision,
+    )
     project["timeline"] = timeline
-    invalidate_timeline_controller(project_id)
     persist_project_results(project_id)
     return {
         "project_id": project_id,
@@ -935,7 +959,7 @@ def build_timeline_sources(project: dict) -> dict[str, SourceClip]:
         if not clip_id:
             continue
         video = videos_by_id.get(clip.get("file_id"))
-        duration = (video or {}).get("metadata", {}).get("duration_sec") if video else None
+        duration = ((video or {}).get("metadata") or {}).get("duration_sec")
         if duration is None:
             duration = clip.get("end_sec", 0.0)
         sources[clip_id] = SourceClip(

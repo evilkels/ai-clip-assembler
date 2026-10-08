@@ -449,6 +449,7 @@ async def run_review_turn(
     client_message_id: Optional[str] = None,
     library: Optional[List[dict]] = None,
     samples_dir: Optional[Path] = None,
+    fallback_versions: bool = False,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -546,7 +547,7 @@ async def run_review_turn(
     payload = dict(reply.get("payload") or {})
     payload.pop("versions", None)
     # A turn that edits and brings no valid Versions gets none fabricated (plan 034 D8).
-    if validated_versions or not (source or operations):
+    if validated_versions or (fallback_versions and not (source or operations)):
         if not validated_versions:
             validated_versions = [
                 version.model_dump() for version in deterministic_versions(bounded_candidates)

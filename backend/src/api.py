@@ -597,13 +597,10 @@ def resume_ai_scoring(project_id: str):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     project = projects[project_id]
-    if is_cloud_harness(project.get("selected_harness", project.get("harness_id", "manual"))) and not project.get("cloud_ai_consent"):
+    if not project.get("cloud_ai_consent"):
         raise HTTPException(
             status_code=403,
-            detail=(
-                "Cloud AI consent is required before this harness can analyze footage. "
-                "Use the manual harness or opt in for this project."
-            ),
+            detail="AI is off for this project. Turn it on in Settings › AI.",
         )
     if (project.get("analysis_progress") or {}).get("phase") == "analyzing":
         raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
@@ -636,22 +633,9 @@ def resume_ai_scoring(project_id: str):
             resumed_by_file.get(entry.get("file_id"), entry)
             for entry in stored.get("per_video", [])
         ]
-        failures = [entry["failure"] for entry in per_video if entry.get("failure")]
-        metadata = {
-            "per_video": per_video,
-            "used_ai": any(entry.get("used_ai") for entry in per_video),
-            "local": False,
-            "clips_left": sum(int(entry.get("clips_left", 0)) for entry in per_video),
-        }
-        if failures:
-            metadata["failure"] = failures[0]
-        models_used = list({entry["model_used"] for entry in per_video if entry.get("model_used")})
-        if len(models_used) == 1:
-            metadata["model_used"] = models_used[0]
-        elif models_used:
-            metadata["models_used"] = models_used
+        metadata = _build_scoring_metadata(per_video, local=False)
         project["ai_scoring"] = metadata
-        effective = "manual" if failures or metadata["clips_left"] else "pi_agent"
+        effective = "manual" if metadata.get("failure") or metadata["clips_left"] else "pi_agent"
         finalized = _finalize_clip_set(
             project_id, per_file_results, effective_harness_id=effective,
             preserve_manual_timeline=True,
@@ -694,6 +678,24 @@ def effective_harness_id(harness_id: str, per_video_metadata: list[dict]) -> str
     ):
         return DEFAULT_HARNESS_ID
     return harness_id
+
+
+def _build_scoring_metadata(per_video: list[dict], *, local: bool) -> dict:
+    metadata = {
+        "per_video": per_video,
+        "used_ai": any(entry.get("used_ai") for entry in per_video),
+        "local": local,
+        "clips_left": sum(int(entry.get("clips_left", 0)) for entry in per_video),
+    }
+    failures = [entry["failure"] for entry in per_video if entry.get("failure")]
+    if failures:
+        metadata["failure"] = failures[0]
+    models_used = list({entry["model_used"] for entry in per_video if entry.get("model_used")})
+    if len(models_used) == 1:
+        metadata["model_used"] = models_used[0]
+    elif models_used:
+        metadata["models_used"] = models_used
+    return metadata
 
 
 @app.post("/projects/{project_id}/analyze/cancel")
@@ -792,22 +794,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         pipeline.timings,
     )
     if request.harness_id == "pi_agent":
-        failures = [v["failure"] for v in pipeline.per_video_metadata if v.get("failure")]
-        harness_metadata = {
-            "per_video": pipeline.per_video_metadata,
-            "used_ai": any(v.get("used_ai") for v in pipeline.per_video_metadata),
-            "local": False,
-            "clips_left": sum(int(v.get("clips_left", 0)) for v in pipeline.per_video_metadata),
-        }
-        if failures:
-            harness_metadata["failure"] = failures[0]
-        models_used = list({
-            v["model_used"] for v in pipeline.per_video_metadata if v.get("model_used")
-        })
-        if len(models_used) == 1:
-            harness_metadata["model_used"] = models_used[0]
-        elif models_used:
-            harness_metadata["models_used"] = models_used
+        harness_metadata = _build_scoring_metadata(pipeline.per_video_metadata, local=False)
         response["metadata"] = harness_metadata
         projects[project_id]["ai_scoring"] = harness_metadata
     else:
@@ -1319,13 +1306,11 @@ def _review_inputs(
     is_default_engine_agent = agent is _DEFAULT_ENGINE_AGENT
     project = projects[project_id]
     default_agent_requires_consent = not project.get("cloud_ai_consent")
-    if default_agent_requires_consent and is_default_engine_agent:
+    fallback_versions = default_agent_requires_consent and is_default_engine_agent
+    if fallback_versions:
         def consent_required_review_agent(_context):
             return {
-                "message": (
-                    "Conversational suggestions need cloud AI consent for this project. "
-                    "Grant consent to enable the In-App Review Agent."
-                ),
+                "message": "AI is off for this project. Turn it on in Settings › AI.",
                 "operations": [],
                 "versions": [],
             }
@@ -1333,7 +1318,7 @@ def _review_inputs(
         agent = consent_required_review_agent
     elif is_default_engine_agent:
         agent = engine_review_agent(get_engine())
-    return candidates, candidate_frames, agent
+    return candidates, candidate_frames, agent, fallback_versions
 
 
 async def _run_review_turn(
@@ -1345,7 +1330,7 @@ async def _run_review_turn(
         for clip_id, decision in controller.document.decisions.items()
         if decision == "excluded"
     )
-    candidates, candidate_frames, agent = _review_inputs(project_id, excluded_clip_ids)
+    candidates, candidate_frames, agent, fallback_versions = _review_inputs(project_id, excluded_clip_ids)
     return await run_review_turn(
         project_id,
         user_message=user_message,
@@ -1358,6 +1343,7 @@ async def _run_review_turn(
         # Scripts read the whole library, excluded clips included (Script API v1).
         library=get_mcp_server()._list_candidates(project_id),
         samples_dir=samples_dir(project_id),
+        fallback_versions=fallback_versions,
     )
 
 
@@ -1417,14 +1403,20 @@ async def review_kickoff(project_id: str):
         session = _proposal_store.session(project_id)
         if session.messages:
             last = session.messages[-1]
-            return {
-                "message": last.text,
-                "proposal": last.proposal.model_dump() if last.proposal else None,
-                "agent_message": last.model_dump(),
-                "session": session.model_dump(),
-            }
+            failed_opening_turn = (
+                last.role == "agent"
+                and last.reply_to_message_id is None
+                and last.payload.get("failure")
+            )
+            if not failed_opening_turn:
+                return {
+                    "message": last.text,
+                    "proposal": last.proposal.model_dump() if last.proposal else None,
+                    "agent_message": last.model_dump(),
+                    "session": session.model_dump(),
+                }
         controller = get_timeline_controller(project_id)
-        candidates, candidate_frames, agent = _review_inputs(project_id)
+        candidates, candidate_frames, agent, fallback_versions = _review_inputs(project_id)
         return await run_review_turn(
             project_id,
             user_message=(
@@ -1438,6 +1430,7 @@ async def review_kickoff(project_id: str):
             record_user_message=False,
             candidate_frames=candidate_frames,
             samples_dir=samples_dir(project_id),
+            fallback_versions=fallback_versions,
         )
 
 

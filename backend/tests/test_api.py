@@ -1783,10 +1783,11 @@ def test_ai_scoring_resume_scores_only_uncached_clips(monkeypatch, tmp_path):
     assert api.projects[project_id]["analysis_progress"]["phase"] == "complete"
 
 
-def test_ai_scoring_resume_requires_consent(monkeypatch, tmp_path):
+def test_ai_scoring_resume_requires_project_ai_permission_for_manual_selection(monkeypatch, tmp_path):
     client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
     project = api.projects[project_id]
     project["ai_scoring"] = {"failure": {"kind": "usage_limit"}, "clips_left": 1, "per_video": []}
+    project["selected_harness"] = "manual"
     project["cloud_ai_consent"] = False
     bin_path, log_path = fake_engine(tmp_path / "resume", scenario="ok")
     monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
@@ -1794,10 +1795,7 @@ def test_ai_scoring_resume_requires_consent(monkeypatch, tmp_path):
     response = client.post(f"/projects/{project_id}/ai-scoring/resume")
 
     assert response.status_code == 403
-    assert response.json()["detail"] == client.post(
-        f"/projects/{project_id}/analyze",
-        json={"project_id": project_id, "harness_id": "pi_agent", "preferences": {}},
-    ).json()["detail"]
+    assert response.json()["detail"] == "AI is off for this project. Turn it on in Settings › AI."
     assert not log_path.exists()
 
 
@@ -2888,10 +2886,7 @@ def test_review_turn_requires_consent_for_both_surfaces(monkeypatch, tmp_path):
     turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
 
     assert turn.status_code == 200
-    assert turn.json()["message"] == (
-        "Conversational suggestions need cloud AI consent for this project. "
-        "Grant consent to enable the In-App Review Agent."
-    )
+    assert turn.json()["message"] == "AI is off for this project. Turn it on in Settings › AI."
     assert turn.json()["proposal"] is None
 
 
@@ -3029,6 +3024,31 @@ def test_review_kickoff_stages_extracted_frames_for_engine(monkeypatch, tmp_path
     records = [json.loads(line) for line in log_path.read_text().splitlines()]
     assert len(records) == 1
     assert any("frame-01.jpg" in arg for arg in records[0]["argv"])
+
+
+def test_review_kickoff_retries_failed_opening_turn_but_keeps_success_idempotent(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["cloud_ai_consent"] = True
+    bin_path, log_path = fake_engine(tmp_path / "retry", scenario="usage_limit,ok")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
+
+    first = client.post(f"/projects/{project_id}/review/kickoff")
+    assert first.status_code == 200
+    first_agent_message = first.json()["agent_message"]
+    assert first_agent_message["payload"]["failure"]["kind"] == "usage_limit"
+
+    second = client.post(f"/projects/{project_id}/review/kickoff")
+    assert second.status_code == 200
+    second_agent_message = second.json()["agent_message"]
+    assert second_agent_message["message_id"] != first_agent_message["message_id"]
+    assert second_agent_message["payload"].get("failure") is None
+
+    third = client.post(f"/projects/{project_id}/review/kickoff")
+    records = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert third.status_code == 200
+    assert third.json()["agent_message"]["message_id"] == second_agent_message["message_id"]
+    assert len(records) == 2
 
 
 def test_clear_review_session_starts_a_fresh_transcript(monkeypatch, tmp_path):

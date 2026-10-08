@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClipGenerationPanel } from '../components/ClipGenerationPanel';
+import { FinishAiScoring } from '../components/FinishAiScoring';
 import { SourceVideoBrowser } from '../components/SourceVideoBrowser';
 import { StatusSurface } from '../components/StatusSurface';
 import { WorkflowHeader } from '../components/WorkflowHeader';
@@ -641,23 +642,13 @@ export function ImportPage() {
 
 /** The stopped AI scoring run: its Provider message and the Finish button (plan 038 D6b). */
 function AiScoringFailure() {
-  const { harnessMetadata, resumingAiScoring, resumeError, resumeAiScoring } = useReview();
+  const { harnessMetadata } = useReview();
   if (!harnessMetadata?.failure) return null;
   const clipsLeft = harnessMetadata.clips_left ?? 0;
   return (
     <>
       <p className="import-status-warning">{harnessMetadata.failure.message}</p>
-      {clipsLeft > 0 ? (
-        <button
-          type="button"
-          className="btn subtle"
-          disabled={resumingAiScoring}
-          onClick={() => void resumeAiScoring()}
-        >
-          {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${clipsLeft} clips left)`}
-        </button>
-      ) : null}
-      {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
+      <FinishAiScoring clipsLeft={clipsLeft} />
     </>
   );
 }

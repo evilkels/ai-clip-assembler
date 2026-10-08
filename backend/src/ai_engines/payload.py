@@ -8,7 +8,10 @@ from typing import List
 
 from .types import AiRequest
 
-_ABSOLUTE_PATH = re.compile(r'(?<![\w.])/(?:[^/\s"\'<>]+/)+[^/\s"\'<>]+')
+_ABSOLUTE_PATH = re.compile(
+    r'(?:(?<![\w./:])|(?<=file://))/'
+    r'(?:[^\s/"\'<>][^/"\'<>]*/)+[^/\s"\'<>]+'
+)
 
 
 def strip_paths(text: str) -> str:

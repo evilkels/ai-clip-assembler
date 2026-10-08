@@ -531,6 +531,7 @@ async def test_run_review_turn_fingerprints_the_candidate_context_given_to_the_a
         candidates=candidates,
         store=ProposalStore(),
         agent=mutating_agent,
+        fallback_versions=True,
     )
 
     assert result["agent_message"]["payload"]["version_set"][
@@ -561,7 +562,7 @@ def test_deterministic_versions_produce_backend_fingerprinted_recipes():
 
 
 @pytest.mark.asyncio
-async def test_empty_model_versions_use_deterministic_backend_fallback():
+async def test_no_versions_engine_reply_does_not_fabricate_versions():
     candidates = [
         {
             "clip_id": "clip-a",
@@ -572,6 +573,32 @@ async def test_empty_model_versions_use_deterministic_backend_fallback():
             "overall_score": 8.0,
         }
     ]
+    class NoVersionsEngine:
+        provider = "chatgpt"
+
+        def run(self, _request):
+            return AiReply(
+                provider="chatgpt",
+                data={"message": "No edits needed.", "operations": [], "versions": []},
+                raw_text='{"message":"No edits needed.","operations":[],"versions":[]}',
+                elapsed_sec=0,
+            )
+
+    result = await run_review_turn(
+        "p1",
+        user_message="Make versions",
+        controller=_controller(),
+        candidates=candidates,
+        store=ProposalStore(),
+        agent=engine_review_agent(NoVersionsEngine()),
+    )
+
+    assert "version_set" not in result["agent_message"]["payload"]
+
+
+@pytest.mark.asyncio
+async def test_stub_turn_can_use_deterministic_backend_fallback():
+    candidates = _CANDIDATES[:1]
     result = await run_review_turn(
         "p1",
         user_message="Make versions",
@@ -579,6 +606,7 @@ async def test_empty_model_versions_use_deterministic_backend_fallback():
         candidates=candidates,
         store=ProposalStore(),
         agent=lambda _context: {"message": "Model unavailable", "operations": []},
+        fallback_versions=True,
     )
 
     version_set = result["agent_message"]["payload"]["version_set"]

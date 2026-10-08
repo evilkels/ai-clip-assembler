@@ -59,6 +59,63 @@ def _clip(clip_id: str, start: float, end: float, score: float) -> ClipSuggestio
     )
 
 
+def test_resume_ai_scoring_stops_after_first_failure(tmp_path):
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    videos = []
+    per_file = {}
+    clips = []
+    for index in (1, 2):
+        file_id = f"file-{index}"
+        video = _source_video(tmp_path, file_id=file_id)
+        videos.append(video)
+        frame_path = samples / f"{file_id}.jpg"
+        frame_path.write_bytes(b"jpg")
+        per_file[file_id] = {"frames": [FrameScore(
+            timestamp=1, frame_path=str(frame_path), motion_stability=8,
+            smoothness_score=8, sharpness_score=8, exposure_score=8,
+            contrast_score=8, visual_interest_score=0, overall_score=8,
+            blur_score=8, brightness=0.8, contrast=0.8, scene_id=1,
+            is_keyframe=True, turn_rate_deg_per_sec=0,
+        ).model_dump()]}
+        clips.append(ClipSuggestion(
+            clip_id=f"clip-{index}", file_id=file_id, file_name=video["file_name"],
+            start_sec=0, end_sec=2, duration_sec=2, smoothness_score=8,
+            visual_interest_score=0, overall_score=8, ai_reason="Stable",
+        ).model_dump())
+
+    class UsageLimitEngine:
+        provider = "chatgpt"
+
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, _request):
+            self.calls += 1
+            return make_failure("usage_limit", "chatgpt")
+
+    engine = UsageLimitEngine()
+    project = {
+        "videos": videos,
+        "clips": clips,
+        "frame_scores": {"per_file": per_file},
+        "generation_stats": {"per_file": {}},
+        "ai_scoring": {"per_video": [
+            {"file_id": "file-1", "clips_left": 1},
+            {"file_id": "file-2", "clips_left": 1},
+        ]},
+    }
+
+    _results, metadata = analysis_service.resume_ai_scoring(
+        project, samples_path=samples, cache_dir=tmp_path / "cache", engine_fn=lambda: engine,
+    )
+
+    assert engine.calls == 1
+    assert metadata[1]["used_ai"] is False
+    assert metadata[1]["failure"] == metadata[0]["failure"]
+    assert metadata[1]["clips_left"] == 1
+
+
 def _frame(timestamp: float, smoothness: float = 8.0) -> FrameScore:
     return FrameScore(
         timestamp=timestamp,

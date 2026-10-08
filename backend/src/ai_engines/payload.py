@@ -8,6 +8,17 @@ from typing import List
 
 from .types import AiRequest
 
+_ABSOLUTE_PATH = re.compile(r'(?<![\w.])/(?:[^/\s"\'<>]+/)+[^/\s"\'<>]+')
+
+
+def strip_paths(text: str) -> str:
+    def replace(match):
+        value = match.group(0)
+        trimmed = value.rstrip(".,;:!?)]}")
+        return Path(trimmed).name + value[len(trimmed):]
+
+    return _ABSOLUTE_PATH.sub(replace, text)
+
 _NAME = re.compile(r"^(?:frame-\d{2}|clip-\d-frame-\d)\.jpg$")
 
 

@@ -597,56 +597,85 @@ def resume_ai_scoring(project_id: str):
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     project = projects[project_id]
+    if is_cloud_harness(project.get("selected_harness", project.get("harness_id", "manual"))) and not project.get("cloud_ai_consent"):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Cloud AI consent is required before this harness can analyze footage. "
+                "Use the manual harness or opt in for this project."
+            ),
+        )
     if (project.get("analysis_progress") or {}).get("phase") == "analyzing":
         raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
     stored = project.get("ai_scoring") or {}
     if not stored.get("failure") or int(stored.get("clips_left", 0)) == 0:
         raise HTTPException(status_code=409, detail="Nothing to resume")
-    per_file_results, resumed_metadata = analysis_service.resume_ai_scoring(
-        project,
-        samples_path=samples_dir(project_id),
-        cache_dir=analysis_dir(project_id) / "ai-scores",
-        engine_fn=get_engine,
+    project["analysis_progress"] = {}
+    set_analysis_progress(
+        project_id,
+        phase="analyzing",
+        harness_id=project.get("selected_harness", "pi_agent"),
+        step="scoring_clips",
+        video_index=0,
+        video_total=len(stored.get("per_video", [])),
+        file_name=None,
+        clip_index=0,
+        clip_total=0,
+        message="Finishing AI scoring",
+        error=None,
     )
-    resumed_by_file = {entry["file_id"]: entry for entry in resumed_metadata}
-    per_video = [
-        resumed_by_file.get(entry.get("file_id"), entry)
-        for entry in stored.get("per_video", [])
-    ]
-    failures = [entry["failure"] for entry in per_video if entry.get("failure")]
-    metadata = {
-        "per_video": per_video,
-        "used_ai": any(entry.get("used_ai") for entry in per_video),
-        "local": False,
-        "clips_left": sum(int(entry.get("clips_left", 0)) for entry in per_video),
-    }
-    if failures:
-        metadata["failure"] = failures[0]
-    models_used = list({entry["model_used"] for entry in per_video if entry.get("model_used")})
-    if len(models_used) == 1:
-        metadata["model_used"] = models_used[0]
-    elif models_used:
-        metadata["models_used"] = models_used
-    project["ai_scoring"] = metadata
-    effective = "manual" if failures or metadata["clips_left"] else "pi_agent"
-    finalized = _finalize_clip_set(
-        project_id, per_file_results, effective_harness_id=effective,
-        preserve_manual_timeline=True,
-    )
-    persist_project_results(project_id)
-    return {
-        "project_id": project_id,
-        "harness_id": "pi_agent",
-        "selected_harness": project.get("selected_harness", "pi_agent"),
-        "effective_harness": effective,
-        "status": "complete",
-        "clips": finalized["clips"],
-        "sequence": finalized["timeline"],
-        "recommendation": finalized["recommendation"],
-        "generation_stats": finalized["generation_stats"],
-        "timings": {"per_video": [], "pipeline_total_sec": 0.0},
-        "metadata": metadata,
-    }
+    try:
+        per_file_results, resumed_metadata = analysis_service.resume_ai_scoring(
+            project,
+            samples_path=samples_dir(project_id),
+            cache_dir=analysis_dir(project_id) / "ai-scores",
+            engine_fn=get_engine,
+        )
+        resumed_by_file = {entry["file_id"]: entry for entry in resumed_metadata}
+        per_video = [
+            resumed_by_file.get(entry.get("file_id"), entry)
+            for entry in stored.get("per_video", [])
+        ]
+        failures = [entry["failure"] for entry in per_video if entry.get("failure")]
+        metadata = {
+            "per_video": per_video,
+            "used_ai": any(entry.get("used_ai") for entry in per_video),
+            "local": False,
+            "clips_left": sum(int(entry.get("clips_left", 0)) for entry in per_video),
+        }
+        if failures:
+            metadata["failure"] = failures[0]
+        models_used = list({entry["model_used"] for entry in per_video if entry.get("model_used")})
+        if len(models_used) == 1:
+            metadata["model_used"] = models_used[0]
+        elif models_used:
+            metadata["models_used"] = models_used
+        project["ai_scoring"] = metadata
+        effective = "manual" if failures or metadata["clips_left"] else "pi_agent"
+        finalized = _finalize_clip_set(
+            project_id, per_file_results, effective_harness_id=effective,
+            preserve_manual_timeline=True,
+        )
+        persist_project_results(project_id)
+        set_analysis_progress(
+            project_id, phase="complete", step="complete", message="AI scoring complete", error=None,
+        )
+        return {
+            "project_id": project_id,
+            "harness_id": "pi_agent",
+            "selected_harness": project.get("selected_harness", "pi_agent"),
+            "effective_harness": effective,
+            "status": "complete",
+            "clips": finalized["clips"],
+            "sequence": finalized["timeline"],
+            "recommendation": finalized["recommendation"],
+            "generation_stats": finalized["generation_stats"],
+            "timings": {"per_video": [], "pipeline_total_sec": 0.0},
+            "metadata": metadata,
+        }
+    except Exception as exc:
+        set_analysis_progress(project_id, phase="error", error=str(exc))
+        raise
 
 
 def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
@@ -1408,6 +1437,7 @@ async def review_kickoff(project_id: str):
             agent=agent,
             record_user_message=False,
             candidate_frames=candidate_frames,
+            samples_dir=samples_dir(project_id),
         )
 
 

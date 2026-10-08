@@ -589,6 +589,7 @@ def resume_ai_scoring(
     stored_frames = (project.get("frame_scores") or {}).get("per_file", {})
     generation = (project.get("generation_stats") or {}).get("per_file", {})
     results, metadata = [], []
+    first_failure = None
     clips_by_file = {}
     for clip in project.get("clips", []):
         clips_by_file.setdefault(clip.get("file_id"), []).append(clip)
@@ -599,6 +600,18 @@ def resume_ai_scoring(
             continue
         clips = [ClipSuggestion.model_validate(clip) for clip in clips_by_file.get(file_id, [])]
         frames = [FrameScore.model_validate(frame) for frame in stored_frames.get(file_id, {}).get("frames", [])]
+        if first_failure is not None:
+            sampled_count = sum(bool(sample_frames_for_clip(clip, frames)) for clip in clips)
+            entry = {
+                "used_ai": False,
+                "model_used": None,
+                "file_id": file_id,
+                "file_name": video["file_name"],
+                "clips_left": sampled_count,
+                "failure": first_failure,
+            }
+            metadata.append(entry)
+            continue
         manual = AssemblyResult(
             clips=clips,
             sequence=TimelineSequence(total_duration_sec=sum(c.duration_sec for c in clips), clips=[c.clip_id for c in clips]),
@@ -618,6 +631,7 @@ def resume_ai_scoring(
         }
         if outcome.failure:
             entry["failure"] = outcome.failure.model_dump(exclude_none=True)
+            first_failure = entry["failure"]
         metadata.append(entry)
         results.append({"file_id": file_id, "clips": clips_by_file[file_id], "result": outcome.result})
     return results, metadata

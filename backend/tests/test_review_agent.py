@@ -736,6 +736,29 @@ async def test_agent_script_reply_becomes_a_proposal_on_the_agent_message_withou
 
 
 @pytest.mark.asyncio
+async def test_unusable_engine_reply_is_stored_as_failure_turn():
+    class BadReplyEngine:
+        provider = "chatgpt"
+
+        def run(self, _request):
+            return AiReply(
+                provider="chatgpt", data={"message": "OK", "versions": 1},
+                raw_text='{"message":"OK","versions":1}', elapsed_sec=0,
+            )
+
+    store = ProposalStore()
+    result = await run_review_turn(
+        "p1", user_message="Review", controller=_controller(), candidates=_CANDIDATES,
+        store=store, agent=engine_review_agent(BadReplyEngine()),
+    )
+
+    message = result["agent_message"]
+    assert message["payload"]["failure"]["kind"] == "unusable_reply"
+    assert "version_set" not in message["payload"]
+    assert message["text"]
+
+
+@pytest.mark.asyncio
 async def test_failing_agent_script_stages_nothing_not_even_its_operations():
     store = ProposalStore()
 

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from src import api
 from src.ai_engines.pi import PiEngine
-from src.ai_engines.payload import PayloadError, stage, staged, validate_images
+from src.ai_engines.payload import PayloadError, stage, staged, strip_paths, validate_images
 from src.ai_engines.types import AiReply, AiRequest
 from src.ai_scoring import enhance_clips
 from src.models import AssemblyResult, ClipSuggestion, FrameScore, TimelineSequence
@@ -97,6 +97,12 @@ def test_rejects_invalid_or_duplicate_image_names(tmp_path):
             stage(request(images, samples, image_names=names))
 
 
+def test_strip_paths_replaces_embedded_absolute_paths_but_keeps_relative_text():
+    text = 'print("/tmp/secret-folder/DJI_0001.MP4") Opened /Users/x/Movies/a.mov file:///Users/x/a.mp4 '
+    assert strip_paths(text) == 'print("DJI_0001.MP4") Opened a.mov file://a.mp4 '
+    assert strip_paths("clip.mov 14:00 5/5 k/v") == "clip.mov 14:00 5/5 k/v"
+
+
 def test_text_has_no_paths(tmp_path):
     project_folder = tmp_path / "secret-folder-fixture"
     samples = project_folder / "clipassembler" / "samples"
@@ -155,14 +161,19 @@ def test_text_has_no_paths(tmp_path):
     candidates, candidate_frames, _agent = api._review_inputs(project_id)
     review = engine_review_agent(recorder)(
         {
-            "user_message": "Review this clip",
+            "user_message": "Please review /tmp/secret-folder/DJI_0001.MP4",
             "candidates": candidates,
             "candidate_frames": candidate_frames,
             "samples_dir": samples,
-            "history": [],
+            "history": [{"script": {"source": 'print("/tmp/secret-folder/DJI_0001.MP4")'},
+                         "log": ["Opened /tmp/secret-folder/DJI_0001.MP4"]}],
+            "timeline": {"notes": "/tmp/secret-folder/DJI_0001.MP4"},
         }
     )
     assert review["message"] == "Ready."
+    assert "secret-folder" not in recorder.requests[-1].text
+    assert "/tmp/" not in recorder.requests[-1].text
+    assert "DJI_0001.MP4" in recorder.requests[-1].text
     requests = [recorder.requests[0], recorder.requests[-1]]
     bin_path, log_path = fake_engine(tmp_path / "fake", reply='{"message":"Ready.","operations":[]}')
     for ai_request in requests:

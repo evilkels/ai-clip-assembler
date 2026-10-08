@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from .ai_engines.engine import AiEngine, REVIEW_TIMEOUT_SEC
+from .ai_engines.messages import make_failure
+from .ai_engines.payload import strip_paths
 from .ai_engines.types import AiFailure, AiRequest
 from .models import (
     CreativeVersion,
@@ -829,46 +831,6 @@ _REVIEW_SCHEMA = {
 }
 
 
-def _strip_history_paths(value):
-    if isinstance(value, dict):
-        return {key: _strip_history_paths(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_strip_history_paths(item) for item in value]
-    if isinstance(value, str) and Path(value).is_absolute():
-        return Path(value).name
-    return value
-
-
-def _safe_candidate(candidate: dict) -> dict:
-    safe = {}
-    for key, value in candidate.items():
-        if key in {"frame_path", "file_path"}:
-            continue
-        if key == "file_name":
-            safe[key] = Path(value).name if isinstance(value, str) else value
-            continue
-        if isinstance(value, str) and Path(value).is_absolute():
-            continue
-        safe[key] = _drop_candidate_paths(value)
-    return safe
-
-
-def _drop_candidate_paths(value):
-    if isinstance(value, dict):
-        return {
-            key: _drop_candidate_paths(item)
-            for key, item in value.items()
-            if not (isinstance(item, str) and Path(item).is_absolute())
-        }
-    if isinstance(value, list):
-        return [
-            _drop_candidate_paths(item)
-            for item in value
-            if not (isinstance(item, str) and Path(item).is_absolute())
-        ]
-    return value
-
-
 def engine_review_agent(engine: AiEngine) -> ReviewAgent:
     def agent(context: dict):
         candidates = context.get("candidates", [])
@@ -888,14 +850,18 @@ def engine_review_agent(engine: AiEngine) -> ReviewAgent:
             }
             for index, frame in enumerate(frames, start=1)
         ]
+        candidate_text = json.dumps([
+            {key: value for key, value in item.items() if key not in {"frame_path", "file_path"}}
+            for item in candidates
+        ])
         prompt = _AGENT_PROMPT.format(
             catalogue=OPERATION_CATALOGUE,
             api_reference=API_REFERENCE,
-            candidates=json.dumps([_safe_candidate(item) for item in candidates])[:6000],
-            candidate_frames=json.dumps(labels)[:4000],
-            timeline=json.dumps(context.get("timeline", {}))[:6000],
-            history=json.dumps(_strip_history_paths(context.get("history", [])[-12:]))[:6000],
-            user_message=context.get("user_message", ""),
+            candidates=strip_paths(candidate_text)[:6000],
+            candidate_frames=strip_paths(json.dumps(labels))[:4000],
+            timeline=strip_paths(json.dumps(context.get("timeline", {})))[:6000],
+            history=strip_paths(json.dumps(context.get("history", [])[-12:]))[:6000],
+            user_message=strip_paths(context.get("user_message", "")),
         )
         reply = engine.run(AiRequest(
             images=images,
@@ -908,6 +874,13 @@ def engine_review_agent(engine: AiEngine) -> ReviewAgent:
         if isinstance(reply, AiFailure):
             return reply
         parsed = dict(reply.data)
+        if (
+            not isinstance(parsed.get("message"), str)
+            or ("operations" in parsed and not isinstance(parsed["operations"], list))
+            or ("versions" in parsed and not isinstance(parsed["versions"], list))
+            or ("script" in parsed and not isinstance(parsed["script"], str))
+        ):
+            return make_failure("unusable_reply", engine.provider)
         parsed["versions"] = _validate_versions(parsed.get("versions") or [], candidates)
         return parsed
 

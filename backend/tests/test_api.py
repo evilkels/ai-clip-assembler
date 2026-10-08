@@ -1691,6 +1691,7 @@ def _prepare_batched_ai_project(monkeypatch, tmp_path):
     api.projects.clear()
     client, project_id, _ = create_folder_project_with_video(tmp_path, filename="DJI_0001.MP4")
     project = api.projects[project_id]
+    project["selected_harness"] = "pi_agent"
     project["cloud_ai_consent"] = True
     monkeypatch.setattr(api, "run_vidstabdetect", lambda **_kwargs: None)
     monkeypatch.setattr(api, "detect_scenes", lambda _path: [])
@@ -1779,6 +1780,36 @@ def test_ai_scoring_resume_scores_only_uncached_clips(monkeypatch, tmp_path):
     assert len(records) == 1
     assert len(records[0]["opened"]) == 1
     assert any("clip-1-frame-1.jpg" in arg for arg in records[0]["argv"])
+    assert api.projects[project_id]["analysis_progress"]["phase"] == "complete"
+
+
+def test_ai_scoring_resume_requires_consent(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    project = api.projects[project_id]
+    project["ai_scoring"] = {"failure": {"kind": "usage_limit"}, "clips_left": 1, "per_video": []}
+    project["cloud_ai_consent"] = False
+    bin_path, log_path = fake_engine(tmp_path / "resume", scenario="ok")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
+
+    response = client.post(f"/projects/{project_id}/ai-scoring/resume")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "pi_agent", "preferences": {}},
+    ).json()["detail"]
+    assert not log_path.exists()
+
+
+def test_ai_scoring_resume_rejects_existing_analysis_progress(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    api.projects[project_id]["ai_scoring"] = {"failure": {"kind": "usage_limit"}, "clips_left": 1}
+    api.projects[project_id]["analysis_progress"] = {"phase": "analyzing"}
+
+    response = client.post(f"/projects/{project_id}/ai-scoring/resume")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Analysis already in progress for this project"
 
 
 def test_rederive_clips_changes_effective_harness_without_changing_selected(monkeypatch, tmp_path):
@@ -2973,6 +3004,27 @@ def test_review_kickoff_runs_a_proactive_turn(monkeypatch, tmp_path):
     assert kicked.status_code == 200
     assert kicked.json()["message"].startswith("Welcome")
     assert "Analysis just finished" in seen["user_message"]
+
+
+def test_review_kickoff_stages_extracted_frames_for_engine(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["cloud_ai_consent"] = True
+    project_samples = api.samples_dir(project_id)
+    project_samples.mkdir(parents=True, exist_ok=True)
+    frame_path = project_samples / "sample.jpg"
+    frame_path.write_bytes(b"jpg")
+    bin_path, log_path = fake_engine(tmp_path / "engine", reply='{"message":"Ready.","operations":[]}')
+    engine = PiEngine(str(bin_path), "openai-codex", "fake")
+    monkeypatch.setattr(api, "get_engine", lambda: engine)
+    monkeypatch.setattr(api, "mcp_frame_paths", lambda _project_id, _clip_id: [str(frame_path)])
+
+    response = client.post(f"/projects/{project_id}/review/kickoff")
+
+    assert response.status_code == 200
+    records = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(records) == 1
+    assert any("frame-01.jpg" in arg for arg in records[0]["argv"])
 
 
 def test_clear_review_session_starts_a_fresh_transcript(monkeypatch, tmp_path):

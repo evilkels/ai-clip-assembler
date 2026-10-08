@@ -1915,6 +1915,77 @@ def test_regenerate_draft_requires_format_or_profile(monkeypatch, tmp_path):
     assert response.status_code == 422
 
 
+def analyze_folder_project_with_four_scenes(monkeypatch, tmp_path):
+    for existing_project_id in list(api.projects):
+        api._timeline_lifecycle.invalidate(existing_project_id)
+    monkeypatch.setattr(
+        api,
+        "probe_video",
+        lambda path: VideoMetadata(
+            file_id=path.name,
+            file_path=str(path),
+            file_name=path.name,
+            duration_sec=160.0,
+            fps=30,
+            resolution=[1920, 1080],
+            codec="h264",
+        ),
+    )
+    client, project_id, source_video = create_folder_project_with_video(tmp_path)
+    stub_expensive_analysis(
+        monkeypatch,
+        [
+            scored_frame(float(second), smoothness=9.0 - scene / 10, scene_id=scene + 1)
+            for scene in range(4)
+            for second in range(scene * 40, scene * 40 + 31)
+        ],
+    )
+    response = client.post(
+        f"/projects/{project_id}/analyze",
+        json={"project_id": project_id, "harness_id": "manual", "preferences": {}},
+    )
+    assert response.status_code == 200
+    first_clip_id = api.projects[project_id]["clips"][0]["clip_id"]
+    assert _op(client, project_id, "include", clip_id=first_clip_id).status_code == 200
+    return client, project_id, source_video.parent
+
+
+def test_draft_format_switch_replaces_saved_timeline_document(monkeypatch, tmp_path):
+    client, project_id, _folder = analyze_folder_project_with_four_scenes(monkeypatch, tmp_path)
+    before = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+
+    response = client.post(f"/projects/{project_id}/draft", json={"format": "long"})
+
+    assert response.status_code == 200
+    draft = response.json()["timeline"]
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert document["profile"] == "long_scenic"
+    assert document["target_duration_sec"] == 480
+    assert [item["source_clip_id"] for item in document["items"]] == [
+        clip["clip_id"] for clip in draft["clips"]
+    ]
+    undone = client.post(f"/projects/{project_id}/timeline/undo").json()["document"]
+    assert undone["items"] == before["items"]
+
+
+def test_draft_format_switch_survives_reload(monkeypatch, tmp_path):
+    client, project_id, folder = analyze_folder_project_with_four_scenes(monkeypatch, tmp_path)
+    draft = client.post(f"/projects/{project_id}/draft", json={"format": "long"}).json()["timeline"]
+
+    api._timeline_lifecycle.invalidate(project_id)
+    api.projects.clear()
+    reopened_id = client.post("/projects/from-folder", json={"folder_path": str(folder)}).json()[
+        "project_id"
+    ]
+
+    document = client.get(f"/projects/{reopened_id}/timeline/document").json()["document"]
+    assert document["profile"] == "long_scenic"
+    assert document["target_duration_sec"] == 480
+    assert [item["source_clip_id"] for item in document["items"]] == [
+        clip["clip_id"] for clip in draft["clips"]
+    ]
+
+
 def test_update_timeline_rejects_unknown_clip_id(monkeypatch, tmp_path):
     api.projects.clear()
     monkeypatch.setattr(api, "PROJECTS_DIR", tmp_path)

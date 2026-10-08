@@ -1,4 +1,9 @@
-from src.clip_assembly import AssemblyPreferences, assemble_smooth_clips
+from src.clip_assembly import (
+    AssemblyPreferences,
+    assemble_smooth_clips,
+    candidate_windows,
+    select_windows,
+)
 from src.models import FrameScore
 
 
@@ -258,3 +263,58 @@ def test_candidate_pool_skips_scene_shorter_than_minimum_duration():
     )
 
     assert result.clips == []
+
+
+def ranges(windows):
+    return [(window.start_sec, window.end_sec) for window in windows]
+
+
+def test_select_windows_returns_non_overlapping_windows_longest_first():
+    windows = candidate_windows([frame(second, 9.0) for second in range(31)], 3, 10)
+
+    assert ranges(select_windows(windows, limit=4)) == [(0, 10), (10, 20), (20, 30)]
+
+
+def test_select_windows_skips_excluded_ranges():
+    windows = candidate_windows([frame(second, 9.0) for second in range(31)], 3, 10)
+
+    picked = select_windows(windows, limit=4, exclude=[(0.0, 12.0)])
+
+    assert ranges(picked) == [(12, 22), (22, 30)]
+
+
+def test_select_windows_prefers_longer_window_within_tolerance():
+    frames = [frame(second, 9.0 if second in (10, 11, 12) else 8.0) for second in range(21)]
+
+    picked = select_windows(candidate_windows(frames, 3, 10), limit=1)
+
+    assert len(picked) == 1
+    assert picked[0].end_sec - picked[0].start_sec == 10
+    assert picked[0].start_sec <= 10 and picked[0].end_sec >= 13
+
+
+def test_select_windows_keeps_short_peak_when_longer_windows_fall_outside_tolerance():
+    frames = [frame(second, 9.0 if second in (10, 11, 12) else 5.0) for second in range(21)]
+
+    picked = select_windows(candidate_windows(frames, 3, 10), limit=1)
+
+    assert len(picked) == 1
+    assert picked[0].end_sec - picked[0].start_sec < 10
+    assert picked[0].start_sec <= 10 and picked[0].end_sec >= 13
+
+
+def test_scene_cap_scales_with_scene_length():
+    frames = [frame(second, 9.0) for second in range(151)]
+
+    result = assemble_smooth_clips(
+        "file-1",
+        "DJI_0001.MP4",
+        frames,
+        AssemblyPreferences(max_clip_duration_sec=10),
+        scene_bounds={1: (0.0, 150.0)},
+        source_duration_sec=150.0,
+    )
+
+    assert len(result.clips) == 12
+    spans = sorted((clip.start_sec, clip.end_sec) for clip in result.clips)
+    assert all(earlier[1] <= later[0] for earlier, later in zip(spans, spans[1:]))

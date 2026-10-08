@@ -507,6 +507,28 @@ const fixtureRoutes: Array<{ fixture: VisualFixture; path: string }> = [
   { fixture: 'export-receipt', path: '/export' },
 ];
 
+async function captureScrolledReviewSnapshot(
+  page: Page,
+  fixture: 'review-grid' | 'review-list',
+  viewport: { width: number; height: number },
+  theme: 'light' | 'dark',
+): Promise<void> {
+  const firstCandidate = fixture === 'review-grid'
+    ? page.locator('.clip-card').first()
+    : page.locator('[data-review-list] > *').first();
+  await firstCandidate.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+  await expect(firstCandidate).toBeInViewport();
+  // Only the candidates column: after scrolling, the page header's wrap point
+  // differed between CI runs, and the header is covered by the page snapshot.
+  await expect(page.locator('main.review-main')).toHaveScreenshot(`${fixture}-scrolled-${viewport.width}x${viewport.height}-${theme}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+    maskColor: theme === 'dark' ? '#12151a' : '#f1f2f4',
+    mask: [firstCandidate.locator('video')],
+  });
+}
+
 test.describe('deterministic visual fixture setup', () => {
   for (const { fixture, path } of fixtureRoutes) {
     test(`${fixture} exposes fixed representative data`, async ({ page }) => {
@@ -650,6 +672,9 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 1024, height: 76
               page.locator('[data-testid="qa-clock"]'),
             ],
           });
+          if (fixture === 'review-grid' || fixture === 'review-list') {
+            await captureScrolledReviewSnapshot(page, fixture, viewport, theme);
+          }
         });
       }
     }

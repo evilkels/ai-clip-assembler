@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolve } from 'node:path';
+
+const configDirectory = __dirname;
 
 export default defineConfig({
   testDir: './e2e',
@@ -10,11 +13,9 @@ export default defineConfig({
   // reports immediately, and a retried test is reported as flaky rather than
   // silently green.
   retries: process.env.CI ? 2 : 0,
-  timeout: 180_000,
-  // The suite bounds itself so a single wedged test cannot consume the whole
-  // job budget. 103 tests at the 180s per-test limit with two CI retries is
-  // ~15 hours in the worst case, which no runner timeout should have to absorb.
-  // Local full runs take 9-12 minutes and CI has done it in under 3.
+  timeout: 30_000,
+  // Real-analysis specs set their own 180-second timeout; stubbed specs keep
+  // the 30-second default so a stalled route fails quickly.
   globalTimeout: process.env.CI ? 20 * 60_000 : 30 * 60_000,
   expect: {
     timeout: 20_000,
@@ -40,8 +41,12 @@ export default defineConfig({
     {
       command: 'cd ../backend && PYTHONPATH=. .venv/bin/uvicorn src.api:app --port 8000',
       url: 'http://127.0.0.1:8000/',
-      reuseExistingServer: true,
+      // A reused backend ignores CLIP_ASSEMBLER_RUNTIME_FILE and may be an orphan running stale code.
+      reuseExistingServer: false,
       timeout: 120_000,
+      env: {
+        CLIP_ASSEMBLER_RUNTIME_FILE: resolve(configDirectory, 'test-results/runtime.json'),
+      },
     },
     {
       command: 'npm run dev:renderer -- --host localhost',

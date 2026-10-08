@@ -25,6 +25,7 @@ Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`
 - `main` accepts only merged PRs: branch, PR, merge, then tag.
 - The PR gate is `.github/workflows/test.yml`; its `npm run` scripts run the
   same checks locally from `frontend/`.
+- E2E coverage and run commands: `frontend/e2e/README.md`.
 - Releases: `docs/UPDATING.md`.
 - Specs go in `docs/specs/`, review records in `docs/reviews/`, mockups in
   `docs/designs/`. A tool that writes plans to `plans/` or

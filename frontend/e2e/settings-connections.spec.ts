@@ -205,7 +205,7 @@ function diagnostics(reachable: boolean) {
   };
 }
 
-test('reaches all Settings panels and preserves the legacy Settings deep link', async ({ page }) => {
+test('reaches all Settings panels from the Settings modal', async ({ page }) => {
   await installDesktopBridge(page, {
     initial: status('connected', 'Connected to ChatGPT.'),
   });

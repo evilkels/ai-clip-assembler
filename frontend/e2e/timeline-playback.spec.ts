@@ -11,6 +11,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+test.describe.configure({ timeout: 180_000 });
+
 function ensureFixtureVideo(name: string, color: string): string {
   const dir = join(process.cwd(), 'e2e', '.fixtures');
   const file = join(dir, name);

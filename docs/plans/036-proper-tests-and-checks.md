@@ -102,7 +102,7 @@ Decisions:
 
 ## Phase 3: An e2e suite the owner can review
 
-- [ ] 3.1 Write `frontend/e2e/README.md` and add a pointer to it in
+- [x] 3.1 Write `frontend/e2e/README.md` and add a pointer to it in
   `AGENTS.md`. It covers:
   - how to run one spec and the whole suite;
   - the two kinds of spec: the real backend through `reviewSetup.ts`, or a
@@ -115,11 +115,11 @@ Decisions:
   - a table with one row per spec: the user flow it proves, and whether the
     backend is real or stubbed.
 
-  Done when every spec has a row.
-- [ ] 3.2 Lower the default per-test timeout to 30 s and give only the specs
+  Done when every spec has a row. (PR #93)
+- [x] 3.2 Lower the default per-test timeout to 30 s and give only the specs
   that run real analysis the 180 s budget (`test.slow()` or a describe-level
-  timeout). Done when a failing stubbed test fails within 30 s.
-- [ ] 3.3 Make three tests prove their names:
+  timeout). Done when a failing stubbed test fails within 30 s. (PR #93)
+- [x] 3.3 Make three tests prove their names:
   - the Review visual snapshots also capture the scrolled candidate browser,
     with cards in view;
   - `playwriter-preview.spec.ts` asserts the Review clip's `currentTime`
@@ -128,10 +128,10 @@ Decisions:
     has no Settings route.
 
   Done when each fails on its stated regression, shown by breaking the owner
-  temporarily.
-- [ ] 3.4 Point the Playwright backend's `CLIP_ASSEMBLER_RUNTIME_FILE` at an
+  temporarily. (PR #93)
+- [x] 3.4 Point the Playwright backend's `CLIP_ASSEMBLER_RUNTIME_FILE` at an
   absolute path under `frontend/test-results/`. Done when a full run writes
-  nothing under `~/.ai-clip-assembler/`.
+  nothing under `~/.ai-clip-assembler/`. (PR #93)
 - [ ] 3.5 Add `.github/workflows/update-linux-baselines.yml`. It is
   `workflow_dispatch` with a `ref` input; it runs the visual spec with
   `--update-snapshots` on `ubuntu-latest` and commits the changed

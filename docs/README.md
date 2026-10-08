@@ -14,10 +14,11 @@ Map of this directory. One folder per document kind — no nesting beyond this.
 
 Top-level guides:
 
+- [ROADMAP.md](ROADMAP.md) — the path to v1.0.0: milestones, order and scope line
 - [GLOSSARY.md](../GLOSSARY.md) — domain vocabulary; use these terms in code, docs and issues
 - [PRD.md](PRD.md) — product requirements
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design
-- [HARNESS_SPEC.md](HARNESS_SPEC.md) — pluggable AI-harness contract
+- [HARNESS_SPEC.md](HARNESS_SPEC.md) — AI-harness contract (outdated for Providers; see ADR 0008)
 - [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) — environment setup + workflow conventions
 - [USER_GUIDE.md](USER_GUIDE.md) — end-user guide
 - [UPDATING.md](UPDATING.md) — in-app update notice, the install wizard, and how to cut a release

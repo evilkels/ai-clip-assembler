@@ -8,3 +8,6 @@ cross-cutting choices with their consequences.
 3. [0003: Projects persist as folders with JSON and FFmpeg-derived metadata](0003-project-folder-persistence.md)
 4. [0004: Exports are editable handoffs; EDL deliberately flattens Speed/Transform](0004-editable-export-and-edl-degradation.md)
 5. [0005: Harness and In-App Review Agent are chosen independently, under one consent gate](0005-harness-and-review-agent-are-independent.md)
+6. [0006: Review scripts compile to Proposals](0006-review-scripts-compile-to-proposals.md)
+7. [0007: AI Access is granted once, when the Editor connects a Provider](0007-ai-access-is-granted-when-connecting.md)
+8. [0008: AI runs through the Editor's own Claude Code or Codex, which the app never installs](0008-ai-runs-through-the-editors-own-provider-program.md)

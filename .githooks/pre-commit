@@ -5,11 +5,16 @@ set -u
 repo_root=$(git rev-parse --show-toplevel) || exit 1
 cd "$repo_root" || exit 1
 
-staged_paths=$(git diff --cached --name-only --diff-filter=ACMR) || exit 1
+staged_paths=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR) || exit 1
+ts_paths=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRD) || exit 1
 eslint_paths=
 ruff_paths=
-has_frontend_ts=false
 has_frontend_tsx=false
+old_ifs=$IFS
+IFS=$(printf '\n_')
+IFS=${IFS%_}
+set -f
+has_frontend_ts=false
 
 for path in $staged_paths; do
   case "$path" in
@@ -22,11 +27,10 @@ for path in $staged_paths; do
         printf 'pre-commit: %s has unstaged changes; stage or discard them first.\n' "$path" >&2
         exit 1
       fi
-      eslint_paths="$eslint_paths
-$path"
       case "$path" in
-        *.ts|*.tsx) has_frontend_ts=true ;;
+        frontend/src/renderer/src/types/generated.ts) continue ;;
       esac
+      eslint_paths="${eslint_paths}${path}${IFS}"
       case "$path" in
         *.tsx) has_frontend_tsx=true ;;
       esac
@@ -36,9 +40,14 @@ $path"
         printf 'pre-commit: %s has unstaged changes; stage or discard them first.\n' "$path" >&2
         exit 1
       fi
-      ruff_paths="$ruff_paths
-$path"
+      ruff_paths="${ruff_paths}${path}${IFS}"
       ;;
+  esac
+done
+
+for path in $ts_paths; do
+  case "$path" in
+    frontend/*.ts|frontend/*.tsx|frontend/*.mts|frontend/*.cts) has_frontend_ts=true ;;
   esac
 done
 
@@ -50,10 +59,10 @@ if [ -n "$eslint_paths" ]; then
     exit 1
   fi
   set --
-  for path in $eslint_paths; do
-    [ -n "$path" ] && set -- "$@" "$path"
-  done
-  frontend/node_modules/.bin/eslint "$@" --max-warnings=0 --ignore-pattern src/renderer/src/types/generated.ts || failed=true
+  # Split the newline-delimited path list; globbing is disabled above.
+  # shellcheck disable=SC2086
+  [ -n "$eslint_paths" ] && set -- $eslint_paths
+  frontend/node_modules/.bin/eslint "$@" --max-warnings=0 || failed=true
 fi
 
 if [ "$has_frontend_tsx" = true ]; then
@@ -82,10 +91,10 @@ if [ -n "$ruff_paths" ]; then
     exit 1
   fi
   set --
-  for path in $ruff_paths; do
-    [ -n "$path" ] && set -- "$@" "$path"
-  done
+  # shellcheck disable=SC2086
+  [ -n "$ruff_paths" ] && set -- $ruff_paths
   backend/.venv/bin/ruff check --no-cache "$@" || failed=true
 fi
 
+IFS=$old_ifs
 [ "$failed" = false ]

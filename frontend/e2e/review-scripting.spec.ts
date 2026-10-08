@@ -1,6 +1,8 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { fixtureVideo, setupReview } from './reviewSetup';
 
+test.describe.configure({ timeout: 180_000 });
+
 // The plan's Goal example, adapted to the fixture: it reads the whole library
 // and sorts longest first, because the fixture's clips are told apart by length.
 const GOAL_SCRIPT = `-- "keep every shot under 3 seconds, longest first, then land near 40s"

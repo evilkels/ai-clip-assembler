@@ -1,4 +1,3 @@
-import hashlib
 import math
 import os
 from pathlib import Path
@@ -20,22 +19,6 @@ _DEFAULT_MODEL_FILENAME = "siglip_image_encoder.onnx"
 class EmbeddingProvider(Protocol):
     def embed_images(self, paths: List[str]) -> List[List[float]]:
         ...
-
-
-class FakeEmbeddingProvider:
-    def __init__(self, dim: int = 32):
-        if dim <= 0:
-            raise ValueError("Embedding dimension must be positive")
-        self.dim = dim
-
-    def embed_images(self, paths: List[str]) -> List[List[float]]:
-        return [self._embed_path(path) for path in paths]
-
-    def _embed_path(self, path: str) -> List[float]:
-        with open(path, "rb") as image_file:
-            digest = hashlib.sha256(image_file.read()).digest()
-        vector = [float(digest[index % len(digest)]) for index in range(self.dim)]
-        return _l2_normalize(vector)
 
 
 def embed_candidate(

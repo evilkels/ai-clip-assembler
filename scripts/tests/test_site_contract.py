@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sys
 import unittest
@@ -95,9 +96,15 @@ class StaticSiteContractTest(unittest.TestCase):
 
     def test_download_menus_expose_current_release_assets_for_both_architectures(self) -> None:
         home = self.parsed[SITE / "index.html"]
+        version = json.loads(
+            (Path(__file__).resolve().parents[2] / "frontend/package.json").read_text(
+                encoding="utf-8"
+            )
+        )["version"]
+        release_tag = f"v{version}"
         assets = {
-            "Apple Silicon": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.2.0/AI.Clip.Assembler-0.2.0-arm64.dmg",
-            "Intel": "https://github.com/evilkels/ai-clip-assembler/releases/download/v0.2.0/AI.Clip.Assembler-0.2.0-x64.dmg",
+            "Apple Silicon": f"https://github.com/evilkels/ai-clip-assembler/releases/download/{release_tag}/AI.Clip.Assembler-{version}-arm64.dmg",
+            "Intel": f"https://github.com/evilkels/ai-clip-assembler/releases/download/{release_tag}/AI.Clip.Assembler-{version}-x64.dmg",
         }
         menus = re.findall(
             r'<details class="download-menu">(.*?)</details>',

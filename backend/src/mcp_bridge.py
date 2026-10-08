@@ -54,34 +54,11 @@ class MCPStdioBridge:
 
 
 def read_message(stream: BinaryIO) -> Optional[Dict[str, Any]]:
-    content_length = None
-
-    while True:
-        line = stream.readline()
-        if line == b"":
-            if content_length is None:
-                return None
-            raise ValueError("Unexpected EOF while reading MCP headers")
-        if line in (b"\r\n", b"\n"):
-            break
-
-        try:
-            header_name, header_value = line.decode("ascii").split(":", 1)
-        except ValueError as exc:
-            raise ValueError("Malformed MCP header") from exc
-
-        if header_name.strip().lower() == "content-length":
-            try:
-                content_length = int(header_value.strip())
-            except ValueError as exc:
-                raise ValueError("Invalid Content-Length header") from exc
-
-    if content_length is None:
-        raise ValueError("Missing Content-Length header")
-
-    payload = stream.read(content_length)
-    if len(payload) != content_length:
-        raise ValueError("Unexpected EOF while reading MCP payload")
+    payload = stream.readline()
+    if payload == b"":
+        return None
+    if not payload.endswith(b"\n"):
+        raise ValueError("Unexpected EOF while reading MCP message")
 
     try:
         return json.loads(payload.decode("utf-8"))
@@ -90,10 +67,8 @@ def read_message(stream: BinaryIO) -> Optional[Dict[str, Any]]:
 
 
 def write_message(stream: BinaryIO, message: Dict[str, Any]) -> None:
-    payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
-    header = "Content-Length: {length}\r\n\r\n".format(length=len(payload)).encode("ascii")
-    stream.write(header)
-    stream.write(payload)
+    payload = json.dumps(message, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    stream.write(payload + b"\n")
     stream.flush()
 
 

@@ -19,11 +19,41 @@ export default tseslint.config(
       }
     },
     rules: {
-      // These compiler advisories require architectural rewrites of existing
-      // playback and loading code. Keep correctness rules such as rules-of-hooks
-      // and exhaustive-deps blocking while those migrations are handled separately.
-      'react-hooks/immutability': 'off',
-      'react-hooks/refs': 'off',
+      'react-hooks/immutability': 'error',
+      'react-hooks/refs': 'error',
+      'react-hooks/set-state-in-effect': 'error'
+    }
+  },
+  {
+    files: ['src/renderer/src/components/Timeline.tsx'],
+    rules: {
+      'react-hooks/immutability': 'off'
+    }
+  },
+  {
+    files: [
+      'src/renderer/src/components/ReviewChatPanel.tsx',
+      'src/renderer/src/components/Timeline.tsx',
+      'src/renderer/src/components/useSequencePlayer.ts'
+    ],
+    rules: {
+      'react-hooks/refs': 'off'
+    }
+  },
+  {
+    files: [
+      'src/renderer/src/components/ClipGenerationPanel.tsx',
+      'src/renderer/src/components/ConnectionsTabPanel.tsx',
+      'src/renderer/src/components/DiagnosticsTabPanel.tsx',
+      'src/renderer/src/components/Timeline.tsx',
+      'src/renderer/src/components/UpdateSection.tsx',
+      'src/renderer/src/components/useSequencePlayer.ts',
+      'src/renderer/src/hooks/useReviewConversation.ts',
+      'src/renderer/src/routes/PlaywriterQa.tsx',
+      'src/renderer/src/routes/Timeline.tsx',
+      'src/renderer/src/state/ReviewContext.tsx'
+    ],
+    rules: {
       'react-hooks/set-state-in-effect': 'off'
     }
   }

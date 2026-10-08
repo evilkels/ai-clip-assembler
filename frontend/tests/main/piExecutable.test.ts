@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   firstExecutableCandidate,
   piExecutableCandidates,
   PI_BIN_RESOLUTION_MARKER,
-  PI_SHELL_PROBE_ARGUMENTS,
-  PI_SHELL_PROBE_COMMAND,
+  resolvePiBinFromLoginShell,
   resolvePiExecutableFromShellOutput,
 } from '../../src/main/piExecutable.js';
 
@@ -51,16 +53,35 @@ test('rejects non-absolute and non-executable marked shell results', async () =>
   );
 });
 
-test('probes the interactive login shell first so rc-file PATH edits are visible', () => {
-  // A non-interactive login shell never sources ~/.zshrc, where nvm/volta/asdf
-  // export their bin directory — the exact reason `pi` went missing in the
-  // packaged app while Terminal found it fine.
-  assert.deepEqual(
-    PI_SHELL_PROBE_ARGUMENTS.map((args) => args[0]),
-    ['-lic', '-lc'],
+test('resolves Pi from a PATH printed by an interactive login shell', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-login-shell-'));
+  const shellPath = join(directory, 'stub-shell');
+  const piPath = join(directory, 'pi');
+  await writeFile(piPath, '#!/bin/sh\nexit 0\n');
+  await chmod(piPath, 0o755);
+  await writeFile(
+    shellPath,
+    // Only an interactive login shell sees the directory holding pi, and the
+    // probe command itself must run: `whence -p` is zsh, so define it here.
+    [
+      '#!/bin/sh',
+      'PATH=/usr/bin:/bin',
+      `if [ "$1" = "-lic" ]; then PATH="${directory}:$PATH"; fi`,
+      'whence() { [ "$1" = "-p" ] && shift; command -v "$1"; }',
+      'eval "$2"',
+      '',
+    ].join('\n'),
   );
-  for (const args of PI_SHELL_PROBE_ARGUMENTS) {
-    assert.equal(args[1], PI_SHELL_PROBE_COMMAND);
+  await chmod(shellPath, 0o755);
+
+  const previousPiBin = process.env.PI_BIN;
+  delete process.env.PI_BIN;
+  try {
+    assert.equal(await resolvePiBinFromLoginShell(shellPath), piPath);
+  } finally {
+    if (previousPiBin === undefined) delete process.env.PI_BIN;
+    else process.env.PI_BIN = previousPiBin;
+    await rm(directory, { recursive: true, force: true });
   }
 });
 

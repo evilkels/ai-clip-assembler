@@ -1,0 +1,77 @@
+name: Update Linux visual baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch to update with current Linux visual baselines
+        required: true
+        type: string
+
+# A push made with GITHUB_TOKEN starts no pull_request run, so the job
+# dispatches the test workflow itself to re-check the updated branch.
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  update-baselines:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install FFmpeg with vidstab
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -hide_banner -filters | grep vidstabdetect
+
+      - name: Set up backend venv
+        working-directory: backend
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Update Linux visual baselines
+        working-directory: frontend
+        run: npx playwright test e2e/visual-conformance.spec.ts --update-snapshots
+
+      - name: Commit and push changed Linux baselines
+        env:
+          REF: ${{ inputs.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add 'frontend/e2e/visual-conformance.spec.ts-snapshots/*-chromium-linux.png'
+          if git diff --cached --quiet; then
+            echo "No Linux visual baselines changed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test: update Linux visual baselines"
+          git push origin "HEAD:${REF}"
+          gh workflow run test.yml --ref "$REF"

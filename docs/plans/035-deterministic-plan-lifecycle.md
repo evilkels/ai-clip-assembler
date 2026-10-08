@@ -43,9 +43,8 @@ The plan format and status rules are in
 - **`check`** changes no files and exits 1 with one line per problem: a
   MALFORMED active plan, a DONE or SUPERSEDED plan outside `done/`, or an index
   that differs from what `sync` would write.
-- **Tests** live in `scripts/tests/test_plans.py` (`unittest`, the style of
-  `scripts/tests/test_release_workflow.py`). They build fixture repos in temp
-  directories with `git init`.
+- **Tests** live in `scripts/tests/test_plans.py` (`unittest`). They build
+  fixture repos in temp directories with `git init`.
 
 ## Phase 1: Tooling and spec
 

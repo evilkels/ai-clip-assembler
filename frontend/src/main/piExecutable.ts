@@ -1,5 +1,7 @@
 import { constants } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { access, readdir, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
 export const PI_BIN_RESOLUTION_MARKER = '__AI_CLIP_ASSEMBLER_PI_BIN__=';
@@ -88,4 +90,33 @@ export async function firstExecutableCandidate(
     }
   }
   return undefined;
+}
+
+export async function resolvePiBinFromLoginShell(
+  shellPath = '/bin/zsh',
+): Promise<string | undefined> {
+  if (process.env.PI_BIN) return process.env.PI_BIN;
+
+  for (const args of PI_SHELL_PROBE_ARGUMENTS) {
+    const probed = await probeShellForPiBin(shellPath, args);
+    if (probed) return probed;
+  }
+  // Shells that refuse to cooperate still leave the executable in known locations.
+  return firstExecutableCandidate(await piExecutableCandidates(homedir()));
+}
+
+function probeShellForPiBin(
+  shellPath: string,
+  args: readonly string[],
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    // Interactive rc files can print the marker before exiting unsuccessfully.
+    execFile(shellPath, [...args], { timeout: 5000 }, (error, stdout) => {
+      if (error && !stdout) {
+        resolve(undefined);
+        return;
+      }
+      void resolvePiExecutableFromShellOutput(stdout).then(resolve);
+    });
+  });
 }

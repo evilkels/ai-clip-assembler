@@ -3,11 +3,8 @@ import math
 import numpy as np
 import pytest
 
-from src.embeddings import (
-    FakeEmbeddingProvider,
-    default_embedding_provider,
-    embed_candidate,
-)
+from src.embeddings import default_embedding_provider, embed_candidate
+from support import FakeEmbeddingProvider
 
 
 def test_embed_candidate_is_unit_norm_and_deterministic(tmp_path):
@@ -22,12 +19,6 @@ def test_embed_candidate_is_unit_norm_and_deterministic(tmp_path):
 
 def test_embed_candidate_none_without_frames():
     assert embed_candidate(FakeEmbeddingProvider(dim=8), []) is None
-
-
-@pytest.mark.parametrize("dim", [0, -1])
-def test_fake_embedding_provider_rejects_non_positive_dimensions(dim):
-    with pytest.raises(ValueError, match="positive"):
-        FakeEmbeddingProvider(dim=dim)
 
 
 def test_embed_candidate_normalizes_each_frame_before_averaging():

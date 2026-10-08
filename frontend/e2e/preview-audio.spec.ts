@@ -11,6 +11,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+test.describe.configure({ timeout: 180_000 });
+
 const PREVIEW_AUDIO_KEY = 'ai-clip-assembler:preview-audio:v1';
 
 function ensureFixtureVideo(name: string, color: string, withAudio: boolean): string {

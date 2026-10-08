@@ -5,10 +5,10 @@ import pytest
 
 from src import analysis_service
 from src.clip_assembly import AssemblyPreferences
-from src.embeddings import FakeEmbeddingProvider
 from src.frame_extraction import FFmpegError, FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
 from src.motion_analysis import FFmpegVidstabUnavailableError
+from support import FakeEmbeddingProvider
 
 
 def _source_video(tmp_path: Path, *, file_id: str = "file-1") -> dict:

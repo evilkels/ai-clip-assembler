@@ -407,7 +407,7 @@ async def delete_project_owned_files(project_id: str):
 
 
 @app.post("/projects/{project_id}/videos")
-async def upload_video(project_id: str, file: UploadFile = File(...)):
+async def upload_video(project_id: str, file: UploadFile = File(...)):  # noqa: B008
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -561,11 +561,11 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     )
     try:
         response = run_analysis_pipeline(project_id, request)
-    except AnalysisCancelled:
+    except AnalysisCancelled as exc:
         set_analysis_progress(
             project_id, phase="cancelled", message="Analysis cancelled", error=None
         )
-        raise HTTPException(status_code=409, detail="Analysis cancelled")
+        raise HTTPException(status_code=409, detail="Analysis cancelled") from exc
     except HTTPException as exc:
         set_analysis_progress(project_id, phase="error", error=str(exc.detail))
         raise
@@ -822,7 +822,7 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
 
 
 @app.post("/projects/{project_id}/clips/rederive")
-async def rederive_clips(project_id: str, preferences: dict = Body(default_factory=dict)):
+async def rederive_clips(project_id: str, preferences: dict = Body(default_factory=dict)):  # noqa: B008
     if project_id not in projects:
         raise HTTPException(status_code=404, detail="Project not found")
     cached = projects[project_id].get("frame_scores")

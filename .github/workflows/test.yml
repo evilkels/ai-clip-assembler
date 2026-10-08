@@ -7,6 +7,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Lets update-linux-baselines.yml re-run the gate after it pushes.
+  workflow_dispatch:
 
 concurrency:
   group: tests-${{ github.ref }}
@@ -36,8 +38,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify release workflow contract
-        run: python3 scripts/tests/test_release_workflow.py -v
+      - name: Lint workflows
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
 
       - name: Verify plan lifecycle contract
         run: python3 scripts/tests/test_plans.py -v

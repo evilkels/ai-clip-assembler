@@ -23,23 +23,27 @@ An approved plan may make a narrow exception for reviewed, deterministic visual-
 
 Follow [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md) for full setup.
 
-Common commands:
+Install the frontend dependencies with `cd frontend && npm ci`, and create the
+backend environment with the steps in [developer setup](docs/DEVELOPER_SETUP.md).
+The CI gate runs these checks:
 
 ```bash
-cd backend
-PYTHONPATH=. .venv/bin/python -m pytest
+actionlint
+python3 scripts/tests/test_release_workflow.py -v
+python3 scripts/tests/test_plans.py -v
 ```
 
 ```bash
 cd frontend
+npm run lint
 npm run typecheck
-npm run build
+npm run test:backend
+npm run test:main
+npx playwright install --with-deps chromium
+npm run test:e2e
 ```
 
-```bash
-# from the repo root
-backend/.venv/bin/python scripts/synthetic_e2e_qa.py
-```
+Install FFmpeg with `vidstabdetect` for the browser tests, as CI does.
 
 ## Pull request checklist
 

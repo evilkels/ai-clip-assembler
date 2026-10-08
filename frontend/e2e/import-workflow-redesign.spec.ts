@@ -1,4 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import { copyFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fixtureVideo } from './reviewSetup';
 
 const folderPath = '/tmp/import-redesign';
 const videos = [
@@ -271,4 +275,47 @@ test('the select-all checkbox reports partial selection hidden by the filter', a
     .poll(() => selectAll.evaluate((element) => (element as HTMLInputElement).indeterminate))
     .toBe(true);
   await expect(selectAll).not.toBeChecked();
+});
+
+test('the Selected Harness survives navigating away from Import and back', async ({ page }) => {
+  // Real backend: the folder project is opened by the app's own startup auto-open,
+  // so a reload re-derives the Selected Harness from what the backend persisted.
+  const folder = mkdtempSync(join(tmpdir(), 'selected-harness-'));
+  copyFileSync(fixtureVideo(), join(folder, 'harness-fixture.mp4'));
+  const recent = { folderPath: folder, lastOpenedAt: '2026-08-12T10:00:00Z', name: 'Navigation project' };
+  await page.addInitScript((project) => {
+    Object.assign(window, {
+      clipAssembler: {
+        backendUrl: 'http://127.0.0.1:8000',
+        platform: 'darwin',
+        listRecentProjects: async () => [project],
+        getLastOpenedRecentProject: async () => project,
+        addRecentProject: async () => [project],
+        checkForAppUpdate: async () => ({ state: 'up-to-date', currentVersion: '0.1.6', latestVersion: '0.1.6' }),
+      },
+    });
+  }, recent);
+
+  await page.goto('/#/import');
+  const harness = page.getByRole('combobox', { name: 'Harness' });
+  await expect(harness).toHaveValue('manual');
+
+  const saved = page.waitForResponse(
+    (response) => response.url().endsWith('/selected-harness') && response.request().method() === 'PUT',
+  );
+  await harness.selectOption('pi_agent');
+  expect((await saved).ok()).toBe(true);
+  await expect(harness).toHaveValue('pi_agent');
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: '2. Review' }).click();
+  await expect(page).toHaveURL(/#\/review/);
+  await page.getByRole('link', { name: '1. Import' }).click();
+  await expect(page).toHaveURL(/#\/import/);
+  await expect(harness).toHaveValue('pi_agent');
+
+  await page.reload();
+  await expect(harness).toHaveValue('pi_agent');
 });

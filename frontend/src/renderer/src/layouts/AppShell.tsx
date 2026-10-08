@@ -50,15 +50,13 @@ export function AppShell({ children }: AppShellProps) {
   }, [projectName]);
 
   const toggleSidebar = () => {
-    setSidebarCollapsed((collapsed) => {
-      const next = !collapsed;
-      try {
-        localStorage.setItem('sidebarCollapsed', String(next));
-      } catch {
-        // Persisting the layout is best-effort.
-      }
-      return next;
-    });
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    try {
+      localStorage.setItem('sidebarCollapsed', String(next));
+    } catch {
+      // Persisting the layout is best-effort.
+    }
   };
 
   /**

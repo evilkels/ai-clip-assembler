@@ -21,8 +21,8 @@ interface SourceClipsPanelProps {
   generationStats: ClipGenerationStats | null;
   loading: boolean;
   error: string | null;
-  smoothnessThreshold: number;
-  onSmoothnessThresholdChange: (value: number) => void;
+  minSmoothness: number;
+  onMinSmoothnessChange: (value: number) => void;
   onInclude: (clipId: string) => void;
   onExclude: (clipId: string) => void;
   // Filtering is owned by the parent so the Review header count is derived
@@ -69,13 +69,13 @@ export function SourceClipsPanel({
   generationStats,
   loading,
   error,
-  smoothnessThreshold,
+  minSmoothness,
   records,
   minOverall,
   onMinOverallChange,
   decisionFilter,
   onDecisionFilterChange,
-  onSmoothnessThresholdChange,
+  onMinSmoothnessChange,
   onInclude,
   onExclude,
 }: SourceClipsPanelProps) {
@@ -245,9 +245,9 @@ export function SourceClipsPanel({
                 min={0}
                 max={10}
                 step={0.5}
-                value={smoothnessThreshold}
+                value={minSmoothness}
                 aria-label="Minimum Smoothness"
-                onChange={(event) => onSmoothnessThresholdChange(Number(event.target.value))}
+                onChange={(event) => onMinSmoothnessChange(Number(event.target.value))}
               />
             </label>
             <label className="review-filter-control">
@@ -269,7 +269,9 @@ export function SourceClipsPanel({
           </div>
           <p className="review-pipeline-helper">
             Every usable clip found in your footage. Include clips in the working Timeline or remove
-            them from it; the backend Timeline Document remains authoritative.
+            them from it; the backend Timeline Document remains authoritative. These filters only
+            hide clips from this list; which clips exist is set by How clips are found on the
+            Import step.
           </p>
           {totalCount > 0 ? (
             <div className="score-legend">

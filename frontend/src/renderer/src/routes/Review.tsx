@@ -42,12 +42,11 @@ export function ReviewPage() {
     loading,
     projectId,
     regenerateDraft,
-    smoothnessThreshold,
-    setSmoothnessThreshold,
     timelineSnapshot,
     uploadedVideos,
   } = useReview();
   const [minOverall, setMinOverall] = useState(0);
+  const [minSmoothness, setMinSmoothness] = useState(0);
   const [decisionFilter, setDecisionFilter] = useState<ReviewFilters['decision']>('all');
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
@@ -81,10 +80,10 @@ export function ReviewPage() {
     () =>
       buildReviewClipRecords(clips, decisions, acceptedOrder, versionMembership, {
         minOverall,
-        minSmoothness: smoothnessThreshold,
+        minSmoothness,
         decision: decisionFilter,
       }),
-    [acceptedOrder, clips, decisions, decisionFilter, minOverall, smoothnessThreshold, versionMembership],
+    [acceptedOrder, clips, decisions, decisionFilter, minOverall, minSmoothness, versionMembership],
   );
 
   const clipsByFile = useMemo(() => {
@@ -148,28 +147,7 @@ export function ReviewPage() {
         )}
         actions={(
           <div className="controls">
-          <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
-          <div className="control">
-            <label htmlFor="smoothness">Display filter</label>
-            <input
-              id="smoothness"
-              type="range"
-              min={0}
-              max={10}
-              step={0.5}
-              value={smoothnessThreshold}
-              onChange={(event) => setSmoothnessThreshold(Number(event.target.value))}
-            />
-            <input
-              type="number"
-              min={0}
-              max={10}
-              step={0.5}
-              value={smoothnessThreshold}
-              aria-label="Display filter threshold value"
-              onChange={(event) => setSmoothnessThreshold(Number(event.target.value))}
-            />
-          </div>
+            <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
           </div>
         )}
       />
@@ -269,8 +247,8 @@ export function ReviewPage() {
               generationStats={generationStats}
               loading={loading}
               error={error}
-              smoothnessThreshold={smoothnessThreshold}
-              onSmoothnessThresholdChange={setSmoothnessThreshold}
+              minSmoothness={minSmoothness}
+              onMinSmoothnessChange={setMinSmoothness}
               onInclude={include}
               onExclude={exclude}
               records={reviewRecords}

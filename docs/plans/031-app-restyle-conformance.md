@@ -1,6 +1,6 @@
 # Plan 031: App restyle conformance — the sections the build has not caught up to
 
-Status: PHASE 1 DONE (2026-09-03) · PHASES 2-7 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance
+Status: PHASE 1 DONE (2026-09-03) · PHASE 4 (SETTINGS) DONE · PHASES 2, 3, 5, 6, 7 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance
 Written against `04c1bdb`, 2026-09-03. Source of truth is the
 **Clip Assembler Restyle** handoff, checked in at
 [`docs/design/2026-09-03-app-restyle-handoff.md`](../design/2026-09-03-app-restyle-handoff.md),
@@ -221,7 +221,7 @@ purpose rather than as a side effect.
 rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
 (green dot), `General`.
 
-- [ ] **Step 3.1** Rebuild the dialog as a rail + panel grid.
+- [x] **Step 3.1** Rebuild the dialog as a rail + panel grid.
       `settingsPanel: 'ai' | 'connections' | 'diagnostics' | 'general'` replaces
       `SettingsTab`. The active rail item is the **one** place a left bar is
       allowed in this design (`--accent-dim` + `inset 2px 0 0 var(--accent)`),
@@ -236,14 +236,14 @@ rail: `AI assistance` (badge `CLOUD`), `Connections` (`2`), `Diagnostics`
       do it after [plan 030](030-truthful-ai-usage.md) Phase 1 persists it —
       otherwise the panel writes to component state that resets on navigation.
       Implemented persisted radio cards and effective scoring fallback feedback in Settings › AI assistance.
-- [ ] **Step 3.3** Move the model account out of Connections into the account
+- [x] **Step 3.3** Move the model account out of Connections into the account
       row of `AI assistance`; Connections becomes MCP desktop clients only.
-- [ ] **Step 3.4** Give the Diagnostics failure branch its designed form. The
+- [x] **Step 3.4** Give the Diagnostics failure branch its designed form. The
       substance is already there — both branches and the ordered guidance steps
       (`DiagnosticsTabPanel.tsx`) — but not the green/red ring cards, the
       `RAN 2 MIN AGO` stamp, the `150px | 1fr` `<dl>`, or the closing note that
       environment-variable steps need an app restart.
-- [ ] **Step 3.5** E2E: each panel reachable, the deep link still lands on the
+- [x] **Step 3.5** E2E: each panel reachable, the deep link still lands on the
       right one, and the failure card renders from a failing diagnostics
       response.
 
@@ -321,8 +321,6 @@ a worker touches it.
 plan 030 dependency and can be done together with Phases 2, 3 and 6 under the
 same single baseline re-cut.
 
-- [ ] **Step 7.1** Settle the decisions above with the design owner and record
-      the outcome here.
 - [ ] **Step 7.2** Timeline deltas 1–9.
 - [ ] **Step 7.3** Export deltas 1–8.
 - [ ] **Step 7.4** Review deltas 1–5, after plan 030 Phases 2–3 land.
@@ -331,9 +329,9 @@ same single baseline re-cut.
 **Not part of this plan.** Reference screens `2a` (`Contact Sheet`, dark),
 `2c` (`Contact Sheet · light`) and `2b` (`Cutting Room`) are new marketing /
 landing-page designs, not app screens and not before-state recreations; the
-handoff README does not list them. They belong to
-[landing-page-polish-and-launch](landing-page-polish-and-launch.md), which now
-carries the pointer.
+handoff README does not list them. No plan schedules them: the 2026-09-01
+landing-page restyle shipped and stands
+([landing-page-polish-and-launch](landing-page-polish-and-launch.md)).
 
 ## Open questions for the design owner
 

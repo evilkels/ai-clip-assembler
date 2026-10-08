@@ -511,8 +511,8 @@ def generate_fcpxml(
         timeline_duration = clip["duration_sec"] / speed
         duration_frames = round(Fraction(str(timeline_duration)) * fps_exact(fps))
         source_fps = source_fps_by_id[clip["file_id"]]
-        start_time = fcpx_time(clip["start_sec"], source_fps)
-        duration_time = fcpx_frames(duration_frames, fps)
+        start_frames = round(Fraction(str(clip["start_sec"])) * fps_exact(source_fps))
+        start_time = fcpx_frames(start_frames, source_fps)
         asset_clip = ET.SubElement(
             spine,
             "asset-clip",
@@ -521,7 +521,7 @@ def generate_fcpxml(
                 "ref": asset_ids[clip["file_id"]],
                 "offset": fcpx_frames(timeline_cursor, fps),
                 "start": start_time,
-                "duration": duration_time,
+                "duration": fcpx_frames(duration_frames, fps),
             },
         )
         if format_by_id[clip["file_id"]] != "r1":
@@ -533,14 +533,14 @@ def generate_fcpxml(
             ET.SubElement(
                 time_map,
                 "timept",
-                {"time": start_time, "value": fcpx_time(clip["start_sec"], source_fps)},
+                {"time": start_time, "value": start_time},
             )
             ET.SubElement(
                 time_map,
                 "timept",
                 {
                     "time": fcpx_fraction_time(
-                        round(Fraction(str(clip["start_sec"])) * fps_exact(source_fps)) * fcpx_frame_duration(source_fps)
+                        start_frames * fcpx_frame_duration(source_fps)
                         + duration_frames * fcpx_frame_duration(fps)
                     ),
                     "value": fcpx_time(clip["end_sec"], source_fps),

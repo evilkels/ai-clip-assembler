@@ -229,53 +229,18 @@ def test_generate_fcpxml_emits_retime_for_suggested_speed():
         }
     ]
 
-    root = ET.fromstring(generate_fcpxml("Drone MVP", clips, videos))
-    asset_clip = root.find(".//asset-clip")
-    assert asset_clip is not None
-    assert asset_clip.attrib["duration"] == "24000/3000s"
-    assert asset_clip.attrib["audioRole"] == "dialogue"
-    assert asset_clip.find("timeMap/timept") is not None
-    assert [timept.attrib["value"] for timept in asset_clip.findall("./timeMap/timept")] == [
-        "30000/3000s",
-        "42000/3000s",
-    ]
-
-
-def test_generate_fcpxml_retime_map_covers_the_clip_range():
-    videos = {
-        "file-1": {
-            "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
-            "file_path": "/Users/me/DJI_0001.MP4",
-            "metadata": {"duration_sec": 120, "fps": 30, "resolution": [1920, 1080]},
-        }
-    }
-    clips = [
-        {
-            "file_id": "file-1",
-            "file_name": "DJI_0001.MP4",
-            "start_sec": 10.0,
-            "end_sec": 14.0,
-            "duration_sec": 4.0,
-            "suggested_speed": 0.5,
-        }
-    ]
-    generated = generate_fcpxml("Retimed", clips, videos)
+    generated = generate_fcpxml("Drone MVP", clips, videos)
     assert_valid_fcpxml(generated)
     asset_clip = ET.fromstring(generated).find(".//asset-clip")
     assert asset_clip is not None
-    timepoints = asset_clip.findall("./timeMap/timept")
-
-    def rational_time(value):
-        return Fraction(value[:-1])
-
-    assert rational_time(timepoints[0].attrib["time"]) == rational_time(
-        asset_clip.attrib["start"]
-    )
-    assert rational_time(timepoints[-1].attrib["time"]) == (
-        rational_time(asset_clip.attrib["start"]) + rational_time(asset_clip.attrib["duration"])
-    )
-    assert [point.attrib["value"] for point in timepoints] == ["30000/3000s", "42000/3000s"]
+    assert asset_clip.attrib["start"] == "30000/3000s"
+    assert asset_clip.attrib["duration"] == "24000/3000s"
+    assert asset_clip.attrib["audioRole"] == "dialogue"
+    # The map spans the clip's local range [start, start + duration].
+    assert [
+        (timept.attrib["time"], timept.attrib["value"])
+        for timept in asset_clip.findall("./timeMap/timept")
+    ] == [("30000/3000s", "30000/3000s"), ("18s", "42000/3000s")]
 
 
 def test_generate_fcpxml_clips_butt_exactly():

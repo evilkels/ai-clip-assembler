@@ -20,19 +20,26 @@ from src.project_store import read_frame_scores
 
 
 def _covered_seconds(clips: list[dict]) -> float:
-    ranges = sorted((float(clip["start_sec"]), float(clip["end_sec"])) for clip in clips)
     total = 0.0
-    current_start = current_end = None
-    for start, end in ranges:
-        if current_end is None:
-            current_start, current_end = start, end
-        elif start > current_end:
+    ranges_by_file: dict[str, list[tuple[float, float]]] = {}
+    for clip in clips:
+        ranges_by_file.setdefault(clip["file_id"], []).append(
+            (float(clip["start_sec"]), float(clip["end_sec"]))
+        )
+
+    for ranges in ranges_by_file.values():
+        ranges.sort()
+        current_start = current_end = None
+        for start, end in ranges:
+            if current_end is None:
+                current_start, current_end = start, end
+            elif start > current_end:
+                total += current_end - current_start
+                current_start, current_end = start, end
+            else:
+                current_end = max(current_end, end)
+        if current_end is not None:
             total += current_end - current_start
-            current_start, current_end = start, end
-        else:
-            current_end = max(current_end, end)
-    if current_end is not None:
-        total += current_end - current_start
     return total
 
 

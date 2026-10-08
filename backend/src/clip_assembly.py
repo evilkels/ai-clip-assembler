@@ -263,6 +263,7 @@ def assemble_smooth_clips(
         scene_caps[scene_id] = scene_cap(preferences, scene_end - scene_start)
 
     clips: List[ClipSuggestion] = []
+    scenes_truncated_by_cap = set()
     for run in candidate_runs(
         frames,
         preferences.smoothness_threshold,
@@ -277,7 +278,17 @@ def assemble_smooth_clips(
             preferences.max_clip_duration_sec,
             scene_end_sec=scene_end if scene_end != float("inf") else None,
         )
-        for chosen in select_windows(windows, limit=scene_caps[run[0].scene_id]):
+        limit = scene_caps[run[0].scene_id]
+        selected_windows = select_windows(windows, limit=limit)
+        if len(selected_windows) >= limit and any(
+            not any(
+                window.start_sec < chosen.end_sec and window.end_sec > chosen.start_sec
+                for chosen in selected_windows
+            )
+            for window in windows
+        ):
+            scenes_truncated_by_cap.add(run[0].scene_id)
+        for chosen in selected_windows:
             clips.append(make_clip(file_id, file_name, chosen))
 
     scenes_with_candidates = {clip.scene_id for clip in clips}
@@ -303,11 +314,14 @@ def assemble_smooth_clips(
         generated_by_scene[clip.scene_id] = generated_by_scene.get(clip.scene_id, 0) + 1
     for clip in selected:
         kept_by_scene[clip.scene_id] = kept_by_scene.get(clip.scene_id, 0) + 1
-    scenes_at_cap = sum(
-        1
-        for scene_id, kept_count in kept_by_scene.items()
-        if kept_count >= scene_caps[scene_id]
-        and generated_by_scene.get(scene_id, 0) > kept_count
+    scenes_at_cap = len(
+        scenes_truncated_by_cap
+        | {
+            scene_id
+            for scene_id, kept_count in kept_by_scene.items()
+            if kept_count >= scene_caps[scene_id]
+            and generated_by_scene.get(scene_id, 0) > kept_count
+        }
     )
 
     return AssemblyResult(

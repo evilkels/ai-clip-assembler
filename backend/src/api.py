@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Load repo-root .env before harness imports: PI_* are read at import time.
 load_dotenv()
@@ -205,7 +205,7 @@ class DraftRequest(BaseModel):
     # remain for back-compat with callers predating the format registry.
     format: Optional[FormatName] = None
     profile: Optional[AssemblyProfile] = None
-    target_duration_sec: Optional[float] = None
+    target_duration_sec: Optional[float] = Field(default=None, gt=0)
 
 
 class ProjectFolderRequest(BaseModel):

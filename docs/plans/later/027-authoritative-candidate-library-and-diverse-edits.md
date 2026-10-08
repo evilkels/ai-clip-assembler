@@ -1,5 +1,11 @@
 # Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
 
+Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).
+The cross-video scene-quota fix moved to [037](../037-extraction-quality.md)
+(milestone 1). The parked `backend/tests/test_version_diversity.py` is on
+`main` behind `pytest.importorskip`; `backend/src/version_diversity.py` does
+not exist yet.
+
 Status: TODO · Priority P1 · Category correctness + clarity · Planned 2026-08-31
 Absorbed plan 016 step 4 and plan 017 items 3-4 on 2026-09-02.
 

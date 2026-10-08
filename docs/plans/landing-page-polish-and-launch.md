@@ -136,7 +136,7 @@ from this baseline plus human editorial input.
 - [ ] 2.1 Add the release-matched DMG URL to the page. Done when the site download link points at the current release's DMG and `python3 scripts/tests/test_site_contract.py -v` passes.
   - `7d1972a` already makes the site's download links follow `frontend/package.json`; confirm that covers this before closing.
 - [ ] 2.2 Produce the truthful proof video per the demo contract in Context (after H1). Done when the H.264 MP4 with captions, the 15–25s muted web cut with controls and reduced-motion/static fallback, the 16:9 poster, the transcript and the source/rights notes exist.
-- [ ] 2.3 Implement the culling guide only after its evidence gate (see [seo-content-pilot](seo-content-pilot.md); after H3 and H4). Done when the guide ships under that plan's implementation contract.
+- [ ] 2.3 Implement the culling guide only after its evidence gate (see [seo-content-pilot](later/seo-content-pilot.md); after H3 and H4). Done when the guide ships under that plan's implementation contract.
 - [ ] 2.4 Turn clean-machine and search findings into scoped issues rather than broadening the launch change. Done when each finding from H1 and H4 is a separate issue or plan task.
 
 ## Human tasks

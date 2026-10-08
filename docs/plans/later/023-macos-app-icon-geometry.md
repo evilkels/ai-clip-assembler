@@ -1,5 +1,7 @@
 # Plan 023: Correct macOS app icon geometry
 
+Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).
+
 Status: TODO · Priority P1 · Effort M · Risk LOW · Category release polish
 Depends on the existing Electron packaging pipeline · Planned 2026-08-12
 

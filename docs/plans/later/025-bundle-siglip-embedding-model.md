@@ -1,5 +1,7 @@
 # 025: Export and bundle the SigLIP embedding model
 
+Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).
+
 The packaged app ships a checksum-verified SigLIP image-encoder model, so Look
 Groups are real and the diversity constraint in edit assembly stops being a
 no-op.
@@ -8,7 +10,7 @@ no-op.
 
 Priority P1 · Effort M · Risk MED · Category release correctness. Planned
 2026-08-13. Status when written: TODO. Depends on Plan 018 (code complete) and
-[self-contained-runtime-tools](self-contained-runtime-tools.md).
+[self-contained-runtime-tools](../self-contained-runtime-tools.md).
 
 ### Why and current evidence
 
@@ -134,7 +136,7 @@ threshold, GPU execution providers, and any change to the HTTP/JSON contract.
 - [ ] 3.2 Attribute: add a `NOTICE` file (none exists in the repo today)
   carrying the Apache-2.0 attribution for Google's SigLIP, and reference it from
   the packaging compliance material tracked in
-  [self-contained-runtime-tools](self-contained-runtime-tools.md) task 2.1. Done
+  [self-contained-runtime-tools](../self-contained-runtime-tools.md) task 2.1. Done
   when both bundled-artifact obligations are recorded in one place.
 - [ ] 3.3 Prove it is no longer inert: on a packaged build, analyse a project
   whose footage contains at least two clearly distinct looks. Done when the

@@ -1,5 +1,7 @@
 # Shell Follow-ups
 
+Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).
+
 The shell work that survived the studio redesign is decided, built or dropped,
 and the score chips are verified against the backend.
 
@@ -11,14 +13,14 @@ TODO.
 Collects the shell work that survived the studio redesign (`6d79c1b`, v0.2.0).
 Replaces `ui-polish-modern-shell.md`, which prescribed a shadcn/Radix migration
 that the redesign overtook with hand-authored CSS, and takes over the deferred
-interaction items from [`done/project-sidebar.md`](done/project-sidebar.md).
+interaction items from [`done/project-sidebar.md`](../done/project-sidebar.md).
 
 Nothing here is a defect. These are additive affordances and one verification
 task, which is why they sit at P3 behind the correctness plans.
 
 ### Settings and Diagnostics surfaces
 
-**MOVED 2026-09-03** to [plan 031](031-app-restyle-conformance.md) Phase 4,
+**MOVED 2026-09-03** to [plan 031](../031-app-restyle-conformance.md) Phase 4,
 which is no longer the open question this item posed. The restyle handoff
 answers it: Settings becomes a four-panel left rail with a new `AI assistance`
 panel, and Diagnostics gets a designed failure card. Two plans must not own the
@@ -29,19 +31,19 @@ same surface, so this one does not.
 A keyboard-only pass over the shell and all routes: visible focus everywhere,
 no traps.
 
-- The pass is a release check; it moved to [040](040-release-qa.md) (H2).
+- The pass is a release check; it moved to [040](../040-release-qa.md) (H2).
 - Timeline trim is not a dead end: its keyboard path is the inspector's In/Out
   fields, proven by `timeline-playback.spec.ts` — see
-  [`done/react-doctor-triage.md`](done/react-doctor-triage.md).
+  [`done/react-doctor-triage.md`](../done/react-doctor-triage.md).
 
 ### Already shipped, do not re-plan
 
-[`done/project-sidebar.md`](done/project-sidebar.md) listed collapse and resize as deferred. Both shipped in
+[`done/project-sidebar.md`](../done/project-sidebar.md) listed collapse and resize as deferred. Both shipped in
 the redesign and are covered by E2E: the collapsible rail lives in
 `AppShell.tsx`, persisted width in `hooks/usePanelWidth.ts`, and
 `project-shell-regressions.spec.ts:268-273` asserts the behaviour. Project row
 rename and the card-style rows shipped earlier via
-[plan 022](done/022-project-shell-header-and-sidebar.md).
+[plan 022](../done/022-project-shell-header-and-sidebar.md).
 
 ### Open questions carried over
 

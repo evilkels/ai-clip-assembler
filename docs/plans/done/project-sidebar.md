@@ -5,7 +5,7 @@ an owner elsewhere, so nothing is tracked here any more. The header below was
 stale: collapse and resize both shipped in the studio redesign and are covered
 by `project-shell-regressions.spec.ts:268-273`, and the remaining interaction
 items (sidebar context menu, keyboard pass) moved to
-[`shell-followups.md`](../shell-followups.md). Row rename and the card-style
+[`shell-followups.md`](../later/shell-followups.md). Row rename and the card-style
 rows shipped in [plan 022](022-project-shell-header-and-sidebar.md).
 
 This file stays as the authoritative record of the sidebar's data source and
@@ -54,7 +54,7 @@ persisted resizable width **shipped** in the studio redesign (`AppShell.tsx`,
 `hooks/usePanelWidth.ts`, asserted by
 `project-shell-regressions.spec.ts:268-273`). The context-menu interaction and
 the keyboard-nav/a11y verification moved to
-[`shell-followups.md`](../shell-followups.md). Superseded above:
+[`shell-followups.md`](../later/shell-followups.md). Superseded above:
 recents-label rename and alphabetical, card-style project rows shipped in
 [plan 022](022-project-shell-header-and-sidebar.md), so the "Rename ...
 deferred to v2" line no longer holds; `lastOpenedAt` is still written but no

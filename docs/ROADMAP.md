@@ -90,8 +90,8 @@ Sizes: S = hours, M = days, L = a week or more of agent work.
 - Windows ([#88](https://github.com/evilkels/ai-clip-assembler/issues/88)) and
   Linux ([#89](https://github.com/evilkels/ai-clip-assembler/issues/89)).
 - API keys as an advanced option.
-- Bundled SigLIP and diverse edits ([025](plans/025-bundle-siglip-embedding-model.md),
-  [027](plans/027-authoritative-candidate-library-and-diverse-edits.md) beyond the quota fix).
+- Bundled SigLIP and diverse edits ([025](plans/later/025-bundle-siglip-embedding-model.md),
+  [027](plans/later/027-authoritative-candidate-library-and-diverse-edits.md) beyond the quota fix).
 - A playable preview of a Proposal before Apply, if it does not fit milestone 4.
 
 ## Not in v1.0.0

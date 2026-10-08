@@ -2,7 +2,7 @@
 
 Status: TODO · Priority P2 · Effort L · Risk HIGH · Category distribution + trust
 Created 2026-09-11 against `v0.3.1`. **Blocked on**
-[self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4 — signing
+[self-contained-runtime-tools](self-contained-runtime-tools.md) 2.4 — signing
 and notarization — which is a prerequisite, not part of this plan.
 
 > **For agentic workers:** Phase 0 is an owner decision with an annual cost
@@ -107,7 +107,7 @@ Security prompt. Most of the user-visible benefit for a fraction of the work.
       and `stapler validate` pass, and a double-click opens it with no Privacy &
       Security detour. **If this step fails, stop — the rest of the plan is
       unreachable.** This is the same clean-machine evidence
-      [self-contained-runtime-tools](self-contained-runtime-tools.md) Task 4 asks
+      [self-contained-runtime-tools](self-contained-runtime-tools.md) H1 asks
       for; do it once and cite it in both plans.
 
 ## Phase 2 — Publish an update feed, not just installers

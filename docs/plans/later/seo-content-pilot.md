@@ -1,5 +1,7 @@
 # SEO content pilot — video culling workflow
 
+Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).
+
 Publish one useful guide from footage overload to a first rough cut at
 `/guides/video-culling-rough-cut-workflow/`, then use real query and engagement
 data before expanding.

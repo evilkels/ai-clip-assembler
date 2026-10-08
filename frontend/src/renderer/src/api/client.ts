@@ -919,6 +919,11 @@ export interface ReviewModelDiagnostic {
 }
 
 export interface Diagnostics {
+  provider: string;
+  reachable: boolean;
+  elapsed_sec: number;
+  failure?: import('../types/generated').AiFailure;
+  /** Legacy view retained until the diagnostics panel switches to the direct result. */
   review_model: ReviewModelDiagnostic;
 }
 

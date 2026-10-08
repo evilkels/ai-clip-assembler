@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional, Set
 
-from .ai_engines.engine import AiEngine
+from .ai_engines.engine import AiEngine, SCORING_TIMEOUT_PER_CLIP_SEC
 from .ai_engines.messages import make_failure
 from .ai_engines.types import AiFailure, AiReply, AiRequest
 from .harness_utils import clamp_score, sample_frames_for_clip
@@ -85,7 +85,7 @@ def enhance_clips(
     progress_callback: Optional[Callable[[int, int], None]] = None,
     cache_dir: Optional[Path] = None,
     only_clip_ids: Optional[Set[str]] = None,
-    timeout_per_clip_sec: float = 120.0,
+    timeout_per_clip_sec: float = SCORING_TIMEOUT_PER_CLIP_SEC,
     samples_dir: Path,
 ) -> ScoringOutcome:
     sampled = []

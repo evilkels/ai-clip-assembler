@@ -6,16 +6,17 @@ operations through the operations core (so they land in Undo History); rejecting
 discards them. Read access is provided as context, so reads "run normally".
 """
 
-import subprocess
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
 from src import review_agent
+from src.ai_engines.messages import format_failure, make_failure
+from src.ai_engines.types import AiReply
 from src.models import TimelineDocument, VersionSet
 from src.review_state import review_context_fingerprint, sequence_fingerprint
 from src.timeline_ops import SourceClip, TimelineController, TimelineOpError, apply_operation, seeded_item_ids
-from src.timeline_script import API_REFERENCE
 from src.timeline_service import TimelineEventBroker
 from src.review_agent import (
     ProposalStore,
@@ -23,6 +24,7 @@ from src.review_agent import (
     _parse_agent_json,
     _validate_versions,
     deterministic_versions,
+    engine_review_agent,
     run_review_turn,
 )
 
@@ -606,21 +608,94 @@ _CANDIDATES = [
 ]
 
 
-def test_default_agent_offers_the_script_api_and_returns_the_model_script(monkeypatch):
-    prompts = []
+@pytest.mark.asyncio
+async def test_failed_review_turn_persists_failure_without_versions(monkeypatch):
+    now = datetime(2026, 10, 8, 12, tzinfo=timezone.utc)
+    failure = make_failure(
+        "usage_limit", "chatgpt", resets_at="2026-10-08T14:00:00+00:00", now=now,
+        tz=timezone.utc,
+    )
+    monkeypatch.setattr(
+        review_agent, "deterministic_versions",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("must not mint Versions")),
+    )
+    store = ProposalStore()
 
-    def fake_pi(command, **_kwargs):
-        prompts.append(command[-1])
-        return subprocess.CompletedProcess(
-            command, 0, stdout='{"message":"Sorted.","script":"timeline:clear()"}', stderr=""
-        )
+    result = await run_review_turn(
+        "p1", user_message="Try again", controller=_controller(), candidates=_CANDIDATES,
+        store=store, agent=lambda _context: failure,
+    )
 
-    monkeypatch.setattr(review_agent.subprocess, "run", fake_pi)
+    message = result["agent_message"]
+    assert message["payload"]["failure"]["kind"] == "usage_limit"
+    assert "version_set" not in message["payload"]
+    assert message["text"] == format_failure(failure, now, timezone.utc)
+    assert result["failure"] == failure.model_dump(exclude_none=True)
 
-    reply = review_agent.default_review_agent({"user_message": "Sort by score", "candidates": []})
 
-    assert API_REFERENCE in prompts[0]
-    assert reply["script"] == "timeline:clear()"
+@pytest.mark.asyncio
+async def test_failed_review_turn_keeps_earlier_version_set_latest():
+    store = ProposalStore()
+    controller = _controller()
+    versions = [{
+        "version_id": "v1", "title": "Calm", "vibe": "calm", "rationale": "Steady",
+        "profile": "short_social", "total_duration_sec": 6,
+        "items": [{"source_clip_id": "clip-a", "file_id": "file-a", "file_name": "A.MOV",
+                   "start_sec": 1, "end_sec": 7, "speed": 1}],
+    }]
+    await run_review_turn(
+        "p1", user_message="Give me versions", controller=controller,
+        candidates=_CANDIDATES, store=store,
+        agent=lambda _context: {"message": "Here are options.", "versions": versions},
+    )
+
+    await run_review_turn(
+        "p1", user_message="Retry", controller=controller, candidates=_CANDIDATES,
+        store=store, agent=lambda _context: make_failure("timed_out", "chatgpt"),
+    )
+
+    latest_with_versions = [
+        message for message in store.session("p1").messages
+        if message.payload.get("version_set")
+    ][-1]
+    assert latest_with_versions.text == "Here are options."
+
+
+def test_engine_review_agent_stages_safe_frame_labels_and_path_free_text(tmp_path):
+    images_dir = tmp_path / "samples"
+    images_dir.mkdir()
+    frames = []
+    for index in range(14):
+        path = images_dir / f"frame-{index}.jpg"
+        path.write_bytes(b"image")
+        frames.append({
+            "clip_id": "clip-a", "file_name": "/private/footage/A.MOV", "scene_id": index,
+            "start_sec": index, "end_sec": index + 1, "frame_path": str(path),
+        })
+
+    class RecordingEngine:
+        provider = "chatgpt"
+
+        def run(self, request):
+            self.request = request
+            return AiReply(provider="chatgpt", data={"message": "Ready."}, raw_text="{}", elapsed_sec=0)
+
+    engine = RecordingEngine()
+    agent = engine_review_agent(engine)
+    agent({"user_message": "Review", "candidates": [{
+        **_CANDIDATES[0], "frame_path": str(frames[0]["frame_path"]),
+        "file_path": "/private/footage/A.MOV", "extra_path": "/private/secret",
+    }], "candidate_frames": frames, "samples_dir": images_dir, "history": [{
+        "script": {"log": ["/private/history/run.log"]},
+    }]})
+
+    request = engine.request
+    assert len(request.images) == 12
+    assert '"frame": "frame-01.jpg"' in request.text
+    assert "frame_path" not in request.text and "file_path" not in request.text
+    assert "/private/" not in request.text
+    assert "run.log" in request.text
+    assert request.timeout_sec == review_agent.REVIEW_TIMEOUT_SEC
 
 
 @pytest.mark.asyncio

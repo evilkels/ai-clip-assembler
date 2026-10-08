@@ -133,7 +133,7 @@ for it (see Decisions).
 
 ## Phase 1: Absolute media paths and the Timeline as exported
 
-- [ ] 1.1 Write absolute file URLs in both generators and remove relative paths.
+- [x] 1.1 Write absolute file URLs in both generators and remove relative paths.
   Delete `path_to_asset_src` and the `media_base_path` parameters of
   `generate_fcpxml` and `generate_resolve_xml`; add `path_to_fcp7_pathurl`
   (`file://localhost` prefix); drop the two `media_base_path` lines in
@@ -143,16 +143,16 @@ for it (see Decisions).
   `test_generate_resolve_xml_pathurl_is_absolute_localhost_url`, and the
   rewritten `test_export_folder_project_*` assertions in
   `backend/tests/test_api.py` (lines 1402 and 1441) pass, and the two relative
-  tests in `test_export_engine.py` (lines 192 and 608) are gone.
-- [ ] 1.2 Export reads only the Timeline Document (`api.py:1390–1396`); delete
+  tests in `test_export_engine.py` (lines 192 and 608) are gone. (PR #100)
+- [x] 1.2 Export reads only the Timeline Document (`api.py:1390–1396`); delete
   `clips_in_timeline_order` if nothing else calls it. Done when
   `test_export_empty_timeline_document_does_not_fall_back_to_legacy_clips`
   (legacy `timeline.clips` holds one clip, every document item removed through
   the controller, export of each format returns `clip_count == 0` and the
   empty-Timeline warning) passes, and
   `test_export_timeline_keeps_present_but_empty_edited_timeline_empty` still
-  passes.
-- [ ] 1.3 Update copy and scripts that promise relative paths. Export page
+  passes. (PR #100)
+- [x] 1.3 Update copy and scripts that promise relative paths. Export page
   description (`frontend/src/renderer/src/routes/Export.tsx:195`) becomes
   `Exports link to your original files by their full path. Keep the footage
   where it is, or export again after moving it.`; `docs/USER_GUIDE.md:156`,
@@ -160,57 +160,59 @@ for it (see Decisions).
   `scripts/synthetic_e2e_qa.py:230–231` say and check `file://` absolute URLs.
   Done when `grep -rn "relative" docs/USER_GUIDE.md docs/MANUAL_QA_GUIDE.md
   docs/QA.md frontend/src/renderer/src/routes/Export.tsx` finds no media-path
-  sentence and `python3 scripts/synthetic_e2e_qa.py` passes its export checks.
-- [ ] 1.4 Write `docs/adr/0009-exports-link-media-by-absolute-file-url.md`
+  sentence and `python3 scripts/synthetic_e2e_qa.py` passes its export checks. (PR #100)
+- [x] 1.4 Write `docs/adr/0009-exports-link-media-by-absolute-file-url.md`
   (status Accepted; context: relative paths produced invalid URLs and a relink
   dialog; decision: absolute URLs in both XML formats, re-export after a move;
   consequences: QA Flow C becomes H4 here) and add it to `docs/adr/README.md`.
-  Done when both files exist and `python3 scripts/plans.py check` passes.
+  Done when both files exist and `python3 scripts/plans.py check` passes. (PR #100)
 
 ## Phase 2: FCPXML that validates against the 1.10 DTD
 
-- [ ] 2.1 Vendor the DTD, pin lxml, add `assert_valid_fcpxml` to
+- [x] 2.1 Vendor the DTD, pin lxml, add `assert_valid_fcpxml` to
   `backend/tests/support.py`, and add
   `test_generate_fcpxml_validates_against_the_1_10_dtd` on the Estepona-shaped
   inputs. Done when the DTD file, its README with the SHA-256, and
   `lxml==5.3.0` are in place and the new test fails on the current generator
-  with the `media-rep` error from #80.
-- [ ] 2.2 Restructure resources as decided: `<media-rep>` child, no `src` on
+  with the `media-rep` error from #80. (PR #100)
+- [x] 2.2 Restructure resources as decided: `<media-rep>` child, no `src` on
   `<asset>`, `a1..aN` asset ids, `format="rN"` on assets, `start="0s"`, no
   format `name`. Done when 2.1's test passes,
   `test_generate_fcpxml_asset_has_media_rep_and_no_src`, and
   `test_generate_fcpxml_ids_are_valid_for_file_names_with_spaces` (file id
   `My clip.MOV`, document still DTD-valid) pass, and the asserts at
-  `test_export_engine.py:80` and `:127` are rewritten to the new shape.
-- [ ] 2.3 Rational timing (after 2.2). Implement `fcpx_frame_duration` as a
+  `test_export_engine.py:80` and `:127` are rewritten to the new shape. (PR #100)
+- [x] 2.3 Rational timing (after 2.2). Implement `fcpx_frame_duration` as a
   `Fraction`, `fps_exact`, and `fcpx_time`; use them for every `offset`,
   `start`, `duration`, `timept` and asset `duration`. Done when
   `test_fcpx_frame_duration_covers_the_rate_table` asserts the exact strings
   for 23.976, 24, 25, 29.97, 30, 47.952, 50, 59.94, 60 and 119.88,
   `test_fcpx_time_is_frame_aligned` asserts `240240/24000s` for 10 s at 23.976
   and `0s` for zero, and `test_generate_fcpxml_23976_source_exports_24000_1001`
-  asserts `frameDuration="1001/24000s"` and a `timept` on a frame boundary.
-- [ ] 2.4 Mixed sources (after 2.3). One `<format>` per distinct source shape,
+  asserts `frameDuration="1001/24000s"` and a `timept` on a frame boundary. (PR #100)
+- [x] 2.4 Mixed sources (after 2.3). One `<format>` per distinct source shape,
   `format` on each `<asset>` and on `<asset-clip>` when it differs from `r1`,
   `audioLayout` on the sequence. Done when
   `test_generate_fcpxml_mixed_30_and_60_sources_get_their_own_formats` (two
   formats, the 30 fps clip's `start` at 30 fps and its `offset` at 60 fps) and
   `test_generate_fcpxml_sequence_audio_layout_follows_sources` (stereo,
-  mono, surround, absent) pass and the document is DTD-valid in each.
-- [ ] 2.5 Golden FCPXML fixtures (after 2.4). Add `fixtures/export/inputs.py`
+  mono, surround, absent) pass and the document is DTD-valid in each. (PR #100)
+- [x] 2.5 Golden FCPXML fixtures (after 2.4). Add `fixtures/export/inputs.py`
   and the three `.fcpxml` files; `test_fcpxml_golden_fixtures_are_unchanged`
   compares generated text to each file and runs `assert_valid_fcpxml` on
   each; a `--update-export-fixtures` pytest option rewrites them. Done when
   the test passes and a one-character change to `generate_fcpxml` fails it
-  with a readable diff.
+  with a readable diff. (PR #100)
+  - The test is now `test_export_xml_golden_fixtures_are_unchanged`: 3.3 added the XMEML goldens to it.
 
 ## Phase 3: Resolve XML structure checks
 
-- [ ] 3.1 Count XMEML frames at the exact rate: `seconds_to_frames` uses
+- [x] 3.1 Count XMEML frames at the exact rate: `seconds_to_frames` uses
   `fps_exact`. Done when `test_seconds_to_frames_uses_exact_ntsc_rate`
   (60 s at 23.976 → 1438 frames, at 59.94 → 3596) passes and
-  `test_generate_resolve_xml_builds_xmeml_timeline` still passes unchanged.
-- [ ] 3.2 Add `assert_well_formed_xmeml` to `support.py` and
+  `test_generate_resolve_xml_builds_xmeml_timeline` still passes unchanged. (PR #100)
+  - In a mixed-rate project XMEML still declares each `<file>` rate at the sequence rate; clip in/out are correct at the clipitem rate (FCP7 convention). Left as is; H2 footage is single-rate.
+- [x] 3.2 Add `assert_well_formed_xmeml` to `support.py` and
   `test_generate_resolve_xml_passes_structure_checks` over the Estepona-shaped
   inputs. Checks: `<!DOCTYPE xmeml>` header; `xmeml@version == "5"`; sequence
   `duration` equals the last video clipitem `end`; every `<rate>` has
@@ -219,25 +221,25 @@ for it (see Decisions).
   `end - start == out - in`; each audio clipitem shares its video clipitem's
   id, `start` and `end`; every `<link>` points at an existing track index and
   clip index. Done when the test passes and removing `pathurl` from the
-  generator fails it.
-- [ ] 3.3 Golden XMEML fixtures (after 3.1): `estepona-1080p5994.xml` and
+  generator fails it. (PR #100)
+- [x] 3.3 Golden XMEML fixtures (after 3.1): `estepona-1080p5994.xml` and
   `cinema-23976-silent.xml` in the same golden test as 2.5, each also run
-  through `assert_well_formed_xmeml`. Done when the test passes on both.
+  through `assert_well_formed_xmeml`. Done when the test passes on both. (PR #100)
 
 ## Phase 4: EDL, docs and gates
 
-- [ ] 4.1 Confirm EDL is untouched by the helper changes:
+- [x] 4.1 Confirm EDL is untouched by the helper changes:
   `test_export_timeline_uses_source_fps_for_edl_timecode` and
   `test_generate_edl_*` pass; add `test_generate_edl_has_no_media_paths`
-  (no `file:` or `/` path in any event line). Done when all EDL tests pass.
-- [ ] 4.2 Update `docs/ARCHITECTURE.md` Export section and `GLOSSARY.md`'s
+  (no `file:` or `/` path in any event line). Done when all EDL tests pass. (PR #100)
+- [x] 4.2 Update `docs/ARCHITECTURE.md` Export section and `GLOSSARY.md`'s
   FCPXML entry to name version 1.10 and the DTD fixture; point
   [drone-workflow-qa-flows](drone-workflow-qa-flows.md) Flow C at H4 here.
   Done when `grep -n "1.10" docs/ARCHITECTURE.md GLOSSARY.md` finds both and
-  `python3 scripts/plans.py check` passes.
-- [ ] 4.3 Full gates: `npm run lint`, `npm run typecheck`, `npm run test:backend`,
+  `python3 scripts/plans.py check` passes. (PR #100)
+- [x] 4.3 Full gates: `npm run lint`, `npm run typecheck`, `npm run test:backend`,
   `npm run test:main`, `npm run test:e2e` from `frontend/`. Done when all pass
-  locally and `.github/workflows/test.yml` is green on the PR.
+  locally and `.github/workflows/test.yml` is green on the PR. (PR #100)
 
 ## Human tasks
 

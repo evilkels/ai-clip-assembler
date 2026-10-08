@@ -11,6 +11,7 @@ from src.export_engine import (
     generate_resolve_xml,
     choose_timeline_fps,
     fcpx_frame_duration,
+    fcpx_frames,
     fcpx_time,
     fps_exact,
     generate_edl,
@@ -424,10 +425,9 @@ def test_fcpx_frame_duration_covers_the_rate_table():
         60: (Fraction(1, 60), "100/6000s", Fraction(60)),
         119.88: (Fraction(1001, 120000), "1001/120000s", Fraction(120000, 1001)),
     }
-    from src.export_engine import _fcpx_frame_duration_text
     for rate, (duration, duration_text, exact_rate) in expected.items():
         assert fcpx_frame_duration(rate) == duration
-        assert _fcpx_frame_duration_text(rate) == duration_text
+        assert fcpx_frames(1, rate) == duration_text
         assert fps_exact(rate) == exact_rate
 
 

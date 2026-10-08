@@ -39,11 +39,6 @@ def fcpx_frame_duration(fps: float) -> Fraction:
     return Fraction(numerator, denominator)
 
 
-def _fcpx_frame_duration_text(fps: float) -> str:
-    numerator, denominator = _fcpx_frame_duration_parts(fps)
-    return f"{numerator}/{denominator}s"
-
-
 def fps_exact(fps: float) -> Fraction:
     numerator, denominator = _fcpx_frame_duration_parts(fps)
     return Fraction(denominator, numerator)
@@ -440,7 +435,7 @@ def generate_fcpxml(
         "format",
         {
             "id": "r1",
-            "frameDuration": _fcpx_frame_duration_text(fps),
+            "frameDuration": fcpx_frames(1, fps),
             "width": str(width),
             "height": str(height),
         },
@@ -458,7 +453,7 @@ def generate_fcpxml(
             format_ids[source_shape] = f"r{len(format_ids) + 1}"
             ET.SubElement(resources, "format", {
                 "id": format_ids[source_shape],
-                "frameDuration": _fcpx_frame_duration_text(source_fps),
+                "frameDuration": fcpx_frames(1, source_fps),
                 "width": str(source_shape[0]),
                 "height": str(source_shape[1]),
             })
@@ -544,7 +539,10 @@ def generate_fcpxml(
                 time_map,
                 "timept",
                 {
-                    "time": fcpx_fraction_time(Fraction(start_time[:-1]) + Fraction(duration_time[:-1])),
+                    "time": fcpx_fraction_time(
+                        round(Fraction(str(clip["start_sec"])) * fps_exact(source_fps)) * fcpx_frame_duration(source_fps)
+                        + duration_frames * fcpx_frame_duration(fps)
+                    ),
                     "value": fcpx_time(clip["end_sec"], source_fps),
                 },
             )

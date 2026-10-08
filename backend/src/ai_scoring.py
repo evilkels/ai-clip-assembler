@@ -8,7 +8,7 @@ from typing import Callable, List, Optional, Set
 
 from .ai_engines.engine import AiEngine, SCORING_TIMEOUT_PER_CLIP_SEC
 from .ai_engines.messages import make_failure
-from .ai_engines.types import AiFailure, AiReply, AiRequest
+from .ai_engines.types import AiFailure, AiRequest
 from .harness_utils import clamp_score, sample_frames_for_clip
 from .models import AssemblyResult, FrameScore
 
@@ -21,13 +21,22 @@ PROMPT_TEMPLATE = (
     "Give each clip a brief reason."
 )
 SCORE_SCHEMA = {
-    "type": "object", "required": ["scores"], "properties": {
-        "scores": {"type": "array", "items": {"type": "object",
-            "required": ["k", "visual_interest", "reason"], "properties": {
-                "k": {"type": "integer"}, "visual_interest": {"type": "number"},
-                "reason": {"type": "string"},
-            }}}
-    }
+    "type": "object",
+    "required": ["scores"],
+    "properties": {
+        "scores": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["k", "visual_interest", "reason"],
+                "properties": {
+                    "k": {"type": "integer"},
+                    "visual_interest": {"type": "number"},
+                    "reason": {"type": "string"},
+                },
+            },
+        }
+    },
 }
 
 
@@ -96,7 +105,9 @@ def enhance_clips(
     if not sampled:
         return _manual_outcome(
             manual_result,
-            make_failure("unusable_reply", engine.provider, detail="no frames available for analysis"),
+            make_failure(
+                "unusable_reply", engine.provider, detail="no frames available for analysis"
+            ),
             0,
             0,
         )
@@ -127,7 +138,8 @@ def enhance_clips(
             file_name = Path(clip.file_name).name
             labels.append(
                 f"{position} → {file_name} {clip.start_sec:.1f}–{clip.end_sec:.1f} s\n"
-                + "  " + ", ".join(staged_names)
+                + "  "
+                + ", ".join(staged_names)
             )
         request = AiRequest(
             images=images,
@@ -143,8 +155,7 @@ def enhance_clips(
         if isinstance(reply, AiFailure):
             failure = reply
             break
-        data = reply.data if isinstance(reply, AiReply) else {}
-        entries = data.get("scores") if isinstance(data, dict) else None
+        entries = reply.data.get("scores")
         by_k = {}
         invalid = set()
         if isinstance(entries, list):
@@ -160,7 +171,11 @@ def enhance_clips(
         for position, (clip, paths, key, attempt) in enumerate(batch, start=1):
             entry = by_k.get(position)
             value = entry.get("visual_interest") if entry else None
-            if position in invalid or isinstance(value, bool) or not isinstance(value, (int, float)):
+            if (
+                position in invalid
+                or isinstance(value, bool)
+                or not isinstance(value, (int, float))
+            ):
                 if attempt == 0:
                     retries.append((clip, paths, key, 1))
                 continue
@@ -184,24 +199,44 @@ def enhance_clips(
     for clip, _paths, _key in sampled:
         score = scores[clip.clip_id]
         visual = round(clamp_score(score["visual_interest"]), 2)
-        enhanced.append(clip.model_copy(update={
-            "visual_interest_score": visual,
-            "overall_score": round(0.7 * clip.overall_score + 0.3 * visual, 2),
-            "ai_reason": f"{clip.ai_reason} | AI: {score.get('reason') or 'No reason provided'}",
-        }))
+        enhanced.append(
+            clip.model_copy(
+                update={
+                    "visual_interest_score": visual,
+                    "overall_score": round(0.7 * clip.overall_score + 0.3 * visual, 2),
+                    "ai_reason": f"{clip.ai_reason} | AI: {score.get('reason') or 'No reason provided'}",
+                }
+            )
+        )
     enhanced.extend(clip for clip in manual_result.clips if clip.clip_id not in sampled_ids)
     enhanced.sort(key=lambda clip: clip.overall_score, reverse=True)
     metadata = dict(manual_result.metadata)
-    metadata.update({
-        "provider": engine.provider, "local": False, "used_ai": True,
-        "clips_enhanced": len(scores), "clips_total": len(sampled), "clips_left": 0,
-    })
-    model_used = getattr(engine, "pi_model", None) or getattr(engine, "model", None)
+    metadata.update(
+        {
+            "provider": engine.provider,
+            "local": False,
+            "used_ai": True,
+            "clips_enhanced": len(scores),
+            "clips_total": len(sampled),
+            "clips_left": 0,
+        }
+    )
+    model_used = getattr(engine, "pi_model", None)
     if model_used:
         metadata["model_used"] = model_used
-    return ScoringOutcome(AssemblyResult(
-        clips=enhanced,
-        sequence=manual_result.sequence.model_copy(update={"clips": [clip.clip_id for clip in enhanced]}),
-        metadata=metadata, harness_id="pi_agent", harness_version="1.0.0",
-        processing_time_sec=manual_result.processing_time_sec,
-    ), True, None, len(scores), 0)
+    return ScoringOutcome(
+        AssemblyResult(
+            clips=enhanced,
+            sequence=manual_result.sequence.model_copy(
+                update={"clips": [clip.clip_id for clip in enhanced]}
+            ),
+            metadata=metadata,
+            harness_id="pi_agent",
+            harness_version="1.0.0",
+            processing_time_sec=manual_result.processing_time_sec,
+        ),
+        True,
+        None,
+        len(scores),
+        0,
+    )

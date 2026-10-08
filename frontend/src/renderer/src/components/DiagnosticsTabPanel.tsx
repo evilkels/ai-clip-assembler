@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getDiagnostics, type Diagnostics } from '../api/client';
+import { getDiagnostics } from '../api/client';
+import type { DiagnosticsResult } from '../types/generated';
 import type { SettingsPanel } from './SettingsModal';
 
 function ranAgoLabel(ranAt: number): string {
@@ -9,7 +10,7 @@ function ranAgoLabel(ranAt: number): string {
 }
 
 export function DiagnosticsTabPanel({ onOpenSettings }: { onOpenSettings: (panel: SettingsPanel) => void }) {
-  const [data, setData] = useState<Diagnostics | null>(null);
+  const [data, setData] = useState<DiagnosticsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [ranAt, setRanAt] = useState<number | null>(null);

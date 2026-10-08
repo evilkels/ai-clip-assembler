@@ -20,7 +20,7 @@ import type {
   VideoMetadata,
 } from '../types/clip';
 import { mockClips } from './mockClips';
-import type { AiFailure, ClipSuggestion, DiagnosticsResult as GeneratedDiagnosticsResult, ScriptRun } from '../types/generated';
+import type { AiFailure, ClipSuggestion, DiagnosticsResult, ScriptRun } from '../types/generated';
 import type { VersionSet } from '../types/version';
 import type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
 import type { UpdateStatus } from '../../../shared/updateStatus';
@@ -907,9 +907,6 @@ export async function updateSettings(changes: SettingsUpdate): Promise<SettingsR
   }
   return res.json() as Promise<SettingsResponse>;
 }
-
-export type DiagnosticsResult = GeneratedDiagnosticsResult;
-export type Diagnostics = DiagnosticsResult;
 
 export async function getDiagnostics(): Promise<DiagnosticsResult> {
   const res = await fetch(`${backendUrl()}/diagnostics`, { cache: 'no-store' });

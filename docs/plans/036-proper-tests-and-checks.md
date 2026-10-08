@@ -71,34 +71,34 @@ Decisions:
 
 ## Phase 2: Tests that can fail
 
-- [ ] 2.1 Switch the MCP stdio bridge to newline-delimited JSON, per the MCP
+- [x] 2.1 Switch the MCP stdio bridge to newline-delimited JSON, per the MCP
   transport spec. First rewrite the two framing tests in
   `backend/tests/test_mcp_bridge.py` to cover several messages, Unicode and
-  EOF. Done when those tests fail on the old framing and pass on the new.
-- [ ] 2.2 Assert exact Transform values in export: FCPXML position and scale,
+  EOF. Done when those tests fail on the old framing and pass on the new. (PR #95)
+- [x] 2.2 Assert exact Transform values in export: FCPXML position and scale,
   Resolve zoom, all from independent expected numbers. Done when zeroing the
-  pan or resetting the scale fails a test.
-- [ ] 2.3 Make the site download test derive the expected release from
+  pan or resetting the scale fails a test. (PR #95)
+- [x] 2.3 Make the site download test derive the expected release from
   `frontend/package.json`, and update `site/index.html` to v0.4.0. Done when a
   version bump without a site update fails
-  `python3 scripts/tests/test_site_contract.py`.
-- [ ] 2.4 Move the fake embedding provider into backend test support and
+  `python3 scripts/tests/test_site_contract.py`. (PR #95)
+- [x] 2.4 Move the fake embedding provider into backend test support and
   delete `test_fake_embedding_provider_rejects_non_positive_dimensions` along
-  with the guard it covers. Done when `backend/src` has no fake provider.
-- [ ] 2.5 Move the `validateRevealExportPath` cases (empty, whitespace, null,
+  with the guard it covers. Done when `backend/src` has no fake provider. (PR #95)
+- [x] 2.5 Move the `validateRevealExportPath` cases (empty, whitespace, null,
   relative, accepted) to `handleRevealExportFile` tests that assert the shell
   is never called on invalid input. Then stop exporting the validator. Done
-  when `npm run test:main` passes and the validator is module-private.
-- [ ] 2.6 Replace the argument-order assertion in `piExecutable.test.ts` with
+  when `npm run test:main` passes and the validator is module-private. (PR #95)
+- [x] 2.6 Replace the argument-order assertion in `piExecutable.test.ts` with
   a test that runs `resolvePiBinFromLoginShell` against a stub shell, which
   prints a PATH only when invoked as an interactive login shell. Done when
-  dropping the login flags fails the test.
+  dropping the login flags fails the test. (PR #95)
 
-- [ ] 2.7 Delete `scripts/tests/test_release_workflow.py` and its CI step. Its
+- [x] 2.7 Delete `scripts/tests/test_release_workflow.py` and its CI step. Its
   four tests are whitespace-exact regexes over `build-dmg.yml`, and one only
   checks that CI runs this same file. Replace them with an `actionlint` step
   in `.github/workflows/test.yml` that validates every workflow. Done when a
-  workflow with an invalid expression fails that step.
+  workflow with an invalid expression fails that step. (PR #95)
 
 ## Phase 3: An e2e suite the owner can review
 

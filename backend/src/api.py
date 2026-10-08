@@ -38,7 +38,7 @@ from .export_engine import (
     generate_resolve_xml,
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
-from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
+from .ai_engines import get_engine
 from .frame_extraction import extract_frames
 from .models import FrameScore
 from .motion_analysis import (
@@ -90,6 +90,7 @@ from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
 # uvicorn's logger so progress messages reach the dev console without extra config
 logger = logging.getLogger("uvicorn.error")
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Kept in step with frontend/package.json so the status bar and the update
 # check report the same release.
@@ -279,6 +280,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "harness_id": restored.get("harness_id") if restored else None,
         "frame_scores": frame_scores,
         "generation_stats": generation_stats,
+        "ai_scoring": restored.get("ai_scoring") if restored else None,
     }
     _proposal_store.configure_project(project_id, folder_path)
     return {
@@ -291,6 +293,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "selected_harness": manifest.harness,
         "effective_harness": restored.get("harness_id") if restored else None,
         "generation_stats": generation_stats,
+        "metadata": restored.get("ai_scoring") if restored else None,
     }
 
 
@@ -586,6 +589,63 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     return response
 
 
+@app.post("/projects/{project_id}/ai-scoring/resume")
+def resume_ai_scoring(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    if (project.get("analysis_progress") or {}).get("phase") == "analyzing":
+        raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
+    stored = project.get("ai_scoring") or {}
+    if not stored.get("failure") or int(stored.get("clips_left", 0)) == 0:
+        raise HTTPException(status_code=409, detail="Nothing to resume")
+    per_file_results, resumed_metadata = analysis_service.resume_ai_scoring(
+        project,
+        samples_path=samples_dir(project_id),
+        cache_dir=analysis_dir(project_id) / "ai-scores",
+        engine_fn=get_engine,
+    )
+    resumed_by_file = {entry["file_id"]: entry for entry in resumed_metadata}
+    per_video = [
+        resumed_by_file.get(entry.get("file_id"), entry)
+        for entry in stored.get("per_video", [])
+    ]
+    failures = [entry["failure"] for entry in per_video if entry.get("failure")]
+    metadata = {
+        "per_video": per_video,
+        "used_ai": any(entry.get("used_ai") for entry in per_video),
+        "local": False,
+        "clips_left": sum(int(entry.get("clips_left", 0)) for entry in per_video),
+    }
+    if failures:
+        metadata["failure"] = failures[0]
+    models_used = list({entry["model_used"] for entry in per_video if entry.get("model_used")})
+    if len(models_used) == 1:
+        metadata["model_used"] = models_used[0]
+    elif models_used:
+        metadata["models_used"] = models_used
+    project["ai_scoring"] = metadata
+    effective = "manual" if failures or metadata["clips_left"] else "pi_agent"
+    finalized = _finalize_clip_set(
+        project_id, per_file_results, effective_harness_id=effective,
+        preserve_manual_timeline=True,
+    )
+    persist_project_results(project_id)
+    return {
+        "project_id": project_id,
+        "harness_id": "pi_agent",
+        "selected_harness": project.get("selected_harness", "pi_agent"),
+        "effective_harness": effective,
+        "status": "complete",
+        "clips": finalized["clips"],
+        "sequence": finalized["timeline"],
+        "recommendation": finalized["recommendation"],
+        "generation_stats": finalized["generation_stats"],
+        "timings": {"per_video": [], "pipeline_total_sec": 0.0},
+        "metadata": metadata,
+    }
+
+
 def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
     return analysis_service.selected_videos(projects[project_id], request)
 
@@ -597,7 +657,7 @@ def is_cloud_harness(harness_id: str) -> bool:
 def effective_harness_id(harness_id: str, per_video_metadata: list[dict]) -> str:
     """Return the harness that actually produced the current Candidate Clips."""
     if harness_id == "pi_agent" and any(
-        metadata.get("warning") or metadata.get("used_ai") is False
+        metadata.get("failure") or metadata.get("used_ai") is False
         for metadata in per_video_metadata
     ):
         return DEFAULT_HARNESS_ID
@@ -641,11 +701,12 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             assign_scene_ids_fn=assign_scene_ids,
             score_samples_fn=score_samples_rule_based,
             assemble_clips_fn=assemble_smooth_clips,
-            enhance_clips_fn=enhance_clips_with_pi_cli,
+            enhance_clips_fn=analysis_service.enhance_clips,
             parse_transforms_fn=parse_trf,
             motion_analysis_enabled=_motion_analysis_capability.available,
             motion_analysis_unavailable_reason=_motion_analysis_capability.reason,
             embedding_provider_fn=default_embedding_provider,
+            engine_fn=get_engine,
         )
     except analysis_service.AnalysisDependencyUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -699,25 +760,15 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         pipeline.timings,
     )
     if request.harness_id == "pi_agent":
-        harness_metadata = {"per_video": pipeline.per_video_metadata}
-        all_ai = all(v.get("used_ai") for v in pipeline.per_video_metadata)
-        any_ai = any(v.get("used_ai") for v in pipeline.per_video_metadata)
-        any_fallback = any(v.get("warning") for v in pipeline.per_video_metadata)
-        if any_fallback or not all_ai:
-            harness_metadata["used_ai"] = any_ai
-            fallback_details = [
-                f"{video.get('file_name', video['file_id'])} ({video['file_id']}): "
-                f"{video.get('warning', 'fallback')}"
-                for video in pipeline.per_video_metadata
-                if video.get("warning")
-            ]
-            harness_metadata["warning"] = (
-                f"Harness Fallback — {'; '.join(fallback_details)}"
-                if fallback_details
-                else "Harness Fallback — Pi Agent could not complete"
-            )
-        else:
-            harness_metadata["used_ai"] = True
+        failures = [v["failure"] for v in pipeline.per_video_metadata if v.get("failure")]
+        harness_metadata = {
+            "per_video": pipeline.per_video_metadata,
+            "used_ai": any(v.get("used_ai") for v in pipeline.per_video_metadata),
+            "local": False,
+            "clips_left": sum(int(v.get("clips_left", 0)) for v in pipeline.per_video_metadata),
+        }
+        if failures:
+            harness_metadata["failure"] = failures[0]
         models_used = list({
             v["model_used"] for v in pipeline.per_video_metadata if v.get("model_used")
         })
@@ -725,8 +776,11 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             harness_metadata["model_used"] = models_used[0]
         elif models_used:
             harness_metadata["models_used"] = models_used
-        harness_metadata["local"] = False
         response["metadata"] = harness_metadata
+        projects[project_id]["ai_scoring"] = harness_metadata
+    else:
+        projects[project_id]["ai_scoring"] = None
+    persist_project_results(project_id)
     return response
 
 
@@ -1144,7 +1198,7 @@ def timestamped_frame_paths(project_id: str, file_id: str) -> list[tuple[int, Pa
 
 def mcp_frame_paths(project_id: str, clip_id: str) -> list:
     """Local frame JPEG paths for a candidate clip, for an agent to read
-    directly (the same `@path` images `pi_cli_harness` attaches)."""
+    directly (the same staged frame attachments the scoring engine receives)."""
     project = projects.get(project_id) or {}
     clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
     if clip is None:
@@ -1813,6 +1867,7 @@ def persist_project_results(project_id: str) -> None:
             clips=project.get("clips", []),
             timeline=project.get("timeline"),
             generation_stats=project.get("generation_stats"),
+            ai_scoring=project.get("ai_scoring"),
         )
     except OSError as exc:
         logger.warning("Could not persist analysis results for %s: %s", project_id, exc)

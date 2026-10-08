@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from src import analysis_service
+from src.ai_engines.messages import make_failure
 from src.clip_assembly import AssemblyPreferences
 from src.frame_extraction import FFmpegError, FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
@@ -152,6 +153,43 @@ def test_run_analysis_pipeline_returns_per_file_outputs(tmp_path):
     assert finalized["timeline"]["source"] == "draft"
     assert finalized["recommendation"]["profile"] == "long_scenic"
     assert finalized["generation_stats"]["totals"]["candidates_kept"] == 3
+
+
+def test_ai_failure_keeps_rule_ranking_and_stops_scoring_later_videos(tmp_path):
+    videos = [_source_video(tmp_path, file_id="file-1"), _source_video(tmp_path, file_id="file-2")]
+    calls = []
+
+    class Engine:
+        provider = "chatgpt"
+        cache_identity = "openai-codex/fake"
+
+        def run(self, _request):
+            calls.append("run")
+            return make_failure("usage_limit", "chatgpt")
+
+    def assemble(file_id, file_name, **_kwargs):
+        clip = _clip(f"clip-{file_id}", 0.0, 3.0, 8.0)
+        clip = clip.model_copy(update={"file_id": file_id, "file_name": file_name})
+        return AssemblyResult(
+            clips=[clip], sequence=TimelineSequence(total_duration_sec=3, clips=[clip.clip_id])
+        )
+
+    result = _run_service(
+        {"project_id": "project-1", "videos": videos, "clips": [], "timeline": None},
+        _request(harness_id="pi_agent"),
+        tmp_path,
+        extract_frames_fn=lambda **_kwargs: [FrameSample(timestamp=1, frame_path="/tmp/frame.jpg")],
+        score_samples_fn=lambda _samples: [_frame(1)],
+        assemble_clips_fn=assemble,
+        engine_fn=lambda: Engine(),
+    )
+
+    assert len(calls) == 1
+    assert [entry["failure"]["kind"] for entry in result.per_video_metadata] == [
+        "usage_limit", "usage_limit"
+    ]
+    assert result.per_video_metadata[1]["used_ai"] is False
+    assert result.per_file_results[0]["clips"][0]["overall_score"] == 8.0
 
 
 def test_finalize_clip_set_carries_generation_stats_for_unanalyzed_files(tmp_path):

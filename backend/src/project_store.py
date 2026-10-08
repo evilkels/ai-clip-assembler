@@ -241,6 +241,7 @@ def write_analysis_results(
     clips: List[dict],
     timeline: Optional[dict],
     generation_stats: Optional[dict] = None,
+    ai_scoring: Optional[dict] = None,
     now: Callable[[], datetime] = datetime_now_utc,
 ) -> None:
     payload = {
@@ -250,6 +251,7 @@ def write_analysis_results(
         "clips": clips,
         "timeline": timeline,
         "generation_stats": generation_stats,
+        "ai_scoring": ai_scoring,
     }
     path = analysis_results_path(project_folder)
     path.parent.mkdir(parents=True, exist_ok=True)

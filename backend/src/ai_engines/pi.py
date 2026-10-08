@@ -61,6 +61,10 @@ class PiEngine:
         self.pi_model = pi_model
         self.provider = "claude" if pi_provider.startswith("anthropic") else "chatgpt"
 
+    @property
+    def cache_identity(self) -> str:
+        return f"{self.pi_provider}/{self.pi_model}"
+
     def run(self, request: AiRequest):
         with staged(request) as staged_request:
             prompt = request.text + "\n\nRespond with ONLY one JSON object and nothing else. It must match this JSON Schema:\n" + json.dumps(request.schema_)

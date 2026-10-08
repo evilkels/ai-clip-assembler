@@ -23,7 +23,8 @@ from src.models import (
     TimelineSequence,
     VideoMetadata,
 )
-from support import FakeEmbeddingProvider
+from support import FakeEmbeddingProvider, fake_engine
+from src.ai_engines.pi import PiEngine
 from src.review_state import sequence_fingerprint
 from src.timeline_script import ScriptResult
 
@@ -208,7 +209,7 @@ def test_analyze_refuses_pi_agent_without_cloud_ai_consent(monkeypatch, tmp_path
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("pi harness must not run without cloud AI consent")
 
-    monkeypatch.setattr(api, "enhance_clips_with_pi_cli", fail_if_called)
+    monkeypatch.setattr(api, "get_engine", fail_if_called)
 
     response = client.post(
         f"/projects/{project_id}/analyze",
@@ -1546,7 +1547,9 @@ def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
         ),
     )
 
-    def fake_enhance(result, frames, **kwargs):
+    from src.ai_scoring import ScoringOutcome
+
+    def fake_enhance(engine, result, frames, **kwargs):
         enhanced = result.model_copy(
             update={
                 "clips": [
@@ -1562,9 +1565,9 @@ def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
                 "harness_id": "pi_agent",
             }
         )
-        return enhanced, True
+        return ScoringOutcome(enhanced, True, None, 1, 0)
 
-    monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+    monkeypatch.setattr("src.api.analysis_service.enhance_clips", fake_enhance)
     api.projects[project_id]["cloud_ai_consent"] = True
 
     response = client.post(
@@ -1649,16 +1652,13 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
         ),
     )
 
-    def fake_enhance(result, frames, **kwargs):
-        fallback = result.model_copy(
-            update={
-                "metadata": {"warning": "pi harness fallback: CLI unavailable or no usable scores", "used_ai": False},
-                "harness_id": "pi_agent",
-            }
-        )
-        return fallback, False
+    from src.ai_engines.messages import make_failure
+    from src.ai_scoring import ScoringOutcome
 
-    monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+    def fake_enhance(engine, result, frames, **kwargs):
+        return ScoringOutcome(result, False, make_failure("engine_error", "chatgpt"), 0, 1)
+
+    monkeypatch.setattr("src.api.analysis_service.enhance_clips", fake_enhance)
     api.projects[project_id]["cloud_ai_consent"] = True
 
     response = client.post(
@@ -1674,8 +1674,8 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
     assert body["effective_harness"] == "manual"
     assert body["clips"][0]["overall_score"] == 8
     assert body["metadata"]["used_ai"] is False
-    assert "DJI_0001.MP4" in body["metadata"]["warning"]
-    assert "file-1" in body["metadata"]["warning"]
+    assert body["metadata"]["failure"]["kind"] == "engine_error"
+    assert body["metadata"]["clips_left"] == 1
     assert api.projects[project_id]["harness_id"] == "manual"
     assert api.projects[project_id]["selected_harness"] == "pi_agent"
 
@@ -1685,6 +1685,100 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
     assert rederived.json()["harness_id"] == "manual"
     assert rederived.json()["selected_harness"] == "pi_agent"
     assert rederived.json()["effective_harness"] == "manual"
+
+
+def _prepare_batched_ai_project(monkeypatch, tmp_path):
+    api.projects.clear()
+    client, project_id, _ = create_folder_project_with_video(tmp_path, filename="DJI_0001.MP4")
+    project = api.projects[project_id]
+    project["cloud_ai_consent"] = True
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **_kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda _path: [])
+
+    saved_samples = []
+
+    def extract(**kwargs):
+        frames_dir = Path(kwargs["frames_dir"])
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        samples = []
+        for index in range(6):
+            path = frames_dir / f"frame-{index}.jpg"
+            path.write_bytes(f"frame-{index}".encode())
+            sample = FrameSample(timestamp=index * 10 + 1, frame_path=str(path))
+            samples.append(sample)
+            saved_samples.append(sample)
+        return samples
+
+    monkeypatch.setattr(api, "extract_frames", extract)
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda _samples: [
+        scored_frame(sample.timestamp).model_copy(update={"frame_path": sample.frame_path})
+        for sample in saved_samples
+    ])
+
+    def assemble(file_id, file_name, **_kwargs):
+        clips = [ClipSuggestion(
+            clip_id=f"clip-{index}", file_id=file_id, file_name=file_name,
+            start_sec=index * 10, end_sec=index * 10 + 3, duration_sec=3,
+            smoothness_score=8, visual_interest_score=0, overall_score=8,
+            ai_reason="Stable 8.0/10",
+        ) for index in range(6)]
+        return AssemblyResult(
+            clips=clips,
+            sequence=TimelineSequence(total_duration_sec=18, clips=[clip.clip_id for clip in clips]),
+        )
+
+    monkeypatch.setattr(api, "assemble_smooth_clips", assemble)
+    return client, project_id
+
+
+def test_analyze_records_ai_failure_and_reopen(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    bin_path, _log = fake_engine(tmp_path / "initial", scenario="usage_limit")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
+
+    response = client.post(f"/projects/{project_id}/analyze", json={
+        "project_id": project_id, "harness_id": "pi_agent", "preferences": {},
+    })
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metadata"]["per_video"][0]["failure"]["kind"] == "usage_limit"
+    assert body["effective_harness"] == "manual"
+    reopened = client.post("/projects/from-folder", json={
+        "folder_path": api.projects[project_id]["project_folder"],
+    })
+    assert reopened.status_code == 200
+    assert reopened.json()["metadata"] == body["metadata"]
+
+
+def test_ai_scoring_resume_scores_only_uncached_clips(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    first_bin, first_log = fake_engine(tmp_path / "initial", scenario="ok,usage_limit")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(first_bin), "openai-codex", "fake"))
+    response = client.post(f"/projects/{project_id}/analyze", json={
+        "project_id": project_id, "harness_id": "pi_agent", "preferences": {},
+    })
+    assert response.status_code == 200
+    assert first_log.exists(), response.json().get("metadata")
+    assert len(first_log.read_text().splitlines()) == 2
+
+    resume_bin, resume_log = fake_engine(tmp_path / "resume", scenario="ok")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(resume_bin), "openai-codex", "fake"))
+
+    def unexpected(**_kwargs):
+        raise AssertionError("resume must use saved analysis data")
+
+    monkeypatch.setattr(api, "run_vidstabdetect", unexpected)
+    monkeypatch.setattr(api, "extract_frames", unexpected)
+    resumed = client.post(f"/projects/{project_id}/ai-scoring/resume")
+
+    assert resumed.status_code == 200
+    assert resumed.json()["effective_harness"] == "pi_agent"
+    assert resumed.json()["metadata"]["clips_left"] == 0
+    records = [json.loads(line) for line in resume_log.read_text().splitlines()]
+    assert len(records) == 1
+    assert len(records[0]["opened"]) == 1
+    assert any("clip-1-frame-1.jpg" in arg for arg in records[0]["argv"])
 
 
 def test_rederive_clips_changes_effective_harness_without_changing_selected(monkeypatch, tmp_path):

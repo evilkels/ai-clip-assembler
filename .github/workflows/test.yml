@@ -7,6 +7,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Lets update-linux-baselines.yml re-run the gate after it pushes.
+  workflow_dispatch:
 
 concurrency:
   group: tests-${{ github.ref }}

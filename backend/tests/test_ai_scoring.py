@@ -24,19 +24,6 @@ class RecordingEngine:
         )
 
 
-def _reply(request, omit=None):
-    count = len(request.text.splitlines()) // 2
-    return AiReply(
-        provider="chatgpt",
-        data={"scores": [
-            {"k": i, "visual_interest": 8, "reason": "clear subject"}
-            for i in range(1, count + 1) if i != omit
-        ]},
-        raw_text="",
-        elapsed_sec=0.1,
-    )
-
-
 def _fixtures(tmp_path, count=12):
     clips, frames = [], []
     for index in range(count):
@@ -81,20 +68,49 @@ def test_twelve_clips_are_scored_in_three_batched_requests(tmp_path):
 
 
 def test_missing_score_is_retried_in_the_next_request(tmp_path):
-    result, frames = _fixtures(tmp_path, 6)
+    result, frames = _fixtures(tmp_path, 7)
 
     class MissingOnceEngine(RecordingEngine):
         def run(self, request):
             self.requests.append(request)
-            return _reply(request, omit=3 if len(self.requests) == 1 else None)
+            replies = [
+                {"scores": [
+                    {"k": 1, "visual_interest": 1, "reason": "clip one"},
+                    {"k": 2, "visual_interest": 2, "reason": "clip two"},
+                    {"k": 4, "visual_interest": 4, "reason": "clip four"},
+                    {"k": 5, "visual_interest": 5, "reason": "clip five"},
+                ]},
+                {"scores": [
+                    {"k": 1, "visual_interest": 3, "reason": "clip three"},
+                    {"k": 2, "visual_interest": 6, "reason": "clip six"},
+                    {"k": 3, "visual_interest": 7, "reason": "clip seven"},
+                ]},
+            ]
+            return AiReply(
+                provider="chatgpt", data=replies[len(self.requests) - 1], raw_text="", elapsed_sec=0.1
+            )
 
     engine = MissingOnceEngine()
     outcome = enhance_clips(engine, result, frames, samples_dir=tmp_path)
 
     assert outcome.used_ai is True
     assert len(engine.requests) == 2
-    assert "1 → DJI_0002.MP4" in engine.requests[1].text
-    assert "1 → DJI_0002.MP4" not in engine.requests[0].text
+    assert engine.requests[0].image_names == [f"clip-{index}-frame-1.jpg" for index in range(1, 6)]
+    assert [line for line in engine.requests[0].text.splitlines() if "→" in line] == [
+        f"{index} → DJI_{index - 1:04}.MP4 {((index - 1) * 10):.1f}–{((index - 1) * 10 + 4):.1f} s"
+        for index in range(1, 6)
+    ]
+    assert engine.requests[1].image_names == [
+        "clip-1-frame-1.jpg", "clip-2-frame-1.jpg", "clip-3-frame-1.jpg"
+    ]
+    assert [line for line in engine.requests[1].text.splitlines() if "→" in line] == [
+        "1 → DJI_0002.MP4 20.0–24.0 s",
+        "2 → DJI_0005.MP4 50.0–54.0 s",
+        "3 → DJI_0006.MP4 60.0–64.0 s",
+    ]
+    assert {clip.clip_id: clip.visual_interest_score for clip in outcome.result.clips} == {
+        f"clip-{index}": index + 1 for index in range(7)
+    }
 
 
 def test_second_batch_failure_keeps_first_batch_cached_and_manual(tmp_path):
@@ -105,7 +121,15 @@ def test_second_batch_failure_keeps_first_batch_cached_and_manual(tmp_path):
             self.requests.append(request)
             if len(self.requests) == 2:
                 return make_failure("usage_limit", "chatgpt")
-            return _reply(request)
+            return AiReply(
+                provider="chatgpt",
+                data={"scores": [
+                    {"k": index, "visual_interest": 8, "reason": "clear subject"}
+                    for index in range(1, 6)
+                ]},
+                raw_text="",
+                elapsed_sec=0.1,
+            )
 
     engine = FailingSecondEngine()
     cache = tmp_path / "cache"

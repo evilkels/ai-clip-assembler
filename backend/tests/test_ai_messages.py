@@ -36,8 +36,8 @@ def test_each_failure_has_provider_specific_copy_and_default_action(kind, provid
 
     assert failure.message
     assert failure.action == EXPECTED_ACTIONS[kind]
-    display_name = {"claude": "Claude", "chatgpt": "Codex" if kind in {"not_installed", "incompatible_version", "engine_error"} else "ChatGPT"}[provider]
-    assert display_name in failure.message or kind in {"not_installed", "incompatible_version", "ai_not_connected", "ai_off_for_project"}
+    display_name = {"claude": "Claude Code" if kind in {"not_installed", "incompatible_version", "engine_error"} else "Claude", "chatgpt": "Codex" if kind in {"not_installed", "incompatible_version", "engine_error"} else "ChatGPT"}[provider]
+    assert display_name in failure.message or kind in {"ai_not_connected", "ai_off_for_project"}
     assert not any(word in failure.message.lower() for word in ["harness", "pi", "consent", "model"])
 
 

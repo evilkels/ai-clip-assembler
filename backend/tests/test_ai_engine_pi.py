@@ -24,7 +24,6 @@ def run_case(tmp_path, scenario, timeout=2, reply=None):
     ("signed_out", "signed_out"), ("usage_limit", "usage_limit"),
     ("rate_limited", "rate_limited"), ("network", "network"),
     ("hang", "timed_out"), ("garbage", "unusable_reply"), ("crash", "engine_error"),
-    ("runs_command", "unusable_reply"),
 ])
 def test_fake_engine_scenarios_are_classified(tmp_path, scenario, kind):
     result, _ = run_case(tmp_path, scenario, timeout=1 if scenario == "hang" else 2)

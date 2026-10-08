@@ -19,7 +19,9 @@ def test_analysis_and_review_send_only_staged_jpegs(monkeypatch, tmp_path):
     folder_name = f"secret-folder-{uuid.uuid4().hex}"
     project_folder = tmp_path / folder_name
     project_folder.mkdir()
-    for filename in ("DJI_0001.MP4", "DJI_0002.MOV"):
+    video_names = ("DJI_0001.MP4", "DJI_0002.MOV")
+    frame_timestamps = (1.0, 2.0)
+    for filename in video_names:
         (project_folder / filename).write_bytes(b"source video")
     client = TestClient(api.app)
     project_id = client.post(
@@ -33,7 +35,7 @@ def test_analysis_and_review_send_only_staged_jpegs(monkeypatch, tmp_path):
     def extract_frames(*, frames_dir, file_id, **_kwargs):
         frames_dir.mkdir(parents=True, exist_ok=True)
         samples = []
-        for timestamp in (1.0, 2.0):
+        for timestamp in frame_timestamps:
             path = frames_dir / f"{file_id}_{int(timestamp * 1000):06d}.jpg"
             Image.new("RGB", (2, 2), color="blue").save(path, format="JPEG")
             samples.append(FrameSample(timestamp=timestamp, frame_path=str(path), scene_id=1))
@@ -82,19 +84,28 @@ def test_analysis_and_review_send_only_staged_jpegs(monkeypatch, tmp_path):
     assert review.status_code == 200, review.text
 
     calls = [json.loads(line) for line in log_path.read_text().splitlines()]
-    assert any(any(re.fullmatch(r"@clip-\d-frame-\d\.jpg", arg) for arg in call["argv"]) for call in calls)
-    review_calls = [
-        call for call in calls
-        if any(re.fullmatch(r"@frame-\d{2}\.jpg", arg) for arg in call["argv"])
-    ]
-    assert len(review_calls) == 1
+    scoring_names = {
+        f"clip-1-frame-{index}.jpg" for index in range(1, len(frame_timestamps) + 1)
+    }
+    review_names = {
+        f"frame-{index:02d}.jpg"
+        for index in range(1, len(video_names) * len(frame_timestamps) + 1)
+    }
+    expected_by_call = []
+    for call in calls:
+        if any(re.fullmatch(r"@clip-\d-frame-\d\.jpg", arg) for arg in call["argv"]):
+            expected_by_call.append(scoring_names)
+        else:
+            expected_by_call.append(review_names)
+    assert expected_by_call
 
     forbidden_env_prefixes = ("PI_", "OPENAI_", "ANTHROPIC_", "CLAUDE_", "CODEX_")
-    for call in calls:
+    for call, expected_names in zip(calls, expected_by_call):
         cwd = Path(call["cwd"])
-        expected_names = set(call["cwd_listing"])
-        assert expected_names
-        assert all(re.fullmatch(r"(?:frame-\d{2}|clip-\d-frame-\d)\.jpg", name) for name in expected_names)
+        attachments = {arg[1:] for arg in call["argv"] if arg.startswith("@")}
+        assert set(call["cwd_listing"]) == expected_names
+        assert attachments == expected_names
+        assert {Path(path).name for path in call["opened"]} == expected_names
         assert set(call["opened"]) == {str(cwd / name) for name in expected_names}
         assert cwd.name.startswith("aca-ai-")
         assert not cwd.exists()

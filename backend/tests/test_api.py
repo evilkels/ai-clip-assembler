@@ -2855,17 +2855,21 @@ def test_review_turn_uses_consented_agent_for_manual_selected_harness(monkeypatc
     client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
     api._proposal_store = api.ProposalStore()
     api.projects[project_id]["cloud_ai_consent"] = True
-
-    def consented_agent(_context):
-        return {"message": "The review agent is ready.", "operations": [], "versions": []}
-
-    monkeypatch.setattr(api, "_review_agent", consented_agent)
+    api.projects[project_id]["selected_harness"] = "manual"
+    reply = '{"message": "The review agent is ready.", "operations": [], "versions": []}'
+    bin_path, log_path = fake_engine(tmp_path / "fake", reply=reply)
+    monkeypatch.setattr(
+        api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake")
+    )
+    monkeypatch.setattr(api, "_review_agent", api._DEFAULT_ENGINE_AGENT)
 
     turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
 
     assert turn.status_code == 200
+    assert api.projects[project_id]["selected_harness"] == "manual"
     assert turn.json()["message"] == "The review agent is ready."
     assert turn.json()["proposal"] is None
+    assert len(log_path.read_text().splitlines()) == 1
 
 
 def test_review_turn_requires_consent_for_both_surfaces(monkeypatch, tmp_path):

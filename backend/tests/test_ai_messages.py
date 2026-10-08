@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from src.ai_engines.messages import default_action, format_failure, make_failure
+from src.ai_engines.messages import format_failure, make_failure
 from src.ai_engines.types import AiFailure
 
 
@@ -13,6 +13,20 @@ KINDS = [
     "rate_limited", "timed_out", "network", "unusable_reply", "engine_error",
     "cancelled", "ai_not_connected", "ai_off_for_project",
 ]
+EXPECTED_ACTIONS = {
+    "not_installed": "open_providers",
+    "incompatible_version": "open_providers",
+    "signed_out": "sign_in",
+    "usage_limit": "wait",
+    "rate_limited": "retry",
+    "timed_out": "retry",
+    "network": "retry",
+    "unusable_reply": "retry",
+    "engine_error": "retry",
+    "cancelled": "none",
+    "ai_not_connected": "open_providers",
+    "ai_off_for_project": "open_providers",
+}
 
 
 @pytest.mark.parametrize("provider", ["claude", "chatgpt"])
@@ -21,7 +35,7 @@ def test_each_failure_has_provider_specific_copy_and_default_action(kind, provid
     failure = make_failure(kind, provider, now=datetime(2026, 1, 1, tzinfo=timezone.utc), tz=timezone.utc)
 
     assert failure.message
-    assert failure.action == default_action(kind)
+    assert failure.action == EXPECTED_ACTIONS[kind]
     display_name = {"claude": "Claude", "chatgpt": "Codex" if kind in {"not_installed", "incompatible_version", "engine_error"} else "ChatGPT"}[provider]
     assert display_name in failure.message or kind in {"not_installed", "incompatible_version", "ai_not_connected", "ai_off_for_project"}
     assert not any(word in failure.message.lower() for word in ["harness", "pi", "consent", "model"])

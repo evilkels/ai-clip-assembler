@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
@@ -30,7 +29,9 @@ class AiFailure(BaseModel):
         if value is None:
             return None
         value = " ".join(value.strip().split())
-        return re.sub(r"(?<!\S)/(?:[^/\s]+/)+([^/\s]+)", r"\1", value)[:500]
+        from .payload import strip_paths
+
+        return strip_paths(value)[:500]
 
 
 class AiReply(BaseModel):

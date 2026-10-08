@@ -115,12 +115,12 @@ of Frame Samples that pass the smoothness and turn-rate gates (1 s each at
 
 | Code | Max s | Clips 0813 / 0814 / 0815 / 0816 | Total | Median s | p90 s | Steady s | Covered s | Short s / 60 | Medium s / 240 | Long s / 480 | Recommended |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| main before Phase 2 | 10 | | | | | | | | | | |
-| after Phase 3 | 10 | | | | | | | | | | |
-| after Phase 3 | 15 | | | | | | | | | | |
-| after Phase 3 | 20 | | | | | | | | | | |
-| after Phase 3 | 30 | | | | | | | | | | |
-| after Phase 4 (adopted default) | | | | | | | | | | | |
+| main before Phase 2 | 10 | 1 / 1 / 1 / 2 | 5 | 3.0 | 3.0 | 192 | 15.0 | 15.0 | 12.0 | 9.0 | short |
+| after Phase 3 | 10 | 4 / 8 / 4 / 4 | 20 | 10.0 | 10.0 | 192 | 171.0 | 60.0 | 130.0 | 103.0 | medium |
+| after Phase 3 | 15 | 3 / 7 / 4 / 4 | 18 | 13.0 | 15.0 | 192 | 181.0 | 58.0 | 136.0 | 136.0 | medium |
+| after Phase 3 | 20 | 2 / 4 / 4 / 3 | 13 | 20.0 | 20.0 | 192 | 185.0 | 56.0 | 130.0 | 164.0 | long |
+| after Phase 3 | 30 | 2 / 4 / 3 / 2 | 11 | 16.0 | 30.0 | 192 | 184.0 | 47.0 | 99.0 | 147.0 | long |
+| after Phase 4 (adopted default) | 20 | 2 / 4 / 4 / 3 | 13 | 20.0 | 20.0 | 192 | 185.0 | 56.0 | 130.0 | 164.0 | long |
 
 ### Measurements (Detox hike)
 
@@ -129,8 +129,8 @@ Same script and columns; the per-file column lists the 13 counts in
 
 | Code | Max s | Clips per file | Total | Median s | p90 s | Steady s | Covered s | Short s / 60 | Medium s / 240 | Long s / 480 | Recommended |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| main before Phase 2 | 10 | | | | | | | | | | |
-| after Phase 4 (adopted default) | | | | | | | | | | | |
+| main before Phase 2 | 10 | 1 / 1 / 1 / 1 / 2 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 | 14 | 3.0 | 4.0 | 483 | 44.0 | 44.0 | 13.0 | 10.0 | short |
+| after Phase 4 (adopted default) | 20 | 2 / 7 / 2 / 4 / 3 / 6 / 1 / 2 / 3 / 1 / 1 / 1 / 1 | 34 | 15.0 | 20.0 | 483 | 463.0 | 59.0 | 240.0 | 333.0 | long |
 
 ### Out of scope
 
@@ -280,6 +280,8 @@ Same script and columns; the per-file column lists the 13 counts in
     to name the adopted value.
   - Write the adopted value and the D6 comparison (count at 20 s versus
     count at 10 s) in a sub-bullet here.
+  - Adopted **20 s**: Estepona gives 13 candidates at 20 s against 20 at
+    10 s, and 13 is not below half of 20 (10).
 - [ ] 4.3 Record the adopted rows and refresh the index. Done when the last
   row of both tables is filled, `../USER_GUIDE.md`'s "How clips are found" text names
   the new default, and `python3 scripts/plans.py sync` leaves

@@ -41,6 +41,13 @@ background.
 
 Analysis time scales with footage and harness; Pi makes a model call per clip.
 
+**How clips are found** sets the rules for Candidate Clips: the shortest and
+longest clip (3 s and 20 s by default), the smoothness and turn-rate limits,
+and how many clips each Scene and each video may keep. A long steady stretch
+gives several back-to-back clips, up to four per started minute of its Scene.
+A project analyzed with an older version keeps the longest clip it was
+analyzed with until you regenerate its clips.
+
 ### 2. Review
 
 ![Review screen](images/review.png)

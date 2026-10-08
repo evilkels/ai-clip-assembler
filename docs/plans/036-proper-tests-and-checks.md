@@ -50,24 +50,24 @@ Decisions:
 
 ## Phase 1: One gate, everywhere
 
-- [ ] 1.1 Add the versioned pre-commit hook as decided. Done when a commit with
+- [x] 1.1 Add the versioned pre-commit hook as decided. Done when a commit with
   an ESLint error in a staged `.tsx` fails and prints the error, a docs-only
   commit prints nothing, and `.git/hooks/pre-commit` no longer runs (because
-  `core.hooksPath` points elsewhere).
-- [ ] 1.2 Turn the three React compiler rules on with the per-file override
+  `core.hooksPath` points elsewhere). (PR #94)
+- [x] 1.2 Turn the three React compiler rules on with the per-file override
   list. Done when `npm run lint` passes and a new file that writes a ref during
-  render fails lint.
-- [ ] 1.3 Make `CONTRIBUTING.md`'s command list match the gate in
+  render fails lint. (PR #94)
+- [x] 1.3 Make `CONTRIBUTING.md`'s command list match the gate in
   `.github/workflows/test.yml`, and drop the stale
   `--ignore=tests/test_codex_cli_harness.py` from `test:backend`. Done when
-  every gate command appears in both places.
-- [ ] 1.4 Add `B` (bugbear) to Ruff's `select` and fix what it finds; if it
+  every gate command appears in both places. (PR #94)
+- [x] 1.4 Add `B` (bugbear) to Ruff's `select` and fix what it finds; if it
   reports more than 40 findings, stop and report the count by rule. Done when
-  `npm run lint:backend` passes.
-- [ ] 1.5 Derive the Settings rail version label from the app version the
+  `npm run lint:backend` passes. (PR #94)
+- [x] 1.5 Derive the Settings rail version label from the app version the
   update check already receives, and remove that manual step from
   `docs/UPDATING.md`. Done when `SettingsModal.tsx` contains no version
-  literal.
+  literal. (PR #94)
 
 ## Phase 2: Tests that can fail
 
@@ -140,7 +140,7 @@ Decisions:
 
 ## Phase 4: Review standards
 
-- [ ] 4.1 Add `CODING_STANDARDS.md` at the root. The `code-review` skill reads
+- [x] 4.1 Add `CODING_STANDARDS.md` at the root. The `code-review` skill reads
   it by name, on top of its built-in smell baseline. It holds judgement rules
   only:
   - a fix that guards one async path against a stale project or session
@@ -149,7 +149,7 @@ Decisions:
     regression test is shown red on the pre-fix code, with the PR saying how;
   - an assertion proves the behaviour the test name claims (visible is not
     playing, scrolled or saved);
-  - a wall-clock bound appears only where the deadline itself is the contract.
+  - a wall-clock bound appears only where the deadline itself is the contract. (PR #94)
 
   Done when the file exists and holds no rule that a tool already enforces.
 

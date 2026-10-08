@@ -136,9 +136,9 @@ def rewrite_links(content: str, source: Path, destination: Path,
         if parts.scheme or parts.netloc or not parts.path or parts.path.startswith("/"):
             return match.group()
         old_target = (source.parent / unquote(parts.path)).resolve()
-        if old_target not in moves:
+        if old_target not in moves and source == destination:
             return match.group()
-        new_path = os.path.relpath(moves[old_target], destination.parent)
+        new_path = os.path.relpath(moves.get(old_target, old_target), destination.parent)
         new_url = urlunsplit(("", "", quote(new_path, safe="/.-_~()"), parts.query, parts.fragment))
         if angled:
             new_url = f"<{new_url}>"

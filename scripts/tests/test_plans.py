@@ -134,6 +134,18 @@ class PlansContractTest(unittest.TestCase):
         self.assertEqual(untracked.read_text(), "[A](docs/plans/a.md)\n")
         self.assertEqual(self.run_plans("check").returncode, 0)
 
+    def test_sync_rebases_links_inside_a_moved_plan(self) -> None:
+        self.write("docs/plans/a.md", "# A\n- [x] 1.1 Done\n[C](c.md#tasks)\n[Guide](../guide.md)\n"
+                   "[Web](https://example.com/c.md)\n[Anchor](#local)\n")
+        self.write("docs/plans/c.md", "# C\n- [ ] 1.1 Work\n")
+        self.write("docs/guide.md", "# Guide\n")
+        self.git("add", "docs")
+        result = self.run_plans("sync")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / "docs/plans/done/a.md").read_text(),
+                         "# A\n- [x] 1.1 Done\n[C](../c.md#tasks)\n[Guide](../../guide.md)\n"
+                         "[Web](https://example.com/c.md)\n[Anchor](#local)\n")
+
     def test_sync_generates_ordered_index_and_preserves_surrounding_text(self) -> None:
         self.write("docs/plans/z-human.md", "# 009: Human\n- [x] 1.1 Done\n- [ ] H1 Review\n")
         self.write("docs/plans/b-progress.md", "# Progress B\n- [x] 1.1 Done\n- [ ] 1.2 Finish B\n- [ ] H1 Review\n")

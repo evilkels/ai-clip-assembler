@@ -5,15 +5,13 @@ import pytest
 from src.runtime_descriptor import write_runtime_descriptor
 
 
-def test_read_message_parses_content_length_frame():
+def test_read_message_parses_multiple_json_lines_and_clean_eof():
     from src import mcp_bridge
 
-    payload = b'{"jsonrpc":"2.0","id":7,"method":"tools/list"}'
     stream = io.BytesIO(
-        b"Content-Length: "
-        + str(len(payload)).encode("ascii")
-        + b"\r\n\r\n"
-        + payload
+        b'{"jsonrpc":"2.0","id":7,"method":"tools/list"}\n'
+        b'{"jsonrpc":"2.0","id":8,"method":"notifications/initialized"}\n'
+        b'{"jsonrpc":"2.0","id":9,"result":{"label":"caf\xc3\xa9"}}\n'
     )
 
     assert mcp_bridge.read_message(stream) == {
@@ -21,22 +19,29 @@ def test_read_message_parses_content_length_frame():
         "id": 7,
         "method": "tools/list",
     }
+    assert mcp_bridge.read_message(stream) == {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "notifications/initialized",
+    }
+    assert mcp_bridge.read_message(stream) == {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "result": {"label": "café"},
+    }
+    assert mcp_bridge.read_message(stream) is None
 
 
-def test_write_message_emits_content_length_frame():
+def test_write_message_emits_multiple_utf8_json_lines():
     from src import mcp_bridge
 
     stream = io.BytesIO()
-    message = {"jsonrpc": "2.0", "id": 9, "result": {"ok": True}}
+    mcp_bridge.write_message(stream, {"jsonrpc": "2.0", "id": 9, "result": {"ok": True}})
+    mcp_bridge.write_message(stream, {"jsonrpc": "2.0", "id": 10, "result": {"label": "café"}})
 
-    mcp_bridge.write_message(stream, message)
-
-    payload = b'{"jsonrpc":"2.0","id":9,"result":{"ok":true}}'
     assert stream.getvalue() == (
-        b"Content-Length: "
-        + str(len(payload)).encode("ascii")
-        + b"\r\n\r\n"
-        + payload
+        b'{"jsonrpc":"2.0","id":9,"result":{"ok":true}}\n'
+        b'{"jsonrpc":"2.0","id":10,"result":{"label":"caf\xc3\xa9"}}\n'
     )
 
 

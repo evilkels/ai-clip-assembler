@@ -35,8 +35,11 @@ ai-clip-backend --mcp-stdio --runtime-file /absolute/path/runtime.json
 Claude Desktop and Codex spawn this command from their MCP config. The bridge is
 stateless: on every tool call it re-reads `runtime.json`, forwards JSON-RPC to
 `POST http://127.0.0.1:<port>/mcp`, and injects the active `project_id` when the
-client omits it. If the app is closed, the runtime file is stale, or no project
-is open, the bridge returns a model-readable MCP error instead of crashing.
+client omits it. Stdin and stdout use one UTF-8 JSON-RPC message per line. The
+bridge accepts consecutive messages until clean EOF and terminates every
+response with a newline. If the app is closed, the runtime file is stale, or no
+project is open, the bridge returns a model-readable MCP error instead of
+crashing.
 
 ## Tools
 

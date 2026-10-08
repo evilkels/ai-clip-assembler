@@ -26,8 +26,9 @@ JSON was rejected because it creates stale state and a competing mutation path.
 `ai-clip-backend --mcp-stdio --runtime-file <abs>` reuses the signed backend
 binary. It handles initialize/tools list/call, rereads runtime state each call,
 and injects active `project_id` when omitted. Missing app/runtime/project returns
-model-friendly MCP errors, never crashes. Confirm framing against the current
-MCP spec for both clients before implementation.
+model-friendly MCP errors, never crashes. MCP stdio framing is newline-delimited
+UTF-8 JSON: one JSON-RPC message per line, with consecutive messages accepted
+until EOF.
 
 ### Runtime and active project
 

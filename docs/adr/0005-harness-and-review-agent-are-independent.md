@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-03).
+Accepted (2026-09-03). The consent scope is superseded by [ADR 0007](0007-ai-access-is-granted-when-connecting.md) and the Pi route by [ADR 0008](0008-ai-runs-through-the-editors-own-provider-program.md) (2026-10-08); scoring and the Review Agent stay independent.
 
 ## Context
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. The per-project opt-in is superseded by [ADR 0007](0007-ai-access-is-granted-when-connecting.md) (2026-10-08); local-first processing by default still stands.
 
 ## Context
 

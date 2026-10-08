@@ -1,6 +1,6 @@
 # Plans
 
-Single home for written plans. Each row summarises; the plan file holds the
+Single home for written plans; the order they ship in is [`ROADMAP.md`](../ROADMAP.md). Each row summarises; the plan file holds the
 detail, evidence and citations.
 
 | | Meaning |

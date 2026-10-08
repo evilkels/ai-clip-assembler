@@ -1,7 +1,7 @@
 # AGENTS.md — AI Clip Assembler
 
 Local-first desktop video editor: Electron + React in `frontend/`, FastAPI +
-Python in `backend/`. Vocabulary: `GLOSSARY.md`. System design:
+Python in `backend/`. Order of work: `docs/ROADMAP.md`. Vocabulary: `GLOSSARY.md`. System design:
 `docs/ARCHITECTURE.md`. Harness contract: `docs/HARNESS_SPEC.md`. Docs map:
 `docs/README.md`.
 

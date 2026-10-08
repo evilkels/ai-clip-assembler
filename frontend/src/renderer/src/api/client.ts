@@ -145,7 +145,7 @@ export interface FolderProjectResult {
   selected_harness?: string;
   effective_harness?: string | null;
   generation_stats?: ClipGenerationStats | null;
-  metadata?: AnalysisResult['metadata'];
+  metadata?: AnalysisResult['metadata'] | null;
 }
 
 export async function createProjectFromFolder(folderPath: string): Promise<FolderProjectResult> {

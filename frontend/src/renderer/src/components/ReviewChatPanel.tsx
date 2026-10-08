@@ -48,6 +48,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
     runningScript,
     error,
     send,
+    retryKickoff,
     runScript,
     resolveProposal,
     staleProposalIds,
@@ -177,10 +178,13 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
           const retryText = failure && message.reply_to_message_id
             ? messages.find((item) => item.message_id === message.reply_to_message_id)?.text
             : undefined;
+          const retryAvailable = message.reply_to_message_id ? Boolean(retryText) : true;
           const failureAction = failure?.action === 'open_providers' || failure?.action === 'sign_in'
             ? { label: 'Open AI settings', run: () => openSettings('ai') }
             : failure?.action === 'retry' || failure?.action === 'wait'
-              ? { label: 'Try again', run: () => { if (retryText) void send(retryText); } }
+              ? retryAvailable
+                ? { label: 'Try again', run: () => { if (retryText) void send(retryText); else void retryKickoff(); } }
+                : null
               : null;
           return (
             <article
@@ -200,7 +204,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
                   type="button"
                   className="btn subtle chat-failure-action"
                   onClick={failureAction.run}
-                  disabled={busy || (failureAction.label === 'Try again' && !retryText)}
+                  disabled={busy}
                 >
                   {failureAction.label}
                 </button>

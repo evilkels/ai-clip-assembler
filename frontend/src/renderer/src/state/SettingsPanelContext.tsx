@@ -1,17 +1,21 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { SettingsModal, type SettingsPanel } from '../components/SettingsModal';
 
 const SettingsPanelContext = createContext<((panel: SettingsPanel) => void) | null>(null);
 
 export function SettingsPanelProvider({ children }: { children: ReactNode }) {
-  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel | null>(null);
-  const openSettings = useCallback((panel: SettingsPanel) => setSettingsPanel(panel), []);
+  const [request, setRequest] = useState<{ panel: SettingsPanel; id: number } | null>(null);
+  const requestId = useRef(0);
+  const openSettings = useCallback((panel: SettingsPanel) => {
+    requestId.current += 1;
+    setRequest({ panel, id: requestId.current });
+  }, []);
 
   return (
     <SettingsPanelContext.Provider value={openSettings}>
       {children}
-      {settingsPanel && (
-        <SettingsModal initialPanel={settingsPanel} onClose={() => setSettingsPanel(null)} />
+      {request && (
+        <SettingsModal key={request.id} initialPanel={request.panel} onClose={() => setRequest(null)} />
       )}
     </SettingsPanelContext.Provider>
   );

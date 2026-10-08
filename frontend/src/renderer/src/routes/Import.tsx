@@ -99,6 +99,8 @@ export function ImportPage() {
     setCloudAiConsent,
     applyAnalysisResult,
     harnessMetadata,
+    resumingAiScoring,
+    resumeError,
     resumeAiScoring,
     rederiveClips,
     openProjectFolder,
@@ -120,7 +122,6 @@ export function ImportPage() {
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [resumingScoring, setResumingScoring] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; fileName: string } | null>(null);
   const [sort, setSort] = useState<SourceVideoSort>({
     key: null,
@@ -591,19 +592,34 @@ export function ImportPage() {
                   <button
                     type="button"
                     className="btn subtle"
-                    disabled={resumingScoring}
-                    onClick={() => {
-                      setResumingScoring(true);
-                      void resumeAiScoring().finally(() => setResumingScoring(false));
-                    }}
+                    disabled={resumingAiScoring}
+                    onClick={() => void resumeAiScoring()}
                   >
-                    {resumingScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
+                    {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
                   </button>
                 ) : null}
+                {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
               </>
             ) : null}
           </div>
         )}
+
+        {!isComplete && harnessMetadata?.failure ? (
+          <div className="import-status-complete">
+            <p className="import-status-warning">{harnessMetadata.failure.message}</p>
+            {(harnessMetadata.clips_left ?? 0) > 0 ? (
+              <button
+                type="button"
+                className="btn subtle"
+                disabled={resumingAiScoring}
+                onClick={() => void resumeAiScoring()}
+              >
+                {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
+              </button>
+            ) : null}
+            {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
+          </div>
+        ) : null}
 
         {isCancelled && (
           <p className="import-status-cancelled">

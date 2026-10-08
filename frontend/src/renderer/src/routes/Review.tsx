@@ -38,6 +38,8 @@ export function ReviewPage() {
     exclude,
     generationStats,
     harnessMetadata,
+    resumingAiScoring,
+    resumeError,
     resumeAiScoring,
     include,
     loading,
@@ -52,7 +54,6 @@ export function ReviewPage() {
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   const conversation = useReviewConversation(projectId);
   const [chatWidth, resizeChat] = usePanelWidth('reviewChatWidth', 320, 240, 560);
-  const [resumingScoring, setResumingScoring] = useState(false);
   const availableClipIds = useMemo(
     () => new Set(clips.map((clip) => clip.clip_id)),
     [clips],
@@ -227,15 +228,13 @@ export function ReviewPage() {
                     <button
                       type="button"
                       className="btn subtle"
-                      disabled={resumingScoring}
-                      onClick={() => {
-                        setResumingScoring(true);
-                        void resumeAiScoring().finally(() => setResumingScoring(false));
-                      }}
+                      disabled={resumingAiScoring}
+                      onClick={() => void resumeAiScoring()}
                     >
-                      {resumingScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
+                      {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
                     </button>
                   ) : null}
+                  {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
                 </StatusSurface>
               </output>
             ) : null}

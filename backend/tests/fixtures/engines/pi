@@ -47,7 +47,7 @@ elif scenario in {"signed_out", "usage_limit", "rate_limited", "network"}:
 elif scenario == "crash":
     print("Segmentation fault", file=sys.stderr)
     raise SystemExit(139)
-elif scenario == "garbage" or scenario == "runs_command":
+elif scenario == "garbage":
     print("this is not json")
 else:
     reply = os.environ.get("ACA_FAKE_REPLY")

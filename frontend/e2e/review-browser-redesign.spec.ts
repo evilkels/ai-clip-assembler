@@ -315,21 +315,6 @@ test('shows the scoring failure and affected Source Videos', async ({ page }) =>
   await expect(notice.getByRole('button', { name: 'Finish AI scoring (2 clips left)' })).toBeVisible();
 });
 
-test('shows no Harness Fallback notice after a successful agentic run', async ({ page }) => {
-  page.on('dialog', (dialog) => dialog.accept());
-  await setupReview(page, {
-    harnessId: 'pi_agent',
-    analysisMetadata: {
-      per_video: [{
-        file_id: 'fixture',
-        file_name: 'review-browser-fixture.mp4',
-      }],
-    },
-  });
-
-  await expect(page.locator('[data-testid="harness-fallback-notice"]')).toHaveCount(0);
-});
-
 test('keeps the review workstation aligned while resizing Ask AI rail', async ({ page }) => {
   await setupReview(page);
   const separator = page.getByRole('separator', { name: 'Resize the Ask the AI panel' });

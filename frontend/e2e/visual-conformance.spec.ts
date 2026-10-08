@@ -518,12 +518,14 @@ async function captureScrolledReviewSnapshot(
     : page.locator('[data-review-list] > *').first();
   await firstCandidate.evaluate((element) => element.scrollIntoView({ block: 'start' }));
   await expect(firstCandidate).toBeInViewport();
-  await expect(page).toHaveScreenshot(`${fixture}-scrolled-${viewport.width}x${viewport.height}-${theme}.png`, {
+  // Only the candidates column: after scrolling, the page header's wrap point
+  // differed between CI runs, and the header is covered by the page snapshot.
+  await expect(page.locator('main.review-main')).toHaveScreenshot(`${fixture}-scrolled-${viewport.width}x${viewport.height}-${theme}.png`, {
     animations: 'disabled',
     caret: 'hide',
     scale: 'css',
     maskColor: theme === 'dark' ? '#12151a' : '#f1f2f4',
-    mask: [firstCandidate.locator('video'), page.locator('[data-testid="qa-clock"]')],
+    mask: [firstCandidate.locator('video')],
   });
 }
 

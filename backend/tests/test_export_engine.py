@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import pytest
 from fractions import Fraction
 import difflib
 from pathlib import Path
@@ -237,6 +238,97 @@ def test_generate_fcpxml_emits_retime_for_suggested_speed():
         "30000/3000s",
         "42000/3000s",
     ]
+
+
+def test_generate_fcpxml_retime_map_covers_the_clip_range():
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "file_path": "/Users/me/DJI_0001.MP4",
+            "metadata": {"duration_sec": 120, "fps": 30, "resolution": [1920, 1080]},
+        }
+    }
+    clips = [
+        {
+            "file_id": "file-1",
+            "file_name": "DJI_0001.MP4",
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+            "suggested_speed": 0.5,
+        }
+    ]
+    generated = generate_fcpxml("Retimed", clips, videos)
+    assert_valid_fcpxml(generated)
+    asset_clip = ET.fromstring(generated).find(".//asset-clip")
+    assert asset_clip is not None
+    timepoints = asset_clip.findall("./timeMap/timept")
+
+    def rational_time(value):
+        return Fraction(value[:-1])
+
+    assert rational_time(timepoints[0].attrib["time"]) == rational_time(
+        asset_clip.attrib["start"]
+    )
+    assert rational_time(timepoints[-1].attrib["time"]) == (
+        rational_time(asset_clip.attrib["start"]) + rational_time(asset_clip.attrib["duration"])
+    )
+    assert [point.attrib["value"] for point in timepoints] == ["30000/3000s", "42000/3000s"]
+
+
+def test_generate_fcpxml_clips_butt_exactly():
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "one.mov",
+            "file_path": "/tmp/one.mov",
+            "metadata": {"duration_sec": 10, "fps": 30, "resolution": [1920, 1080]},
+        }
+    }
+    clips = [
+        {
+            "file_id": "file-1",
+            "file_name": "one.mov",
+            "start_sec": 0,
+            "end_sec": 1.02,
+            "duration_sec": 1.02,
+        }
+        for _ in range(3)
+    ]
+    root = ET.fromstring(generate_fcpxml("Three clips", clips, videos))
+    asset_clips = root.findall(".//sequence/spine/asset-clip")
+    for previous, current in zip(asset_clips, asset_clips[1:]):
+        previous_end = Fraction(previous.attrib["offset"][:-1]) + Fraction(
+            previous.attrib["duration"][:-1]
+        )
+        assert Fraction(current.attrib["offset"][:-1]) == previous_end
+
+
+@pytest.mark.parametrize("fps,expected_timebase", [(47.952, "48"), (119.88, "120")])
+def test_xmeml_rate_matches_frame_counting(fps, expected_timebase):
+    videos = {
+        "file-1": {
+            "file_id": "file-1",
+            "file_name": "one.mov",
+            "file_path": "/tmp/one.mov",
+            "metadata": {"duration_sec": 10, "fps": fps, "resolution": [1920, 1080]},
+        }
+    }
+    clips = [
+        {
+            "file_id": "file-1",
+            "file_name": "one.mov",
+            "start_sec": 0,
+            "end_sec": 1,
+            "duration_sec": 1,
+        }
+    ]
+    root = ET.fromstring(generate_resolve_xml("Rate", clips, videos).split("?>", 1)[1])
+    rate = root.find("./sequence/rate")
+    assert rate is not None
+    assert rate.find("timebase").text == expected_timebase
+    assert rate.find("ntsc").text == "TRUE"
 
 
 def test_generate_fcpxml_links_media_by_absolute_file_url(tmp_path):

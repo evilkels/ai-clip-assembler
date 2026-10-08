@@ -50,11 +50,21 @@ def fps_exact(fps: float) -> Fraction:
 
 
 def fcpx_time(seconds: float, fps: float) -> str:
-    if seconds == 0:
+    frames = round(Fraction(str(seconds)) * fps_exact(fps))
+    return fcpx_frames(frames, fps)
+
+
+def fcpx_frames(frames: int, fps: float) -> str:
+    if frames == 0:
         return "0s"
     numerator, denominator = _fcpx_frame_duration_parts(fps)
-    frames = int(round(seconds * float(fps_exact(fps))))
     return f"{frames * numerator}/{denominator}s"
+
+
+def fcpx_fraction_time(seconds: Fraction) -> str:
+    if seconds.denominator == 1:
+        return f"{seconds.numerator}s"
+    return f"{seconds.numerator}/{seconds.denominator}s"
 
 
 def choose_timeline_fps(videos_by_id: Dict[str, dict]) -> float:
@@ -207,17 +217,11 @@ def generate_edl(
 
 
 def is_ntsc_rate(fps: float) -> bool:
-    return abs(fps - 29.97) < 0.02 or abs(fps - 59.94) < 0.02 or abs(fps - 23.976) < 0.02
+    return _fcpx_frame_duration_parts(fps)[0] == 1001
 
 
 def xmeml_timebase(fps: float) -> int:
-    if abs(fps - 29.97) < 0.02:
-        return 30
-    if abs(fps - 59.94) < 0.02:
-        return 60
-    if abs(fps - 23.976) < 0.02:
-        return 24
-    return int(round(fps or 30))
+    return round(fps_exact(fps))
 
 
 def append_xmeml_rate(parent: ET.Element, fps: float) -> None:
@@ -506,20 +510,23 @@ def generate_fcpxml(
     sequence = ET.SubElement(project, "sequence", sequence_attributes)
     spine = ET.SubElement(sequence, "spine")
 
-    timeline_cursor = 0.0
+    timeline_cursor = 0
     for clip in clips:
         speed = max(0.01, float(clip.get("suggested_speed", 1.0) or 1.0))
         timeline_duration = clip["duration_sec"] / speed
+        duration_frames = round(Fraction(str(timeline_duration)) * fps_exact(fps))
         source_fps = source_fps_by_id[clip["file_id"]]
+        start_time = fcpx_time(clip["start_sec"], source_fps)
+        duration_time = fcpx_frames(duration_frames, fps)
         asset_clip = ET.SubElement(
             spine,
             "asset-clip",
             {
                 "name": clip["file_name"],
                 "ref": asset_ids[clip["file_id"]],
-                "offset": fcpx_time(timeline_cursor, fps),
-                "start": fcpx_time(clip["start_sec"], source_fps),
-                "duration": fcpx_time(timeline_duration, fps),
+                "offset": fcpx_frames(timeline_cursor, fps),
+                "start": start_time,
+                "duration": duration_time,
             },
         )
         if format_by_id[clip["file_id"]] != "r1":
@@ -531,13 +538,13 @@ def generate_fcpxml(
             ET.SubElement(
                 time_map,
                 "timept",
-                {"time": "0s", "value": fcpx_time(clip["start_sec"], source_fps)},
+                {"time": start_time, "value": fcpx_time(clip["start_sec"], source_fps)},
             )
             ET.SubElement(
                 time_map,
                 "timept",
                 {
-                    "time": fcpx_time(timeline_duration, fps),
+                    "time": fcpx_fraction_time(Fraction(start_time[:-1]) + Fraction(duration_time[:-1])),
                     "value": fcpx_time(clip["end_sec"], source_fps),
                 },
             )
@@ -553,7 +560,7 @@ def generate_fcpxml(
                     "position": f"{transform['x'] * width} {transform['y'] * height}",
                 },
             )
-        timeline_cursor += timeline_duration
+        timeline_cursor += duration_frames
 
     ET.indent(fcpxml, space="  ")
     return ET.tostring(fcpxml, encoding="unicode")

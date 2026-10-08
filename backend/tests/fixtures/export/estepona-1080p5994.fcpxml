@@ -23,8 +23,8 @@
             <asset-clip name="DJI_0001.MOV" ref="a1" offset="0s" start="120120/60000s" duration="360360/60000s" audioRole="dialogue" />
             <asset-clip name="DJI_0002.MOV" ref="a2" offset="360360/60000s" start="599599/60000s" duration="719719/60000s" format="r2" audioRole="dialogue">
               <timeMap>
-                <timept time="0s" value="599599/60000s" />
-                <timept time="719719/60000s" value="959959/60000s" />
+                <timept time="599599/60000s" value="599599/60000s" />
+                <timept time="659659/30000s" value="959959/60000s" />
               </timeMap>
             </asset-clip>
             <asset-clip name="DJI_0003.MOV" ref="a3" offset="1080079/60000s" start="1260259/60000s" duration="360360/60000s" format="r2" audioRole="dialogue">

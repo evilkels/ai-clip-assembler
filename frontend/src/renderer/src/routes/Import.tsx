@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ClipGenerationPanel,
-  preferencesFromGenerationStats,
-} from '../components/ClipGenerationPanel';
+import { ClipGenerationPanel } from '../components/ClipGenerationPanel';
 import { SourceVideoBrowser } from '../components/SourceVideoBrowser';
 import { StatusSurface } from '../components/StatusSurface';
 import { WorkflowHeader } from '../components/WorkflowHeader';
@@ -20,6 +17,7 @@ import {
 } from '../api/client';
 import { usePublishGateActions, type GateActions } from '../state/StepGateContext';
 import type { ClipGenerationPreferences } from '../types/clip';
+import { preferencesFromGenerationStats } from '../lib/clipGenerationPreferences';
 import type { SourceVideoSort, SourceVideoSortKey } from '../lib/sourceVideoView';
 
 const HARNESS_HINTS: Record<string, string> = {

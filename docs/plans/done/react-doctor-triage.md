@@ -1,9 +1,12 @@
 # React Doctor Triage
 
-Status: re-triaged 2026-09-02 against v0.2.0 (`6d79c1b`) with react-doctor
-0.2.14. Every finding group below was read in the source before being
-classified. Three real defects remain (a fourth is fixed); the large majority of
-the 94 findings are false positives. Defect 4 was added 2026-09-03.
+Status: **DONE 2026-10-04.** All four defects are fixed (branch
+`feat/small-plans-batch`), and so are the further project-switch races that
+the closing reviews found in the conversation hook and `ReviewContext`. The judgment calls below stay
+architecture decisions, not open work. Originally re-triaged 2026-09-02 against
+v0.2.0 (`6d79c1b`) with react-doctor 0.2.14; every finding group was read in the
+source before being classified, and the large majority of the 94 findings are
+false positives. Defect 4 was added 2026-09-03.
 
 **Goal:** Fix the defects react-doctor actually found, and stop treating its
 score as a quality signal for this repo.
@@ -42,7 +45,13 @@ finding here blocks a build.
    retries assertions. The value of the change is the removed state mirror and
    the narrower component interface, not a bug users were hitting.
 
-2. **Timeline trim handles are a keyboard dead end.** The handles are
+2. ~~**Timeline trim handles are a keyboard dead end.**~~ **FIXED 2026-10-04.**
+   The keyboard path already existed and is now the decided one: each timeline
+   clip's focusable `Select <file>` button opens the inspector, whose `In` / `Out`
+   fields set the bounds. `timeline-playback.spec.ts` "trims a clip with the
+   keyboard alone" proves it with Tab, Enter and typing only. The drag handles
+   stay pointer-only and are now `aria-hidden`. Original finding:
+   The handles are
    non-focusable `<div>`s carrying pointer/mouse handlers with no keyboard
    equivalent (`Timeline.tsx:750-755,793-798`). Clip *selection* and *reorder*
    do have keyboard paths (`Timeline.tsx:369-405`), and mouse trimming is
@@ -53,15 +62,28 @@ finding here blocks a build.
    the existing `<div>`s — that satisfies the linter without giving keyboard
    users a trim path.
 
-3. **Project switching can render the previous project's conversation for one
-   commit.** `useReviewConversation` clears `messages`, `versionSet` and
+3. ~~**Project switching can render the previous project's conversation for one
+   commit.**~~ **FIXED 2026-10-04.** `useReviewConversation` now resets during
+   render when `projectId` changes, and the `activeProject` guard is set in a
+   `useLayoutEffect` so no late response can slip between the reset and the
+   guard. `e2e/review-project-switch.spec.ts` failed 3/3 before the fix. The
+   closing review also disproved the claim below that the async race was fully
+   guarded: a proposal Undo resolving after a switch reconciled the old
+   project's Timeline into the new one, and so did a timeline edit, a Redo, or
+   the recovery fetch after a failed edit (`ReviewContext` now reconciles a
+   snapshot only for the project that asked for it); and a message queued
+   behind a pending request was delivered into the next project (`deliver` now
+   drops it). Each has a test in the same spec that was red before its fix. Original finding:
+   `useReviewConversation` clears `messages`, `versionSet` and
    `error` inside an effect keyed on `projectId` (`useReviewConversation.ts:58-62`)
    rather than during render, so stale review data can paint briefly. The
    async race itself *is* correctly guarded by both the `alive` flag and the
    `activeProject` ref (`useReviewConversation.ts:67-83`) — this is stale UI,
    not a data-overwrite bug. Rule: `no-adjust-state-on-prop-change`.
 
-4. **The rail-collapse preference is persisted from inside a state updater.**
+4. ~~**The rail-collapse preference is persisted from inside a state updater.**~~
+   **FIXED 2026-10-04.** `toggleSidebar` derives `next` outside the updater and
+   persists it after `setSidebarCollapsed`. Original finding:
    `AppShell.toggleSidebar` writes `localStorage` inside the
    `setSidebarCollapsed` callback (`AppShell.tsx:52-62`). Rules:
    `no-impure-state-updater` (error), `no-side-effect-in-state-updater-function`.
@@ -111,19 +133,21 @@ Do not act on these; they describe intentional design:
 
 ## Batches
 
-1. **Tests first.** Assert that project switching clears the conversation, and
-   that trim is reachable by keyboard. These must fail before any fix lands.
-2. **Safe mechanical fixes** (behavior-preserving): hoist `viewOptions` to
-   module scope (`SourceVideoBrowser.tsx:93-97`), and move
-   `preferencesFromGenerationStats` out of the component file to restore the
-   Fast Refresh boundary (`ClipGenerationPanel.tsx:29-43`).
-3. ~~Fix the stale header count.~~ Done 2026-09-02.
-4. **Keyboard trim.** Product decision required: focusable handles with
-   arrow-key increments, or an inspector-based trim path. Needs batch 1.
-5. **Project-reset refactor** in `useReviewConversation`, preserving the
-   existing `alive`/`activeProject` guards.
-6. **Architecture last** — whether to split `Timeline` and `Import`, and
-   whether to redesign the direction/playing state machine.
+- [x] 1. **Tests first.** The project-switch spec failed before its fix. The
+      keyboard trim test passed on the old code — the inspector path already
+      worked — so it is a characterization test, not a red one.
+- [x] 2. **Safe mechanical fixes:** `VIEW_OPTIONS` is module-scoped in
+      `SourceVideoBrowser.tsx`, and `preferencesFromGenerationStats` lives in
+      `lib/clipGenerationPreferences.ts`, so `ClipGenerationPanel.tsx` exports
+      only the component.
+- [x] 3. ~~Fix the stale header count.~~ Done 2026-09-02.
+- [x] 4. **Keyboard trim.** Inspector-based path, decided from the code: it
+      already existed and was reachable, so no new trim UI was needed.
+- [x] 5. **Project-reset refactor** in `useReviewConversation`, keeping the
+      `alive` flag and `activeProject` guards.
+- 6. **Architecture last** — whether to split `Timeline` and `Import`, and
+   whether to redesign the direction/playing state machine. Not scheduled;
+   these are the judgment calls above, not defects.
 
 Do not quote a predicted score for these batches; the earlier snapshots in
 this plan's history (88 → 90 → 44 → 46) tracked codebase growth more than

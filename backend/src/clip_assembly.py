@@ -18,7 +18,7 @@ SCENE_CAP_WINDOW_SEC = 60.0
 @dataclass(frozen=True)
 class AssemblyPreferences:
     min_clip_duration_sec: float = 3.0
-    max_clip_duration_sec: float = 15.0
+    max_clip_duration_sec: float = 20.0
     smoothness_threshold: float = 6.0
     target_duration_sec: float = 120.0
     max_turn_rate_deg_per_sec: float = 16.0

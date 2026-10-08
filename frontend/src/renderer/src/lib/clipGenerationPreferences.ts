@@ -2,7 +2,7 @@ import type { ClipGenerationPreferences, ClipGenerationStats } from '../types/cl
 
 const DEFAULT_PREFERENCES: ClipGenerationPreferences = {
   min_clip_duration_sec: 3,
-  max_clip_duration_sec: 10,
+  max_clip_duration_sec: 20,
   smoothness_threshold: 6,
   target_duration_sec: 120,
   max_turn_rate_deg_per_sec: 16,

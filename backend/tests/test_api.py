@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src import api, review_agent
+from src.clip_assembly import AssemblyPreferences
 from src.frame_extraction import FFmpegUnavailableError
 from src.models import (
     AssemblyResult,
@@ -1244,12 +1245,16 @@ def test_analyze_rejects_invalid_sample_fps(monkeypatch, tmp_path):
     assert "sample_fps" in response.json()["detail"]
 
 
-def test_default_analysis_preferences_cap_candidate_windows_at_ten_seconds():
+def test_default_analysis_preferences_cap_candidate_windows_at_twenty_seconds():
     preferences = api.preferences_from_request({})
 
     assert preferences.min_clip_duration_sec == 3.0
-    assert preferences.max_clip_duration_sec == 10.0
+    assert preferences.max_clip_duration_sec == 20.0
     assert preferences.max_candidates_per_video == 30
+
+
+def test_default_preferences_match_dataclass():
+    assert api.preferences_from_request({}) == AssemblyPreferences()
 
 
 def test_analyze_returns_clear_error_when_ffmpeg_is_missing(monkeypatch, tmp_path):

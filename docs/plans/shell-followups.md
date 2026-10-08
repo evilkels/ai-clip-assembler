@@ -20,9 +20,7 @@ task, which is why they sit at P3 behind the correctness plans.
 
 2. **Score verification.** The Review score chips (`ScoreChip.tsx`) render
    overall and smoothness values on a 0-10 scale with tier colouring. Confirm
-   the displayed numbers match what the backend computes, and that the tier
-   thresholds (>=8 green, >=5 yellow) are the intended product boundaries
-   rather than inherited placeholders.
+   the displayed numbers match what the backend computes.
 
 3. ~~**Settings and Diagnostics surfaces.**~~ **MOVED 2026-09-03** to
    [plan 031](031-app-restyle-conformance.md) Phase 4, which is no longer the
@@ -36,9 +34,10 @@ task, which is why they sit at P3 behind the correctness plans.
    the row is not carrying two always-visible affordances.
 
 5. **Keyboard navigation and accessibility verification.** A keyboard-only pass
-   over the shell and all routes: visible focus everywhere, no traps. Note that
-   Timeline trim is currently a confirmed keyboard dead end — that defect is
-   tracked in [`react-doctor-triage.md`](react-doctor-triage.md), not here.
+   over the shell and all routes: visible focus everywhere, no traps. Timeline
+   trim is not a dead end: its keyboard path is the inspector's In/Out fields,
+   proven by `timeline-playback.spec.ts` — see
+   [`done/react-doctor-triage.md`](done/react-doctor-triage.md).
 
 ## Already shipped, do not re-plan
 

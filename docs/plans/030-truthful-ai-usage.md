@@ -1,7 +1,11 @@
 # Plan 030: Truthful AI usage — selected vs effective harness, and an independent Review Agent
 
-Status: TODO · Priority P1 · Effort M · Risk MED · Category correctness + trust
-Created 2026-09-03 against `48a0f8b`. Implements
+Status: **IN PROGRESS** — one gap left (Step 2.3, below) · Priority P1 · Effort M · Risk MED · Category correctness + trust
+Created 2026-09-03 against `48a0f8b`. Phases 1–3 shipped in `bbad130` (PR #76),
+Step 4.1 in PR #78; the boxes below were ticked on 2026-10-04 after each was
+re-verified against the code, and Step 4.2 is the full-gate run on
+`feat/small-plans-batch`. Step 2.3 was found only half done during owner QA the
+same day; see "Remaining" below. Implements
 [ADR 0005](../adr/0005-harness-and-review-agent-are-independent.md).
 
 > **For agentic workers:** phases are ordered; each step has its own
@@ -60,45 +64,48 @@ paths.
 
 ## Phase 1 — Model the two harnesses
 
-- [ ] **Step 1.1** Persist **Selected Harness** on the project and in the
+- [x] **Step 1.1** Persist **Selected Harness** on the project and in the
       manifest (`ProjectManifest.harness` already exists and is unused). It
       must survive navigation, reopen, and re-derive.
-- [ ] **Step 1.2** Write **Effective Harness** wherever a Candidate Clip
+- [x] **Step 1.2** Write **Effective Harness** wherever a Candidate Clip
       library is produced: analysis, and `/clips/rederive`. Re-derive writes
       `manual`; analysis writes the harness that actually ran, which is
       `manual` on a Harness Fallback.
-- [ ] **Step 1.3** Backend tests: analysis with `pi_agent` and a working CLI
+- [x] **Step 1.3** Backend tests: analysis with `pi_agent` and a working CLI
       records both as `pi_agent`; with the CLI missing, Selected stays
       `pi_agent` while Effective becomes `manual`; re-derive changes Effective
       only; both survive a project reopen.
 
 ## Phase 2 — Decouple the Review Agent
 
-- [ ] **Step 2.1** Choose the In-App Review Agent from its own setting rather
+- [x] **Step 2.1** Choose the In-App Review Agent from its own setting rather
       than `harness_id`, keeping the existing cloud-AI consent check as the
       single gate. Removing the coupling must not weaken ADR 0001: without
       consent, no provider call for either surface.
-- [ ] **Step 2.2** Default the agent setting so existing projects behave
+      As built there is no separate agent setting: the agent is chosen from
+      the project's cloud-AI consent alone (`bbad130`), which is the single
+      gate ADR 0005 asks for.
+- [x] **Step 2.2** Default the agent setting so existing projects behave
       sensibly: consent granted implies the agent is available regardless of
       Selected Harness.
 - [ ] **Step 2.3** Retire the "Manual analysis is ready." stub message. If a
       stub agent is still needed for the no-consent case, it must describe the
       *agent's* state, not the harness — e.g. that conversational suggestions
       need cloud AI consent for this project, with the way to grant it.
-- [ ] **Step 2.4** Tests: rule-based Selected Harness plus consent yields a
+- [x] **Step 2.4** Tests: rule-based Selected Harness plus consent yields a
       real agent; no consent yields the stub for both surfaces.
 
 ## Phase 3 — Make fallback visible
 
-- [ ] **Step 3.1** Carry `metadata` through the client: declare it in the
+- [x] **Step 3.1** Carry `metadata` through the client: declare it in the
       response type and map it (`client.ts:386-404`).
-- [ ] **Step 3.2** Surface a **Harness Fallback** in Review where the Editor
+- [x] **Step 3.2** Surface a **Harness Fallback** in Review where the Editor
       will see it, naming the reason and the affected Source Videos. The
       backend already supplies `used_ai`, the per-video `warning`, and
       `models_used`.
-- [ ] **Step 3.3** Say it in the regenerate confirm dialog too: re-deriving
+- [x] **Step 3.3** Say it in the regenerate confirm dialog too: re-deriving
       discards AI enhancement and returns the library to rule-based.
-- [ ] **Step 3.4** E2E: a run whose harness falls back shows the notice and
+- [x] **Step 3.4** E2E: a run whose harness falls back shows the notice and
       names the reason; a fully successful agentic run shows none.
 
 ## Phase 4 — Show the Selected Harness
@@ -107,17 +114,50 @@ paths.
       outside Import, so "what is this project set to?" is answerable without
       navigating back. Show Effective alongside it when they differ.
       Settings › AI assistance now renders the persisted selection and effective fallback receipt.
-- [ ] **Step 4.2** Full gates: backend, ruff, lint, typecheck, `test:main`,
+- [x] **Step 4.2** Full gates: backend, ruff, lint, typecheck, `test:main`,
       Playwright.
+      Run 2026-10-04 on `feat/small-plans-batch` (macOS): backend 560 passed,
+      3 skipped; ruff clean; typecheck and lint clean; `test:main` 73 passed;
+      Playwright 135 passed.
+
+## Remaining — consent must be discoverable (found 2026-10-04)
+
+Step 2.3's stub now describes the agent's state ("Conversational suggestions
+need cloud AI consent for this project. Grant consent to enable the In-App
+Review Agent.") but not **the way to grant it**, and there is no way outside an
+analysis run: consent is only saved by the `window.confirm` that Import shows
+when analysis starts with Pi Agent selected (`Import.tsx`, `handleAnalyze`).
+Settings › AI assistance shows the state with the subtitle "Granted once per
+project, revocable here." but has no grant or revoke control
+(`AiAssistancePanel.tsx`, "Cloud consent by project").
+
+Owner direction (2026-10-04): this must be much clearer to the Editor — either
+**consent enabled by default**, or a **prominent introduction dialog / wizard**
+that explains cloud AI and asks once.
+
+- Default-enabled consent contradicts [ADR 0001](../adr/0001-local-first-and-cloud-consent.md)
+  ("explicit per-project consent", opt-in) and the AGENTS.md privacy line, so
+  choosing it means superseding that ADR first.
+- An introduction dialog fits ADR 0001 as written. It overlaps
+  [plan 031](031-app-restyle-conformance.md) Phase 5, which already replaces
+  the `window.confirm` with a designed consent gate; build one consent surface,
+  not two.
+
+Done when the no-consent chat message links or points to a working grant
+action, Settings either grants and revokes consent or stops claiming it can,
+and an E2E grants consent from that surface and sees the real agent.
 
 ## Done criteria
 
-- [ ] Selecting the Manual Harness leaves the In-App Review Agent working.
-- [ ] The Selected Harness survives navigation, reopen and re-derive.
-- [ ] A Harness Fallback is visible in the UI with its reason.
-- [ ] Re-derive changes the Effective Harness only, and says what it discards.
-- [ ] No user-facing string says "manual mode".
-- [ ] Without cloud-AI consent, neither scoring nor chat calls a provider.
+- [x] Selecting the Manual Harness leaves the In-App Review Agent working.
+- [x] The Selected Harness survives navigation, reopen and re-derive.
+      Navigation is covered by `import-workflow-redesign.spec.ts` "the Selected
+      Harness survives navigating away from Import and back" (added 2026-10-04);
+      reopen and re-derive by `backend/tests/test_api.py`.
+- [x] A Harness Fallback is visible in the UI with its reason.
+- [x] Re-derive changes the Effective Harness only, and says what it discards.
+- [x] No user-facing string says "manual mode".
+- [x] Without cloud-AI consent, neither scoring nor chat calls a provider.
 
 ## Stop and report instead of improvising if
 

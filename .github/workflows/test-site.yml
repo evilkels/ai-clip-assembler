@@ -6,6 +6,7 @@ on:
       - 'site/**'
       - 'scripts/tests/site_contract.py'
       - 'scripts/tests/test_site_contract.py'
+      - 'frontend/package.json'
       - 'README.md'
       - '.github/workflows/test-site.yml'
   push:
@@ -14,6 +15,7 @@ on:
       - 'site/**'
       - 'scripts/tests/site_contract.py'
       - 'scripts/tests/test_site_contract.py'
+      - 'frontend/package.json'
       - 'README.md'
       - '.github/workflows/test-site.yml'
 

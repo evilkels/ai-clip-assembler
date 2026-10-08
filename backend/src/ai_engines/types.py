@@ -5,9 +5,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Provider = Literal["claude", "chatgpt"]
 AiFailureKind = Literal[
-    "not_installed", "incompatible_version", "signed_out", "usage_limit", "rate_limited",
-    "timed_out", "network", "unusable_reply", "engine_error", "cancelled",
-    "ai_not_connected", "ai_off_for_project",
+    "not_installed",
+    "incompatible_version",
+    "signed_out",
+    "usage_limit",
+    "rate_limited",
+    "timed_out",
+    "network",
+    "unusable_reply",
+    "engine_error",
+    "cancelled",
+    "ai_not_connected",
+    "ai_off_for_project",
 ]
 AiFailureAction = Literal["open_providers", "sign_in", "retry", "wait", "none"]
 

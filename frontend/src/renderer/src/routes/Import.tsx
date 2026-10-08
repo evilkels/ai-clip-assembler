@@ -99,9 +99,6 @@ export function ImportPage() {
     setCloudAiConsent,
     applyAnalysisResult,
     harnessMetadata,
-    resumingAiScoring,
-    resumeError,
-    resumeAiScoring,
     rederiveClips,
     openProjectFolder,
     rescanOpenProject,
@@ -585,39 +582,13 @@ export function ImportPage() {
                 {notice.message}
               </p>
             ))}
-            {harnessMetadata?.failure ? (
-              <>
-                <p className="import-status-warning">{harnessMetadata.failure.message}</p>
-                {(harnessMetadata.clips_left ?? 0) > 0 ? (
-                  <button
-                    type="button"
-                    className="btn subtle"
-                    disabled={resumingAiScoring}
-                    onClick={() => void resumeAiScoring()}
-                  >
-                    {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
-                  </button>
-                ) : null}
-                {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
-              </>
-            ) : null}
+            {harnessMetadata?.failure ? <AiScoringFailure /> : null}
           </div>
         )}
 
         {!isComplete && harnessMetadata?.failure ? (
           <div className="import-status-complete">
-            <p className="import-status-warning">{harnessMetadata.failure.message}</p>
-            {(harnessMetadata.clips_left ?? 0) > 0 ? (
-              <button
-                type="button"
-                className="btn subtle"
-                disabled={resumingAiScoring}
-                onClick={() => void resumeAiScoring()}
-              >
-                {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${harnessMetadata.clips_left} clips left)`}
-              </button>
-            ) : null}
-            {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
+            <AiScoringFailure />
           </div>
         ) : null}
 
@@ -665,5 +636,28 @@ export function ImportPage() {
         </dialog>
       )}
     </div>
+  );
+}
+
+/** The stopped AI scoring run: its Provider message and the Finish button (plan 038 D6b). */
+function AiScoringFailure() {
+  const { harnessMetadata, resumingAiScoring, resumeError, resumeAiScoring } = useReview();
+  if (!harnessMetadata?.failure) return null;
+  const clipsLeft = harnessMetadata.clips_left ?? 0;
+  return (
+    <>
+      <p className="import-status-warning">{harnessMetadata.failure.message}</p>
+      {clipsLeft > 0 ? (
+        <button
+          type="button"
+          className="btn subtle"
+          disabled={resumingAiScoring}
+          onClick={() => void resumeAiScoring()}
+        >
+          {resumingAiScoring ? 'Scoring…' : `Finish AI scoring (${clipsLeft} clips left)`}
+        </button>
+      ) : null}
+      {resumeError ? <p className="import-status-error">{resumeError}</p> : null}
+    </>
   );
 }

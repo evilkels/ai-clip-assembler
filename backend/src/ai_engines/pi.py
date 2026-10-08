@@ -23,7 +23,7 @@ def parse_json_object(raw: str) -> dict:
         start, end = text.find("{"), text.rfind("}")
         if start < 0 or end <= start:
             raise
-        parsed = json.loads(text[start:end + 1])
+        parsed = json.loads(text[start : end + 1])
     if isinstance(parsed, list):
         if not parsed:
             raise ValueError("Empty JSON array")
@@ -35,9 +35,14 @@ def parse_json_object(raw: str) -> dict:
 
 def classify_pi_error(text: str) -> Tuple[str, dict]:
     lowered = text.lower()
-    if re.search(r'no api key (?:found for "?|for provider: )\S+|provider is not configured|token refresh failed \(401\)|failed to extract accountid from token|authentication failed for ', lowered):
+    if re.search(
+        r'no api key (?:found for "?|for provider: )\S+|provider is not configured|token refresh failed \(401\)|failed to extract accountid from token|authentication failed for ',
+        lowered,
+    ):
         return "signed_out", {}
-    if re.search(r"you have hit your chatgpt usage limit|usage_limit_reached|usage_not_included", lowered):
+    if re.search(
+        r"you have hit your chatgpt usage limit|usage_limit_reached|usage_not_included", lowered
+    ):
         match = re.search(r"try again in ~?(\d+) min", text, re.IGNORECASE)
         extra = {}
         if match:
@@ -49,7 +54,11 @@ def classify_pi_error(text: str) -> Tuple[str, dict]:
         return "rate_limited", {"retry_after_sec": float(match.group(1))} if match else {}
     if re.search(r"timed? out|timeout", lowered):
         return "timed_out", {}
-    if re.search(r"fetch failed|getaddrinfo|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|network.?error|connection.?(error|refused|lost)|socket hang up|websocket.?(error|closed)", text, re.IGNORECASE):
+    if re.search(
+        r"fetch failed|getaddrinfo|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|network.?error|connection.?(error|refused|lost)|socket hang up|websocket.?(error|closed)",
+        text,
+        re.IGNORECASE,
+    ):
         return "network", {}
     return "engine_error", {"detail": text}
 
@@ -67,12 +76,28 @@ class PiEngine:
 
     def run(self, request: AiRequest):
         with staged(request) as staged_request:
-            prompt = request.text + "\n\nRespond with ONLY one JSON object and nothing else. It must match this JSON Schema:\n" + json.dumps(request.schema_)
+            prompt = (
+                request.text
+                + "\n\nRespond with ONLY one JSON object and nothing else. It must match this JSON Schema:\n"
+                + json.dumps(request.schema_)
+            )
             argv = [
-                self.pi_bin, "--provider", self.pi_provider, "--model", self.pi_model,
-                "--print", "--mode", "text", "--no-session", "--no-context-files",
-                "--no-skills", "--no-extensions", "--tools", "",
-                *[f"@{name}" for name in staged_request.names], prompt,
+                self.pi_bin,
+                "--provider",
+                self.pi_provider,
+                "--model",
+                self.pi_model,
+                "--print",
+                "--mode",
+                "text",
+                "--no-session",
+                "--no-context-files",
+                "--no-skills",
+                "--no-extensions",
+                "--tools",
+                "",
+                *[f"@{name}" for name in staged_request.names],
+                prompt,
             ]
             env = {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}
             try:
@@ -92,22 +117,41 @@ class PiEngine:
                     raise ValueError("Missing required response key")
             except (ValueError, json.JSONDecodeError):
                 return make_failure("unusable_reply", self.provider)
-            return AiReply(provider=self.provider, data=data, raw_text=result.stdout, elapsed_sec=result.elapsed_sec)
+            return AiReply(
+                provider=self.provider,
+                data=data,
+                raw_text=result.stdout,
+                elapsed_sec=result.elapsed_sec,
+            )
 
     def status(self) -> EngineStatus:
         path = shutil.which(self.pi_bin)
         if path is None and os.path.isfile(self.pi_bin) and os.access(self.pi_bin, os.X_OK):
             path = self.pi_bin
         if not path:
-            return EngineStatus(provider=self.provider, installed=False, signed_in=False, ready=False)
+            return EngineStatus(
+                provider=self.provider, installed=False, signed_in=False, ready=False
+            )
         version = None
         try:
-            result = run_process([self.pi_bin, "--version"], ".", {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}, 5)
+            result = run_process(
+                [self.pi_bin, "--version"],
+                ".",
+                {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")},
+                5,
+            )
             if not result.timed_out and result.returncode == 0 and result.stdout.strip():
                 version = result.stdout.strip().split()[0]
         except (FileNotFoundError, PermissionError):
             pass
-        return EngineStatus(provider=self.provider, installed=True, version=version, path=path, signed_in=True, ready=True)
+        return EngineStatus(
+            provider=self.provider,
+            installed=True,
+            version=version,
+            path=path,
+            signed_in=True,
+            ready=True,
+        )
 
     def sign_in(self) -> None:
         raise NotImplementedError

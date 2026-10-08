@@ -587,11 +587,10 @@ def _turn_result(agent_message: ReviewMessage, session: ReviewSession) -> dict:
     return result
 
 
-# --- Default model-backed agent -----------------------------------------------
+# --- Engine-backed agent -------------------------------------------------------
 #
-# Not unit-tested (needs the pi CLI + network); tests inject a stub `agent`.
-# Degrades gracefully to a chat-only reply on any failure so the app never
-# crashes and never silently edits the timeline.
+# An engine failure comes back as an AiFailure, which run_review_turn stores as
+# a failed turn with no Versions (plan 038 D5), so the timeline is never edited.
 
 OPERATION_CATALOGUE = ", ".join(OPERATIONS.keys())
 

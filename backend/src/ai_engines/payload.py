@@ -15,9 +15,10 @@ def strip_paths(text: str) -> str:
     def replace(match):
         value = match.group(0)
         trimmed = value.rstrip(".,;:!?)]}")
-        return Path(trimmed).name + value[len(trimmed):]
+        return Path(trimmed).name + value[len(trimmed) :]
 
     return _ABSOLUTE_PATH.sub(replace, text)
+
 
 _NAME = re.compile(r"^(?:frame-\d{2}|clip-\d-frame-\d)\.jpg$")
 
@@ -67,7 +68,11 @@ def _names(request: AiRequest) -> List[str]:
 def stage(request: AiRequest) -> StagedRequest:
     if request.images and request.samples_dir is None:
         raise PayloadError("samples_dir is required when images are provided")
-    paths = validate_images(request.images, request.samples_dir, request.image_limit) if request.images else []
+    paths = (
+        validate_images(request.images, request.samples_dir, request.image_limit)
+        if request.images
+        else []
+    )
     names = _names(request)
     cwd = Path(tempfile.mkdtemp(prefix="aca-ai-"))
     staged_images = []

@@ -5,10 +5,17 @@ from typing import Optional
 from .types import AiFailure, AiFailureAction, AiFailureKind, Provider
 
 _ACTIONS = {
-    "not_installed": "open_providers", "incompatible_version": "open_providers",
-    "signed_out": "sign_in", "usage_limit": "wait", "rate_limited": "retry",
-    "timed_out": "retry", "network": "retry", "unusable_reply": "retry",
-    "engine_error": "retry", "cancelled": "none", "ai_not_connected": "open_providers",
+    "not_installed": "open_providers",
+    "incompatible_version": "open_providers",
+    "signed_out": "sign_in",
+    "usage_limit": "wait",
+    "rate_limited": "retry",
+    "timed_out": "retry",
+    "network": "retry",
+    "unusable_reply": "retry",
+    "engine_error": "retry",
+    "cancelled": "none",
+    "ai_not_connected": "open_providers",
     "ai_off_for_project": "open_providers",
 }
 _PROVIDER = {"claude": "Claude", "chatgpt": "ChatGPT"}
@@ -92,9 +99,20 @@ def make_failure(
     tz: Optional[tzinfo] = None,
 ) -> AiFailure:
     failure = AiFailure(
-        kind=kind, provider=provider, message="", action=default_action(kind), detail=detail,
-        resets_at=resets_at, window=window, retry_after_sec=retry_after_sec, timeout_sec=timeout_sec,
+        kind=kind,
+        provider=provider,
+        message="",
+        action=default_action(kind),
+        detail=detail,
+        resets_at=resets_at,
+        window=window,
+        retry_after_sec=retry_after_sec,
+        timeout_sec=timeout_sec,
     )
-    return failure.model_copy(update={
-        "message": format_failure(failure, now or datetime.now(timezone.utc), tz or datetime.now().astimezone().tzinfo)
-    })
+    return failure.model_copy(
+        update={
+            "message": format_failure(
+                failure, now or datetime.now(timezone.utc), tz or datetime.now().astimezone().tzinfo
+            )
+        }
+    )

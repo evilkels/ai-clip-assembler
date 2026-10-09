@@ -2,7 +2,7 @@
  * Clip and project types — frontend mirror of backend shapes.
  */
 
-import type { ClipSuggestion, CreativeVersion } from './generated';
+import type { AiFailure, ClipSuggestion, CreativeVersion } from './generated';
 
 type BackendScoreKey = Extract<keyof ClipSuggestion, `${string}_score`>;
 type MappedScoreKey =
@@ -106,18 +106,14 @@ export interface AnalysisResult {
 export interface HarnessVideoUsage {
   file_id: string;
   file_name?: string;
-  used_ai?: boolean;
-  model_used?: string | null;
-  warning?: string;
+  failure?: AiFailure;
+  clips_left?: number;
 }
 
 export interface HarnessUsageMetadata {
   per_video?: HarnessVideoUsage[];
-  used_ai?: boolean;
-  model_used?: string;
-  models_used?: string[];
-  local?: boolean;
-  warning?: string;
+  failure?: AiFailure;
+  clips_left?: number;
 }
 
 export interface AnalysisNotice {

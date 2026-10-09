@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClipGenerationPanel } from '../components/ClipGenerationPanel';
+import { FinishAiScoring } from '../components/FinishAiScoring';
 import { SourceVideoBrowser } from '../components/SourceVideoBrowser';
 import { StatusSurface } from '../components/StatusSurface';
 import { WorkflowHeader } from '../components/WorkflowHeader';
@@ -98,6 +99,7 @@ export function ImportPage() {
     setAnalysisStatus,
     setCloudAiConsent,
     applyAnalysisResult,
+    harnessMetadata,
     rederiveClips,
     openProjectFolder,
     rescanOpenProject,
@@ -538,7 +540,7 @@ export function ImportPage() {
                       ) : null}
                       {activeProgress.clip_total ? (
                         <span>
-                          Pi clips {activeProgress.clip_index ?? 0}/{activeProgress.clip_total}
+                          AI clips {activeProgress.clip_index ?? 0}/{activeProgress.clip_total}
                         </span>
                       ) : null}
                     </div>
@@ -581,8 +583,15 @@ export function ImportPage() {
                 {notice.message}
               </p>
             ))}
+            {harnessMetadata?.failure ? <AiScoringFailure /> : null}
           </div>
         )}
+
+        {!isComplete && harnessMetadata?.failure ? (
+          <div className="import-status-complete">
+            <AiScoringFailure />
+          </div>
+        ) : null}
 
         {isCancelled && (
           <p className="import-status-cancelled">
@@ -628,5 +637,18 @@ export function ImportPage() {
         </dialog>
       )}
     </div>
+  );
+}
+
+/** The stopped AI scoring run: its Provider message and the Finish button (plan 038 D6b). */
+function AiScoringFailure() {
+  const { harnessMetadata } = useReview();
+  if (!harnessMetadata?.failure) return null;
+  const clipsLeft = harnessMetadata.clips_left ?? 0;
+  return (
+    <>
+      <p className="import-status-warning">{harnessMetadata.failure.message}</p>
+      <FinishAiScoring clipsLeft={clipsLeft} />
+    </>
   );
 }

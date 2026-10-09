@@ -38,7 +38,9 @@ from .export_engine import (
     generate_resolve_xml,
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
-from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
+from .ai_engines import get_engine
+from .ai_engines.engine import PING_TIMEOUT_SEC
+from .ai_engines.types import AiFailure, AiRequest, AiReply
 from .frame_extraction import extract_frames
 from .models import FrameScore
 from .motion_analysis import (
@@ -73,7 +75,7 @@ from .mcp_server import TimelineMCPServer
 from .review_agent import (
     ProposalStore,
     ReviewAgentError,
-    default_review_agent,
+    engine_review_agent,
     run_editor_script,
     run_review_turn,
 )
@@ -90,6 +92,7 @@ from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
 # uvicorn's logger so progress messages reach the dev console without extra config
 logger = logging.getLogger("uvicorn.error")
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Kept in step with frontend/package.json so the status bar and the update
 # check report the same release.
@@ -136,7 +139,8 @@ _motion_analysis_capability = FFmpegVidstabCapability(available=True)
 # testable/overridable; proposals are staged here and replayed through the
 # operations core on accept.
 _proposal_store = ProposalStore()
-_review_agent = default_review_agent
+_DEFAULT_ENGINE_AGENT = object()
+_review_agent = _DEFAULT_ENGINE_AGENT
 _review_locks: dict[str, asyncio.Lock] = {}
 
 # --- Analysis cancellation -------------------------------------------------
@@ -279,6 +283,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "harness_id": restored.get("harness_id") if restored else None,
         "frame_scores": frame_scores,
         "generation_stats": generation_stats,
+        "ai_scoring": restored.get("ai_scoring") if restored else None,
     }
     _proposal_store.configure_project(project_id, folder_path)
     return {
@@ -291,6 +296,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         "selected_harness": manifest.harness,
         "effective_harness": restored.get("harness_id") if restored else None,
         "generation_stats": generation_stats,
+        "metadata": restored.get("ai_scoring") if restored else None,
     }
 
 
@@ -586,6 +592,76 @@ def analyze_videos(project_id: str, request: AnalysisRequest):
     return response
 
 
+@app.post("/projects/{project_id}/ai-scoring/resume")
+def resume_ai_scoring(project_id: str):
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    if not project.get("cloud_ai_consent"):
+        raise HTTPException(
+            status_code=403,
+            detail="AI is off for this project. Turn it on in Settings › AI.",
+        )
+    if (project.get("analysis_progress") or {}).get("phase") == "analyzing":
+        raise HTTPException(status_code=409, detail="Analysis already in progress for this project")
+    stored = project.get("ai_scoring") or {}
+    if not stored.get("failure") or int(stored.get("clips_left", 0)) == 0:
+        raise HTTPException(status_code=409, detail="Nothing to resume")
+    project["analysis_progress"] = {}
+    set_analysis_progress(
+        project_id,
+        phase="analyzing",
+        harness_id=project.get("selected_harness", "pi_agent"),
+        step="scoring_clips",
+        video_index=0,
+        video_total=len(stored.get("per_video", [])),
+        file_name=None,
+        clip_index=0,
+        clip_total=0,
+        message="Finishing AI scoring",
+        error=None,
+    )
+    try:
+        per_file_results, resumed_metadata = analysis_service.resume_ai_scoring(
+            project,
+            samples_path=samples_dir(project_id),
+            cache_dir=analysis_dir(project_id) / "ai-scores",
+            engine_fn=get_engine,
+        )
+        resumed_by_file = {entry["file_id"]: entry for entry in resumed_metadata}
+        per_video = [
+            resumed_by_file.get(entry.get("file_id"), entry)
+            for entry in stored.get("per_video", [])
+        ]
+        metadata = _build_scoring_metadata(per_video, local=False)
+        project["ai_scoring"] = metadata
+        effective = "manual" if metadata.get("failure") or metadata["clips_left"] else "pi_agent"
+        finalized = _finalize_clip_set(
+            project_id, per_file_results, effective_harness_id=effective,
+            preserve_manual_timeline=True,
+        )
+        persist_project_results(project_id)
+        set_analysis_progress(
+            project_id, phase="complete", step="complete", message="AI scoring complete", error=None,
+        )
+        return {
+            "project_id": project_id,
+            "harness_id": "pi_agent",
+            "selected_harness": project.get("selected_harness", "pi_agent"),
+            "effective_harness": effective,
+            "status": "complete",
+            "clips": finalized["clips"],
+            "sequence": finalized["timeline"],
+            "recommendation": finalized["recommendation"],
+            "generation_stats": finalized["generation_stats"],
+            "timings": {"per_video": [], "pipeline_total_sec": 0.0},
+            "metadata": metadata,
+        }
+    except Exception as exc:
+        set_analysis_progress(project_id, phase="error", error=str(exc))
+        raise
+
+
 def selected_videos(project_id: str, request: AnalysisRequest) -> list[dict]:
     return analysis_service.selected_videos(projects[project_id], request)
 
@@ -597,11 +673,29 @@ def is_cloud_harness(harness_id: str) -> bool:
 def effective_harness_id(harness_id: str, per_video_metadata: list[dict]) -> str:
     """Return the harness that actually produced the current Candidate Clips."""
     if harness_id == "pi_agent" and any(
-        metadata.get("warning") or metadata.get("used_ai") is False
+        metadata.get("failure") or metadata.get("used_ai") is False
         for metadata in per_video_metadata
     ):
         return DEFAULT_HARNESS_ID
     return harness_id
+
+
+def _build_scoring_metadata(per_video: list[dict], *, local: bool) -> dict:
+    metadata = {
+        "per_video": per_video,
+        "used_ai": any(entry.get("used_ai") for entry in per_video),
+        "local": local,
+        "clips_left": sum(int(entry.get("clips_left", 0)) for entry in per_video),
+    }
+    failures = [entry["failure"] for entry in per_video if entry.get("failure")]
+    if failures:
+        metadata["failure"] = failures[0]
+    models_used = list({entry["model_used"] for entry in per_video if entry.get("model_used")})
+    if len(models_used) == 1:
+        metadata["model_used"] = models_used[0]
+    elif models_used:
+        metadata["models_used"] = models_used
+    return metadata
 
 
 @app.post("/projects/{project_id}/analyze/cancel")
@@ -641,11 +735,12 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             assign_scene_ids_fn=assign_scene_ids,
             score_samples_fn=score_samples_rule_based,
             assemble_clips_fn=assemble_smooth_clips,
-            enhance_clips_fn=enhance_clips_with_pi_cli,
+            enhance_clips_fn=analysis_service.enhance_clips,
             parse_transforms_fn=parse_trf,
             motion_analysis_enabled=_motion_analysis_capability.available,
             motion_analysis_unavailable_reason=_motion_analysis_capability.reason,
             embedding_provider_fn=default_embedding_provider,
+            engine_fn=get_engine,
         )
     except analysis_service.AnalysisDependencyUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -699,34 +794,12 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         pipeline.timings,
     )
     if request.harness_id == "pi_agent":
-        harness_metadata = {"per_video": pipeline.per_video_metadata}
-        all_ai = all(v.get("used_ai") for v in pipeline.per_video_metadata)
-        any_ai = any(v.get("used_ai") for v in pipeline.per_video_metadata)
-        any_fallback = any(v.get("warning") for v in pipeline.per_video_metadata)
-        if any_fallback or not all_ai:
-            harness_metadata["used_ai"] = any_ai
-            fallback_details = [
-                f"{video.get('file_name', video['file_id'])} ({video['file_id']}): "
-                f"{video.get('warning', 'fallback')}"
-                for video in pipeline.per_video_metadata
-                if video.get("warning")
-            ]
-            harness_metadata["warning"] = (
-                f"Harness Fallback — {'; '.join(fallback_details)}"
-                if fallback_details
-                else "Harness Fallback — Pi Agent could not complete"
-            )
-        else:
-            harness_metadata["used_ai"] = True
-        models_used = list({
-            v["model_used"] for v in pipeline.per_video_metadata if v.get("model_used")
-        })
-        if len(models_used) == 1:
-            harness_metadata["model_used"] = models_used[0]
-        elif models_used:
-            harness_metadata["models_used"] = models_used
-        harness_metadata["local"] = False
+        harness_metadata = _build_scoring_metadata(pipeline.per_video_metadata, local=False)
         response["metadata"] = harness_metadata
+        projects[project_id]["ai_scoring"] = harness_metadata
+    else:
+        projects[project_id]["ai_scoring"] = None
+    persist_project_results(project_id)
     return response
 
 
@@ -1144,7 +1217,7 @@ def timestamped_frame_paths(project_id: str, file_id: str) -> list[tuple[int, Pa
 
 def mcp_frame_paths(project_id: str, clip_id: str) -> list:
     """Local frame JPEG paths for a candidate clip, for an agent to read
-    directly (the same `@path` images `pi_cli_harness` attaches)."""
+    directly (the same staged frame attachments the scoring engine receives)."""
     project = projects.get(project_id) or {}
     clip = next((c for c in project.get("clips", []) if c.get("clip_id") == clip_id), None)
     if clip is None:
@@ -1230,21 +1303,22 @@ def _review_inputs(
         if len(candidate_frames) >= 12:
             break
     agent = _review_agent
+    is_default_engine_agent = agent is _DEFAULT_ENGINE_AGENT
     project = projects[project_id]
     default_agent_requires_consent = not project.get("cloud_ai_consent")
-    if default_agent_requires_consent and agent is default_review_agent:
+    fallback_versions = default_agent_requires_consent and is_default_engine_agent
+    if fallback_versions:
         def consent_required_review_agent(_context):
             return {
-                "message": (
-                    "Conversational suggestions need cloud AI consent for this project. "
-                    "Grant consent to enable the In-App Review Agent."
-                ),
+                "message": "AI is off for this project. Turn it on in Settings › AI.",
                 "operations": [],
                 "versions": [],
             }
 
         agent = consent_required_review_agent
-    return candidates, candidate_frames, agent
+    elif is_default_engine_agent:
+        agent = engine_review_agent(get_engine())
+    return candidates, candidate_frames, agent, fallback_versions
 
 
 async def _run_review_turn(
@@ -1256,7 +1330,7 @@ async def _run_review_turn(
         for clip_id, decision in controller.document.decisions.items()
         if decision == "excluded"
     )
-    candidates, candidate_frames, agent = _review_inputs(project_id, excluded_clip_ids)
+    candidates, candidate_frames, agent, fallback_versions = _review_inputs(project_id, excluded_clip_ids)
     return await run_review_turn(
         project_id,
         user_message=user_message,
@@ -1268,6 +1342,8 @@ async def _run_review_turn(
         client_message_id=client_message_id,
         # Scripts read the whole library, excluded clips included (Script API v1).
         library=get_mcp_server()._list_candidates(project_id),
+        samples_dir=samples_dir(project_id),
+        fallback_versions=fallback_versions,
     )
 
 
@@ -1327,14 +1403,20 @@ async def review_kickoff(project_id: str):
         session = _proposal_store.session(project_id)
         if session.messages:
             last = session.messages[-1]
-            return {
-                "message": last.text,
-                "proposal": last.proposal.model_dump() if last.proposal else None,
-                "agent_message": last.model_dump(),
-                "session": session.model_dump(),
-            }
+            failed_opening_turn = (
+                last.role == "agent"
+                and last.reply_to_message_id is None
+                and last.payload.get("failure")
+            )
+            if not failed_opening_turn:
+                return {
+                    "message": last.text,
+                    "proposal": last.proposal.model_dump() if last.proposal else None,
+                    "agent_message": last.model_dump(),
+                    "session": session.model_dump(),
+                }
         controller = get_timeline_controller(project_id)
-        candidates, candidate_frames, agent = _review_inputs(project_id)
+        candidates, candidate_frames, agent, fallback_versions = _review_inputs(project_id)
         return await run_review_turn(
             project_id,
             user_message=(
@@ -1347,6 +1429,8 @@ async def review_kickoff(project_id: str):
             agent=agent,
             record_user_message=False,
             candidate_frames=candidate_frames,
+            samples_dir=samples_dir(project_id),
+            fallback_versions=fallback_versions,
         )
 
 
@@ -1504,159 +1588,30 @@ async def write_settings(request: SettingsUpdateRequest):
     return _settings_payload()
 
 
-# Diagnostic ping is intentionally short so the UI gets a quick verdict; a slow
-# model is itself a signal worth surfacing rather than blocking on the full
-# per-call timeout.
-_DIAGNOSTIC_TIMEOUT_SEC = 45.0
-
-
-# Failure detail is provider text we do not control, so the guidance below is
-# keyed off coarse substrings and always ends with a step that works regardless.
-_AUTH_MARKERS = (
-    "no api key", "not authenticated", "unauthenticated", "unauthorized",
-    "401", "403", "sign in", "log in", "login", "credential", "token",
-)
-_MODEL_MARKERS = ("unknown model", "model not found", "invalid model", "404", "no such model")
-_NETWORK_MARKERS = (
-    "enotfound", "econnrefused", "getaddrinfo", "network", "dns", "proxy",
-    "connection", "socket", "tls", "certificate",
-)
-
-_PI_INSTALL_STEP = (
-    "Install Pi if it is missing: npm install -g @earendil-works/pi-coding-agent"
-)
-
-
-def _missing_binary_guidance(pi_bin: str) -> list:
-    """Steps for the common case: pi works in Terminal but not inside the app.
-
-    macOS starts Finder/Dock launches with a minimal PATH, so anything a version
-    manager (nvm, volta, asdf) adds from ~/.zshrc is invisible to the app even
-    though the same shell finds it interactively.
-    """
-    return [
-        f"Confirm the CLI exists: run  which {pi_bin}  in Terminal.",
-        _PI_INSTALL_STEP,
-        "macOS launches apps with a minimal PATH, so a pi installed by nvm, "
-        "volta, or asdf is invisible here even when Terminal finds it. Link it "
-        "somewhere the app always looks:  sudo ln -sf \"$(which pi)\" /opt/homebrew/bin/pi  "
-        "(use /usr/local/bin/pi on Intel Macs).",
-        "Then run this check again — no restart needed, /opt/homebrew/bin and "
-        "/usr/local/bin are always searched.",
-        "Alternative: quit the app and relaunch it with the path supplied "
-        "explicitly:  open --env PI_BIN=\"$(which pi)\" -a \"AI Clip Assembler\"",
-    ]
-
-
-def _reachability_guidance(result: dict, pi_bin: str, timeout_sec: float) -> list:
-    """Actionable next steps for a failed reachability check, most likely first."""
-    if not result["binary"]["found"]:
-        return _missing_binary_guidance(pi_bin)
-
-    detail = (result["detail"] or "").lower()
-    if any(marker in detail for marker in _AUTH_MARKERS):
-        return [
-            "Open Settings > Connections and sign in to the review model account.",
-            "Or authenticate the CLI directly:  pi /login  then retry "
-            "(the app reads the same credentials from ~/.pi/agent/auth.json).",
-            "If a different provider is configured, make sure Pi has credentials "
-            "for it, or switch the provider in Settings.",
-        ]
-    if any(marker in detail for marker in _MODEL_MARKERS):
-        return [
-            f"The provider rejected model \"{result['model']}\". Check the spelling "
-            "in Settings against the models your account can use.",
-            "Try the default model to confirm the account works at all, then "
-            "change it back.",
-        ]
-    if any(marker in detail for marker in _NETWORK_MARKERS):
-        return [
-            "Check network access — the provider call never completed.",
-            "If you are behind a VPN or proxy, allow outbound HTTPS for the CLI, "
-            "then run this check again.",
-        ]
-    if "no response within" in detail:
-        return [
-            f"The provider did not answer within {timeout_sec:.0f}s. Run the check "
-            "again — a cold or busy model often clears on a retry.",
-            "If it keeps timing out, raise the per-call timeout in Settings or "
-            "pick a faster model.",
-        ]
-    return [
-        f"Reproduce it in Terminal to see the full error:  {pi_bin} --provider "
-        f"{result['provider']} --model {result['model']} --print \"Reply with OK.\"",
-        "Check Settings > Connections for the account state, and confirm the "
-        "provider and model names are valid.",
-    ]
-
-
-def _ping_review_model(settings: dict) -> dict:
-    """Run a trivial pi turn to confirm the review model is reachable.
-
-    Mirrors how the review agent invokes pi (same provider/model/cwd/env) but
-    with no frames and a tiny prompt, so it isolates binary/auth/model
-    reachability from project-specific failures.
-    """
-    pi_bin = settings["pi_bin"]
-    resolved = shutil.which(pi_bin)
-    binary = {"configured": pi_bin, "resolved": resolved, "found": resolved is not None}
-    result = {
-        "binary": binary,
-        "provider": settings["pi_provider"],
-        "model": settings["pi_model"],
-        "reachable": False,
-        "elapsed_sec": None,
-        "detail": "",
-    }
-    if resolved is None:
-        result["detail"] = f"pi CLI not found on PATH ({pi_bin})"
-        return result
-
-    command = [
-        pi_bin, "--provider", settings["pi_provider"], "--model", settings["pi_model"],
-        "--print", "--mode", "text", "--no-session", "--no-context-files",
-        "--no-skills", "--no-extensions",
-        "Reply with the single word OK.",
-    ]
+def _ping_ai(engine) -> dict:
     started = time.monotonic()
-    try:
-        completed = subprocess.run(
-            command, capture_output=True, stdin=subprocess.DEVNULL, text=True,
-            timeout=_DIAGNOSTIC_TIMEOUT_SEC, cwd=str(REPO_ROOT), env=os.environ.copy(),
-        )
-    except subprocess.TimeoutExpired:
-        result["elapsed_sec"] = round(time.monotonic() - started, 1)
-        result["detail"] = f"No response within {_DIAGNOSTIC_TIMEOUT_SEC:.0f}s"
-        return result
-    except OSError as exc:
-        result["elapsed_sec"] = round(time.monotonic() - started, 1)
-        result["detail"] = str(exc)
-        return result
-
-    result["elapsed_sec"] = round(time.monotonic() - started, 1)
-    stdout = (completed.stdout or "").strip()
-    if completed.returncode == 0 and stdout:
-        result["reachable"] = True
-        result["detail"] = stdout[:200]
-    else:
-        result["detail"] = (
-            (completed.stderr or completed.stdout or "pi CLI returned no output").strip()[:500]
-        )
+    reply = engine.run(AiRequest(
+        images=[],
+        text="Reply with the single word OK",
+        schema={
+            "type": "object", "required": ["reply"],
+            "properties": {"reply": {"type": "string"}},
+        },
+        timeout_sec=PING_TIMEOUT_SEC,
+    ))
+    result = {
+        "provider": engine.provider,
+        "reachable": isinstance(reply, AiReply),
+        "elapsed_sec": round(time.monotonic() - started, 1),
+    }
+    if isinstance(reply, AiFailure):
+        result["failure"] = reply.model_dump(exclude_none=True)
     return result
 
 
 @app.get("/diagnostics")
 async def diagnostics():
-    settings = get_settings()
-    review_model = await asyncio.to_thread(_ping_review_model, settings)
-    review_model["guidance"] = (
-        []
-        if review_model["reachable"]
-        else _reachability_guidance(
-            review_model, settings["pi_bin"], _DIAGNOSTIC_TIMEOUT_SEC
-        )
-    )
-    return {"review_model": review_model}
+    return await asyncio.to_thread(_ping_ai, get_engine())
 
 
 @app.get("/harnesses")
@@ -1813,6 +1768,7 @@ def persist_project_results(project_id: str) -> None:
             clips=project.get("clips", []),
             timeline=project.get("timeline"),
             generation_stats=project.get("generation_stats"),
+            ai_scoring=project.get("ai_scoring"),
         )
     except OSError as exc:
         logger.warning("Could not persist analysis results for %s: %s", project_id, exc)

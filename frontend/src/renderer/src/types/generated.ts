@@ -5,6 +5,29 @@
 /* Do not modify it by hand - just update the pydantic models and then re-run the script
 */
 
+export interface AiFailure {
+  kind:
+    | "not_installed"
+    | "incompatible_version"
+    | "signed_out"
+    | "usage_limit"
+    | "rate_limited"
+    | "timed_out"
+    | "network"
+    | "unusable_reply"
+    | "engine_error"
+    | "cancelled"
+    | "ai_not_connected"
+    | "ai_off_for_project";
+  provider?: ("claude" | "chatgpt") | null;
+  message: string;
+  action: "open_providers" | "sign_in" | "retry" | "wait" | "none";
+  detail?: string | null;
+  resets_at?: string | null;
+  window?: ("5h" | "weekly") | null;
+  retry_after_sec?: number | null;
+  timeout_sec?: number | null;
+}
 export interface AssemblyResult {
   harness_id?: string;
   harness_version?: string;
@@ -62,6 +85,12 @@ export interface CreativeVersionItem {
   transform?: {
     [k: string]: unknown;
   };
+}
+export interface DiagnosticsResult {
+  provider: string;
+  reachable: boolean;
+  elapsed_sec: number;
+  failure?: AiFailure | null;
 }
 export interface FrameSample {
   timestamp: number;

@@ -3835,6 +3835,16 @@ a {
   color: var(--yellow);
 }
 
+.chat-failure {
+  border-color: var(--border-warning);
+  background: var(--bg-warning);
+}
+
+.chat-failure-action {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
 .chat-busy {
   align-self: flex-start;
   display: flex;

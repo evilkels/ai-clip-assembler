@@ -15,6 +15,7 @@ import type { ReviewConversation } from '../hooks/useReviewConversation';
 import { ProposalCard } from './ProposalCard';
 import { ScriptRunCard } from './ScriptRunCard';
 import { SegmentedControl } from './SegmentedControl';
+import { useOpenSettings } from '../state/SettingsPanelContext';
 
 interface ReviewChatPanelProps {
   conversation: ReviewConversation;
@@ -47,6 +48,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
     runningScript,
     error,
     send,
+    retryKickoff,
     runScript,
     resolveProposal,
     staleProposalIds,
@@ -56,6 +58,7 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
     clearHistory,
   } = conversation;
   const [mode, setMode] = useState<ComposerMode>('message');
+  const openSettings = useOpenSettings();
   const [messageDraft, setMessageDraft] = useState('');
   const [scriptDraft, setScriptDraft] = useState('');
   const scriptRef = useRef<HTMLTextAreaElement>(null);
@@ -171,11 +174,24 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
       >
         {messages.map((message) => {
           const { script, proposal } = message;
+          const failure = message.role === 'agent' ? message.payload.failure : undefined;
+          const retryText = failure && message.reply_to_message_id
+            ? messages.find((item) => item.message_id === message.reply_to_message_id)?.text
+            : undefined;
+          const retryAvailable = message.reply_to_message_id ? Boolean(retryText) : true;
+          const failureAction = failure?.action === 'open_providers' || failure?.action === 'sign_in'
+            ? { label: 'Open AI settings', run: () => openSettings('ai') }
+            : failure?.action === 'retry' || failure?.action === 'wait'
+              ? retryAvailable
+                ? { label: 'Try again', run: () => { if (retryText) void send(retryText); else void retryKickoff(); } }
+                : null
+              : null;
           return (
             <article
               key={message.message_id}
-              className={`chat-msg chat-${message.role}${script ? ' chat-script' : ''}`}
+              className={`chat-msg chat-${message.role}${script ? ' chat-script' : ''}${failure ? ' chat-failure' : ''}`}
               data-message-id={message.message_id}
+              data-testid={failure ? 'chat-failure' : undefined}
               aria-label={`${message.role === 'agent' ? 'AI' : 'You'} message at ${formatMessageTime(message.created_at)}`}
             >
               <header className="chat-msg-meta">
@@ -183,6 +199,16 @@ export function ReviewChatPanel({ conversation }: ReviewChatPanelProps) {
                 <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>
               </header>
               {message.text ? <p className="chat-msg-body">{message.text}</p> : null}
+              {failureAction ? (
+                <button
+                  type="button"
+                  className="btn subtle chat-failure-action"
+                  onClick={failureAction.run}
+                  disabled={busy}
+                >
+                  {failureAction.label}
+                </button>
+              ) : null}
               {script ? (
                 <ScriptRunCard
                   script={script}

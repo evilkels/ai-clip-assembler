@@ -20,7 +20,7 @@ import type {
   VideoMetadata,
 } from '../types/clip';
 import { mockClips } from './mockClips';
-import type { ClipSuggestion, ScriptRun } from '../types/generated';
+import type { AiFailure, ClipSuggestion, DiagnosticsResult, ScriptRun } from '../types/generated';
 import type { VersionSet } from '../types/version';
 import type { ReviewModelAccountStatus } from '../../../shared/reviewModelAuth';
 import type { UpdateStatus } from '../../../shared/updateStatus';
@@ -145,6 +145,7 @@ export interface FolderProjectResult {
   selected_harness?: string;
   effective_harness?: string | null;
   generation_stats?: ClipGenerationStats | null;
+  metadata?: AnalysisResult['metadata'] | null;
 }
 
 export async function createProjectFromFolder(folderPath: string): Promise<FolderProjectResult> {
@@ -753,7 +754,7 @@ export interface ReviewMessage {
   reply_to_message_id: string | null;
   proposal: Proposal | null;
   script?: ScriptRun | null;
-  payload: Record<string, unknown> & { version_set?: VersionSet };
+  payload: Record<string, unknown> & { version_set?: VersionSet; failure?: AiFailure };
 }
 
 export interface ReviewSession {
@@ -907,23 +908,44 @@ export async function updateSettings(changes: SettingsUpdate): Promise<SettingsR
   return res.json() as Promise<SettingsResponse>;
 }
 
-export interface ReviewModelDiagnostic {
-  binary: { configured: string; resolved: string | null; found: boolean };
-  provider: string;
-  model: string;
-  reachable: boolean;
-  elapsed_sec: number | null;
-  detail: string;
-  /** Ordered remediation steps; empty when the model is reachable. */
-  guidance?: string[];
-}
-
-export interface Diagnostics {
-  review_model: ReviewModelDiagnostic;
-}
-
-export async function getDiagnostics(): Promise<Diagnostics> {
+export async function getDiagnostics(): Promise<DiagnosticsResult> {
   const res = await fetch(`${backendUrl()}/diagnostics`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Diagnostics failed: ${res.status}`);
-  return res.json() as Promise<Diagnostics>;
+  return res.json() as Promise<DiagnosticsResult>;
+}
+
+export async function resumeAiScoring(projectId: string): Promise<AnalysisResult> {
+  const res = await fetch(`${backendUrl()}/projects/${encodeURIComponent(projectId)}/ai-scoring/resume`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Unable to finish AI scoring: ${res.status}`);
+  }
+  const raw = (await res.json()) as {
+    project_id: string;
+    harness_id: string;
+    selected_harness?: string;
+    effective_harness?: string;
+    status: string;
+    clips: BackendClipSuggestion[];
+    sequence: AnalysisResult['sequence'];
+    recommendation: AnalysisResult['recommendation'];
+    generation_stats?: ClipGenerationStats;
+    metadata?: AnalysisResult['metadata'];
+    notices?: AnalysisResult['notices'];
+  };
+  return {
+    project_id: raw.project_id,
+    harness_id: raw.harness_id,
+    selected_harness: raw.selected_harness,
+    effective_harness: raw.effective_harness,
+    status: raw.status,
+    clips: raw.clips.map(mapBackendClip),
+    sequence: raw.sequence,
+    recommendation: raw.recommendation,
+    generation_stats: raw.generation_stats,
+    metadata: raw.metadata,
+    notices: raw.notices,
+  };
 }

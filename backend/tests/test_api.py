@@ -23,7 +23,8 @@ from src.models import (
     TimelineSequence,
     VideoMetadata,
 )
-from support import FakeEmbeddingProvider
+from support import FakeEmbeddingProvider, fake_engine
+from src.ai_engines.pi import PiEngine
 from src.review_state import sequence_fingerprint
 from src.timeline_script import ScriptResult
 
@@ -208,7 +209,7 @@ def test_analyze_refuses_pi_agent_without_cloud_ai_consent(monkeypatch, tmp_path
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("pi harness must not run without cloud AI consent")
 
-    monkeypatch.setattr(api, "enhance_clips_with_pi_cli", fail_if_called)
+    monkeypatch.setattr(api, "get_engine", fail_if_called)
 
     response = client.post(
         f"/projects/{project_id}/analyze",
@@ -1546,7 +1547,9 @@ def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
         ),
     )
 
-    def fake_enhance(result, frames, **kwargs):
+    from src.ai_scoring import ScoringOutcome
+
+    def fake_enhance(engine, result, frames, **kwargs):
         enhanced = result.model_copy(
             update={
                 "clips": [
@@ -1562,9 +1565,9 @@ def test_analyze_pi_agent_harness_returns_enhanced_clips(monkeypatch, tmp_path):
                 "harness_id": "pi_agent",
             }
         )
-        return enhanced, True
+        return ScoringOutcome(enhanced, True, None, 1, 0)
 
-    monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+    monkeypatch.setattr("src.api.analysis_service.enhance_clips", fake_enhance)
     api.projects[project_id]["cloud_ai_consent"] = True
 
     response = client.post(
@@ -1649,16 +1652,13 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
         ),
     )
 
-    def fake_enhance(result, frames, **kwargs):
-        fallback = result.model_copy(
-            update={
-                "metadata": {"warning": "pi harness fallback: CLI unavailable or no usable scores", "used_ai": False},
-                "harness_id": "pi_agent",
-            }
-        )
-        return fallback, False
+    from src.ai_engines.messages import make_failure
+    from src.ai_scoring import ScoringOutcome
 
-    monkeypatch.setattr("src.api.enhance_clips_with_pi_cli", fake_enhance)
+    def fake_enhance(engine, result, frames, **kwargs):
+        return ScoringOutcome(result, False, make_failure("engine_error", "chatgpt"), 0, 1)
+
+    monkeypatch.setattr("src.api.analysis_service.enhance_clips", fake_enhance)
     api.projects[project_id]["cloud_ai_consent"] = True
 
     response = client.post(
@@ -1674,8 +1674,8 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
     assert body["effective_harness"] == "manual"
     assert body["clips"][0]["overall_score"] == 8
     assert body["metadata"]["used_ai"] is False
-    assert "DJI_0001.MP4" in body["metadata"]["warning"]
-    assert "file-1" in body["metadata"]["warning"]
+    assert body["metadata"]["failure"]["kind"] == "engine_error"
+    assert body["metadata"]["clips_left"] == 1
     assert api.projects[project_id]["harness_id"] == "manual"
     assert api.projects[project_id]["selected_harness"] == "pi_agent"
 
@@ -1685,6 +1685,129 @@ def test_analyze_pi_agent_fallback_when_cli_unavailable(monkeypatch, tmp_path):
     assert rederived.json()["harness_id"] == "manual"
     assert rederived.json()["selected_harness"] == "pi_agent"
     assert rederived.json()["effective_harness"] == "manual"
+
+
+def _prepare_batched_ai_project(monkeypatch, tmp_path):
+    api.projects.clear()
+    client, project_id, _ = create_folder_project_with_video(tmp_path, filename="DJI_0001.MP4")
+    project = api.projects[project_id]
+    project["selected_harness"] = "pi_agent"
+    project["cloud_ai_consent"] = True
+    monkeypatch.setattr(api, "run_vidstabdetect", lambda **_kwargs: None)
+    monkeypatch.setattr(api, "detect_scenes", lambda _path: [])
+
+    saved_samples = []
+
+    def extract(**kwargs):
+        frames_dir = Path(kwargs["frames_dir"])
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        samples = []
+        for index in range(6):
+            path = frames_dir / f"frame-{index}.jpg"
+            path.write_bytes(f"frame-{index}".encode())
+            sample = FrameSample(timestamp=index * 10 + 1, frame_path=str(path))
+            samples.append(sample)
+            saved_samples.append(sample)
+        return samples
+
+    monkeypatch.setattr(api, "extract_frames", extract)
+    monkeypatch.setattr(api, "score_samples_rule_based", lambda _samples: [
+        scored_frame(sample.timestamp).model_copy(update={"frame_path": sample.frame_path})
+        for sample in saved_samples
+    ])
+
+    def assemble(file_id, file_name, **_kwargs):
+        clips = [ClipSuggestion(
+            clip_id=f"clip-{index}", file_id=file_id, file_name=file_name,
+            start_sec=index * 10, end_sec=index * 10 + 3, duration_sec=3,
+            smoothness_score=8, visual_interest_score=0, overall_score=8,
+            ai_reason="Stable 8.0/10",
+        ) for index in range(6)]
+        return AssemblyResult(
+            clips=clips,
+            sequence=TimelineSequence(total_duration_sec=18, clips=[clip.clip_id for clip in clips]),
+        )
+
+    monkeypatch.setattr(api, "assemble_smooth_clips", assemble)
+    return client, project_id
+
+
+def test_analyze_records_ai_failure_and_reopen(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    bin_path, _log = fake_engine(tmp_path / "initial", scenario="usage_limit")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
+
+    response = client.post(f"/projects/{project_id}/analyze", json={
+        "project_id": project_id, "harness_id": "pi_agent", "preferences": {},
+    })
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metadata"]["per_video"][0]["failure"]["kind"] == "usage_limit"
+    assert body["effective_harness"] == "manual"
+    reopened = client.post("/projects/from-folder", json={
+        "folder_path": api.projects[project_id]["project_folder"],
+    })
+    assert reopened.status_code == 200
+    assert reopened.json()["metadata"] == body["metadata"]
+
+
+def test_ai_scoring_resume_scores_only_uncached_clips(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    first_bin, first_log = fake_engine(tmp_path / "initial", scenario="ok,usage_limit")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(first_bin), "openai-codex", "fake"))
+    response = client.post(f"/projects/{project_id}/analyze", json={
+        "project_id": project_id, "harness_id": "pi_agent", "preferences": {},
+    })
+    assert response.status_code == 200
+    assert first_log.exists(), response.json().get("metadata")
+    assert len(first_log.read_text().splitlines()) == 2
+
+    resume_bin, resume_log = fake_engine(tmp_path / "resume", scenario="ok")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(resume_bin), "openai-codex", "fake"))
+
+    def unexpected(**_kwargs):
+        raise AssertionError("resume must use saved analysis data")
+
+    monkeypatch.setattr(api, "run_vidstabdetect", unexpected)
+    monkeypatch.setattr(api, "extract_frames", unexpected)
+    resumed = client.post(f"/projects/{project_id}/ai-scoring/resume")
+
+    assert resumed.status_code == 200
+    assert resumed.json()["effective_harness"] == "pi_agent"
+    assert resumed.json()["metadata"]["clips_left"] == 0
+    records = [json.loads(line) for line in resume_log.read_text().splitlines()]
+    assert len(records) == 1
+    assert len(records[0]["opened"]) == 1
+    assert any("clip-1-frame-1.jpg" in arg for arg in records[0]["argv"])
+    assert api.projects[project_id]["analysis_progress"]["phase"] == "complete"
+
+
+def test_ai_scoring_resume_requires_project_ai_permission_for_manual_selection(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    project = api.projects[project_id]
+    project["ai_scoring"] = {"failure": {"kind": "usage_limit"}, "clips_left": 1, "per_video": []}
+    project["selected_harness"] = "manual"
+    project["cloud_ai_consent"] = False
+    bin_path, log_path = fake_engine(tmp_path / "resume", scenario="ok")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
+
+    response = client.post(f"/projects/{project_id}/ai-scoring/resume")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "AI is off for this project. Turn it on in Settings › AI."
+    assert not log_path.exists()
+
+
+def test_ai_scoring_resume_rejects_existing_analysis_progress(monkeypatch, tmp_path):
+    client, project_id = _prepare_batched_ai_project(monkeypatch, tmp_path)
+    api.projects[project_id]["ai_scoring"] = {"failure": {"kind": "usage_limit"}, "clips_left": 1}
+    api.projects[project_id]["analysis_progress"] = {"phase": "analyzing"}
+
+    response = client.post(f"/projects/{project_id}/ai-scoring/resume")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Analysis already in progress for this project"
 
 
 def test_rederive_clips_changes_effective_harness_without_changing_selected(monkeypatch, tmp_path):
@@ -2730,18 +2853,21 @@ def test_review_turn_uses_consented_agent_for_manual_selected_harness(monkeypatc
     client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
     api._proposal_store = api.ProposalStore()
     api.projects[project_id]["cloud_ai_consent"] = True
-
-    def consented_agent(_context):
-        return {"message": "The review agent is ready.", "operations": [], "versions": []}
-
-    monkeypatch.setattr(api, "default_review_agent", consented_agent)
-    monkeypatch.setattr(api, "_review_agent", consented_agent)
+    api.projects[project_id]["selected_harness"] = "manual"
+    reply = '{"message": "The review agent is ready.", "operations": [], "versions": []}'
+    bin_path, log_path = fake_engine(tmp_path / "fake", reply=reply)
+    monkeypatch.setattr(
+        api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake")
+    )
+    monkeypatch.setattr(api, "_review_agent", api._DEFAULT_ENGINE_AGENT)
 
     turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
 
     assert turn.status_code == 200
+    assert api.projects[project_id]["selected_harness"] == "manual"
     assert turn.json()["message"] == "The review agent is ready."
     assert turn.json()["proposal"] is None
+    assert len(log_path.read_text().splitlines()) == 1
 
 
 def test_review_turn_requires_consent_for_both_surfaces(monkeypatch, tmp_path):
@@ -2752,16 +2878,15 @@ def test_review_turn_requires_consent_for_both_surfaces(monkeypatch, tmp_path):
     def cloud_agent_must_not_run(_context):
         raise AssertionError("default review agent must not run without cloud AI consent")
 
-    monkeypatch.setattr(api, "default_review_agent", cloud_agent_must_not_run)
-    monkeypatch.setattr(api, "_review_agent", cloud_agent_must_not_run)
+    monkeypatch.setattr(api, "_review_agent", api._DEFAULT_ENGINE_AGENT)
+    monkeypatch.setattr(
+        api, "get_engine", lambda: (_ for _ in ()).throw(AssertionError("engine must not run"))
+    )
 
     turn = client.post(f"/projects/{project_id}/review/turn", json={"message": "make it good"})
 
     assert turn.status_code == 200
-    assert turn.json()["message"] == (
-        "Conversational suggestions need cloud AI consent for this project. "
-        "Grant consent to enable the In-App Review Agent."
-    )
+    assert turn.json()["message"] == "AI is off for this project. Turn it on in Settings › AI."
     assert turn.json()["proposal"] is None
 
 
@@ -2880,6 +3005,52 @@ def test_review_kickoff_runs_a_proactive_turn(monkeypatch, tmp_path):
     assert "Analysis just finished" in seen["user_message"]
 
 
+def test_review_kickoff_stages_extracted_frames_for_engine(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["cloud_ai_consent"] = True
+    project_samples = api.samples_dir(project_id)
+    project_samples.mkdir(parents=True, exist_ok=True)
+    frame_path = project_samples / "sample.jpg"
+    frame_path.write_bytes(b"jpg")
+    bin_path, log_path = fake_engine(tmp_path / "engine", reply='{"message":"Ready.","operations":[]}')
+    engine = PiEngine(str(bin_path), "openai-codex", "fake")
+    monkeypatch.setattr(api, "get_engine", lambda: engine)
+    monkeypatch.setattr(api, "mcp_frame_paths", lambda _project_id, _clip_id: [str(frame_path)])
+
+    response = client.post(f"/projects/{project_id}/review/kickoff")
+
+    assert response.status_code == 200
+    records = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(records) == 1
+    assert any("frame-01.jpg" in arg for arg in records[0]["argv"])
+
+
+def test_review_kickoff_retries_failed_opening_turn_but_keeps_success_idempotent(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api._proposal_store = api.ProposalStore()
+    api.projects[project_id]["cloud_ai_consent"] = True
+    bin_path, log_path = fake_engine(tmp_path / "retry", scenario="usage_limit,ok")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(bin_path), "openai-codex", "fake"))
+
+    first = client.post(f"/projects/{project_id}/review/kickoff")
+    assert first.status_code == 200
+    first_agent_message = first.json()["agent_message"]
+    assert first_agent_message["payload"]["failure"]["kind"] == "usage_limit"
+
+    second = client.post(f"/projects/{project_id}/review/kickoff")
+    assert second.status_code == 200
+    second_agent_message = second.json()["agent_message"]
+    assert second_agent_message["message_id"] != first_agent_message["message_id"]
+    assert second_agent_message["payload"].get("failure") is None
+
+    third = client.post(f"/projects/{project_id}/review/kickoff")
+    records = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert third.status_code == 200
+    assert third.json()["agent_message"]["message_id"] == second_agent_message["message_id"]
+    assert len(records) == 2
+
+
 def test_clear_review_session_starts_a_fresh_transcript(monkeypatch, tmp_path):
     client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
     api._proposal_store = api.ProposalStore()
@@ -2972,7 +3143,6 @@ def _script_project(monkeypatch, tmp_path):
     def agent_must_not_run(_context):
         raise AssertionError("running a script must not call the review agent")
 
-    monkeypatch.setattr(api, "default_review_agent", agent_must_not_run)
     monkeypatch.setattr(api, "_review_agent", agent_must_not_run)
     return client, project_id
 
@@ -3275,42 +3445,36 @@ async def test_staging_a_large_script_recording_does_not_block_the_event_loop(mo
     assert longest_stall < 0.5
 
 
-def diagnostic_result(found=True, detail="", model="gpt-5.4-mini", provider="openai-codex"):
-    return {
-        "binary": {"configured": "pi", "resolved": "/usr/local/bin/pi" if found else None, "found": found},
-        "provider": provider,
-        "model": model,
-        "reachable": False,
-        "elapsed_sec": 0.2,
-        "detail": detail,
-    }
+def test_diagnostics_reachable(tmp_path, monkeypatch):
+    binary, _log = fake_engine(tmp_path, reply='{"reply":"OK"}')
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(binary), "openai-codex", "fake"))
+
+    response = TestClient(api.app).get("/diagnostics")
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "chatgpt"
+    assert response.json()["reachable"] is True
+    assert "review_model" not in response.json()
 
 
-def test_diagnostics_guides_a_missing_binary_towards_the_gui_path_gap(monkeypatch):
-    """The packaged app inherits a minimal PATH, so this is the likeliest failure."""
-    monkeypatch.setattr(api, "_ping_review_model", lambda settings: diagnostic_result(found=False))
-    guidance = TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"]
+def test_diagnostics_signed_out(tmp_path, monkeypatch):
+    binary, _log = fake_engine(tmp_path, scenario="signed_out")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(binary), "openai-codex", "fake"))
 
-    assert any("which pi" in step for step in guidance)
-    assert any("/opt/homebrew/bin/pi" in step for step in guidance)
-    assert any("PI_BIN=" in step for step in guidance)
+    response = TestClient(api.app).get("/diagnostics")
 
-
-def test_diagnostics_guidance_matches_the_failure_kind(monkeypatch):
-    cases = {
-        "No API key found for openai-codex": "Connections",
-        "unknown model gpt-9": "Settings",
-        "getaddrinfo ENOTFOUND api.openai.com": "network",
-        "No response within 45s": "again",
-    }
-    for detail, expected in cases.items():
-        monkeypatch.setattr(api, "_ping_review_model", lambda settings, d=detail: diagnostic_result(detail=d))
-        guidance = TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"]
-        assert guidance, detail
-        assert any(expected in step for step in guidance), (detail, guidance)
+    assert response.status_code == 200
+    assert response.json()["reachable"] is False
+    assert response.json()["failure"]["kind"] == "signed_out"
 
 
-def test_diagnostics_omits_guidance_when_the_model_is_reachable(monkeypatch):
-    reachable = {**diagnostic_result(), "reachable": True, "detail": "OK"}
-    monkeypatch.setattr(api, "_ping_review_model", lambda settings: reachable)
-    assert TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"] == []
+def test_diagnostics_timed_out(tmp_path, monkeypatch):
+    binary, _log = fake_engine(tmp_path, scenario="hang")
+    monkeypatch.setattr(api, "get_engine", lambda: PiEngine(str(binary), "openai-codex", "fake"))
+    monkeypatch.setattr(api, "PING_TIMEOUT_SEC", 1.0)
+
+    response = TestClient(api.app).get("/diagnostics")
+
+    assert response.status_code == 200
+    assert response.json()["reachable"] is False
+    assert response.json()["failure"]["kind"] == "timed_out"

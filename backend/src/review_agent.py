@@ -7,25 +7,25 @@ of mutating the live Timeline Document. Accepting **replays** the operations
 through the operations core (so they land in Undo History); rejecting discards
 them. Read access runs normally (provided here as context).
 
-The actual model call is injected as an ``agent`` callable so the loop is
-deterministic and testable; the default implementation reuses
-``pi_cli_harness``'s provider/model env-config.
+The engine call is injected as an ``agent`` callable so the loop is
+deterministic and testable.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import logging
-import os
-import subprocess
 import uuid
 from contextlib import nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
+from .ai_engines.engine import AiEngine, REVIEW_TIMEOUT_SEC
+from .ai_engines.messages import make_failure
+from .ai_engines.payload import strip_paths
+from .ai_engines.types import AiFailure, AiRequest
 from .models import (
     CreativeVersion,
     CreativeVersionItem,
@@ -38,8 +38,6 @@ from .models import (
     TimelineItem,
     VersionSet,
 )
-from .app_settings import get_settings
-from .pi_cli_harness import REPO_ROOT
 from .project_store import read_review_session, write_review_session
 from .review_state import review_context_fingerprint, sequence_fingerprint
 from .timeline_ops import (
@@ -51,9 +49,6 @@ from .timeline_ops import (
     seeded_item_ids,
 )
 from .timeline_script import API_REFERENCE, run_script
-
-
-logger = logging.getLogger("uvicorn.error")
 
 
 class ReviewAgentError(Exception):
@@ -438,7 +433,7 @@ def _script_result(message: ReviewMessage, session: ReviewSession) -> dict:
 
 # Signature of the injectable model call: given read context, return a message
 # and the mutating operations to stage.
-ReviewAgent = Callable[[dict], dict]
+ReviewAgent = Callable[[dict], Union[dict, AiFailure]]
 
 
 async def run_review_turn(
@@ -453,6 +448,8 @@ async def run_review_turn(
     candidate_frames: Optional[List[dict]] = None,
     client_message_id: Optional[str] = None,
     library: Optional[List[dict]] = None,
+    samples_dir: Optional[Path] = None,
+    fallback_versions: bool = False,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -505,7 +502,19 @@ async def run_review_turn(
         "history": [message.model_dump() for message in store.session(project_id).messages],
         "candidate_frames": candidate_frames or [],
     }
+    if samples_dir is not None:
+        context["samples_dir"] = samples_dir
     reply = agent(context)
+    if isinstance(reply, AiFailure):
+        payload = {"failure": reply.model_dump(exclude_none=True)}
+        agent_message = store.append_message(
+            project_id,
+            role="agent",
+            text=reply.message,
+            payload=payload,
+            reply_to_message_id=editor_message.message_id if editor_message else None,
+        )
+        return _turn_result(agent_message, store.session(project_id))
     message = reply.get("message", "")
     source = reply.get("script")
     operations = reply.get("operations") or []
@@ -538,7 +547,7 @@ async def run_review_turn(
     payload = dict(reply.get("payload") or {})
     payload.pop("versions", None)
     # A turn that edits and brings no valid Versions gets none fabricated (plan 034 D8).
-    if validated_versions or not (source or operations):
+    if validated_versions or (fallback_versions and not (source or operations)):
         if not validated_versions:
             validated_versions = [
                 version.model_dump() for version in deterministic_versions(bounded_candidates)
@@ -567,25 +576,28 @@ async def run_review_turn(
 
 def _turn_result(agent_message: ReviewMessage, session: ReviewSession) -> dict:
     proposal = agent_message.proposal
-    return {
+    result = {
         "message": agent_message.text,
         "proposal": proposal.model_dump() if proposal else None,
         "agent_message": agent_message.model_dump(),
         "session": session.model_dump(),
     }
+    failure = agent_message.payload.get("failure")
+    if failure is not None:
+        result["failure"] = failure
+    return result
 
 
-# --- Default model-backed agent (reuses pi_cli_harness env-config) ----------
+# --- Engine-backed agent -------------------------------------------------------
 #
-# Not unit-tested (needs the pi CLI + network); tests inject a stub `agent`.
-# Degrades gracefully to a chat-only reply on any failure so the app never
-# crashes and never silently edits the timeline.
+# An engine failure comes back as an AiFailure, which run_review_turn stores as
+# a failed turn with no Versions (plan 038 D5), so the timeline is never edited.
 
 OPERATION_CATALOGUE = ", ".join(OPERATIONS.keys())
 
 _AGENT_PROMPT = (
     "You are a creative video editor reviewing local drone footage. Compare the "
-    "labelled frame samples and technical scores. Technical smoothness is "
+    "attached labelled frame samples and technical scores. Technical smoothness is "
     "authoritative; use images for subject, composition, progression, and "
     "redundancy. You PROPOSE edits; the editor accepts or rejects them.\n\n"
     "Available timeline operations (and their args): {catalogue}.\n"
@@ -806,46 +818,70 @@ def deterministic_versions(candidates: List[dict]) -> List[CreativeVersion]:
     return versions
 
 
-def default_review_agent(context: dict) -> dict:
-    """Call the pi CLI for a propose-mode turn; degrade to chat-only on failure."""
-    prompt = _AGENT_PROMPT.format(
-        catalogue=OPERATION_CATALOGUE,
-        api_reference=API_REFERENCE,
-        candidates=json.dumps(context.get("candidates", []))[:6000],
-        candidate_frames=json.dumps(context.get("candidate_frames", []))[:4000],
-        timeline=json.dumps(context.get("timeline", {}))[:6000],
-        history=json.dumps(context.get("history", [])[-12:])[:6000],
-        user_message=context.get("user_message", ""),
-    )
-    frame_paths = [
-        frame["frame_path"]
-        for frame in context.get("candidate_frames", [])[:12]
-        if frame.get("frame_path")
-    ]
-    settings = get_settings()
-    command = [
-        settings["pi_bin"], "--provider", settings["pi_provider"],
-        "--model", settings["pi_model"],
-        "--print", "--mode", "text", "--no-session", "--no-context-files",
-        "--no-skills", "--no-extensions", "--tools", "read",
-        *[f"@{path}" for path in frame_paths], prompt,
-    ]
-    try:
-        completed = subprocess.run(
-            command, capture_output=True, stdin=subprocess.DEVNULL, text=True,
-            timeout=settings["pi_timeout_sec"], cwd=str(REPO_ROOT),
-            env=os.environ.copy(),
+_REVIEW_SCHEMA = {
+    "type": "object",
+    "required": ["message"],
+    "properties": {
+        "message": {"type": "string"},
+        "operations": {"type": "array", "items": {"type": "object"}},
+        "script": {"type": "string"},
+        "versions": {"type": "array", "items": {"type": "object"}},
+    },
+    "additionalProperties": True,
+}
+
+
+def engine_review_agent(engine: AiEngine) -> ReviewAgent:
+    def agent(context: dict):
+        candidates = context.get("candidates", [])
+        frames = [
+            frame for frame in context.get("candidate_frames", [])
+            if frame.get("frame_path")
+        ][:12]
+        images = [Path(frame["frame_path"]) for frame in frames]
+        labels = [
+            {
+                "clip_id": frame.get("clip_id"),
+                "file_name": Path(frame.get("file_name") or "").name,
+                "scene_id": frame.get("scene_id"),
+                "start_sec": frame.get("start_sec"),
+                "end_sec": frame.get("end_sec"),
+                "frame": f"frame-{index:02d}.jpg",
+            }
+            for index, frame in enumerate(frames, start=1)
+        ]
+        candidate_text = json.dumps([
+            {key: value for key, value in item.items() if key not in {"frame_path", "file_path"}}
+            for item in candidates
+        ])
+        prompt = _AGENT_PROMPT.format(
+            catalogue=OPERATION_CATALOGUE,
+            api_reference=API_REFERENCE,
+            candidates=strip_paths(candidate_text)[:6000],
+            candidate_frames=strip_paths(json.dumps(labels))[:4000],
+            timeline=strip_paths(json.dumps(context.get("timeline", {})))[:6000],
+            history=strip_paths(json.dumps(context.get("history", [])[-12:]))[:6000],
+            user_message=strip_paths(context.get("user_message", "")),
         )
-        if completed.returncode != 0 or not (completed.stdout or "").strip():
-            raise ReviewAgentError((completed.stderr or "pi CLI returned no output").strip())
-        parsed = _parse_agent_json(completed.stdout)
-        parsed["versions"] = _validate_versions(
-            parsed.get("versions") or [], context.get("candidates", [])
-        )
+        reply = engine.run(AiRequest(
+            images=images,
+            text=prompt,
+            schema=_REVIEW_SCHEMA,
+            timeout_sec=REVIEW_TIMEOUT_SEC,
+            samples_dir=context.get("samples_dir"),
+            image_limit=12,
+        ))
+        if isinstance(reply, AiFailure):
+            return reply
+        parsed = dict(reply.data)
+        if (
+            not isinstance(parsed.get("message"), str)
+            or ("operations" in parsed and not isinstance(parsed["operations"], list))
+            or ("versions" in parsed and not isinstance(parsed["versions"], list))
+            or ("script" in parsed and not isinstance(parsed["script"], str))
+        ):
+            return make_failure("unusable_reply", engine.provider)
+        parsed["versions"] = _validate_versions(parsed.get("versions") or [], candidates)
         return parsed
-    except (OSError, ValueError, ReviewAgentError, subprocess.TimeoutExpired) as exc:
-        logger.warning("review agent unavailable, replying chat-only: %s", exc)
-        return {
-            "message": "I couldn't reach the review model just now, so I have no edits to propose.",
-            "operations": [],
-        }
+
+    return agent

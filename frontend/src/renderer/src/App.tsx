@@ -8,6 +8,7 @@ import { AppShell } from './layouts/AppShell';
 import { ReviewProvider } from './state/ReviewContext';
 import { StepGateProvider } from './state/StepGateContext';
 import { ThemeProvider } from './state/ThemeContext';
+import { SettingsPanelProvider } from './state/SettingsPanelContext';
 
 function Shell() {
   return (
@@ -31,7 +32,9 @@ export default function App() {
         {/* Routes publish the actions that unblock their step; the shell's
             action bar renders whichever one the derived gate asks for. */}
         <StepGateProvider>
-          <Shell />
+          <SettingsPanelProvider>
+            <Shell />
+          </SettingsPanelProvider>
         </StepGateProvider>
       </ReviewProvider>
     </ThemeProvider>

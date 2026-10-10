@@ -46,6 +46,7 @@ Sizes: S = hours, M = days, L = a week or more of agent work.
 | 0 | **Baseline** | Plans, glossary and decision records match the product; open PRs merged | S | 035 Phase 2, this file |
 | 1 | **A first cut worth keeping, without AI** | More and longer Candidate Clips per Source Video; Medium and Long edits fill their target | S–M | [037](plans/037-extraction-quality.md) (includes the cross-video quota fix from 027) |
 | 1b | **Exports that open** (alongside 1) | FCPXML opens in Final Cut, Resolve XML in Resolve, without relinking; automated checks guard both | M | [032](plans/032-valid-fcpxml-and-nle-verification.md) |
+| 1c | **iPhone footage end to end** (after 1b) | Phone clips export at 59.94 in shooting order, upright; Review and Timeline previews fit vertical video; exports are named after the Project | S–M | [041](plans/041-iphone-footage.md) |
 | 2 | **Honest AI errors** | "ChatGPT limit reached, resets 14:00 — your earlier suggestions are kept"; nothing beyond Frame Samples and text leaves the Mac | M | [038](plans/038-ai-connection.md) Phases 1–2 (replaces [030](plans/done/030-truthful-ai-usage.md)'s remainder) |
 | 3 | **Connect Claude or ChatGPT** | A welcome wizard and a Providers screen like T3 Code's: installed → signed in → ready, with Download, Sign in and Check again; Connect and allow; AI On / Off per project | L | [038](plans/038-ai-connection.md) Phases 3–6 |
 | 4 | **The AI edits like a Resolve console** | Ask for a story cut; the AI looks across the whole library, runs its Script, fixes its own errors, and shows one Proposal; Apply puts it on the Timeline | L | [review-visual-editing](plans/review-visual-editing.md) (absorbs agent-operable-timeline) |
@@ -62,6 +63,9 @@ Sizes: S = hours, M = days, L = a week or more of agent work.
   count, median length, and how full each edit gets.
 - **1b beside 1:** export is the product's last step and is independent code.
   Media paths are absolute (owner decision).
+- **1c after 1b:** the owner's own footage is iPhone video; a real-footage run
+  on 2026-10-10 showed 1b's frame-rate rule and the capture time both break on
+  phone VFR, so it lands before any AI milestone is tested on that footage.
 - **2 before 3:** one AI seam with typed failures and a locked-down payload is
   the interface Claude Code and Codex plug into; doing it on today's path first
   makes the visible honesty win early and the vendor work a pure addition.

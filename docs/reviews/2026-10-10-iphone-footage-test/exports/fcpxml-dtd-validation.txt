@@ -1,0 +1,9 @@
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : Element asset content does not follow the DTD, expecting (media-rep+ , metadata?), got 
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : No declaration for attribute src of element asset
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : Element asset content does not follow the DTD, expecting (media-rep+ , metadata?), got 
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : No declaration for attribute src of element asset
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : Element asset content does not follow the DTD, expecting (media-rep+ , metadata?), got 
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : No declaration for attribute src of element asset
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : Element asset content does not follow the DTD, expecting (media-rep+ , metadata?), got 
+/Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml:1: element asset: validity error : No declaration for attribute src of element asset
+Document /Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10/exports/fcp/timeline.fcpxml does not validate against /tmp/iphone-test-dtd/FCPXMLv1_10.dtd

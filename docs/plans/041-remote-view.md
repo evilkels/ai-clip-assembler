@@ -230,7 +230,7 @@ These corrections replace the stale draft's claims:
     - A mutation without CSRF, with `Origin: null` or with a wrong port gets 403.
     - An unexposed Project gets 404.
     - The headers above are present.
-- [ ] 1.7 Add `backend/src/remote/lifecycle.py` and the fd-3 control channel in `backend/packaging/entry.py`. Done when `backend/tests/test_remote_lifecycle.py` starts `packaging/entry.py` as a subprocess with `pass_fds` and shows the cases below.
+- [x] 1.7 Add `backend/src/remote/lifecycle.py` and the fd-3 control channel in `backend/packaging/entry.py`. Done when `backend/tests/test_remote_lifecycle.py` starts `packaging/entry.py` as a subprocess with `pass_fds` and shows the cases below.
   - When `CLIP_ASSEMBLER_CONTROL_FD` is set, a reader thread handles these messages:
     - `enable {owner_login, public_origin, mac_name}`: start a second `uvicorn.Server` for the remote app on `127.0.0.1:0` in the running event loop, mint a new ingress (32 random bytes, base64url), reply `{remote_port, ingress, instance}`.
     - `heartbeat` (every 5 s; the lease expires after 15 s).

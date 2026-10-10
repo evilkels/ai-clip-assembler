@@ -11,3 +11,4 @@ cross-cutting choices with their consequences.
 6. [0006: Review scripts compile to Proposals](0006-review-scripts-compile-to-proposals.md)
 7. [0007: AI Access is granted once, when the Editor connects a Provider](0007-ai-access-is-granted-when-connecting.md)
 8. [0008: AI runs through the Editor's own Claude Code or Codex, which the app never installs](0008-ai-runs-through-the-editors-own-provider-program.md)
+10. [0010: Remote View over the Editor's tailnet stays Local-First](0010-remote-view-over-tailnet.md) — Proposed

@@ -30,7 +30,7 @@ const STEP_LABELS: Record<string, string> = {
   motion_analysis: 'Motion analysis',
   frame_extraction: 'Extracting frames',
   scene_detection: 'Detecting scenes',
-  scoring_clips: 'Scoring clips with AI',
+  scoring_clips: 'Scoring clips',
   complete: 'Complete',
 };
 
@@ -431,7 +431,7 @@ export function ImportPage() {
       <WorkflowHeader
         title="Import"
         step="Step 01 / 04"
-        description="Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates."
+        description="Choose a footage folder or upload video files. Analyze to detect stable clip candidates."
         actions={(
           <>
             <button type="button" className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>

@@ -52,6 +52,7 @@ Decisions so far:
 ## Phase 5: Verify
 
 - [ ] 5.1 Re-run the real-footage test on `main` after Phases 2–4 merge. Done when an addendum to the review records each bug fixed or still open, with screenshots.
+  - Checkpoint 2026-10-10: retest screenshots and exports saved unchanged in `1bacf0a` under `docs/reviews/2026-10-10-iphone-footage-test/retest/`; shooting-order fix is PR #107. The written retest addendum is still absent, so this task remains open. Phase 6 and human checks remain open.
 
 ## Phase 6: Later polish
 

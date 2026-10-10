@@ -69,7 +69,7 @@ Phase order: Phase 1 = Pair + approval, Projects, Footage/uploads, Now on the
 Mac. Phase 2 = Clips grid, Clip player, accept/reject. Phase 3 = Export to
 phone. Later = start/cancel analysis from the phone, light Timeline.
 
-The URL is `https://<mac>.<tailnet>.ts.net:8443/remote/` — a dedicated port, so
+The URL is `https://<mac>.<tailnet>.ts.net:8448/remote/` — a dedicated port, so
 the bookmark never collides with other apps the Editor serves from the Mac.
 
 ## Screens
@@ -241,9 +241,9 @@ Tapping the status pill on any screen opens a bottom sheet:
   ends every session; approved devices reconnect when you turn it back on."
   Below it the live URL with port, and a readiness line that walks the
   prerequisites:
-  `Tailscale installed ✓ · signed in as elvijs@… ✓ · certificate ready ✓ · port 8443 free, Funnel off ✓ · serving ✓`.
+  `Tailscale installed ✓ · signed in as elvijs@… ✓ · certificate ready ✓ · port 8448 free, Funnel off ✓ · serving ✓`.
   Each unmet step has one sentence and, where useful, the manual command.
-- **Conflict state** (port 8443 used by another app, Funnel turned on, or our
+- **Conflict state** (port 8448 used by another app, Funnel turned on, or our
   handler changed): Remote View switches itself off, sessions end, and the
   panel says what it found and that it changed nothing else. Turning it back on
   is deliberate.
@@ -364,7 +364,7 @@ Rules:
 | Code expired / used | Code expired — show a new one on the Mac. | — |
 | Mac declined | The Mac declined this phone. | — |
 | Tailscale missing on Mac | Install Tailscale and sign in, then turn Remote View on. | Open tailscale.com |
-| Port or Funnel conflict (Mac) | Remote View is off: port 8443 is in use by another app / has Funnel on. Nothing else was changed. | Details |
+| Port or Funnel conflict (Mac) | Remote View is off: port 8448 is in use by another app / has Funnel on. Nothing else was changed. | Details |
 
 ## Accessibility
 
@@ -422,7 +422,7 @@ budget to validate on device; previews never fall back to raw footage.
    it ships it uses the Mac's saved scoring choice and AI settings only.
 6. **Lite 480p preview.** Only if the relayed-path test (plan 041 H3) shows
    720p stalls; otherwise one preview size.
-7. **Port 8443 already in use.** Resolved: Remote View refuses to turn on and
+7. **Port 8448 already in use.** Resolved: Remote View refuses to turn on and
    says so; it never picks another port.
 8. **"Show on phone" default.** Resolved: off for every Project until the
    Editor checks it.

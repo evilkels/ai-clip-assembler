@@ -34,7 +34,7 @@ A **Remote View** may be exposed, opt-in, under these conditions, and only
 then is it considered Local-First:
 
 1. **Own devices only.** "Tailnet" here means the Editor's own devices.
-   Exposure is via `tailscale serve` on a dedicated HTTPS port (8443) and a
+   Exposure is via `tailscale serve` on a dedicated HTTPS port (8448) and a
    `/remote` handler. `tailscale funnel`, public URLs, third-party relay or
    media-storage services, and binding any backend listener to a non-loopback
    interface are prohibited. Footage travels phone → Mac encrypted by
@@ -87,7 +87,7 @@ then is it considered Local-First:
 - The earlier "no new network surface" statements in the MCP plan/spec are
   narrowed, not reversed: the MCP endpoint remains loopback-only and is not on
   the remote listener.
-- The app takes a soft dependency on the Tailscale CLI and on port 8443 for this
+- The app takes a soft dependency on the Tailscale CLI and on port 8448 for this
   feature only; everything else works without it.
 - The PRD's "no footage uploaded to any server" is clarified to "no footage
   leaves the Editor's own devices"; the PRD should be amended when this ADR is

@@ -84,6 +84,13 @@ Sizes: S = hours, M = days, L = a week or more of agent work.
 - A sponsorship link (e.g. Buy Me a Coffee), set up outside this repo.
 - More test-footage folders beyond Estepona as milestones need them.
 
+## Experiment before v1.0.0
+
+- **Remote View** ([041](plans/041-remote-view.md)): the app on the Editor's
+  iPhone over their own tailnet: send footage, review clips, get 9:16 MP4s for
+  Instagram. Built ahead of v1.0.0 to learn whether the phone workflow is worth
+  investing in. It is off by default and does not gate any milestone.
+
 ## After v1.0.0
 
 - BPM-assisted cutting to music (v1.1).

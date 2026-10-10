@@ -1,11 +1,11 @@
 # 041: Remote View
 
-The Editor opens `https://<mac>.<tailnet>.ts.net:8443/remote/` on their iPhone, over their own tailnet, pairs once with approval on the Mac, sends footage into a Project with verified resumable uploads, sees what the Mac is doing, reviews Candidate Clips with prepared previews, and gets Phone Exports (rendered MP4s, original or 9:16) back onto the phone for Instagram. Remote View is off by default, and one switch on the Mac blocks all phone access at once.
+The Editor opens `https://<mac>.<tailnet>.ts.net:8448/remote/` on their iPhone, over their own tailnet, pairs once with approval on the Mac, sends footage into a Project with verified resumable uploads, sees what the Mac is doing, reviews Candidate Clips with prepared previews, and gets Phone Exports (rendered MP4s, original or 9:16) back onto the phone for Instagram. Remote View is off by default, and one switch on the Mac blocks all phone access at once.
 
 ## Context
 
 Owner request (2026-10-10). Remote View is not on the v1.0.0
-[ROADMAP](../ROADMAP.md); H7 asks the owner where it goes. Each phase is one
+[ROADMAP](../ROADMAP.md); The owner placed it before v1.0.0 as an experiment (H7). Each phase is one
 PR and one delivery gate. A phase is done only when its physical-iPhone human
 task passes.
 
@@ -35,15 +35,18 @@ UX spec decides what the Editor sees. This plan decides order and scope.
 ### Decisions so far
 
 - **Security over Tailscale comes first.** Exposure is `tailscale serve` only:
-  dedicated HTTPS port **8443**, handler `/remote`, target
+  dedicated HTTPS port **8448**, handler `/remote`, target
   `http://127.0.0.1:<remotePort>/<ingress>/`. The app never runs `tailscale
   funnel` or `tailscale serve reset`. It adds or removes only a handler it can
   prove is its own, and checks that every other Serve entry is unchanged
   (§2.2–2.3).
-- **Port 8443 conflict: refuse.** If another app holds 8443 or Funnel is on
-  for it, enabling fails with "Remote View is off: port 8443 is in use by
-  another app. Nothing else was changed." (or "…has Funnel on…"). The app
-  never picks another port.
+- **Port: 8448 by default, changeable; conflict refuses.** The owner's Mac
+  already serves 8443, so the default is 8448. The Remote View panel has a Port
+  field (stored in app settings; 1024–65535). If another app holds the chosen
+  port or Funnel is on for it, enabling fails with "Remote View is off: port
+  <port> is in use by another app. Nothing else was changed. Choose another
+  port." (or "…has Funnel on…"). The app never picks or switches ports by
+  itself. Elsewhere in this plan, read "8448" as "the configured port".
 - **One Mac-side switch.** Settings → Remote View is off by default. Turning it
   off closes the gate in the backend first: every request fails and SSE and
   media streams end. Then sessions are dropped, the listener stops, and the
@@ -290,17 +293,17 @@ These corrections replace the stale draft's claims:
 - [ ] 1.11 Add `frontend/src/main/tailscaleCli.ts` and `frontend/src/main/remoteViewController.ts` for Serve ownership. Done when `frontend/tests/main/remoteViewController.test.ts` runs against a fake CLI and shows the cases below.
   - Locate the CLI in order: `/Applications/Tailscale.app/Contents/MacOS/Tailscale`, `/opt/homebrew/bin/tailscale`, `/usr/local/bin/tailscale`. Run it with `execFile`, fixed argv and a 10 s timeout.
   - From `status --json`: `BackendState === "Running"`, `Self.DNSName` without the trailing dot, and the owner login from `User[Self.UserID].LoginName`.
-  - Preflight from `serve status --json`: refuse if `<host>:8443` has any handler except one matching the owner record, or `AllowFunnel["<host>:8443"]` is true. Use the 1.2 copy.
-  - Add with `serve --bg --https=8443 --set-path=/remote http://127.0.0.1:<port>/<ingress>/`. Record `{host, port: 8443, mount: "/remote", target}` in `userData/remote-view/serve-owner.json`.
+  - Preflight from `serve status --json`: refuse if `<host>:8448` has any handler except one matching the owner record, or `AllowFunnel["<host>:8448"]` is true. Use the 1.2 copy.
+  - Add with `serve --bg --https=8448 --set-path=/remote http://127.0.0.1:<port>/<ingress>/`. Record `{host, port: 8448, mount: "/remote", target}` in `userData/remote-view/serve-owner.json`.
   - Re-read the config. If anything outside our handler changed, remove ours and report a conflict.
   - Remove with the same flags plus `off`, and only when the live handler equals the record.
-  - Watch every 5 s while enabled. Funnel on, target changed, another handler on 8443, or a different owner login → disable (backend first) and report the conflict. Re-enabling is a deliberate user action.
+  - Watch every 5 s while enabled. Funnel on, target changed, another handler on 8448, or a different owner login → disable (backend first) and report the conflict. Re-enabling is a deliberate user action.
   - The argv builder exports only `status`, `serve status`, `serve add` and `serve off`. The test asserts no path can produce `reset` or `funnel`.
   - The fake CLI is `tests/main/fixtures/fake-tailscale.mjs`: Serve state in a temp JSON file, with every argv logged.
   - Test cases for the done criterion:
     - Enable then disable leaves unrelated entries byte-identical.
-    - 8443 held by another target → refused with the conflict copy.
-    - Funnel on 8443 → refused.
+    - 8448 held by another target → refused with the conflict copy.
+    - Funnel on 8448 → refused.
     - Funnel turned on mid-session → disabled, and only our handler removed.
     - A replaced handler is not removed.
     - A stale owned handler from a crashed run is removed by the startup sweep.
@@ -322,8 +325,8 @@ These corrections replace the stale draft's claims:
   - `RemoteViewPanel.tsx` goes in the panel list of `SettingsModal.tsx`, following UX §9 and the mockup's Mac panel:
     - Toggle, off by default, with the UX copy.
     - Live URL with port.
-    - Five-step readiness line: installed, signed in as …, certificate ready, port 8443 free and Funnel off, serving.
-    - Certificate and serving are proven by main fetching `https://<host>:8443/remote/api/health` and matching `instance`, retrying for up to 2 min and showing "certificate provisioning…" while it retries.
+    - Five-step readiness line: installed, signed in as …, certificate ready, port 8448 free and Funnel off, serving.
+    - Certificate and serving are proven by main fetching `https://<host>:8448/remote/api/health` and matching `instance`, retrying for up to 2 min and showing "certificate provisioning…" while it retries.
     - Conflict state.
     - QR, only when serving is ready.
     - "works once · expires in m:ss" with **New code**.
@@ -331,12 +334,12 @@ These corrections replace the stale draft's claims:
     - **Show on phone**: Recent Projects, unchecked by default, with missing folders disabled.
     - Paired devices: label, login, approved date, last seen, connected dot, path, **Revoke**, and **Revoke all** below.
     - **Keep this Mac awake**.
-  - Main renders the QR with the `qrcode` npm package (`toString(url, {type: 'svg'})`), with no network access. The URL is `https://<host>:8443/remote/#pair=<token>`.
+  - Main renders the QR with the `qrcode` npm package (`toString(url, {type: 'svg'})`), with no network access. The URL is `https://<host>:8448/remote/#pair=<token>`.
   - `layouts/ProjectHeader.tsx` shows "Remote · n" while n ≥ 1 sessions are live. Clicking it opens Settings → Remote View.
   - Test cases for the done criterion:
     - Off by default.
     - The "Install Tailscale and sign in" step copy.
-    - The port-8443 and Funnel conflict copy.
+    - The port-8448 and Funnel conflict copy.
     - QR and countdown.
     - Approve and Deny call the bridge.
     - Show on phone toggles persist.
@@ -380,7 +383,7 @@ These corrections replace the stale draft's claims:
     - A receipt digest mismatch → failed and never "imported".
 - [ ] 1.18 Add the Playwright phone harness. Done when `npx playwright test --project=remote-iphone e2e/remote-pair-upload.spec.ts` passes locally and in CI and shows the cases below.
   - `backend/tests/remote_serve_shim.py` mimics Serve:
-    - It serves HTTPS on `localhost:18443` with a throwaway self-signed certificate made by `openssl req -x509` in a temp directory. It never uses 8443, so it cannot collide with a real Serve on a dev Mac.
+    - It serves HTTPS on `localhost:18443` with a throwaway self-signed certificate made by `openssl req -x509` in a temp directory. It never uses 8448, so it cannot collide with a real Serve on a dev Mac.
     - It strips `/remote` and prepends the ingress, and injects `Tailscale-User-Login: owner@example.test`.
     - It runs the backend app plus the remote app with an in-process lease, and seeds a fixture folder Project, exposed, with synthetic `.mov` files made by `ffmpeg -f lavfi` at startup.
     - Shim-only test routes under `/__test/` (approve pending, revoke, disable, drop the next response after commit, push fake analysis progress) exist only in the shim process.
@@ -400,7 +403,7 @@ These corrections replace the stale draft's claims:
 - [ ] 1.20 Update docs and terms. Done when every new link resolves and `python3 scripts/plans.py check` passes.
   - `GLOSSARY.md`: add **Remote View**, **Paired Device** and **Mac Job**, defined as in the UX spec's Terms.
   - `docs/USER_GUIDE.md`: a "Remote View (iPhone)" section.
-  - `docs/TROUBLESHOOTING.md`: no Tailscale, certificate provisioning, port 8443 conflict, Funnel conflict, paused uploads, and "Available when the app starts its own backend".
+  - `docs/TROUBLESHOOTING.md`: no Tailscale, certificate provisioning, port 8448 conflict, Funnel conflict, paused uploads, and "Available when the app starts its own backend".
   - `docs/ARCHITECTURE.md`: the remote listener and control channel.
   - `SECURITY.md`: the Remote View boundary and the stated local-process limitation (§2.4).
   - ADR 0010 → Accepted, with its README entry updated.
@@ -556,7 +559,7 @@ These corrections replace the stale draft's claims:
 ## Human tasks
 
 - [ ] H1 Phase 1 on a physical iPhone over the real tailnet. Record the results in `docs/reviews/`.
-  - Toggle on and check that readiness shows 8443 free and Funnel off.
+  - Toggle on and check that readiness shows 8448 free and Funnel off.
   - Scan the QR, then Approve on the Mac.
   - Send three 20–30 MB `.mov` files and one multi-GB file. Lock the screen, switch tabs, and make Safari reload so a file has to be reselected. Also switch Wi-Fi ↔ cellular.
   - Every file reaches **Imported and verified**, appears once in the Project root and in the desktop sidebar, and the SHA-256 values match.
@@ -574,4 +577,4 @@ These corrections replace the stale draft's claims:
   - Validate the 100 MiB share budget on the device.
 - [ ] H5 Compare the committed `remote-iphone` screenshots with the [mockup](../designs/remote-view/remote-view.html) and approve them or list the differences.
 - [ ] H6 Revoke-during-use drill: Revoke all while one upload and one preview are active. Both stop, the phone lands on Pair with "This phone was removed", and the upload resumes only after a new pairing.
-- [ ] H7 Decide where Remote View sits in [ROADMAP](../ROADMAP.md): before v1.0.0, or parked in `docs/plans/later/` until after.
+- [x] H7 Decide where Remote View sits in [ROADMAP](../ROADMAP.md). Owner, 2026-10-10: build it before v1.0.0 as an experiment to learn whether the phone workflow is worth investing in further.

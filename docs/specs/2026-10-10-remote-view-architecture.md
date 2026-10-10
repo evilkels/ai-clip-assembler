@@ -38,7 +38,7 @@ The AI Access rules continue to apply when analysis is started remotely: [ADR 00
 
 ```text
 iPhone Safari
-  https://<mac>.<tailnet>.ts.net:8443/remote/
+  https://<mac>.<tailnet>.ts.net:8448/remote/
          |
          | Tailscale Serve: tailnet only, /remote only
          v
@@ -58,7 +58,7 @@ Project / upload / analysis / timeline / render services
   existing desktop API and MCP
 ```
 
-Reserve HTTPS port **8443** for Remote View, subject to a preflight conflict check. Its separate browser origin avoids sharing an origin with the Mac’s existing Serve applications. Do not automatically select a changing public port; the bookmark should remain stable.
+Reserve HTTPS port **8448** for Remote View, subject to a preflight conflict check. Its separate browser origin avoids sharing an origin with the Mac’s existing Serve applications. Do not automatically select a changing public port; the bookmark should remain stable.
 
 The existing backend’s random loopback port remains unchanged. Electron currently allocates and launches it in [index.ts:347-350](../../frontend/src/main/index.ts#L347) (`startPackagedBackend`, packaged builds only; dev runs the backend separately on port 8000), using the lifecycle helpers in [backendLifecycle.ts:253](../../frontend/src/main/backendLifecycle.ts#L253).
 
@@ -71,10 +71,10 @@ This is stronger than the draft’s proposal to expose a path on the unrestricte
 Illustrative command shape:
 
 ```sh
-tailscale serve --bg --https=8443 --set-path=/remote \
+tailscale serve --bg --https=8448 --set-path=/remote \
   http://127.0.0.1:<remotePort>/<ingress-capability>/
 
-tailscale serve --bg --https=8443 --set-path=/remote off
+tailscale serve --bg --https=8448 --set-path=/remote off
 ```
 
 Execute with `execFile` and fixed argument construction, never a shell string. Record the exact host, public port, mount and target owned by the app.

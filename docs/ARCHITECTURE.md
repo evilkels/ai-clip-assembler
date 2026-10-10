@@ -141,10 +141,12 @@ more than one item (multi-instance).
 - **Persistence/migration** (`project_store.py`): document saved per
   project; migration loader upgrades the legacy
   `{clip_id, start_sec, end_sec}` timeline into timeline items.
-- **Export** (`export_engine.py`): speed and transform are encoded into
-  FCPXML (`adjust-transform`) and Resolve XML (Basic Motion); EDL flattens
-  them with a warning. The export response returns the generated path, format,
-  status, item count, duration metadata, and warnings.
+- **Export** (`export_engine.py`): Final Cut Pro exports use FCPXML 1.10 and
+  are validated against `backend/tests/fixtures/fcpxml/FCPXMLv1_10.dtd`.
+  Speed and transform are encoded into FCPXML (`adjust-transform`) and Resolve
+  XML (Basic Motion); EDL flattens them with a warning. The export response
+  returns the generated path, format, status, item count, duration metadata,
+  and warnings.
 
 #### Timeline page projection
 

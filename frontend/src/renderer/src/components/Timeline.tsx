@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,6 +16,7 @@ import { EmptyState } from './EmptyState';
 import { ClipPreview } from './ClipPreview';
 import { PreviewAudioControl } from './PreviewAudioControl';
 import { SourceAudioBadge } from './SourceAudioBadge';
+import { sequenceAspect } from '../lib/displayAspect';
 import { sourceAudioState } from '../lib/sourceAudio';
 import { usePreviewAudio } from '../state/usePreviewAudio';
 import { useSequencePlayer } from './useSequencePlayer';
@@ -188,6 +190,14 @@ export function Timeline({
     });
   }, [totalDuration]);
 
+  // The timecode span has no React children: paintPlayhead overwrites its
+  // textContent during playback, which would orphan React-managed text nodes.
+  useLayoutEffect(() => {
+    if (timecodeRef.current) {
+      timecodeRef.current.textContent = `${formatClock(playheadRef.current)} / ${formatClock(totalDuration)}`;
+    }
+  }, [playhead, totalDuration]);
+
   const paintPlayhead = useCallback((timelineSec: number) => {
     playheadRef.current = timelineSec;
     if (playheadLineRef.current) {
@@ -227,6 +237,7 @@ export function Timeline({
   const { currentIndex, play, playing, previewProps, seekTo, stop } = sequencePlayer;
   const previewSegment = segments[currentIndex] ?? selectedSegment ?? segments[0];
   const previewAudio = sourceAudioState(previewSegment?.fileId, uploadedVideos);
+  const previewAspect = sequenceAspect(segments[0]?.fileId, uploadedVideos);
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   // A source known to have no audio stays silent whatever the preference says.
   const previewMuted = muted || previewAudio.hasAudio === false;
@@ -612,15 +623,21 @@ export function Timeline({
             '--timeline-preview-height': `${previewHeight}px`,
           } as CSSProperties}
         >
-          <ClipPreview
-            {...previewProps}
-            label={previewSegment.fileName}
-            scale={previewSegment.scale}
-            testId="timeline-preview-video"
-            muted={previewMuted}
-            volume={volume}
-            onAudioBlocked={() => setMuted(true)}
-          />
+          <div
+            className="timeline-preview-frame"
+            style={{ '--preview-aspect': previewAspect } as CSSProperties}
+          >
+            <ClipPreview
+              {...previewProps}
+              label={previewSegment.fileName}
+              aspect={previewAspect}
+              scale={previewSegment.scale}
+              testId="timeline-preview-video"
+              muted={previewMuted}
+              volume={volume}
+              onAudioBlocked={() => setMuted(true)}
+            />
+          </div>
           <div className="timeline-preview-meta">
               <SourceAudioBadge hasAudio={previewAudio.hasAudio} channels={previewAudio.channels} />
               <strong
@@ -672,9 +689,7 @@ export function Timeline({
             ▶
           </button>
           <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
-          <span className="timecode" ref={timecodeRef}>
-            {formatClock(playhead)} / {formatClock(totalDuration)}
-          </span>
+          <span className="timecode" ref={timecodeRef} />
           {currentSegment && (
             <span className="timeline-current" title={currentSegment.fileName}>
               {currentSegment.fileName}

@@ -2,6 +2,7 @@ import asyncio
 import json
 import threading
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
@@ -23,7 +24,7 @@ from src.models import (
     TimelineSequence,
     VideoMetadata,
 )
-from support import FakeEmbeddingProvider
+from support import FakeEmbeddingProvider, assert_valid_fcpxml
 from src.review_state import sequence_fingerprint
 from src.timeline_script import ScriptResult
 
@@ -1369,6 +1370,58 @@ def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
     assert "TITLE:" in Path(body["file_path"]).read_text()
 
 
+def test_folder_export_uses_project_folder_name_for_handoff_titles(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "Bike Ride — 2026-10-10"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    api.projects[project_id]["videos"][0]["metadata"] = {
+        "duration_sec": 10.0,
+        "fps": 30,
+        "resolution": [1920, 1080],
+    }
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "DJI_0042.MP4",
+            "file_name": "DJI_0042.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+    title = "Bike Ride — 2026-10-10"
+
+    edl_response = client.post(f"/projects/{project_id}/export?format=edl")
+    fcpxml_response = client.post(f"/projects/{project_id}/export?format=fcpxml")
+    resolve_response = client.post(f"/projects/{project_id}/export?format=resolve_xml")
+
+    assert edl_response.status_code == 200
+    assert fcpxml_response.status_code == 200
+    assert resolve_response.status_code == 200
+    edl = Path(edl_response.json()["file_path"]).read_text(encoding="utf-8")
+    assert f"TITLE: {title}" in edl
+
+    fcpxml = Path(fcpxml_response.json()["file_path"]).read_text(encoding="utf-8")
+    assert_valid_fcpxml(fcpxml)
+    fcpxml_root = ET.fromstring(fcpxml)
+    event = fcpxml_root.find("./library/event")
+    project = fcpxml_root.find("./library/event/project")
+    assert event is not None and event.attrib["name"] == title
+    assert project is not None and project.attrib["name"] == title
+
+    resolve_xml = Path(resolve_response.json()["file_path"]).read_text(encoding="utf-8")
+    resolve_root = ET.fromstring(resolve_xml)
+    assert resolve_root.findtext("./sequence/name") == title
+
+
 def test_export_folder_project_writes_inside_project_exports(tmp_path):
     api.projects.clear()
     project_folder = tmp_path / "footage"
@@ -1404,7 +1457,7 @@ def test_export_folder_project_writes_inside_project_exports(tmp_path):
     body = response.json()
     export_path = Path(body["file_path"])
     assert export_path == project_folder / "exports" / "fcp" / "timeline.fcpxml"
-    assert 'src="../../DJI_0042.MP4"' in export_path.read_text(encoding="utf-8")
+    assert f'src="file://{quote(str(source_video.absolute()))}"' in export_path.read_text(encoding="utf-8")
 
 
 def test_export_folder_project_resolve_xml_writes_davinci_timeline(tmp_path):
@@ -1443,7 +1496,7 @@ def test_export_folder_project_resolve_xml_writes_davinci_timeline(tmp_path):
     assert export_path == project_folder / "exports" / "davinci" / "timeline.xml"
     content = export_path.read_text(encoding="utf-8")
     assert '<xmeml version="5">' in content
-    assert "<pathurl>../../DJI_0042.MP4</pathurl>" in content
+    assert f"<pathurl>file://localhost{quote(str((project_folder / 'DJI_0042.MP4').absolute()))}</pathurl>" in content
 
 
 def test_export_folder_project_requires_overwrite_flag_for_existing_export(tmp_path):
@@ -2255,6 +2308,23 @@ def test_export_timeline_keeps_present_but_empty_edited_timeline_empty(monkeypat
     assert body["clip_count"] == 0
     assert body["total_duration_sec"] == 0
     assert Path(body["file_path"]).read_text() == "TITLE: AI Clip Assembler\nFCM: NON-DROP FRAME\n"
+
+
+def test_export_empty_timeline_document_does_not_fall_back_to_legacy_clips(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    item_id = _op(client, project_id, "include", clip_id="clip-1").json()["document"]["items"][0]["item_id"]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+    assert _op(client, project_id, "remove_item", item_id=item_id).status_code == 200
+    assert api.get_timeline_controller(project_id).document.items == []
+
+    empty_warning = "The Timeline is empty, so this export has no clips."
+    for export_format in ("fcpxml", "resolve_xml", "edl"):
+        response = client.post(f"/projects/{project_id}/export?format={export_format}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["clip_count"] == 0
+        assert empty_warning in body["warnings"]
 
 
 def test_export_timeline_uses_source_fps_for_edl_timecode(monkeypatch, tmp_path):

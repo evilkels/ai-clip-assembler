@@ -95,7 +95,7 @@ function formatDuration(seconds: number): string {
 
 export function ExportPage() {
   const { clips, timelineItems, projectId, projectFolder } = useReview();
-  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('edl');
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('fcpxml');
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportResults, setExportResults] = useState<
     Partial<Record<ExportFormat, DisplayExportResult>>
@@ -192,7 +192,7 @@ export function ExportPage() {
       <WorkflowHeader
         title="Export"
         step="Step 04 / 04"
-        description={`${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} in the Timeline · ${formatDuration(effectiveDuration)} total. Media paths stay relative to the project folder.`}
+        description={`${timelineItems.length} item${timelineItems.length === 1 ? '' : 's'} in the Timeline · ${formatDuration(effectiveDuration)} total. Exports link to your original files by their full path. Keep the footage where it is, or export again after moving it.`}
         actions={Object.values(exportResults).some(Boolean) ? (
           <button
             type="button"
@@ -326,7 +326,7 @@ export function ExportPage() {
                     )}
                   </div>
                   <div className="export-receipt-detail">
-                    Backend report: {formatDuration(result.total_duration_sec)} · {result.status}
+                    Source media used: {formatDuration(result.total_duration_sec)} · {result.status}
                   </div>
                   {result.warnings.length > 0 && (
                     <div role="status" data-testid={`export-warning-${format.id}`} className="export-warning">

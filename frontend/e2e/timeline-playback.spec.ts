@@ -815,6 +815,27 @@ test('forward play is video-driven: monotonic advance, stable src, zero seeking 
   expect(seekCount, 'video must not be hard-seeked during steady forward play').toBe(0);
 });
 
+test('transport clock keeps following Timeline edits after play and stop', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithItems(page, projectId, [
+    { offset: 0, duration: 4, speed: 1 },
+    { offset: 4, duration: 2, speed: 1 },
+  ]);
+  const clock = page.locator('.timeline-toolbar .timecode');
+  await expect(clock).toHaveText(/ \/ 0:06\.0$/);
+
+  await page.getByTestId('transport-play').click();
+  await expect(clock).not.toHaveText(/^0:00\.0 /);
+  await page.getByTestId('transport-stop').click();
+
+  // Playback painted the clock imperatively; later edits must still reach it.
+  await postTimelineOperation(page, projectId, 'set_speed', { item_id: items[0].item_id, speed: 2 });
+  await expect(clock).toHaveText(/ \/ 0:04\.0$/);
+
+  await postTimelineOperation(page, projectId, 'remove_item', { item_id: items[1].item_id });
+  await expect(clock).toHaveText(/ \/ 0:02\.0$/);
+});
+
 /** Find the index of the first Timeline Item whose visible file name differs
  * from the first item's — i.e. the actual Source Video boundary — rather
  * than assuming the boundary sits between item 0 and item 1. */
@@ -984,7 +1005,7 @@ test('export format cards control one explicit handoff and keep receipt actions 
   const cards = page.locator('[data-testid^="export-format-card-"]');
   await expect(cards).toHaveCount(3);
   await expect(page.locator('.export-format-cards .btn')).toHaveCount(0);
-  await expect(page.getByTestId('export-format-card-edl')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('export-format-card-fcpxml')).toHaveAttribute('aria-pressed', 'true');
 
   const edlCard = page.getByTestId('export-format-card-edl');
   await edlCard.focus();
@@ -1032,6 +1053,7 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
   });
 
   await page.goto('/#/export');
+  await page.getByTestId('export-format-card-edl').click();
   await page.getByTestId('export-selected').click();
 
   const after = await page.request
@@ -1099,6 +1121,7 @@ test('export asks before overwrite and retries exactly once', async ({ page }) =
     });
   });
   await page.goto('/#/export');
+  await page.getByTestId('export-format-card-edl').click();
   page.once('dialog', (dialog) => void dialog.accept());
   await page.getByTestId('export-selected').click();
 

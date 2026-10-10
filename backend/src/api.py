@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import threading
 import time
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import List, Literal, Optional
@@ -36,6 +37,7 @@ from .export_engine import (
     generate_edl,
     generate_fcpxml,
     generate_resolve_xml,
+    snap_frame_rate,
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
@@ -1515,22 +1517,23 @@ async def export_timeline(
     export_dir = export_dir_for(project_id, format)
     export_dir.mkdir(parents=True, exist_ok=True)
     videos_by_id = {video["file_id"]: video for video in projects[project_id]["videos"]}
-    # Prefer the backend-authoritative Timeline Document so Speed/Transform flow
-    # into the export; fall back to the legacy timeline for un-edited projects.
     document = get_timeline_controller(project_id).document
-    if document.items:
-        clips = clips_from_timeline_document(projects[project_id], document)
-    else:
-        clips = clips_in_timeline_order(projects[project_id])
+    clips = clips_from_timeline_document(projects[project_id], document)
+    project_folder = projects[project_id].get("project_folder")
+    title = Path(project_folder).name if project_folder else "AI Clip Assembler"
 
     if format == "edl":
         file_path = export_dir / "timeline.edl"
         ensure_export_can_write(file_path, overwrite)
+        edl_title = "".join(
+            " " if unicodedata.category(character) == "Cc" else character
+            for character in title
+        )
         file_path.write_text(
             generate_edl(
-                "AI Clip Assembler",
+                edl_title,
                 clips,
-                fps=round_edl_fps(choose_timeline_fps(videos_by_id)),
+                fps=round_edl_fps(choose_timeline_fps(videos_by_id, clips)),
                 videos_by_id=videos_by_id,
             ),
             encoding="utf-8",
@@ -1538,29 +1541,29 @@ async def export_timeline(
     elif format == "fcpxml":
         file_path = export_dir / "timeline.fcpxml"
         ensure_export_can_write(file_path, overwrite)
-        media_base_path = export_dir if projects[project_id].get("project_folder") else None
         file_path.write_text(
             generate_fcpxml(
-                "AI Clip Assembler",
+                title,
                 clips,
                 videos_by_id,
-                media_base_path=media_base_path,
             ),
             encoding="utf-8",
         )
     else:
         file_path = export_dir / "timeline.xml"
         ensure_export_can_write(file_path, overwrite)
-        media_base_path = export_dir if projects[project_id].get("project_folder") else None
         file_path.write_text(
             generate_resolve_xml(
-                "AI Clip Assembler",
+                title,
                 clips,
                 videos_by_id,
-                media_base_path=media_base_path,
             ),
             encoding="utf-8",
         )
+
+    warnings = edl_flatten_warnings(clips, videos_by_id) if format == "edl" else []
+    if not clips:
+        warnings.append("The Timeline is empty, so this export has no clips.")
 
     return {
         "project_id": project_id,
@@ -1569,7 +1572,7 @@ async def export_timeline(
         "file_path": str(file_path),
         "clip_count": len(clips),
         "total_duration_sec": round(sum(clip["duration_sec"] for clip in clips), 3),
-        "warnings": edl_flatten_warnings(clips, videos_by_id) if format == "edl" else [],
+        "warnings": warnings,
     }
 
 
@@ -1991,22 +1994,6 @@ def clips_from_timeline_document(project: dict, document: TimelineDocument) -> l
     return resolved
 
 
-def clips_in_timeline_order(project: dict) -> list:
-    clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
-    timeline = project.get("timeline")
-    if timeline is None or "clips" not in timeline:
-        return project.get("clips", [])
-
-    timeline_entries = timeline.get("clips") or []
-    if not timeline_entries:
-        return []
-
-    if isinstance(timeline_entries[0], str):
-        return [clips_by_id[clip_id] for clip_id in timeline_entries if clip_id in clips_by_id]
-
-    return resolve_timeline_entries(clips_by_id, timeline_entries)
-
-
 def resolve_timeline_clips(project: dict, updates: list[TimelineClipUpdate]) -> list[dict]:
     clips_by_id = {clip["clip_id"]: clip for clip in project.get("clips", [])}
     seen_clip_ids = set()
@@ -2063,8 +2050,8 @@ def resolve_timeline_entries(clips_by_id: dict, timeline_entries: list[dict]) ->
     return resolved_clips
 
 
-def round_edl_fps(fps: float) -> int:
-    return int(round(fps or 30))
+def round_edl_fps(fps: float) -> float:
+    return snap_frame_rate(fps)
 
 
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:

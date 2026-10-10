@@ -1,0 +1,24 @@
+<fcpxml version="1.10">
+  <resources>
+    <format id="r1" frameDuration="100/6000s" width="3840" height="2160" />
+    <format id="r2" frameDuration="100/3000s" width="3840" height="2160" />
+    <asset id="a1" name="IMG_0060.MOV" start="0s" duration="180000/6000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_0060.MOV" />
+    </asset>
+    <asset id="a2" name="IMG_0030.MOV" start="0s" duration="90000/3000s" hasVideo="1" format="r2" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_0030.MOV" />
+    </asset>
+  </resources>
+  <library>
+    <event name="iPhone Mixed Rate">
+      <project name="iPhone Mixed Rate">
+        <sequence format="r1" tcStart="0s" tcFormat="NDF" audioLayout="stereo">
+          <spine>
+            <asset-clip name="IMG_0060.MOV" ref="a1" offset="0s" start="12000/6000s" duration="36000/6000s" audioRole="dialogue" />
+            <asset-clip name="IMG_0030.MOV" ref="a2" offset="36000/6000s" start="30000/3000s" duration="36000/6000s" format="r2" audioRole="dialogue" />
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

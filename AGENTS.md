@@ -30,3 +30,7 @@ Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`
 - Specs go in `docs/specs/`, review records in `docs/reviews/`, mockups in
   `docs/designs/`. A tool that writes plans to `plans/` or
   `docs/superpowers/plans/` gets them merged into `docs/plans/`.
+- Tool scratch folders (`.superpowers/`, SDD ledgers, implementer reports,
+  delegation briefs) are git-ignored and never committed. Delegated work is
+  tracked as tasks in its `docs/plans/` plan; a record worth keeping goes in
+  `docs/reviews/`.

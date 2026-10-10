@@ -37,7 +37,7 @@ If any of these three fails, the workflow is not solved regardless of which feat
 
 - **A — Cold start**: folder → auto-detected videos → analysis with per-file progress → Review Board ranked by Overall Score → accept/reject/reorder → export → open in DaVinci. Watch for: Review Board empty despite "done" analysis (scoring threshold too high), folder picker demanding a separate output location (folder-model regression), "Media offline" in DaVinci (absolute vs. relative paths bug), drag-reorder losing state.
 - **B — Iterate**: reopen project, change smoothness threshold (must filter instantly, no full re-analysis), reject/trim clips, re-export without touching `clipassembler/analysis/` mtimes.
-- **C — Portability**: moved to [plan 032](032-valid-fcpxml-and-nle-verification.md) Step 5.4 (move the project folder, then export again).
+- **C — Portability**: an existing export's absolute media URLs break when its project folder moves. Reopen the moved folder in the app and export again; see [plan 032](032-valid-fcpxml-and-nle-verification.md) H4.
 - **D — Signal test (the important one)**: manually pick ground-truth timecodes first, then compare Manual-harness vs. AI-harness (e.g. Pi Agent) suggestions against that ground truth. Recall ≥0.70, precision ≥0.50, ≥1 "surprise win" per session, ≤10% obvious-reject false positives (2-clip overlap rule: time ranges intersect ≥50% of either duration). Decision rule: if AI harness doesn't beat Manual by ≥10pp recall or ≥2 surprise wins, **default to Manual until the harness improves** — tracked as a finding, not a blocker.
 - **E — Stress (optional)**: same as Flow A on 2+hr footage; analysis budget extends to 60 min, UI must stay responsive (no freezes >1s), renderer memory <1.5GB.
 
@@ -48,7 +48,7 @@ Multi-track timeline, color grading/transitions/effects, Windows/Linux support
 
 ### Automation status
 
-**Implemented**: `scripts/synthetic_e2e_qa.py` generates synthetic smooth/shaky/mixed footage and drives the real backend pipeline — verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with relative paths, and close/reopen restore. Playwright covers upload, analysis completion, Review/Timeline video preview, inclusion.
+**Implemented**: `scripts/synthetic_e2e_qa.py` generates synthetic smooth/shaky/mixed footage and drives the real backend pipeline — verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with absolute `file://` media URLs, and close/reopen restore. Playwright covers upload, analysis completion, Review/Timeline video preview, inclusion.
 
 **Still manual** (not automatable): real-footage timing targets, renderer responsiveness under real load, actual DaVinci/FCP import with zero relink prompts and linked-audio verification, project move/Locate through the packaged app, and the Flow D AI-vs-Manual human judgment call.
 
@@ -58,13 +58,13 @@ Test-machine hardware baseline for timing targets — unnamed/unresolved. Which 
 
 ## Phase 1: Automated coverage
 
-- [x] 1.1 Synthetic end-to-end QA: `scripts/synthetic_e2e_qa.py` drives the real backend pipeline on generated smooth/shaky/mixed footage. Done when it verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with relative paths, and close/reopen restore (shipped before v0.4.0)
+- [x] 1.1 Synthetic end-to-end QA: `scripts/synthetic_e2e_qa.py` drives the real backend pipeline on generated smooth/shaky/mixed footage. Done when it verifies folder discovery, manual-harness analysis, smooth-vs-shaky discrimination, timeline edits, all three exports with absolute `file://` media URLs, and close/reopen restore (shipped before v0.4.0)
 - [x] 1.2 Playwright coverage of upload, analysis completion, Review/Timeline video preview and inclusion (shipped before v0.4.0)
 
 ## Human tasks
 
 - [ ] H1 Flow A on real footage: 30 min of 4K/60fps on the test machine reaches candidate clips on the Review Board in <15 min.
 - [ ] H2 Flow E (optional): Flow A on 2+hr footage stays responsive (no freezes >1s, renderer memory <1.5GB, analysis within 60 min).
-- [ ] H3 Import the exported timeline into DaVinci and Final Cut Pro: zero relink prompts and linked source audio on audio-bearing clips. Flow C (move the project folder, export again) is tracked in [032](032-valid-fcpxml-and-nle-verification.md) Step 5.4.
+- [ ] H3 Import the exported timeline into DaVinci and Final Cut Pro: zero relink prompts and linked source audio on audio-bearing clips. Flow C (move the project folder, export again) is tracked in [032](032-valid-fcpxml-and-nle-verification.md) H4.
 - [ ] H4 Flow D on real footage: manual ground-truth timecodes first, then Manual vs. AI harness suggestions; recall ≥0.70 and precision ≥0.50 recorded as a finding.
 - [ ] H5 Project move/Locate through the packaged app.

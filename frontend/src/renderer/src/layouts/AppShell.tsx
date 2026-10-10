@@ -134,7 +134,7 @@ export function AppShell({ children }: AppShellProps) {
         const thresholds = gate.unblock === 'loosen-rules' ? thresholdSummary(generationStats) : null;
         return gated(gate, {
           currentStep: 1,
-          summary: uploadedVideos.length > 0 ? `${uploadedVideos.length} sources loaded` : 'Import footage to begin',
+          summary: uploadedVideos.length > 0 ? `${uploadedVideos.length} source${uploadedVideos.length === 1 ? '' : 's'} loaded` : 'Import footage to begin',
           detail: warning?.message ?? thresholds ?? 'next: pick the keepers in Review',
           detailTone: warning ? 'warning' : 'muted',
           // Partial results are usable, so the step stays crossable while the

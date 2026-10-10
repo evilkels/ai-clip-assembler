@@ -1,0 +1,42 @@
+<fcpxml version="1.10">
+  <resources>
+    <format id="r1" frameDuration="1001/60000s" width="1080" height="1920" />
+    <format id="r2" frameDuration="1001/120000s" width="1080" height="1920" />
+    <asset id="a1" name="IMG_1022.MOV" start="0s" duration="587587/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_1022.MOV" />
+    </asset>
+    <asset id="a2" name="IMG_1023.MOV" start="0s" duration="797797/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_1023.MOV" />
+    </asset>
+    <asset id="a3" name="IMG_1028.MOV" start="0s" duration="1172171/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_1028.MOV" />
+    </asset>
+    <asset id="a4" name="IMG_1029.MOV" start="0s" duration="651651/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_1029.MOV" />
+    </asset>
+    <asset id="a5" name="IMG_UNUSED.MOV" start="0s" duration="1200199/120000s" hasVideo="1" format="r2" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/iPhone/IMG_UNUSED.MOV" />
+    </asset>
+  </resources>
+  <library>
+    <event name="iPhone VFR 1080p 59.94 Vertical">
+      <project name="iPhone VFR 1080p 59.94 Vertical">
+        <sequence format="r1" tcStart="0s" tcFormat="NDF" audioLayout="stereo">
+          <spine>
+            <asset-clip name="IMG_1023.MOV" ref="a2" offset="0s" start="0s" duration="1080079/60000s" audioRole="dialogue">
+              <timeMap>
+                <timept time="0s" value="0s" />
+                <timept time="1080079/60000s" value="539539/60000s" />
+              </timeMap>
+            </asset-clip>
+            <asset-clip name="IMG_1023.MOV" ref="a2" offset="1080079/60000s" start="539539/60000s" duration="180180/60000s" audioRole="dialogue" />
+            <asset-clip name="IMG_1028.MOV" ref="a3" offset="1260259/60000s" start="0s" duration="480480/60000s" audioRole="dialogue">
+              <adjust-transform scale="1.2 1.2" position="0.0 0.0" />
+            </asset-clip>
+            <asset-clip name="IMG_1029.MOV" ref="a4" offset="1740739/60000s" start="0s" duration="623623/60000s" audioRole="dialogue" />
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

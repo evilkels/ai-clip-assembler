@@ -11,7 +11,7 @@ This record supersedes the earlier “complete” wording in the studio and land
 
 The app was compared side by side at 1440×1000 and 1024×768, in light and dark, against the read-only Claude export sections #1d Import, #1b Review, #3a Timeline, and #3b Export. Reference captures are retained outside tracked baselines at .superpowers/sdd/2026-09-01-literal-design-conformance/design-references/. The landing page was compared at 1440px against docs/design/2026-09-01-landing-page-reference.html; responsive states were checked at 1200, 900, 500, and 390px in both themes.
 
-Inputs consulted for this record include the Task 6 and Task 7 implementer reports under .superpowers/sdd/2026-09-01-literal-design-conformance/, the earlier workflow Task 6/7 reports under .superpowers/sdd/2026-08-14-studio-workflow-redesign/, the staged review packages under the conformance SDD directory, the prior HTML review record, the two implementation plans, the approved spec, the branch commit history, and PR #68's review/comments.
+Inputs consulted for this record include the Task 6 and Task 7 implementer reports under .superpowers/sdd/2026-09-01-literal-design-conformance/, the earlier workflow Task 6/7 reports in [`2026-08-14-studio-workflow-redesign-sdd/`](2026-08-14-studio-workflow-redesign-sdd/), the staged review packages under the conformance SDD directory, the prior HTML review record, the two implementation plans, the approved spec, the branch commit history, and PR #68's review/comments.
 
 ### Findings and disposition
 

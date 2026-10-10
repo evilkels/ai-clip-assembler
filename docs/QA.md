@@ -91,7 +91,8 @@ validation.
 ### Resolve XML and EDL
 
 1. Export folder-project Resolve XML; import via File → Import → Timeline.
-   Confirm no dialog/relink, matching count/order/in-out, and relative media.
+   Confirm absolute `file://` media URLs, no dialog/relink, and matching
+   count/order/in-out. After moving the folder, reopen it and export again.
 2. Move the whole folder and repeat: still zero relink.
 3. Run `scripts/backend_smoke_test.py` on real footage, add original media to
    Resolve, import EDL, and confirm count, positions/durations, online/relink

@@ -170,7 +170,8 @@ A generated file that carries the timeline into a professional editing app.
 _Avoid_: Render, output
 
 **FCPXML**:
-The primary XML export format for Final Cut Pro.
+The primary XML export format for Final Cut Pro, version 1.10, validated
+against `backend/tests/fixtures/fcpxml/FCPXMLv1_10.dtd`.
 _Avoid_: Final Cut XML
 
 **EDL**:

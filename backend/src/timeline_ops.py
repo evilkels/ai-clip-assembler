@@ -35,6 +35,19 @@ class TimelineOpError(Exception):
     """Raised when an operation is invalid (unknown id, bad bounds, etc.)."""
 
 
+class TimelinePersistError(Exception):
+    """Raised when a committed-in-principle transition could not be saved.
+
+    The controller leaves its document, revision and undo/redo stacks exactly
+    as they were and publishes nothing, so a failed save is never acknowledged.
+    """
+
+    MESSAGE = "Couldn't save the Timeline"
+
+    def __init__(self, message: str = MESSAGE) -> None:
+        super().__init__(message)
+
+
 class TimelineRevisionConflict(TimelineOpError):
     """Raised when ``expected_revision`` does not match the live document.
 
@@ -372,6 +385,7 @@ def apply_operation_in_place(
 
 
 OnChange = Callable[[TimelineDocument], Awaitable[None]]
+Persist = Callable[[TimelineDocument], None]
 
 
 class TimelineController:
@@ -391,11 +405,13 @@ class TimelineController:
         *,
         history_limit: int = DEFAULT_HISTORY_LIMIT,
         on_change: Optional[OnChange] = None,
+        persist: Optional[Persist] = None,
     ) -> None:
         self._document = document
         self._sources = sources
         self._history_limit = history_limit
         self._on_change = on_change
+        self._persist = persist
         self._undo: List[TimelineDocument] = []
         self._redo: List[TimelineDocument] = []
         self._lock = asyncio.Lock()
@@ -433,15 +449,26 @@ class TimelineController:
         if expected_revision is not None and expected_revision != self._document.revision:
             raise TimelineRevisionConflict(expected_revision, self._document.revision)
 
+    def _stamp(self, new_document: TimelineDocument) -> TimelineDocument:
+        """Stamp the next revision and save it durably *before* anything changes.
+
+        ``persist`` raising leaves the live document and both history stacks
+        untouched, so a failed save is never acknowledged or published.
+        """
+        stamped = new_document.model_copy(update={"revision": self._next_revision()})
+        if self._persist is not None:
+            self._persist(stamped)
+        return stamped
+
     def _commit(
         self, new_document: TimelineDocument, *, clear_redo: bool
     ) -> TimelineDocument:
-        """Stamp the next revision, snapshot for undo, and become the new state.
+        """Persist, then snapshot for undo and become the new state.
 
         Caller must already hold ``self._lock`` and must ``await self._notify()``
         once afterwards, so a transition is exactly one revision + one event.
         """
-        stamped = new_document.model_copy(update={"revision": self._next_revision()})
+        stamped = self._stamp(new_document)
         self._push_undo(self._document)
         self._document = stamped
         if clear_redo:
@@ -497,11 +524,12 @@ class TimelineController:
             self._check_revision(expected_revision)
             if not self._undo:
                 return self._document
-            self._redo.append(self._document)
-            restored = self._undo.pop()
             # Restore prior *content* but advance the revision: a counter that
             # rewound would falsely read as a base another writer already saw.
-            self._document = restored.model_copy(update={"revision": self._next_revision()})
+            restored = self._stamp(self._undo[-1])
+            self._undo.pop()
+            self._redo.append(self._document)
+            self._document = restored
             await self._notify()
             return self._document
 
@@ -509,9 +537,10 @@ class TimelineController:
         async with self._lock:
             if not self._redo:
                 return self._document
+            restored = self._stamp(self._redo[-1])
+            self._redo.pop()
             self._push_undo(self._document)
-            restored = self._redo.pop()
-            self._document = restored.model_copy(update={"revision": self._next_revision()})
+            self._document = restored
             await self._notify()
             return self._document
 

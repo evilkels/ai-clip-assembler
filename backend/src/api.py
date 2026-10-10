@@ -21,7 +21,7 @@ from typing import List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 # Load repo-root .env before harness imports: PI_* are read at import time.
@@ -65,8 +65,7 @@ from .project_store import (
     project_state_dir,
     read_analysis_results,
     read_frame_scores,
-    rescan_project,
-    write_project_manifest,
+    project_manifest_path,
     write_analysis_results,
     write_frame_scores,
     write_timeline_document,
@@ -79,14 +78,18 @@ from .review_agent import (
     run_editor_script,
     run_review_turn,
 )
+from .project_events import SOURCES_CHANGED, ProgressGate, analysis_event
+from .project_service import ProjectLockedError, ProjectService
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
     TimelineController,
     TimelineOpError,
+    TimelinePersistError,
     TimelineRevisionConflict,
 )
 from .timeline_service import TimelineLifecycle
+from .uploads.service import UploadService
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes  # noqa: F401 - public test seam
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
@@ -116,6 +119,25 @@ app.add_middleware(
 )
 
 
+class ProjectSaveError(Exception):
+    """A Project file could not be written; the route answers 500."""
+
+    MESSAGE = "Couldn't save the Project results"
+
+    def __init__(self, message: str = MESSAGE) -> None:
+        super().__init__(message)
+
+
+@app.exception_handler(ProjectSaveError)
+async def project_save_error_handler(_request, exc: ProjectSaveError):
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@app.exception_handler(TimelinePersistError)
+async def timeline_persist_error_handler(_request, exc: TimelinePersistError):
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
 @app.on_event("startup")
 async def write_runtime_on_startup():
     global _motion_analysis_capability
@@ -129,6 +151,11 @@ async def write_runtime_on_startup():
     )
 
 projects = {}
+project_service = ProjectService(projects, opener=lambda folder: open_folder_project(folder))
+upload_service = UploadService(
+    project_service=project_service,
+    on_imported=lambda project_id, source, metadata: on_source_imported(project_id, source, metadata),
+)
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 _active_project_id: Optional[str] = None
@@ -244,11 +271,79 @@ async def create_project():
     return {"project_id": project_id}
 
 
+def _folder_open_payload(project_id: str) -> dict:
+    project = projects[project_id]
+    return {
+        "project_id": project_id,
+        "project_folder": project["project_folder"],
+        "project": project["project"],
+        "videos": project["videos"],
+        "clips": project["clips"],
+        "timeline": project["timeline"],
+        "selected_harness": project["selected_harness"],
+        "effective_harness": project.get("harness_id"),
+        "generation_stats": project.get("generation_stats"),
+    }
+
+
+def open_folder_project(folder_path: Path) -> str:
+    """Open (or create) a folder Project and return its single runtime ID.
+
+    The same folder, however it is reached (symlink, ``..``, trailing slash),
+    resolves to one runtime Project instead of minting a new one per open.
+    """
+    with project_service.open_lock:
+        return _open_folder_project_locked(folder_path)
+
+
+def _open_folder_project_locked(folder_path: Path) -> str:
+    existing = project_service.find_open(folder_path)
+    if existing is not None:
+        return existing
+    if project_manifest_path(folder_path).exists():
+        project_service.acquire_folder(folder_path)
+    manifest = create_or_open_folder_project(folder_path)
+    project_service.acquire_folder(folder_path)
+
+    project_id = str(uuid.uuid4())
+    videos = videos_from_manifest(folder_path, manifest)
+    restored = read_analysis_results(folder_path)
+    frame_scores = read_frame_scores(folder_path)
+    projects[project_id] = {
+        "project_id": project_id,
+        "project_folder": str(folder_path),
+        "project": manifest.model_dump(),
+        "videos": videos,
+        "clips": restored["clips"] if restored else [],
+        "timeline": restored.get("timeline") if restored else None,
+        "cloud_ai_consent": manifest.cloud_ai_consent,
+        "selected_harness": manifest.harness,
+        "harness_id": restored.get("harness_id") if restored else None,
+        "frame_scores": frame_scores,
+        "generation_stats": restored.get("generation_stats") if restored else None,
+    }
+    _proposal_store.configure_project(project_id, folder_path)
+    _recover_interrupted_imports(project_id, folder_path)
+    return project_id
+
+
+def _recover_interrupted_imports(project_id: str, folder_path: Path) -> None:
+    """Finish phone imports a crash interrupted (journalled publications)."""
+    if not (folder_path / "clipassembler" / "cache" / "uploads").is_dir():
+        return
+    try:
+        upload_service.recover(folder_path, project_id)
+    except Exception:
+        logger.exception("Recovering interrupted imports failed for %s", folder_path)
+
+
 @app.post("/projects/from-folder")
 async def create_project_from_folder(request: ProjectFolderRequest):
     folder_path = Path(request.folder_path).expanduser()
     try:
-        manifest = create_or_open_folder_project(folder_path)
+        project_id = open_folder_project(folder_path)
+    except ProjectLockedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except NoSourceVideosFoundError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ProjectFolderNotWritableError as exc:
@@ -261,39 +356,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ProjectStoreError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    project_id = str(uuid.uuid4())
-    videos = videos_from_manifest(folder_path, manifest)
-    restored = read_analysis_results(folder_path)
-    frame_scores = read_frame_scores(folder_path)
-    clips = restored["clips"] if restored else []
-    timeline = restored.get("timeline") if restored else None
-    generation_stats = restored.get("generation_stats") if restored else None
-    projects[project_id] = {
-        "project_id": project_id,
-        "project_folder": str(folder_path),
-        "project": manifest.model_dump(),
-        "videos": videos,
-        "clips": clips,
-        "timeline": timeline,
-        "cloud_ai_consent": manifest.cloud_ai_consent,
-        "selected_harness": manifest.harness,
-        "harness_id": restored.get("harness_id") if restored else None,
-        "frame_scores": frame_scores,
-        "generation_stats": generation_stats,
-    }
-    _proposal_store.configure_project(project_id, folder_path)
-    return {
-        "project_id": project_id,
-        "project_folder": str(folder_path),
-        "project": manifest.model_dump(),
-        "videos": videos,
-        "clips": clips,
-        "timeline": timeline,
-        "selected_harness": manifest.harness,
-        "effective_harness": restored.get("harness_id") if restored else None,
-        "generation_stats": generation_stats,
-    }
+    return _folder_open_payload(project_id)
 
 
 @app.put("/projects/{project_id}/cloud-ai-consent")
@@ -305,14 +368,17 @@ async def update_cloud_ai_consent(project_id: str, request: CloudAiConsentReques
     manifest_payload = project.get("project")
     if project.get("project_folder") and manifest_payload:
         try:
-            manifest = create_or_open_folder_project(Path(project["project_folder"]))
-            updated = manifest.model_copy(update={"cloud_ai_consent": request.consented})
-            write_project_manifest(Path(project["project_folder"]), updated)
+            project_service.update_manifest(
+                project_id,
+                lambda manifest: manifest.model_copy(
+                    update={"cloud_ai_consent": request.consented}
+                ),
+                create_if_missing=True,
+            )
         except ProjectStoreError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (FileNotFoundError, NotADirectoryError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        project["project"] = updated.model_dump()
 
     project["cloud_ai_consent"] = request.consented
 
@@ -328,10 +394,11 @@ def persist_selected_harness(project_id: str, harness_id: str) -> None:
     project = projects[project_id]
     folder = project.get("project_folder")
     if folder:
-        manifest = create_or_open_folder_project(Path(folder))
-        updated = manifest.model_copy(update={"harness": harness_id})
-        write_project_manifest(Path(folder), updated)
-        project["project"] = updated.model_dump()
+        project_service.update_manifest(
+            project_id,
+            lambda manifest: manifest.model_copy(update={"harness": harness_id}),
+            create_if_missing=True,
+        )
     project["selected_harness"] = harness_id
 
 
@@ -374,7 +441,7 @@ async def rescan_project_sources(project_id: str):
 
     folder_path = Path(project["project_folder"])
     try:
-        manifest = rescan_project(folder_path)
+        manifest = project_service.rescan(project_id)
     except ProjectStoreError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -391,6 +458,19 @@ async def rescan_project_sources(project_id: str):
     }
 
 
+@app.get("/projects/{project_id}/sources")
+async def get_project_sources(project_id: str):
+    """The Project's current Source Videos (cheap: the in-memory projection)."""
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    return {
+        "project_id": project_id,
+        "project": project.get("project"),
+        "videos": project.get("videos", []),
+    }
+
+
 @app.delete("/projects/{project_id}/files")
 async def delete_project_owned_files(project_id: str):
     if project_id not in projects:
@@ -399,7 +479,9 @@ async def delete_project_owned_files(project_id: str):
     if not project.get("project_folder"):
         raise HTTPException(status_code=400, detail="Delete project files is only available for folder projects")
 
-    deleted = delete_project_files(Path(project["project_folder"]))
+    with project_service.lock(project_id):
+        deleted = delete_project_files(Path(project["project_folder"]))
+    project_service.release_folder(Path(project["project_folder"]))
     global _active_project_id
     if _active_project_id == project_id:
         _active_project_id = None
@@ -489,12 +571,22 @@ async def get_project_video_poster(
     )
 
 
+def publish_project_event(project_id: str, payload: dict) -> None:
+    """Fan a Project event out to every desktop and phone subscriber (any thread)."""
+    _timeline_lifecycle.publish_threadsafe(project_id, payload)
+
+
+_progress_gate = ProgressGate()
+
+
 def set_analysis_progress(project_id: str, **fields) -> None:
     progress = projects[project_id].setdefault("analysis_progress", {})
     now = time.time()
     progress.setdefault("started_at", now)
     fields.setdefault("updated_at", now)
     progress.update(fields)
+    if _progress_gate.allow(project_id, progress.get("phase")):
+        publish_project_event(project_id, analysis_event(progress))
 
 
 @app.get("/projects/{project_id}/analyze/status")
@@ -995,14 +1087,15 @@ def _initial_timeline_document(project: dict, sources: dict[str, SourceClip]) ->
 
 
 def _write_timeline_for_project(project: dict, document: TimelineDocument) -> None:
-    project["timeline_document"] = document.model_dump()
+    """Save the document durably, then mirror it in memory.
+
+    A write error propagates (the controller turns it into
+    ``TimelinePersistError``), and memory only changes after the file did.
+    """
     folder = project.get("project_folder")
     if folder:
-        try:
-            write_timeline_document(Path(folder), document)
-        except OSError as exc:
-            project_id = project.get("project_id", "unknown")
-            logger.warning("Could not persist timeline document for %s: %s", project_id, exc)
+        write_timeline_document(Path(folder), document)
+    project["timeline_document"] = document.model_dump()
 
 
 _timeline_lifecycle = TimelineLifecycle(
@@ -1012,6 +1105,9 @@ _timeline_lifecycle = TimelineLifecycle(
     document_writer=_write_timeline_for_project,
     candidate_lister=lambda project_id: get_mcp_server()._list_candidates(project_id),
 )
+
+
+project_events = _timeline_lifecycle
 
 
 def invalidate_timeline_controller(project_id: str) -> None:
@@ -1680,30 +1776,43 @@ def project_dir(project_id: str) -> Path:
     return PROJECTS_DIR / project_id
 
 
+def video_entry_for(folder_path: Path, source_video, metadata=None) -> dict:
+    """The runtime ``videos`` projection entry for one Source Video."""
+    video_path = folder_path / source_video.filename
+    try:
+        metadata = metadata or probe_video(video_path)
+        metadata.file_id = source_video.filename
+        metadata.file_name = source_video.filename
+        metadata.file_path = str(video_path)
+        metadata_dump = metadata.model_dump()
+    except (FFprobeUnavailableError, FFprobeError, OSError):
+        # None, not {}: an empty dict is truthy in the frontend's
+        # `metadata?: VideoMetadata` check and crashes the source table.
+        metadata_dump = None
+    return {
+        "file_id": source_video.filename,
+        "file_name": source_video.filename,
+        "file_path": str(video_path),
+        "status": "ready",
+        "metadata": metadata_dump,
+    }
+
+
 def videos_from_manifest(folder_path: Path, manifest) -> list[dict]:
-    videos = []
-    for source_video in manifest.source_videos:
-        video_path = folder_path / source_video.filename
-        try:
-            metadata = probe_video(video_path)
-            metadata.file_id = source_video.filename
-            metadata.file_name = source_video.filename
-            metadata.file_path = str(video_path)
-            metadata_dump = metadata.model_dump()
-        except (FFprobeUnavailableError, FFprobeError, OSError):
-            # None, not {}: an empty dict is truthy in the frontend's
-            # `metadata?: VideoMetadata` check and crashes the source table.
-            metadata_dump = None
-        videos.append(
-            {
-                "file_id": source_video.filename,
-                "file_name": source_video.filename,
-                "file_path": str(video_path),
-                "status": "ready",
-                "metadata": metadata_dump,
-            }
-        )
-    return videos
+    return [video_entry_for(folder_path, source_video) for source_video in manifest.source_videos]
+
+
+def on_source_imported(project_id: str, source_video, metadata=None) -> None:
+    """A verified import landed in the Project: refresh the projection and tell clients."""
+    project = projects.get(project_id)
+    if project is None or not project.get("project_folder"):
+        return
+    entry = video_entry_for(Path(project["project_folder"]), source_video, metadata)
+    videos = [v for v in project.get("videos", []) if v["file_id"] != entry["file_id"]]
+    videos.append(entry)
+    order = {v["filename"]: i for i, v in enumerate((project.get("project") or {}).get("source_videos", []))}
+    project["videos"] = sorted(videos, key=lambda v: order.get(v["file_id"], len(order)))
+    publish_project_event(project_id, {"type": SOURCES_CHANGED})
 
 
 def registered_video(project_id: str, file_id: str) -> dict:
@@ -1807,20 +1916,23 @@ def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:
 def persist_project_results(project_id: str) -> None:
     """Write clips + timeline to <project>/clipassembler/analysis/results.json
     so re-opening a folder project restores the Review Board. No-op for
-    legacy upload projects, which have no folder to persist into."""
+    legacy upload projects, which have no folder to persist into. A failed
+    write raises ``ProjectSaveError`` (mapped to a 500 by the app handler)."""
     project = projects.get(project_id)
     if not project or not project.get("project_folder"):
         return
     try:
-        write_analysis_results(
-            Path(project["project_folder"]),
-            harness_id=project.get("harness_id") or "manual",
-            clips=project.get("clips", []),
-            timeline=project.get("timeline"),
-            generation_stats=project.get("generation_stats"),
-        )
+        with project_service.lock(project_id):
+            write_analysis_results(
+                Path(project["project_folder"]),
+                harness_id=project.get("harness_id") or "manual",
+                clips=project.get("clips", []),
+                timeline=project.get("timeline"),
+                generation_stats=project.get("generation_stats"),
+            )
     except OSError as exc:
         logger.warning("Could not persist analysis results for %s: %s", project_id, exc)
+        raise ProjectSaveError() from exc
 
 
 def project_work_dir(project_id: str) -> Path:

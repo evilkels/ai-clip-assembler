@@ -329,6 +329,18 @@ export async function rescanProject(projectId: string): Promise<FolderProjectRes
   return res.json() as Promise<FolderProjectResult>;
 }
 
+/** The Project's current Source Videos, e.g. after the Mac imported a phone upload. */
+export async function fetchProjectSources(
+  projectId: string,
+): Promise<Pick<FolderProjectResult, 'project_id' | 'videos'>> {
+  const res = await fetch(`${backendUrl()}/projects/${encodeURIComponent(projectId)}/sources`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Loading sources failed: ${res.status}`);
+  }
+  return res.json() as Promise<Pick<FolderProjectResult, 'project_id' | 'videos'>>;
+}
+
 export async function uploadVideo(
   projectId: string,
   file: File,
@@ -708,16 +720,21 @@ export async function redoTimeline(projectId: string): Promise<TimelineSnapshot>
 }
 
 /**
- * Subscribe to a project's live timeline events (SSE). The callback fires on
+ * Subscribe to a project's live events (SSE). `onTimelineChanged` fires on
  * every `timeline-changed` event so the GUI reconciles from the authoritative
- * document — this is what makes an agent's edit appear live. Returns a teardown.
+ * document — this is what makes an agent's edit appear live. `onSourcesChanged`
+ * fires when the Source Video list changed behind the app's back. Returns a
+ * teardown.
  */
 export function subscribeTimelineEvents(
   projectId: string,
   onTimelineChanged: () => void,
+  onSourcesChanged?: () => void,
 ): () => void {
   const source = new EventSource(`${backendUrl()}/projects/${projectId}/events`);
   source.addEventListener('timeline-changed', () => onTimelineChanged());
+  // `sources-changed`: footage arrived (e.g. verified import from a phone).
+  if (onSourcesChanged) source.addEventListener('sources-changed', () => onSourcesChanged());
   return () => source.close();
 }
 

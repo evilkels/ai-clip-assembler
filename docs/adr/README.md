@@ -12,3 +12,4 @@ cross-cutting choices with their consequences.
 7. [0007: AI Access is granted once, when the Editor connects a Provider](0007-ai-access-is-granted-when-connecting.md)
 8. [0008: AI runs through the Editor's own Claude Code or Codex, which the app never installs](0008-ai-runs-through-the-editors-own-provider-program.md)
 9. [0009: Exports link media by absolute file URL](0009-exports-link-media-by-absolute-file-url.md)
+10. [0010: Remote View over the Editor's tailnet stays Local-First](0010-remote-view-over-tailnet.md) — Proposed

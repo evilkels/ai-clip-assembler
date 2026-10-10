@@ -12,11 +12,12 @@ a Server-Sent Events stream, and the same broker can back other transports.
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import Awaitable, Callable, Dict, Mapping, Optional, Set
 
 from .models import TimelineDocument
 from .review_state import review_context_fingerprint, sequence_fingerprint
-from .timeline_ops import SourceClip, TimelineController
+from .timeline_ops import SourceClip, TimelineController, TimelinePersistError
 
 
 TIMELINE_CHANGED = "timeline-changed"
@@ -29,28 +30,95 @@ DocumentWriter = Callable[[dict, TimelineDocument], None]
 CandidateLister = Callable[[str], list]
 
 
+class Subscription:
+    """One subscriber's queue, bound to the event loop that will consume it."""
+
+    def __init__(
+        self,
+        queue: "asyncio.Queue[dict]",
+        loop: Optional[asyncio.AbstractEventLoop],
+        bounded: bool,
+    ) -> None:
+        self.queue = queue
+        self.loop = loop
+        self.bounded = bounded
+
+
+OVERFLOW = "overflow"
+
+
 class TimelineEventBroker:
-    """Per-project fan-out of timeline events to subscriber queues."""
+    """Per-project fan-out of Project events to subscriber queues.
+
+    Despite the historical name it carries every Project event
+    (``timeline-changed``, ``analysis-progress``, ``sources-changed``).
+    ``publish_threadsafe`` may be called from any thread (an analysis worker, an
+    upload finalizer); delivery hops onto each subscriber's own loop with
+    ``call_soon_threadsafe``. A bounded subscriber that falls behind is dropped:
+    its queue is replaced by a single ``overflow`` marker so its consumer closes
+    the stream and refetches instead of buffering without limit.
+    """
 
     def __init__(self) -> None:
-        self._subscribers: Dict[str, Set["asyncio.Queue[dict]"]] = {}
+        self._subscribers: Dict[str, Set[Subscription]] = {}
+        self._lock = threading.Lock()
 
     def subscribe(self, project_id: str) -> "asyncio.Queue[dict]":
-        queue: "asyncio.Queue[dict]" = asyncio.Queue()
-        self._subscribers.setdefault(project_id, set()).add(queue)
-        return queue
+        return self.subscribe_bounded(project_id, maxsize=0).queue
 
-    def unsubscribe(self, project_id: str, queue: "asyncio.Queue[dict]") -> None:
-        subscribers = self._subscribers.get(project_id)
-        if subscribers is None:
-            return
-        subscribers.discard(queue)
-        if not subscribers:
-            self._subscribers.pop(project_id, None)
+    def subscribe_bounded(self, project_id: str, maxsize: int = 0) -> Subscription:
+        try:
+            loop: Optional[asyncio.AbstractEventLoop] = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        subscription = Subscription(asyncio.Queue(maxsize=maxsize), loop, bounded=maxsize > 0)
+        with self._lock:
+            self._subscribers.setdefault(project_id, set()).add(subscription)
+        return subscription
+
+    def unsubscribe(self, project_id: str, queue_or_subscription) -> None:
+        with self._lock:
+            subscribers = self._subscribers.get(project_id)
+            if subscribers is None:
+                return
+            for subscription in list(subscribers):
+                if subscription is queue_or_subscription or subscription.queue is queue_or_subscription:
+                    subscribers.discard(subscription)
+            if not subscribers:
+                self._subscribers.pop(project_id, None)
+
+    def subscriber_count(self, project_id: str) -> int:
+        with self._lock:
+            return len(self._subscribers.get(project_id, ()))
 
     async def publish(self, project_id: str, payload: dict) -> None:
-        for queue in list(self._subscribers.get(project_id, ())):
-            queue.put_nowait(payload)
+        self.publish_threadsafe(project_id, payload)
+
+    def publish_threadsafe(self, project_id: str, payload: dict) -> None:
+        with self._lock:
+            targets = list(self._subscribers.get(project_id, ()))
+        try:
+            running: Optional[asyncio.AbstractEventLoop] = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        for subscription in targets:
+            loop = subscription.loop
+            if loop is None or loop is running:
+                self._deliver(project_id, subscription, payload)
+            else:
+                try:
+                    loop.call_soon_threadsafe(self._deliver, project_id, subscription, payload)
+                except RuntimeError:  # its loop is gone: nobody is listening any more
+                    self.unsubscribe(project_id, subscription)
+
+    def _deliver(self, project_id: str, subscription: Subscription, payload: dict) -> None:
+        try:
+            subscription.queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            self.unsubscribe(project_id, subscription)
+            while not subscription.queue.empty():
+                subscription.queue.get_nowait()
+            subscription.queue.put_nowait({"type": OVERFLOW})
 
     def publisher(self, project_id: str) -> OnChange:
         """An ``on_change`` hook for a :class:`TimelineController` that emits a
@@ -97,6 +165,7 @@ class TimelineLifecycle:
                 document,
                 sources,
                 on_change=self._make_on_change(project_id),
+                persist=self._make_persist(project_id),
             )
             self._controllers[project_id] = controller
         else:
@@ -125,14 +194,30 @@ class TimelineLifecycle:
     def subscribe(self, project_id: str) -> "asyncio.Queue[dict]":
         return self._broker.subscribe(project_id)
 
-    def unsubscribe(self, project_id: str, queue: "asyncio.Queue[dict]") -> None:
-        self._broker.unsubscribe(project_id, queue)
+    def subscribe_bounded(self, project_id: str, maxsize: int) -> Subscription:
+        return self._broker.subscribe_bounded(project_id, maxsize)
+
+    def unsubscribe(self, project_id: str, queue_or_subscription) -> None:
+        self._broker.unsubscribe(project_id, queue_or_subscription)
+
+    def publish_threadsafe(self, project_id: str, payload: dict) -> None:
+        """Publish a Project event from any thread."""
+        self._broker.publish_threadsafe(project_id, payload)
+
+    def _make_persist(self, project_id: str):
+        def persist(document: TimelineDocument) -> None:
+            project = self._project_lookup(project_id)
+            if project is None:
+                return
+            try:
+                self._document_writer(project, document)
+            except OSError as exc:
+                raise TimelinePersistError() from exc
+
+        return persist
 
     def _make_on_change(self, project_id: str) -> OnChange:
         async def on_change(document: TimelineDocument) -> None:
-            project = self._project_lookup(project_id)
-            if project is not None:
-                self._document_writer(project, document)
             await self._broker.publish(
                 project_id,
                 {"type": TIMELINE_CHANGED, "version": document.version},

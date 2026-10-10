@@ -20,6 +20,7 @@ from src.timeline_ops import (
     SourceClip,
     TimelineController,
     TimelineOpError,
+    TimelinePersistError,
     TimelineRevisionConflict,
     _ITEM_ID_NAMESPACE,
     _new_item_id,
@@ -840,3 +841,78 @@ def test_nested_seeded_item_ids_restore_the_outer_seed():
     assert inner == uuid.uuid5(_ITEM_ID_NAMESPACE, "inner:0").hex
     # The outer sequence resumes where it left off rather than restarting.
     assert second == uuid.uuid5(_ITEM_ID_NAMESPACE, "outer:1").hex
+
+
+# --- commit before acknowledging (plan 041 task 1.2) --------------------------
+
+
+def _failing_persist(document):
+    raise OSError("disk full")
+
+
+@pytest.mark.asyncio
+async def test_failed_persist_leaves_document_history_and_events_untouched():
+    sources = make_sources(("a", 0.0, 2.0, 10.0), ("b", 0.0, 2.0, 10.0))
+    published = []
+    saved = []
+    fail = {"on": False}
+
+    def persist(document):
+        if fail["on"]:
+            raise TimelinePersistError()
+        saved.append(document.revision)
+
+    async def on_change(document):
+        published.append(document.revision)
+
+    controller = TimelineController(
+        empty_doc(), sources, on_change=on_change, persist=persist
+    )
+    await controller.apply("add_item", source_clip_id="a")
+    await controller.apply("add_item", source_clip_id="b")
+    await controller.undo()  # leaves one redo entry
+    before = (
+        controller.document,
+        list(controller._undo),
+        list(controller._redo),
+        list(published),
+    )
+
+    fail["on"] = True
+    with pytest.raises(TimelinePersistError, match="Couldn't save the Timeline"):
+        await controller.apply("add_item", source_clip_id="a")
+    with pytest.raises(TimelinePersistError):
+        await controller.apply_batch(
+            [{"operation": "add_item", "args": {"source_clip_id": "a"}}],
+            expected_revision=controller.document.revision,
+        )
+    with pytest.raises(TimelinePersistError):
+        await controller.undo()
+    with pytest.raises(TimelinePersistError):
+        await controller.redo()
+
+    after = (
+        controller.document,
+        list(controller._undo),
+        list(controller._redo),
+        list(published),
+    )
+    assert after == before
+    assert saved == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_persist_sees_the_stamped_document_before_it_goes_live():
+    seen = []
+    controller_holder = {}
+
+    def persist(document):
+        seen.append((document.revision, controller_holder["c"].document.revision))
+
+    controller = TimelineController(
+        empty_doc(), make_sources(("a", 0.0, 2.0, 10.0)), persist=persist
+    )
+    controller_holder["c"] = controller
+    await controller.apply("add_item", source_clip_id="a")
+    assert seen == [(1, 0)]
+    assert controller.document.revision == 1

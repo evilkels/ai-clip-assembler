@@ -8,7 +8,7 @@ document.
 import pytest
 
 from src.models import TimelineDocument
-from src.timeline_ops import SourceClip, TimelineController
+from src.timeline_ops import SourceClip, TimelineController, TimelinePersistError
 from src.timeline_service import TimelineEventBroker, TimelineLifecycle
 
 
@@ -105,3 +105,28 @@ def test_invalidate_rebuilds_only_the_requested_project_controller():
     assert lifecycle.get_controller("p2") is p2_controller
     assert lifecycle.get_controller("p1") is not p1_controller
     assert lifecycle.get_controller("p1").document.profile == "reloaded"
+
+
+@pytest.mark.asyncio
+async def test_service_writer_failure_changes_nothing_and_publishes_nothing():
+    projects = {"p1": {"document": TimelineDocument()}}
+    lifecycle = _lifecycle(projects)
+    controller = lifecycle.get_controller("p1")
+    await controller.apply("add_item", source_clip_id="clip-a")
+    queue = lifecycle.subscribe("p1")
+
+    def boom(_project, _document):
+        raise OSError("read-only volume")
+
+    lifecycle._document_writer = boom
+    before = controller.document
+    with pytest.raises(TimelinePersistError, match="Couldn't save the Timeline"):
+        await controller.apply("add_item", source_clip_id="clip-a")
+
+    assert controller.document == before
+    assert controller.document.revision == 1
+    assert queue.empty()
+    # undo history is intact: undoing still reaches the empty document.
+    lifecycle._document_writer = lambda _p, _d: None
+    undone = await controller.undo()
+    assert undone.items == []

@@ -12,10 +12,10 @@ Decisions: compare Project snapshots excluding only `server_time`, retain the co
 
 ## Phase 1: Preserve, fix and verify
 
-- [x] 1.1 Preserve the prototype browser assets under `docs/designs/remote-view/prototype/` with a synthetic API harness. Done when it runs without the machine-specific server or private data.
-- [x] 1.2 Ignore server clock changes when deciding whether to repaint. Done when two otherwise identical poll responses retain the same thumbnail nodes.
-- [x] 1.3 Add a browser regression for unchanged polls and meaningful changes. Done when it fails on the pre-fix code, passes after the fix, and a changed decision or progress is rendered.
-- [x] 1.4 Independently review and verify the served prototype. Done when the original no-change polling loop retains its image nodes and the PR records the checked change and results.
+- [x] 1.1 Preserve the prototype browser assets under `docs/designs/remote-view/prototype/` with a synthetic API harness. PR #109. Done when it runs without the machine-specific server or private data.
+- [x] 1.2 Ignore server clock changes when deciding whether to repaint. PR #109. Done when two otherwise identical poll responses retain the same thumbnail nodes.
+- [x] 1.3 Add a browser regression for unchanged polls and meaningful changes. PR #109. Done when it fails on the pre-fix code, passes after the fix, and a changed decision or progress is rendered.
+- [x] 1.4 Independently review and verify the served prototype. PR #109. Done when the original no-change polling loop retains its image nodes and the PR records the checked change and results.
 
 ## Human tasks
 

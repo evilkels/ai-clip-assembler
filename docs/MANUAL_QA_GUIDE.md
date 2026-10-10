@@ -104,10 +104,11 @@ Expect metadata, complete status, smooth candidates, and actionable tool errors.
 
 ## Resolve validation and evidence
 
-Import `exports/davinci/timeline.xml`; confirm no relink and matching
-count/order/in-out/speed/transform. For audio-bearing source clips, verify
+Import `exports/davinci/timeline.xml`; confirm it uses absolute `file://`
+media URLs, no relink, and matching count/order/in-out/speed/transform. For audio-bearing source clips, verify
 linked waveforms on the corresponding audio tracks; a silent source must add no
-audio item. Move the folder and repeat. Import EDL after adding source media;
+audio item. Move the folder, reopen it in the app, export again, then import
+the new XML. Import EDL after adding source media;
 verify timing/orientation and `B` or `AA/V` for audio-bearing sources versus
 `V` for silent sources. Capture media properties, quality examples,
 harness/count, editorial usefulness, Timeline persistence, agent outcomes, and

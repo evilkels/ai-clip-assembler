@@ -1,0 +1,39 @@
+<fcpxml version="1.10">
+  <resources>
+    <format id="r1" frameDuration="1001/60000s" width="1080" height="1920" />
+    <format id="r2" frameDuration="1001/60000s" width="1920" height="1080" />
+    <asset id="a1" name="DJI_0001.MOV" start="0s" duration="2156154/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/Estepona/DJI_0001.MOV" />
+    </asset>
+    <asset id="a2" name="DJI_0002.MOV" start="0s" duration="2549547/60000s" hasVideo="1" format="r2" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/Estepona/DJI_0002.MOV" />
+    </asset>
+    <asset id="a3" name="DJI_0003.MOV" start="0s" duration="3072069/60000s" hasVideo="1" format="r2" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/Estepona/DJI_0003.MOV" />
+    </asset>
+    <asset id="a4" name="DJI_0004.MOV" start="0s" duration="2879877/60000s" hasVideo="1" format="r2" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/editor/Movies/Estepona/DJI_0004.MOV" />
+    </asset>
+  </resources>
+  <library>
+    <event name="Estepona Travel Edit">
+      <project name="Estepona Travel Edit">
+        <sequence format="r1" tcStart="0s" tcFormat="NDF" audioLayout="stereo">
+          <spine>
+            <asset-clip name="DJI_0001.MOV" ref="a1" offset="0s" start="120120/60000s" duration="360360/60000s" audioRole="dialogue" />
+            <asset-clip name="DJI_0002.MOV" ref="a2" offset="360360/60000s" start="599599/60000s" duration="719719/60000s" format="r2" audioRole="dialogue">
+              <timeMap>
+                <timept time="599599/60000s" value="599599/60000s" />
+                <timept time="659659/30000s" value="959959/60000s" />
+              </timeMap>
+            </asset-clip>
+            <asset-clip name="DJI_0003.MOV" ref="a3" offset="1080079/60000s" start="1260259/60000s" duration="360360/60000s" format="r2" audioRole="dialogue">
+              <adjust-transform scale="1.2 1.2" position="54.0 -38.4" />
+            </asset-clip>
+            <asset-clip name="DJI_0004.MOV" ref="a4" offset="1440439/60000s" start="240240/60000s" duration="300300/60000s" format="r2" audioRole="dialogue" />
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

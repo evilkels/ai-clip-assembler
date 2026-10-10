@@ -160,7 +160,9 @@ and use the compact All items list to move between repeated placements.
 ![Export screen](images/export.png)
 
 Choose Resolve XML, FCPXML, or EDL. Folder-project exports live under
-`exports/{davinci,fcp,edl}` with relative media paths. Use **Review export
+`exports/{davinci,fcp,edl}` and link to original media with absolute `file://`
+URLs. Keep the footage where it is, or reopen the moved project and export
+again. Use **Review export
 payload** to inspect every ordered Timeline Item before importing into your
 NLE: repeated items, `item_id`, Candidate Clip and resolved file metadata, bounds,
 Speed, and Transform are shown. Export reads the current backend Timeline

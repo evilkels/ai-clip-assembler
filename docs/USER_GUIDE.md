@@ -168,14 +168,15 @@ NLE: repeated items, `item_id`, Candidate Clip and resolved file metadata, bound
 Speed, and Transform are shown. Export reads the current backend Timeline
 Document directly; it does not first save the Review page's legacy order or
 trim projection. Each result keeps its file path, item count, export-time effective
-duration, status, backend duration metadata, and warnings. EDL warns when Speed
+duration, status, source media used duration (the unretimed sum of source ranges),
+and warnings. EDL warns when Speed
 or Transform was flattened; FCPXML and Resolve XML carry those supported values.
 Existing-file exports ask for overwrite confirmation, and a Resolve XML result
 offers **Open in DaVinci Resolve**.
 
 Format cards make the handoff explicit. After export, the receipt preserves the
-export-time item count, effective runtime, backend report, warnings, generated
-path, and Copy/Reveal actions even if the Timeline changes afterward. EDL's
+export-time item count, effective runtime, source media used duration, warnings,
+generated path, and Copy/Reveal actions even if the Timeline changes afterward. EDL's
 speed/transform caveat remains visible in the handoff summary and receipt.
 
 ## Choosing an AI harness

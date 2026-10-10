@@ -393,6 +393,7 @@ async function openFixtureRoute(page: Page, fixture: VisualFixture, path: string
     await expect(page.getByTestId('timeline-summary')).toContainText('3 items');
   }
   if (fixture === 'export-receipt') {
+    await page.getByTestId('export-format-card-edl').click();
     await page.getByTestId('export-selected').click();
     await expect(page.getByTestId('export-result-edl')).toBeVisible();
     await expect(page.getByTestId('export-result-edl')).toContainText('CMX 3600 EDL exported');

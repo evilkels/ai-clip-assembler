@@ -2,6 +2,7 @@ import asyncio
 import json
 import threading
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
@@ -23,7 +24,7 @@ from src.models import (
     TimelineSequence,
     VideoMetadata,
 )
-from support import FakeEmbeddingProvider
+from support import FakeEmbeddingProvider, assert_valid_fcpxml
 from src.review_state import sequence_fingerprint
 from src.timeline_script import ScriptResult
 
@@ -1367,6 +1368,58 @@ def test_export_timeline_writes_requested_format(monkeypatch, tmp_path):
     assert body["status"] == "generated"
     assert body["file_path"].endswith("timeline.edl")
     assert "TITLE:" in Path(body["file_path"]).read_text()
+
+
+def test_folder_export_uses_project_folder_name_for_handoff_titles(tmp_path):
+    api.projects.clear()
+    project_folder = tmp_path / "Bike Ride — 2026-10-10"
+    project_folder.mkdir()
+    (project_folder / "DJI_0042.MP4").write_bytes(b"video")
+    client = TestClient(api.app)
+    project_id = client.post(
+        "/projects/from-folder",
+        json={"folder_path": str(project_folder)},
+    ).json()["project_id"]
+    api.projects[project_id]["videos"][0]["metadata"] = {
+        "duration_sec": 10.0,
+        "fps": 30,
+        "resolution": [1920, 1080],
+    }
+    api.projects[project_id]["clips"] = [
+        {
+            "clip_id": "clip-1",
+            "file_id": "DJI_0042.MP4",
+            "file_name": "DJI_0042.MP4",
+            "start_sec": 0,
+            "end_sec": 3,
+            "duration_sec": 3,
+            "overall_score": 8,
+        }
+    ]
+    api.projects[project_id]["timeline"] = {"clips": ["clip-1"], "total_duration_sec": 3}
+    title = "Bike Ride — 2026-10-10"
+
+    edl_response = client.post(f"/projects/{project_id}/export?format=edl")
+    fcpxml_response = client.post(f"/projects/{project_id}/export?format=fcpxml")
+    resolve_response = client.post(f"/projects/{project_id}/export?format=resolve_xml")
+
+    assert edl_response.status_code == 200
+    assert fcpxml_response.status_code == 200
+    assert resolve_response.status_code == 200
+    edl = Path(edl_response.json()["file_path"]).read_text(encoding="utf-8")
+    assert f"TITLE: {title}" in edl
+
+    fcpxml = Path(fcpxml_response.json()["file_path"]).read_text(encoding="utf-8")
+    assert_valid_fcpxml(fcpxml)
+    fcpxml_root = ET.fromstring(fcpxml)
+    event = fcpxml_root.find("./library/event")
+    project = fcpxml_root.find("./library/event/project")
+    assert event is not None and event.attrib["name"] == title
+    assert project is not None and project.attrib["name"] == title
+
+    resolve_xml = Path(resolve_response.json()["file_path"]).read_text(encoding="utf-8")
+    resolve_root = ET.fromstring(resolve_xml)
+    assert resolve_root.findtext("./sequence/name") == title
 
 
 def test_export_folder_project_writes_inside_project_exports(tmp_path):

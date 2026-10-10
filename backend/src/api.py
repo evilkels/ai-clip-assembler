@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import threading
 import time
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import List, Literal, Optional
@@ -1422,13 +1423,19 @@ async def export_timeline(
     videos_by_id = {video["file_id"]: video for video in projects[project_id]["videos"]}
     document = get_timeline_controller(project_id).document
     clips = clips_from_timeline_document(projects[project_id], document)
+    project_folder = projects[project_id].get("project_folder")
+    title = Path(project_folder).name if project_folder else "AI Clip Assembler"
 
     if format == "edl":
         file_path = export_dir / "timeline.edl"
         ensure_export_can_write(file_path, overwrite)
+        edl_title = "".join(
+            " " if unicodedata.category(character) == "Cc" else character
+            for character in title
+        )
         file_path.write_text(
             generate_edl(
-                "AI Clip Assembler",
+                edl_title,
                 clips,
                 fps=round_edl_fps(choose_timeline_fps(videos_by_id, clips)),
                 videos_by_id=videos_by_id,
@@ -1440,7 +1447,7 @@ async def export_timeline(
         ensure_export_can_write(file_path, overwrite)
         file_path.write_text(
             generate_fcpxml(
-                "AI Clip Assembler",
+                title,
                 clips,
                 videos_by_id,
             ),
@@ -1451,7 +1458,7 @@ async def export_timeline(
         ensure_export_can_write(file_path, overwrite)
         file_path.write_text(
             generate_resolve_xml(
-                "AI Clip Assembler",
+                title,
                 clips,
                 videos_by_id,
             ),

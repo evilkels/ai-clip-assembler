@@ -9,7 +9,8 @@ interface ClipPreviewProps {
   mediaUrl?: string;
   startSec: number;
   endSec: number;
-  label: string;
+  /** Names the video and captions it in-frame; omit when the owner shows the name itself. */
+  label?: string;
   currentTimeSec?: number;
   playing?: boolean;
   loop?: boolean;
@@ -33,6 +34,8 @@ interface ClipPreviewProps {
   volume?: number;
   /** Called when Chromium refuses unmuted playback so the UI can show muted. */
   onAudioBlocked?: () => void;
+  /** Width / height of the frame; the box hugs the picture instead of 16:9. */
+  aspect?: number;
 }
 
 function boundedStart(startSec: number, endSec: number): number {
@@ -56,6 +59,7 @@ export function ClipPreview({
   muted = true,
   volume = 1,
   onAudioBlocked,
+  aspect,
 }: ClipPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const appliedSeekRef = useRef<{ epoch: number; mediaUrl: string } | null>(null);
@@ -143,15 +147,19 @@ export function ClipPreview({
 
   if (!mediaUrl) {
     return (
-      <div className="clip-preview missing" data-testid={`${testId}-missing`}>
-        <span>{label}</span>
+      <div
+        className="clip-preview missing"
+        data-testid={`${testId}-missing`}
+        style={{ aspectRatio: aspect }}
+      >
+        {label ? <span>{label}</span> : null}
         <span>No preview</span>
       </div>
     );
   }
 
   return (
-    <div className="clip-preview">
+    <div className="clip-preview" style={{ aspectRatio: aspect }}>
       <video
         ref={videoRef}
         data-testid={testId}
@@ -189,7 +197,7 @@ export function ClipPreview({
             keeps the now-audible preview accessible. */}
         <track kind="captions" />
       </video>
-      <div className="clip-preview-label">{label}</div>
+      {label ? <div className="clip-preview-label">{label}</div> : null}
     </div>
   );
 }

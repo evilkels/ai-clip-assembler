@@ -16,6 +16,7 @@ import { EmptyState } from './EmptyState';
 import { ClipPreview } from './ClipPreview';
 import { PreviewAudioControl } from './PreviewAudioControl';
 import { SourceAudioBadge } from './SourceAudioBadge';
+import { sequenceAspect } from '../lib/displayAspect';
 import { sourceAudioState } from '../lib/sourceAudio';
 import { usePreviewAudio } from '../state/usePreviewAudio';
 import { useSequencePlayer } from './useSequencePlayer';
@@ -236,6 +237,7 @@ export function Timeline({
   const { currentIndex, play, playing, previewProps, seekTo, stop } = sequencePlayer;
   const previewSegment = segments[currentIndex] ?? selectedSegment ?? segments[0];
   const previewAudio = sourceAudioState(previewSegment?.fileId, uploadedVideos);
+  const previewAspect = sequenceAspect(segments[0]?.fileId, uploadedVideos);
   const anySourceHasAudio = uploadedVideos.some((video) => video.metadata?.has_audio === true);
   // A source known to have no audio stays silent whatever the preference says.
   const previewMuted = muted || previewAudio.hasAudio === false;
@@ -624,6 +626,7 @@ export function Timeline({
           <ClipPreview
             {...previewProps}
             label={previewSegment.fileName}
+            aspect={previewAspect}
             scale={previewSegment.scale}
             testId="timeline-preview-video"
             muted={previewMuted}

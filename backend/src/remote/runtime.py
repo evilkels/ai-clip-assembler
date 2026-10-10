@@ -78,6 +78,8 @@ class RemoteRuntime:
         self.public_origin: Optional[str] = None
         self.mac_name: str = ""
         self.network_path: str = "unknown"
+        # The tus upload service; created on first use by the upload routes.
+        self.uploads = None
         auth.add_listener(self._on_auth_event)
 
     # --- lease --------------------------------------------------------------

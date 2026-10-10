@@ -341,3 +341,49 @@ class RemoteProjectDetail(BaseModel):
 class RemoteError(BaseModel):
     reason: str
     message: Optional[str] = None
+
+
+class RemoteChunkReceipt(BaseModel):
+    offset: int
+    length: int
+    sha256: str
+
+
+class RemoteUploadReceipt(BaseModel):
+    """Proof of import: the phone compares ``sha256`` with its own before it says verified."""
+
+    upload_id: str
+    source_uuid: str
+    filename: str
+    size_bytes: int
+    sha256: str
+    verified_at: str
+    already_in_project: bool = False
+
+
+class RemoteUploadStatus(BaseModel):
+    upload_id: str
+    state: Literal[
+        "receiving",
+        "received",
+        "verifying",
+        "publishing",
+        "imported",
+        "failed",
+        "cancelled",
+        "expired",
+        "recovery_pending",
+    ]
+    offset: int
+    length: int
+    filename: str
+    expires_at: Optional[float] = None
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    receipt: Optional[RemoteUploadReceipt] = None
+    chunks: Optional[List[RemoteChunkReceipt]] = None
+
+
+class RemoteFinalizeRequest(BaseModel):
+    sha256: str = Field(pattern="^[0-9a-f]{64}$")
+    idempotency_key: str = Field(min_length=8, max_length=128)

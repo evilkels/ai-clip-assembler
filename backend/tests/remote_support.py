@@ -80,7 +80,7 @@ class Phone:
 
 
 class RemoteHarness:
-    def __init__(self, tmp_path, ui_dir=None, clock=None):
+    def __init__(self, tmp_path, ui_dir=None, clock=None, uploads=None):
         api.projects.clear()
         self.clock = clock or Clock()
         self.store = RemoteStore(tmp_path / "remote-store")
@@ -92,6 +92,8 @@ class RemoteHarness:
             projects=api.projects,
             ui_dir=ui_dir,
         )
+        if uploads is not None:
+            self.runtime.uploads = uploads
         self.runtime.open_lease(OWNER, ORIGIN, MAC_NAME)
         self.app = create_remote_app(self.runtime)
 
@@ -125,3 +127,73 @@ def body(response):
         return response.json()
     except json.JSONDecodeError:
         return response.text
+
+
+def tus_metadata(filename="IMG_1234.MOV", filetype="video/quicktime", last_modified=None):
+    import base64
+
+    def enc(value):
+        return base64.b64encode(value.encode()).decode()
+
+    parts = [f"filename {enc(filename)}"]
+    if filetype:
+        parts.append(f"filetype {enc(filetype)}")
+    if last_modified is not None:
+        parts.append(f"lastModified {enc(str(last_modified))}")
+    return ",".join(parts)
+
+
+def chunk_checksum(data, algorithm="sha256"):
+    import base64
+    import hashlib
+
+    return f"{algorithm} " + base64.b64encode(getattr(hashlib, algorithm)(data).digest()).decode()
+
+
+TUS = {"Tus-Resumable": "1.0.0"}
+
+
+class Tus:
+    """The tus calls a phone makes, against one Project."""
+
+    def __init__(self, phone, project_uuid):
+        self.phone = phone
+        self.base = f"/api/projects/{project_uuid}"
+
+    def create(self, length, filename="IMG_1234.MOV", key="key-00000001", **meta):
+        return self.phone.post(
+            f"{self.base}/uploads",
+            extra={
+                **TUS,
+                "Upload-Length": str(length),
+                "Upload-Metadata": tus_metadata(filename, **meta),
+                "Idempotency-Key": key,
+            },
+        )
+
+    def upload_id(self, response):
+        assert response.status_code == 201, response.text
+        return response.headers["location"].rsplit("/", 1)[1]
+
+    def head(self, upload_id):
+        return self.phone.request("HEAD", f"{self.base}/uploads/{upload_id}", extra=TUS)
+
+    def patch(self, upload_id, offset, data, checksum=None, content_type="application/offset+octet-stream"):
+        return self.phone.request(
+            "PATCH",
+            f"{self.base}/uploads/{upload_id}",
+            content=data,
+            extra={
+                **TUS,
+                "Upload-Offset": str(offset),
+                "Content-Type": content_type,
+                "Upload-Checksum": checksum or chunk_checksum(data),
+            },
+        )
+
+    def delete(self, upload_id):
+        return self.phone.request("DELETE", f"{self.base}/uploads/{upload_id}", extra=TUS)
+
+    def status(self, upload_id, chunks=False):
+        suffix = "?chunks=true" if chunks else ""
+        return self.phone.get(f"{self.base}/upload-status/{upload_id}{suffix}")

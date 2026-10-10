@@ -248,7 +248,7 @@ These corrections replace the stale draft's claims:
     - `disable` makes the next request 503 at once and refuses the port within 1 s.
     - Closing the pipe and stopping heartbeats each disable within 16 s.
     - Re-enable mints a new ingress and the old one gets 404.
-- [ ] 1.8 Add `backend/src/uploads/service.py` and `uploads/store.py` for tus transfers. Done when `backend/tests/test_uploads_tus.py` covers the cases below.
+- [x] 1.8 Add `backend/src/uploads/service.py` and `uploads/store.py` for tus transfers. Done when `backend/tests/test_uploads_tus.py` covers the cases below.
   - Supported: tus 1.0 core, `creation`, `checksum` (advertise `sha1,sha256`), `expiration` and `termination`, on the §5.2 wire contract.
   - Routes: `OPTIONS/POST /api/projects/{id}/uploads`, `HEAD/PATCH/DELETE /api/projects/{id}/uploads/{uploadId}` and `GET /api/projects/{id}/upload-status/{uploadId}`.
   - Staging is `clipassembler/cache/uploads/<id>/{record.json,data.part}`, refused if it resolves outside the Project through a symlink.

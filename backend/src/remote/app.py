@@ -561,12 +561,10 @@ def _is_within(candidate: Path, root: Path) -> bool:
 
 
 def register_extensions(app: FastAPI, runtime: RemoteRuntime) -> None:
-    """Later tasks add routers here (events, uploads) before the catch-alls."""
-    for hook in EXTENSIONS:
-        hook(app, runtime)
+    """Route groups that live in their own modules, registered before the catch-alls."""
+    from ..uploads.routes import register_upload_routes
 
-
-EXTENSIONS: List[Callable[[FastAPI, RemoteRuntime], None]] = []
+    register_upload_routes(app, runtime)
 
 
 def create_remote_app(runtime: RemoteRuntime) -> Callable:

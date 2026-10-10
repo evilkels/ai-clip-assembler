@@ -101,9 +101,18 @@ export interface Proposal {
   based_on_timeline_revision?: number;
   status?: "pending" | "accepted" | "rejected" | "superseded";
 }
+export interface RemoteChunkReceipt {
+  offset: number;
+  length: number;
+  sha256: string;
+}
 export interface RemoteError {
   reason: string;
   message?: string | null;
+}
+export interface RemoteFinalizeRequest {
+  sha256: string;
+  idempotency_key: string;
 }
 export interface RemoteHealth {
   ok?: boolean;
@@ -171,6 +180,39 @@ export interface RemoteProjectSummary {
 }
 export interface RemoteSessionRenewed {
   csrf_token: string;
+}
+/**
+ * Proof of import: the phone compares ``sha256`` with its own before it says verified.
+ */
+export interface RemoteUploadReceipt {
+  upload_id: string;
+  source_uuid: string;
+  filename: string;
+  size_bytes: number;
+  sha256: string;
+  verified_at: string;
+  already_in_project?: boolean;
+}
+export interface RemoteUploadStatus {
+  upload_id: string;
+  state:
+    | "receiving"
+    | "received"
+    | "verifying"
+    | "publishing"
+    | "imported"
+    | "failed"
+    | "cancelled"
+    | "expired"
+    | "recovery_pending";
+  offset: number;
+  length: number;
+  filename: string;
+  expires_at?: number | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  receipt?: RemoteUploadReceipt | null;
+  chunks?: RemoteChunkReceipt[] | null;
 }
 export interface ReviewMessage {
   message_id: string;

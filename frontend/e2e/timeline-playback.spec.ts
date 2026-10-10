@@ -825,7 +825,7 @@ test('transport clock keeps following Timeline edits after play and stop', async
   await expect(clock).toHaveText(/ \/ 0:06\.0$/);
 
   await page.getByTestId('transport-play').click();
-  await page.waitForTimeout(700);
+  await expect(clock).not.toHaveText(/^0:00\.0 /);
   await page.getByTestId('transport-stop').click();
 
   // Playback painted the clock imperatively; later edits must still reach it.

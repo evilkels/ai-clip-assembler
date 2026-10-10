@@ -16,7 +16,7 @@ import {
   type HarnessInfo,
 } from '../api/client';
 import { usePublishGateActions, type GateActions } from '../state/StepGateContext';
-import type { ClipGenerationPreferences } from '../types/clip';
+import type { ClipGenerationPreferences, UploadedVideo } from '../types/clip';
 import { preferencesFromGenerationStats } from '../lib/clipGenerationPreferences';
 import type { SourceVideoSort, SourceVideoSortKey } from '../lib/sourceVideoView';
 
@@ -116,12 +116,16 @@ export function ImportPage() {
   // Files finished during the current run: Candidate Clips and generation stats
   // only refresh when the whole batch completes.
   const [completedThisRun, setCompletedThisRun] = useState<Set<string>>(new Set());
-  const previousRunningNameRef = useRef<string | null>(null);
+  const runBatchRef = useRef<UploadedVideo[]>([]);
+  const previousRunningRef = useRef<{ index: number; name: string } | null>(null);
   const analyzedIds = useMemo(() => {
     const ids = new Set(clips.map((clip) => clip.file_id));
-    const statFileNames = new Set(Object.keys(generationStats?.per_file ?? {}));
-    for (const video of uploadedVideos) {
-      if (statFileNames.has(video.file_name)) ids.add(video.file_id);
+    for (const key of Object.keys(generationStats?.per_file ?? {})) {
+      // Keyed by file_id; the file_name match covers older stats.
+      const video =
+        uploadedVideos.find((candidate) => candidate.file_id === key) ??
+        uploadedVideos.find((candidate) => candidate.file_name === key);
+      if (video) ids.add(video.file_id);
     }
     for (const fileId of completedThisRun) ids.add(fileId);
     return ids;
@@ -271,6 +275,8 @@ export function ImportPage() {
       return;
     }
     setCancelling(false);
+    runBatchRef.current = uploadedVideos.filter((video) => selectedIds.includes(video.file_id));
+    previousRunningRef.current = null;
     setCompletedThisRun(new Set());
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
@@ -305,8 +311,13 @@ export function ImportPage() {
     } finally {
       setProgress(null);
       setCancelling(false);
+      // Finished, failed or cancelled: the stored results are authoritative now,
+      // so cancelled files must not stay marked (and deselected) as analyzed.
+      runBatchRef.current = [];
+      setCompletedThisRun(new Set());
     }
   }, [
+    uploadedVideos,
     projectId,
     selectedHarness,
     cloudAiConsent,
@@ -391,13 +402,30 @@ export function ImportPage() {
   const activeProgress = isAnalyzing ? progress ?? analysisStatus : analysisStatus;
   const runningFileName = isAnalyzing ? activeProgress.file_name ?? null : null;
 
+  const runningVideoIndex = isAnalyzing ? activeProgress.video_index ?? null : null;
   useEffect(() => {
-    const previous = previousRunningNameRef.current;
-    previousRunningNameRef.current = runningFileName;
-    if (!previous || !runningFileName || previous === runningFileName) return;
-    const finished = uploadedVideos.find((video) => video.file_name === previous);
+    const previous = previousRunningRef.current;
+    const current =
+      runningFileName && runningVideoIndex ? { index: runningVideoIndex, name: runningFileName } : null;
+    previousRunningRef.current = current;
+    if (!previous || !current) return;
+    if (previous.index === current.index && previous.name === current.name) return;
+    // The backend walks the selected batch in order, so video_index pins the file
+    // even when several files share a name.
+    const batch = runBatchRef.current;
+    const indexed = batch[previous.index - 1];
+    const finished =
+      indexed?.file_name === previous.name
+        ? indexed
+        : batch.find((video) => video.file_name === previous.name);
     if (finished) setCompletedThisRun((ids) => new Set(ids).add(finished.file_id));
-  }, [runningFileName, uploadedVideos]);
+  }, [runningFileName, runningVideoIndex]);
+
+  useEffect(() => {
+    runBatchRef.current = [];
+    previousRunningRef.current = null;
+    setCompletedThisRun(new Set());
+  }, [projectId]);
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
   const eta = estimatedRemaining(activeProgress, activePercent);
 
@@ -486,6 +514,7 @@ export function ImportPage() {
           <div className="import-workstation" data-import-workstation>
             <SourceVideoBrowser
               projectId={projectId}
+              analysisResults={generationStats}
               videos={uploadedVideos}
               analyzedIds={analyzedIds}
               deselected={deselected}

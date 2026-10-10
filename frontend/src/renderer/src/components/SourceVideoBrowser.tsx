@@ -15,6 +15,8 @@ import type { UploadedVideo } from '../types/clip';
 
 interface Props {
   projectId: string | null;
+  /** Identity changes with every completed analysis, so a poster that 404ed retries. */
+  analysisResults: object | null;
   videos: UploadedVideo[];
   analyzedIds: ReadonlySet<string>;
   deselected: ReadonlySet<string>;
@@ -69,12 +71,16 @@ function SourceVideoPoster({
   projectId,
   video,
   analyzed,
+  analysisResults,
 }: {
   projectId: string | null;
   video: UploadedVideo;
   analyzed: boolean;
+  analysisResults: object | null;
 }) {
-  const [failed, setFailed] = useState(false);
+  // A failure only counts for the analysis it happened under.
+  const [failedUnder, setFailedUnder] = useState<{ results: object | null } | null>(null);
+  const failed = failedUnder !== null && failedUnder.results === analysisResults;
   return (
     <div className="source-video-poster" aria-hidden="true">
       {projectId && analyzed && !failed ? (
@@ -83,7 +89,7 @@ function SourceVideoPoster({
           loading="lazy"
           decoding="async"
           alt=""
-          onError={() => setFailed(true)}
+          onError={() => setFailedUnder({ results: analysisResults })}
         />
       ) : (
         <span>{fileExtension(video.file_name)}</span>
@@ -98,6 +104,7 @@ function sortArrow(sort: SourceVideoSort, key: SourceVideoSortKey): string {
 
 export function SourceVideoBrowser({
   projectId,
+  analysisResults,
   videos,
   analyzedIds,
   deselected,
@@ -255,6 +262,7 @@ export function SourceVideoBrowser({
                   projectId={projectId}
                   video={video}
                   analyzed={analyzedIds.has(video.file_id)}
+                  analysisResults={analysisResults}
                 />
                 <div className="source-video-card-head">{selectionBox(video)}<strong title={video.file_name}>{video.file_name}</strong></div>
                 <span>{video.metadata ? formatClock(video.metadata.duration_sec) : 'Pending'} · {analysisLabel(video)}</span>

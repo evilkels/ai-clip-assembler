@@ -5,6 +5,7 @@ const configDirectory = __dirname;
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: 'remote-prototype-refresh.spec.ts',
   // Specs share one local FastAPI process and its in-memory project registry.
   // Parallel workers can clear another spec's project while analysis is running.
   workers: 1,

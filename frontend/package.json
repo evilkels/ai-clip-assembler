@@ -32,6 +32,7 @@
     "test:main": "tsc -p tsconfig.main-tests.json && node --test .tmp/main-tests/tests/main/*.test.js",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
+    "test:e2e:remote-prototype": "playwright test --config playwright.remote-prototype.config.ts",
     "postinstall": "electron-builder install-app-deps",
     "dist": "npm run build:backend && npm run build && electron-builder",
     "doctor": "react-doctor",

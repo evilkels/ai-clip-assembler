@@ -91,13 +91,19 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
             size_bytes = video_path.stat().st_size
         except OSError:
             size_bytes = 0
-    created_at = extract_created_at(video_path, payload)
+    created_at = extract_created_at(video_path, payload, video_stream)
+    r_frame_rate = parse_frame_rate(video_stream.get("r_frame_rate") or "0/0")
+    avg_frame_rate = parse_frame_rate(video_stream.get("avg_frame_rate") or "0/0")
+    if r_frame_rate > 0 and avg_frame_rate > 0 and abs(avg_frame_rate - r_frame_rate) / r_frame_rate <= 0.01:
+        fps = r_frame_rate
+    else:
+        fps = avg_frame_rate if avg_frame_rate > 0 else r_frame_rate
     return VideoMetadata(
         file_id=str(uuid.uuid4()),
         file_path=str(video_path),
         file_name=video_path.name,
         duration_sec=round(float(duration_value), 3),
-        fps=parse_frame_rate(video_stream.get("avg_frame_rate") or video_stream.get("r_frame_rate") or "0/0"),
+        fps=fps,
         resolution=[width, height],
         display_resolution=display_resolution(width, height, rotation),
         rotation_degrees=rotation,
@@ -112,17 +118,50 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
     )
 
 
-def extract_created_at(video_path: Path, payload: Dict[str, Any]) -> Optional[str]:
+def extract_created_at(
+    video_path: Path, payload: Dict[str, Any], video_stream: Optional[Dict[str, Any]] = None
+) -> Optional[str]:
     """Recording time from container tags, falling back to the file mtime."""
-    tags = payload.get("format", {}).get("tags", {}) or {}
-    creation_time = tags.get("creation_time")
-    if creation_time:
-        return str(creation_time)
+    format_tags = payload.get("format", {}).get("tags", {}) or {}
+    stream_tags = (video_stream or {}).get("tags", {}) or {}
+    timestamps = (
+        _case_insensitive_tag(format_tags, "com.apple.quicktime.creationdate"),
+        _case_insensitive_tag(format_tags, "creation_time"),
+        _case_insensitive_tag(stream_tags, "creation_time"),
+    )
+    for timestamp in timestamps:
+        normalized = _normalize_timestamp(timestamp)
+        if normalized is not None:
+            return normalized
     try:
         mtime = video_path.stat().st_mtime
-        return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+        return _format_utc_timestamp(datetime.fromtimestamp(mtime, tz=timezone.utc))
     except OSError:
         return None
+
+
+def _case_insensitive_tag(tags: Dict[str, Any], key: str) -> Any:
+    key = key.casefold()
+    return next((value for tag, value in tags.items() if str(tag).casefold() == key), None)
+
+
+def _normalize_timestamp(value: Any) -> Optional[str]:
+    if value is None or not str(value).strip():
+        return None
+    timestamp = str(value).strip()
+    if timestamp.endswith(("Z", "z")):
+        timestamp = f"{timestamp[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(timestamp)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return _format_utc_timestamp(parsed.astimezone(timezone.utc))
+
+
+def _format_utc_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def ffprobe_command(video_path: Path) -> Sequence[str]:

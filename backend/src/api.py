@@ -916,7 +916,9 @@ def enrich_clips_with_source_metadata(project: dict) -> list:
     Clips analyzed before these fields existed — or merged back from an earlier
     partial-analysis run — lack them, which makes the per-file track render for
     only some cards. The values live on the source video's metadata, which is
-    always available, so we fill any gaps from there.
+    always available, so we fill any gaps from there. The capture time is
+    always refreshed: folder projects re-probe on open, and older probes stored
+    the transfer time instead of the recording time.
     """
     videos_by_id = {video["file_id"]: video for video in project.get("videos", [])}
     clips = project.get("clips", [])
@@ -924,7 +926,7 @@ def enrich_clips_with_source_metadata(project: dict) -> list:
         meta = (videos_by_id.get(clip.get("file_id")) or {}).get("metadata") or {}
         if clip.get("source_duration_sec") is None:
             clip["source_duration_sec"] = meta.get("duration_sec")
-        if clip.get("source_created_at") is None:
+        if meta.get("created_at") or clip.get("source_created_at") is None:
             clip["source_created_at"] = meta.get("created_at")
     return clips
 

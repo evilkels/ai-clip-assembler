@@ -3314,3 +3314,21 @@ def test_diagnostics_omits_guidance_when_the_model_is_reachable(monkeypatch):
     reachable = {**diagnostic_result(), "reachable": True, "detail": "OK"}
     monkeypatch.setattr(api, "_ping_review_model", lambda settings: reachable)
     assert TestClient(api.app).get("/diagnostics").json()["review_model"]["guidance"] == []
+
+
+def test_enrich_clips_refreshes_capture_time_from_source_metadata():
+    project = {
+        "videos": [
+            {"file_id": "IMG_1029.mov", "metadata": {"created_at": "2026-10-10T10:58:12.000000Z"}},
+            {"file_id": "IMG_1022.mov", "metadata": {}},
+        ],
+        "clips": [
+            {"file_id": "IMG_1029.mov", "source_created_at": "2026-10-10T15:57:53.000000Z"},
+            {"file_id": "IMG_1022.mov", "source_created_at": "2026-10-10T16:02:53.000000Z"},
+        ],
+    }
+
+    clips = api.enrich_clips_with_source_metadata(project)
+
+    assert clips[0]["source_created_at"] == "2026-10-10T10:58:12.000000Z"
+    assert clips[1]["source_created_at"] == "2026-10-10T16:02:53.000000Z"

@@ -155,6 +155,22 @@ def test_unparseable_creationdate_falls_back_to_creation_time():
     assert metadata.created_at == "2026-10-10T09:52:00.000000Z"
 
 
+
+def test_out_of_range_creationdate_falls_back_to_creation_time():
+    payload = {
+        "format": {
+            "tags": {
+                "com.apple.quicktime.creationdate": "0001-01-01T00:00:00+0300",
+                "creation_time": "2026-10-10T09:52:00Z",
+            }
+        },
+        "streams": [{"codec_type": "video", "width": 1920, "height": 1080}],
+    }
+
+    metadata = parse_ffprobe_metadata(Path("/footage/iphone.mov"), payload)
+
+    assert metadata.created_at == "2026-10-10T09:52:00.000000Z"
+
 def test_stream_creation_time_is_used_when_format_tags_are_missing():
     payload = {
         "format": {"tags": {}},
@@ -287,3 +303,22 @@ def test_probe_video_reports_missing_ffprobe_clearly(tmp_path):
         assert "ffprobe" in str(exc)
     else:
         raise AssertionError("Expected missing ffprobe to raise a clear domain error")
+
+
+def test_unusable_frame_rates_report_zero():
+    for r_frame_rate in ("-25/1", "NaN"):
+        payload = {
+            "streams": [
+                {
+                    "codec_type": "video",
+                    "width": 1920,
+                    "height": 1080,
+                    "r_frame_rate": r_frame_rate,
+                    "avg_frame_rate": "0/0",
+                }
+            ]
+        }
+
+        metadata = parse_ffprobe_metadata(Path("/footage/iphone.mov"), payload)
+
+        assert metadata.fps == 0.0

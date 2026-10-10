@@ -92,12 +92,12 @@ def parse_ffprobe_metadata(video_path: Path, payload: Dict[str, Any]) -> VideoMe
         except OSError:
             size_bytes = 0
     created_at = extract_created_at(video_path, payload, video_stream)
-    r_frame_rate = parse_frame_rate(video_stream.get("r_frame_rate") or "0/0")
-    avg_frame_rate = parse_frame_rate(video_stream.get("avg_frame_rate") or "0/0")
-    if r_frame_rate > 0 and avg_frame_rate > 0 and abs(avg_frame_rate - r_frame_rate) / r_frame_rate <= 0.01:
+    r_frame_rate = _usable_rate(parse_frame_rate(video_stream.get("r_frame_rate") or "0/0"))
+    avg_frame_rate = _usable_rate(parse_frame_rate(video_stream.get("avg_frame_rate") or "0/0"))
+    if r_frame_rate and avg_frame_rate and abs(avg_frame_rate - r_frame_rate) / r_frame_rate <= 0.01:
         fps = r_frame_rate
     else:
-        fps = avg_frame_rate if avg_frame_rate > 0 else r_frame_rate
+        fps = avg_frame_rate or r_frame_rate
     return VideoMetadata(
         file_id=str(uuid.uuid4()),
         file_path=str(video_path),
@@ -140,6 +140,10 @@ def extract_created_at(
         return None
 
 
+def _usable_rate(rate: float) -> float:
+    return rate if math.isfinite(rate) and rate > 0 else 0.0
+
+
 def _case_insensitive_tag(tags: Dict[str, Any], key: str) -> Any:
     key = key.casefold()
     return next((value for tag, value in tags.items() if str(tag).casefold() == key), None)
@@ -157,7 +161,10 @@ def _normalize_timestamp(value: Any) -> Optional[str]:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    return _format_utc_timestamp(parsed.astimezone(timezone.utc))
+    try:
+        return _format_utc_timestamp(parsed)
+    except (OverflowError, ValueError):
+        return None
 
 
 def _format_utc_timestamp(value: datetime) -> str:

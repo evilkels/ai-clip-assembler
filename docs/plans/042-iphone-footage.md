@@ -51,7 +51,8 @@ Decisions so far:
 
 ## Phase 5: Verify
 
-- [ ] 5.1 Re-run the real-footage test on `main` after Phases 2–4 merge. Done when an addendum to the review records each bug fixed or still open, with screenshots.
+- [x] 5.1 Re-run the real-footage test on `main` after Phases 2–4 merge. Done when an addendum to the review records each bug fixed or still open, with screenshots. (PR #107)
+  - Retest evidence saved in `1bacf0a`; the [Phase 5 addendum](../reviews/2026-10-10-iphone-footage-test.md#phase-5-retest-addendum--2026-10-10) audits each original finding, preserves screenshots and export evidence, and names unverified checks. Phase 6 and human checks remain open.
 
 ## Phase 6: Later polish
 

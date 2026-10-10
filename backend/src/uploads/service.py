@@ -6,10 +6,9 @@ states with separate guarantees: this module owns the first (and, in
 it is fsynced and its receipt line is durable.
 """
 
-import errno
+import base64
 import hashlib
 import hmac
-import base64
 import re
 import threading
 import time
@@ -17,9 +16,13 @@ import uuid
 from pathlib import Path
 from typing import Callable, Dict, Iterator, Optional
 
+from ..models import VideoMetadata
+from ..project_store import ProjectSourceVideo
 from ..reservations import ReservationLedger
+from ..video_probe import probe_video
 from . import store
-from .naming import UploadRejected, validate_metadata
+from .ingest import FinalizeContext, IngestMixin, hash_file  # noqa: F401
+from .naming import UploadRejected, storage_error, validate_metadata
 from .store import (
     UNFINISHED_STATES,
     ChunkReceipt,
@@ -112,7 +115,7 @@ class ChunkWriter:
             self._handle.write(piece)
         except OSError as exc:
             self.abort()
-            raise _storage_error(exc) from exc
+            raise storage_error(exc) from exc
         self._chunk_hash.update(piece)
         if self._check is not self._chunk_hash:
             self._check.update(piece)
@@ -134,7 +137,7 @@ class ChunkWriter:
                 self._handle.flush()
                 store.fsync_fd(self._handle.fileno())
             except OSError as exc:
-                raise _storage_error(exc) from exc
+                raise storage_error(exc) from exc
             self._service.fault("after_fsync")
             receipt = ChunkReceipt(
                 o=self._base,
@@ -146,7 +149,7 @@ class ChunkWriter:
                 try:
                     store.append_receipt(upload.directory, receipt)
                 except OSError as exc:
-                    raise _storage_error(exc) from exc
+                    raise storage_error(exc) from exc
                 self._checkpointed = True
                 upload.receipts.append(receipt)
                 upload.offset = self._base + self._written
@@ -192,22 +195,24 @@ class ChunkWriter:
         self._service._after_transfer(self._folder, self.upload)
 
 
-def _storage_error(exc: OSError) -> UploadRejected:
-    if exc.errno in (errno.ENOSPC, errno.EDQUOT):
-        return UploadRejected(507, "insufficient_storage", "The Mac is low on space for this file.")
-    return UploadRejected(500, "storage_error", "The Mac couldn't write this chunk")
-
-
-class UploadService:
+class UploadService(IngestMixin):
     def __init__(
         self,
         *,
         ledger: Optional[ReservationLedger] = None,
         clock: Callable[[], float] = time.time,
+        project_service=None,
+        probe: Callable[[Path], VideoMetadata] = probe_video,
+        on_imported: Optional[Callable[[str, ProjectSourceVideo, Optional[VideoMetadata]], None]] = None,
     ) -> None:
         self.ledger = ledger or ReservationLedger()
         self.clock = clock
+        self.project_service = project_service
+        self._probe = probe
+        self._on_imported = on_imported
         self.fault: Callable[[str], None] = lambda step: None
+        self._workers: Dict[str, threading.Thread] = {}
+        self._recovered: set = set()
         self._lock = threading.RLock()
         self._folders: Dict[Path, _Folder] = {}
         self._active: Dict[str, int] = {}
@@ -316,7 +321,7 @@ class UploadService:
                 store.write_record(directory, record)
             except OSError as exc:
                 store.remove_staging(directory)
-                raise _storage_error(exc) from exc
+                raise storage_error(exc) from exc
             upload = Upload(record=record, directory=directory, updated_at=record.created_at)
             folder.uploads[upload_id] = upload
             self.ledger.set(upload_id, length)
@@ -480,6 +485,16 @@ class UploadService:
                     store.remove_staging(upload.directory)
                     del folder.uploads[upload.upload_id]
 
+    def sweep_all(self) -> None:
+        """Expire stale uploads in every Project this process has loaded."""
+        with self._lock:
+            roots = list(self._folders)
+        for root in roots:
+            try:
+                self.sweep(root)
+            except Exception:
+                pass
+
     # -- views --------------------------------------------------------------------------
 
     def status(self, project_root: Path, upload: Upload, *, include_chunks: bool = False) -> dict:
@@ -487,9 +502,13 @@ class UploadService:
         receipt = store.read_ingest_receipt(Path(project_root), upload.upload_id) if (
             record.state == "imported"
         ) else None
+        state = "failed" if upload.damaged else record.state
+        if state == "publishing" and not self._worker_alive(upload.upload_id):
+            # Nobody is finishing this import: recovery will (or already tried to).
+            state = "recovery_pending"
         result = {
             "upload_id": upload.upload_id,
-            "state": "failed" if upload.damaged else record.state,
+            "state": state,
             "offset": upload.offset,
             "length": record.length,
             "filename": record.filename,
@@ -508,4 +527,5 @@ class UploadService:
 def iter_pieces(data: bytes, size: int) -> Iterator[bytes]:
     for index in range(0, len(data), size):
         yield data[index : index + size]
+
 

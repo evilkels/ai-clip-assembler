@@ -264,7 +264,7 @@ These corrections replace the stale draft's claims:
     - Another Paired Device gets 404 for a known upload ID.
     - Expiry removes only app-owned paths and leaves a tombstone.
     - Revoke releases reservations.
-- [ ] 1.9 Finalize, publish and deduplicate (after 1.8). Done when `backend/tests/test_uploads_finalize.py` covers the cases below.
+- [x] 1.9 Finalize, publish and deduplicate (after 1.8). Done when `backend/tests/test_uploads_finalize.py` covers the cases below.
   - `POST /api/projects/{id}/uploads/{uploadId}/finalize {sha256, idempotency_key}` runs the §6.1 transaction through the Project service:
     1. Reread the file from disk and hash it.
     2. Compare against `Upload-Length` and the phone's SHA-256.

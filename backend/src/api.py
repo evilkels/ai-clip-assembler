@@ -76,7 +76,7 @@ from .review_agent import (
     run_editor_script,
     run_review_turn,
 )
-from .project_events import ProgressGate, analysis_event
+from .project_events import SOURCES_CHANGED, ProgressGate, analysis_event
 from .project_service import ProjectLockedError, ProjectService
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
@@ -87,6 +87,7 @@ from .timeline_ops import (
     TimelineRevisionConflict,
 )
 from .timeline_service import TimelineLifecycle
+from .uploads.service import UploadService
 from .scene_detection import SceneBoundary, assign_scene_ids, detect_scenes  # noqa: F401 - public test seam
 from .video_probe import FFprobeError, FFprobeUnavailableError, probe_video
 
@@ -149,6 +150,10 @@ async def write_runtime_on_startup():
 
 projects = {}
 project_service = ProjectService(projects, opener=lambda folder: open_folder_project(folder))
+upload_service = UploadService(
+    project_service=project_service,
+    on_imported=lambda project_id, source, metadata: on_source_imported(project_id, source, metadata),
+)
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 _active_project_id: Optional[str] = None
@@ -316,7 +321,18 @@ def _open_folder_project_locked(folder_path: Path) -> str:
         "generation_stats": restored.get("generation_stats") if restored else None,
     }
     _proposal_store.configure_project(project_id, folder_path)
+    _recover_interrupted_imports(project_id, folder_path)
     return project_id
+
+
+def _recover_interrupted_imports(project_id: str, folder_path: Path) -> None:
+    """Finish phone imports a crash interrupted (journalled publications)."""
+    if not (folder_path / "clipassembler" / "cache" / "uploads").is_dir():
+        return
+    try:
+        upload_service.recover(folder_path, project_id)
+    except Exception:
+        logger.exception("Recovering interrupted imports failed for %s", folder_path)
 
 
 @app.post("/projects/from-folder")
@@ -1757,30 +1773,43 @@ def project_dir(project_id: str) -> Path:
     return PROJECTS_DIR / project_id
 
 
+def video_entry_for(folder_path: Path, source_video, metadata=None) -> dict:
+    """The runtime ``videos`` projection entry for one Source Video."""
+    video_path = folder_path / source_video.filename
+    try:
+        metadata = metadata or probe_video(video_path)
+        metadata.file_id = source_video.filename
+        metadata.file_name = source_video.filename
+        metadata.file_path = str(video_path)
+        metadata_dump = metadata.model_dump()
+    except (FFprobeUnavailableError, FFprobeError, OSError):
+        # None, not {}: an empty dict is truthy in the frontend's
+        # `metadata?: VideoMetadata` check and crashes the source table.
+        metadata_dump = None
+    return {
+        "file_id": source_video.filename,
+        "file_name": source_video.filename,
+        "file_path": str(video_path),
+        "status": "ready",
+        "metadata": metadata_dump,
+    }
+
+
 def videos_from_manifest(folder_path: Path, manifest) -> list[dict]:
-    videos = []
-    for source_video in manifest.source_videos:
-        video_path = folder_path / source_video.filename
-        try:
-            metadata = probe_video(video_path)
-            metadata.file_id = source_video.filename
-            metadata.file_name = source_video.filename
-            metadata.file_path = str(video_path)
-            metadata_dump = metadata.model_dump()
-        except (FFprobeUnavailableError, FFprobeError, OSError):
-            # None, not {}: an empty dict is truthy in the frontend's
-            # `metadata?: VideoMetadata` check and crashes the source table.
-            metadata_dump = None
-        videos.append(
-            {
-                "file_id": source_video.filename,
-                "file_name": source_video.filename,
-                "file_path": str(video_path),
-                "status": "ready",
-                "metadata": metadata_dump,
-            }
-        )
-    return videos
+    return [video_entry_for(folder_path, source_video) for source_video in manifest.source_videos]
+
+
+def on_source_imported(project_id: str, source_video, metadata=None) -> None:
+    """A verified import landed in the Project: refresh the projection and tell clients."""
+    project = projects.get(project_id)
+    if project is None or not project.get("project_folder"):
+        return
+    entry = video_entry_for(Path(project["project_folder"]), source_video, metadata)
+    videos = [v for v in project.get("videos", []) if v["file_id"] != entry["file_id"]]
+    videos.append(entry)
+    order = {v["filename"]: i for i, v in enumerate((project.get("project") or {}).get("source_videos", []))}
+    project["videos"] = sorted(videos, key=lambda v: order.get(v["file_id"], len(order)))
+    publish_project_event(project_id, {"type": SOURCES_CHANGED})
 
 
 def registered_video(project_id: str, file_id: str) -> dict:

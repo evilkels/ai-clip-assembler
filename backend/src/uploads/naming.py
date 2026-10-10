@@ -7,6 +7,7 @@ an internal ID.
 
 import base64
 import binascii
+import errno
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -115,3 +116,10 @@ def validate_metadata(raw: Optional[str]) -> UploadMetadata:
         filetype=filetype,
         client_last_modified=modified,
     )
+
+
+def storage_error(exc: OSError) -> UploadRejected:
+    """Map an ``OSError`` from staging writes to the reply the phone should see."""
+    if exc.errno in (errno.ENOSPC, errno.EDQUOT):
+        return UploadRejected(507, "insufficient_storage", "The Mac is low on space for this file.")
+    return UploadRejected(500, "storage_error", "The Mac couldn't write this chunk")

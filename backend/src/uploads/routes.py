@@ -19,6 +19,7 @@ from ..remote.app import (
 from ..remote.runtime import RemoteRuntime
 from .naming import UploadRejected
 from .service import (
+    FinalizeContext,
     CHUNK_CEILING,
     MAX_UPLOAD_BYTES,
     TUS_ALGORITHMS,
@@ -56,7 +57,7 @@ def _require_tus_version(request: Request) -> None:
 
 def service_of(runtime: RemoteRuntime) -> UploadService:
     if runtime.uploads is None:
-        runtime.uploads = UploadService()
+        runtime.uploads = UploadService(project_service=runtime.project_service)
     return runtime.uploads
 
 
@@ -69,11 +70,16 @@ def register_upload_routes(app: FastAPI, runtime: RemoteRuntime) -> None:
     )
     base = "/api/projects/{project_id}"
 
-    async def project_root(request: Request, project_id: str) -> Path:
-        _runtime_id, project = await run_in_threadpool(
+    async def project_context(request: Request, project_id: str) -> FinalizeContext:
+        runtime_id, project = await run_in_threadpool(
             open_exposed_project, runtime_of(request), project_id
         )
-        return Path(project["project_folder"])
+        folder = Path(project["project_folder"])
+        await run_in_threadpool(service.ensure_recovered, folder, runtime_id)
+        return FinalizeContext(folder, runtime_id)
+
+    async def project_root(request: Request, project_id: str) -> Path:
+        return (await project_context(request, project_id)).root
 
     @app.options(base + "/uploads", include_in_schema=False)
     async def options_uploads(
@@ -253,7 +259,33 @@ def register_upload_routes(app: FastAPI, runtime: RemoteRuntime) -> None:
             raise _reject(exc) from exc
         return await run_in_threadpool(service.status, root, upload, include_chunks=chunks)
 
-    register_finalize_route(app, runtime, service, base, project_root)
+    @app.post(base + "/uploads/{upload_id}/finalize", response_model=RemoteUploadStatus,
+              response_model_exclude_none=True)
+    async def finalize_upload(
+        project_id: str,
+        upload_id: str,
+        body: RemoteFinalizeRequest,
+        request: Request,
+        response: Response,
+        authed: Annotated[Authed, Depends(require_session)],
+    ):
+        ctx = await project_context(request, project_id)
+        try:
+            upload = await run_in_threadpool(
+                service.lookup, ctx.root, upload_id, authed.device.device_id
+            )
+            await run_in_threadpool(
+                service.finalize,
+                ctx,
+                upload,
+                sha256=body.sha256,
+                idempotency_key=body.idempotency_key,
+            )
+        except UploadRejected as exc:
+            raise _reject(exc) from exc
+        status = await run_in_threadpool(service.status, ctx.root, upload)
+        response.status_code = 200 if status["state"] in ("imported", "failed") else 202
+        return status
 
 
 def _closed_response(reason: Optional[str]) -> Response:
@@ -264,8 +296,3 @@ def _closed_response(reason: Optional[str]) -> Response:
         content=b'{"reason":"%s"}' % (reason or "revoked").encode(),
         media_type="application/json",
     )
-
-
-def register_finalize_route(app, runtime, service, base, project_root) -> None:
-    """Finalization lands with task 1.9."""
-    _ = (app, runtime, service, base, project_root, RemoteFinalizeRequest)

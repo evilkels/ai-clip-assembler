@@ -42,6 +42,7 @@ from .runtime import RemoteRuntime
 
 HEARTBEAT_LEASE_SEC = 15.0
 LISTENER_STOP_TIMEOUT_SEC = 1.0
+SWEEP_INTERVAL_SEC = 600.0
 
 
 class ControlError(Exception):
@@ -210,7 +211,11 @@ class RemoteLifecycle:
 
     def _watchdog(self) -> None:
         interval = min(0.5, max(0.05, self.lease_timeout_sec / 10))
+        last_sweep = self._monotonic()
         while not self._stop.wait(interval):
+            if self.runtime.uploads is not None and self._monotonic() - last_sweep > SWEEP_INTERVAL_SEC:
+                last_sweep = self._monotonic()
+                self.runtime.uploads.sweep_all()
             with self._lock:
                 expired = (
                     self._enabled
@@ -400,6 +405,7 @@ def build_lifecycle(loop: asyncio.AbstractEventLoop, fd: int) -> RemoteLifecycle
         ui_dir=Path(ui_dir) if ui_dir else None,
         events=api.project_events,
     )
+    runtime.uploads = api.upload_service
     try:
         timeout = float(os.environ.get("CLIP_ASSEMBLER_LEASE_TIMEOUT_SEC", HEARTBEAT_LEASE_SEC))
     except ValueError:

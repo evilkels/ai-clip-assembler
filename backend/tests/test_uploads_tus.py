@@ -565,6 +565,16 @@ def test_expiry_removes_only_app_owned_paths_and_leaves_a_tombstone(tmp_path):
     assert missing.value.status == 404
 
 
+def test_sweep_all_expires_stale_uploads_in_every_loaded_project(tmp_path):
+    clock = Clock()
+    service = service_for(clock=clock)
+    roots = [make_root(tmp_path, "p1"), make_root(tmp_path, "p2")]
+    uploads = [create(service, root, 100)[0] for root in roots]
+    clock.advance(UPLOAD_TTL_SEC + 1)
+    service.sweep_all()
+    assert [u.record.state for u in uploads] == ["expired", "expired"]
+
+
 def test_expiry_skips_uploads_being_verified_or_published(tmp_path):
     clock = Clock()
     service = service_for(clock=clock)

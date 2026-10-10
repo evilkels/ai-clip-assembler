@@ -195,6 +195,9 @@ frontend/skills/
 # Visual brainstorming companion scratch
 .superpowers/
 
+# /brag skill output
+brag-output/
+
 # Local implementation worktrees
 .worktrees/
 

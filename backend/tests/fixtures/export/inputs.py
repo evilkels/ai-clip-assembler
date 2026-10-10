@@ -1,7 +1,17 @@
 """Synthetic export inputs based on representative source footage."""
 
 
-def _source(file_id, file_name, path, fps, resolution, duration, audio_channels=2, display=None):
+def _source(
+    file_id,
+    file_name,
+    path,
+    fps,
+    resolution,
+    duration,
+    audio_channels=2,
+    display=None,
+    rotation=90,
+):
     metadata = {
         "duration_sec": duration,
         "fps": fps,
@@ -13,7 +23,7 @@ def _source(file_id, file_name, path, fps, resolution, duration, audio_channels=
     }
     if display:
         metadata["display_resolution"] = display
-        metadata["rotation_degrees"] = 90
+        metadata["rotation_degrees"] = rotation
     return {
         "file_id": file_id,
         "file_name": file_name,
@@ -63,6 +73,41 @@ IPHONE_MIXED = {
     "clips": [
         _clip("iphone-60", "IMG_0060.MOV", 2, 8),
         _clip("iphone-30", "IMG_0030.MOV", 10, 16),
+    ],
+}
+
+IPHONE_VFR_1080P5994_VERTICAL = {
+    "title": "iPhone VFR 1080p 59.94 Vertical",
+    "videos": {
+        "iphone-1022": _source(
+            "iphone-1022", "IMG_1022.MOV", "/Users/editor/Movies/iPhone/IMG_1022.MOV",
+            59.93, [1920, 1080], 9.795, display=[1080, 1920], rotation=270,
+        ),
+        "iphone-1023": _source(
+            "iphone-1023", "IMG_1023.MOV", "/Users/editor/Movies/iPhone/IMG_1023.MOV",
+            59.94, [1920, 1080], 13.297, display=[1080, 1920], rotation=270,
+        ),
+        "iphone-1028": _source(
+            "iphone-1028", "IMG_1028.MOV", "/Users/editor/Movies/iPhone/IMG_1028.MOV",
+            59.94, [1920, 1080], 19.535, display=[1080, 1920], rotation=270,
+        ),
+        "iphone-1029": _source(
+            "iphone-1029", "IMG_1029.MOV", "/Users/editor/Movies/iPhone/IMG_1029.MOV",
+            59.96, [1920, 1080], 10.857, display=[1080, 1920], rotation=270,
+        ),
+        "iphone-unused-11988": _source(
+            "iphone-unused-11988", "IMG_UNUSED.MOV", "/Users/editor/Movies/iPhone/IMG_UNUSED.MOV",
+            119.88, [1920, 1080], 10, display=[1080, 1920], rotation=270,
+        ),
+    },
+    "clips": [
+        _clip("iphone-1023", "IMG_1023.MOV", 0, 9, speed=0.5),
+        _clip("iphone-1023", "IMG_1023.MOV", 9, 12),
+        _clip(
+            "iphone-1028", "IMG_1028.MOV", 0, 8,
+            transform={"scale": 1.2, "x": 0, "y": 0},
+        ),
+        _clip("iphone-1029", "IMG_1029.MOV", 0, 10.4),
     ],
 }
 

@@ -6,13 +6,44 @@ from urllib.parse import quote
 import xml.etree.ElementTree as ET
 
 
+_STANDARD_FRAME_RATES = (
+    23.976,
+    24,
+    25,
+    29.97,
+    30,
+    47.952,
+    48,
+    50,
+    59.94,
+    60,
+    100,
+    119.88,
+    120,
+)
+_NTSC_FRAME_RATES = {23.976, 29.97, 47.952, 59.94, 119.88}
+
+
+def snap_frame_rate(fps: float) -> float:
+    try:
+        fps = float(fps)
+    except (TypeError, ValueError):
+        return 30.0
+    if not math.isfinite(fps) or fps <= 0:
+        return 30.0
+
+    nearest = min(
+        _STANDARD_FRAME_RATES,
+        key=lambda rate: (abs(fps - rate), rate not in _NTSC_FRAME_RATES),
+    )
+    return nearest if abs(fps - nearest) <= 0.005 * nearest else fps
+
+
 def seconds_to_timecode(seconds: float, fps: float = 30) -> str:
-    fps = int(round(fps))
-    if fps <= 0:
-        fps = 30
-    total_frames = int(round(seconds * fps))
-    frames = total_frames % fps
-    total_seconds = total_frames // fps
+    base = int(round(snap_frame_rate(fps)))
+    total_frames = int(round(seconds * fps_exact(fps)))
+    frames = total_frames % base
+    total_seconds = total_frames // base
     secs = total_seconds % 60
     total_minutes = total_seconds // 60
     minutes = total_minutes % 60
@@ -21,6 +52,7 @@ def seconds_to_timecode(seconds: float, fps: float = 30) -> str:
 
 
 def _fcpx_frame_duration_parts(fps: float) -> tuple[int, int]:
+    fps = snap_frame_rate(fps)
     for rate, numerator, denominator in (
         (23.976, 1001, 24000),
         (29.97, 1001, 30000),
@@ -28,9 +60,9 @@ def _fcpx_frame_duration_parts(fps: float) -> tuple[int, int]:
         (59.94, 1001, 60000),
         (119.88, 1001, 120000),
     ):
-        if abs(fps - rate) < 0.02:
+        if fps == rate:
             return numerator, denominator
-    rounded = int(round(fps or 30))
+    rounded = int(round(fps))
     return 100, 100 * rounded
 
 
@@ -62,23 +94,49 @@ def fcpx_fraction_time(seconds: Fraction) -> str:
     return f"{seconds.numerator}/{seconds.denominator}s"
 
 
-def choose_timeline_fps(videos_by_id: Dict[str, dict]) -> float:
+def choose_timeline_fps(
+    videos_by_id: Dict[str, dict], clips: Optional[List[dict]] = None
+) -> float:
+    def rates_for(sources):
+        rates = []
+        for video in sources:
+            fps_val = (video.get("metadata") or {}).get("fps")
+            if fps_val is None:
+                continue
+            try:
+                fps = float(fps_val)
+            except (TypeError, ValueError):
+                continue
+            if fps > 0:
+                rates.append(snap_frame_rate(fps))
+        return rates
+
     rates = []
-    for video in videos_by_id.values():
-        fps_val = (video.get("metadata") or {}).get("fps")
-        if fps_val is None:
-            continue
-        try:
-            fps = float(fps_val)
-        except (TypeError, ValueError):
-            continue
-        if fps > 0:
-            rates.append(fps)
-    return max(rates) if rates else 30.0
+    if clips:
+        rates = rates_for(
+            videos_by_id[clip["file_id"]]
+            for clip in clips
+            if clip.get("file_id") in videos_by_id
+        )
+    if not rates:
+        rates = rates_for(videos_by_id.values())
+    if not rates:
+        return 30.0
+    counts = {}
+    for rate in rates:
+        counts[rate] = counts.get(rate, 0) + 1
+    return max(counts, key=lambda rate: (counts[rate], rate))
 
 
-def timeline_dimensions(videos_by_id: Dict[str, dict]) -> list[int]:
-    for video in videos_by_id.values():
+def timeline_dimensions(
+    videos_by_id: Dict[str, dict], clips: Optional[List[dict]] = None
+) -> list[int]:
+    sources = (
+        (videos_by_id[clip["file_id"]] for clip in clips if clip.get("file_id") in videos_by_id)
+        if clips
+        else videos_by_id.values()
+    )
+    for video in sources:
         metadata = video.get("metadata") or {}
         display = metadata.get("display_resolution") or metadata.get("resolution")
         if display and len(display) == 2:
@@ -271,8 +329,8 @@ def generate_resolve_xml(
     videos_by_id: Dict[str, dict],
 ) -> str:
     """FCP7 XMEML v5 timeline for DaVinci Resolve's XML importer."""
-    fps = choose_timeline_fps(videos_by_id)
-    width, height = timeline_dimensions(videos_by_id)
+    fps = choose_timeline_fps(videos_by_id, clips)
+    width, height = timeline_dimensions(videos_by_id, clips)
     total_frames = sum(xmeml_clip_frames(clip, fps) for clip in clips)
 
     xmeml = ET.Element("xmeml", {"version": "5"})
@@ -428,8 +486,8 @@ def generate_fcpxml(
 ) -> str:
     fcpxml = ET.Element("fcpxml", {"version": "1.10"})
     resources = ET.SubElement(fcpxml, "resources")
-    fps = choose_timeline_fps(videos_by_id)
-    width, height = timeline_dimensions(videos_by_id)
+    fps = choose_timeline_fps(videos_by_id, clips)
+    width, height = timeline_dimensions(videos_by_id, clips)
     ET.SubElement(
         resources,
         "format",
@@ -446,7 +504,7 @@ def generate_fcpxml(
     format_by_id = {}
     for file_id, video in videos_by_id.items():
         metadata = video.get("metadata") or {}
-        source_fps = float(metadata.get("fps") or fps)
+        source_fps = snap_frame_rate(metadata.get("fps") or fps)
         display = metadata.get("display_resolution") or metadata.get("resolution") or [width, height]
         source_shape = (int(display[0]), int(display[1]), fcpx_frame_duration(source_fps))
         if source_shape not in format_ids:

@@ -5,7 +5,13 @@ import difflib
 from pathlib import Path
 from urllib.parse import quote
 from tests.support import assert_valid_fcpxml, assert_well_formed_xmeml
-from tests.fixtures.export.inputs import CINEMA, ESTEPONA, IPHONE_MIXED
+from src.api import round_edl_fps
+from tests.fixtures.export.inputs import (
+    CINEMA,
+    ESTEPONA,
+    IPHONE_MIXED,
+    IPHONE_VFR_1080P5994_VERTICAL,
+)
 
 from src.export_engine import (
     generate_resolve_xml,
@@ -19,6 +25,7 @@ from src.export_engine import (
     edl_flatten_warnings,
     seconds_to_frames,
     seconds_to_timecode,
+    snap_frame_rate,
 )
 
 
@@ -442,8 +449,10 @@ def test_export_xml_golden_fixtures_are_unchanged(request):
         ("estepona-1080p5994.fcpxml", ESTEPONA),
         ("iphone-4k60-mixed.fcpxml", IPHONE_MIXED),
         ("cinema-23976-silent.fcpxml", CINEMA),
+        ("iphone-vfr-1080p5994-vertical.fcpxml", IPHONE_VFR_1080P5994_VERTICAL),
         ("estepona-1080p5994.xml", ESTEPONA),
         ("cinema-23976-silent.xml", CINEMA),
+        ("iphone-vfr-1080p5994-vertical.xml", IPHONE_VFR_1080P5994_VERTICAL),
     )
     for filename, case in cases:
         if filename.endswith(".fcpxml"):
@@ -522,6 +531,59 @@ def test_choose_timeline_fps_all_invalid_defaults_to_30():
         "f4": {"metadata": {}},
     }
     assert choose_timeline_fps(videos) == 30.0
+
+
+@pytest.mark.parametrize(
+    ("fps", "expected"),
+    [
+        (59.96, 59.94),
+        (59.93, 59.94),
+        (60, 60),
+        (29.98, 29.97),
+        (23.98, 23.976),
+        (25.02, 25),
+        (15, 15),
+        (0, 30),
+    ],
+)
+def test_snap_frame_rate(fps, expected):
+    assert snap_frame_rate(fps) == expected
+
+
+def test_choose_timeline_fps_ignores_unused_source():
+    videos = {
+        "used": {"metadata": {"fps": 59.94}},
+        "unused": {"metadata": {"fps": 119.88}},
+    }
+    clips = [{"file_id": "used"}]
+    assert choose_timeline_fps(videos, clips) == 59.94
+
+
+def test_choose_timeline_fps_majority_tie_uses_higher_rate():
+    videos = {
+        "low-1": {"metadata": {"fps": 25}},
+        "low-2": {"metadata": {"fps": 25}},
+        "high-1": {"metadata": {"fps": 30}},
+        "high-2": {"metadata": {"fps": 30}},
+    }
+    clips = [{"file_id": file_id} for file_id in videos]
+    assert choose_timeline_fps(videos, clips) == 30
+
+
+def test_edl_record_out_uses_exact_ntsc_rate():
+    clips = [
+        {
+            "file_id": "file-1",
+            "file_name": "clip.mov",
+            "start_sec": 0,
+            "end_sec": 30.4,
+            "duration_sec": 30.4,
+        }
+    ]
+    edl = generate_edl("NTSC", clips, fps=59.94)
+    record = next(line for line in edl.splitlines() if line.startswith("001"))
+    assert record.split()[-1] == "00:00:30:22"
+    assert round_edl_fps(59.96) == 59.94
 
 
 def make_resolve_videos_and_clips():

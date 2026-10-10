@@ -36,6 +36,7 @@ from .export_engine import (
     generate_edl,
     generate_fcpxml,
     generate_resolve_xml,
+    snap_frame_rate,
 )
 from .app_settings import EDITABLE_KEYS, get_settings, update_settings
 from .pi_cli_harness import REPO_ROOT, enhance_clips_with_pi_cli
@@ -1427,7 +1428,7 @@ async def export_timeline(
             generate_edl(
                 "AI Clip Assembler",
                 clips,
-                fps=round_edl_fps(choose_timeline_fps(videos_by_id)),
+                fps=round_edl_fps(choose_timeline_fps(videos_by_id, clips)),
                 videos_by_id=videos_by_id,
             ),
             encoding="utf-8",
@@ -1928,8 +1929,8 @@ def resolve_timeline_entries(clips_by_id: dict, timeline_entries: list[dict]) ->
     return resolved_clips
 
 
-def round_edl_fps(fps: float) -> int:
-    return int(round(fps or 30))
+def round_edl_fps(fps: float) -> float:
+    return snap_frame_rate(fps)
 
 
 def preferences_from_request(preferences: dict) -> AssemblyPreferences:

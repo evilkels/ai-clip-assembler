@@ -1,4 +1,4 @@
-# 041: iPhone footage end to end
+# 042: iPhone footage end to end
 
 A folder of iPhone clips goes from Import to an export that opens at the
 footage's real frame rate, in shooting order, upright, with every preview sized

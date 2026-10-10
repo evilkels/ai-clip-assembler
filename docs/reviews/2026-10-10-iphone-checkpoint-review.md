@@ -36,3 +36,8 @@ Independent tester completed:
 PR #107's source-only commit had a passing GitHub gate; the checkpoint pushes start new gates. Local browser tests are blocked by an existing Python backend on port 8000, which was left untouched. Temporary dependency symlink was removed after testing; the preexisting backend environment was retained. Local logs: `/tmp/ai-clip-status-tests/iphone-*.log` (scratch, not repository artifacts).
 
 Resume by writing the task 5.1 retest addendum from the preserved evidence, checking the independent validation below, then continuing Phase 6. Physical NLE and real HEVC/HDR checks remain human tasks. Nothing was merged during this takeover.
+
+
+## PR-quality follow-up
+
+The missing Phase 5 addendum was subsequently written from the saved evidence in the [original report](2026-10-10-iphone-footage-test.md#phase-5-retest-addendum--2026-10-10), including every original finding and its verification limit. Task 5.1 is now checked in PR #107; progress is 11/14 implementation tasks, with both human checks open. The saved FCPXML was revalidated against the 1.10 DTD. Earlier checkpoint counts above describe the state at takeover.

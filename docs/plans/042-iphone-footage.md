@@ -34,10 +34,10 @@ Decisions so far:
 
 ## Phase 2: Editor UI
 
-- [ ] 2.1 Keep the Timeline transport clock updating after playback. Done when a play → Stop → retime test sees the new total.
-- [ ] 2.2 Mark each Source Video Analyzed as soon as its run step finishes, including files with zero Candidate Clips, cancelled runs and late requests. Done when the Import specs for batch progress, cancel and same-name files pass.
-- [ ] 2.3 Make Thumbs and Compact span the Source Videos browser, show poster frames and the real file extension. Done when the width and poster-recovery specs pass.
-- [ ] 2.4 Fix the Import copy: "upload video files", "Scoring clips", "1 source loaded". Done when the visual baselines show the new copy.
+- [x] 2.1 Keep the Timeline transport clock updating after playback. Done when a play → Stop → retime test sees the new total. (PR #103)
+- [x] 2.2 Mark each Source Video Analyzed as soon as its run step finishes, including files with zero Candidate Clips, cancelled runs and late requests. Done when the Import specs for batch progress, cancel and same-name files pass. (PR #103)
+- [x] 2.3 Make Thumbs and Compact span the Source Videos browser, show poster frames and the real file extension. Done when the width and poster-recovery specs pass. (PR #103)
+- [x] 2.4 Fix the Import copy: "upload video files", "Scoring clips", "1 source loaded". Done when the visual baselines show the new copy. (PR #103)
 
 ## Phase 3: Vertical previews
 

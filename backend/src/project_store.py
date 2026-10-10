@@ -16,7 +16,11 @@ from .review_state import sequence_fingerprint
 
 PROJECT_STATE_DIRNAME = "clipassembler"
 PROJECT_MANIFEST_FILENAME = "project.json"
-PROJECT_SCHEMA_VERSION = 1
+# v2 adds durable Project and Source Video UUIDs, content identity and upload
+# provenance (plan 041 task 1.3). v1 manifests still load and are rewritten.
+PROJECT_SCHEMA_VERSION = 2
+OLDEST_SUPPORTED_PROJECT_SCHEMA_VERSION = 1
+NEWER_PROJECT_MESSAGE = "This Project was saved by a newer version of the app"
 ANALYSIS_RESULTS_FILENAME = "results.json"
 ANALYSIS_RESULTS_SCHEMA_VERSION = 2
 FRAME_SCORES_FILENAME = "frame_scores.json"
@@ -55,13 +59,56 @@ class InvalidProjectManifestError(ProjectStoreError):
     pass
 
 
+class ProjectTooNewError(InvalidProjectManifestError):
+    pass
+
+
 class UnsafeProjectFolderError(ProjectStoreError):
     pass
+
+
+def new_uuid() -> str:
+    return str(uuid.uuid4())
+
+
+class SourceFingerprint(BaseModel):
+    """Cheap filesystem identity used to notice a Source Video changed on disk.
+
+    A hint, never a deduplication key: a changed fingerprint invalidates any
+    stored hash, while a matching one is not proof of identical bytes.
+    """
+
+    size: int
+    mtime_ns: int
+    inode: int
+
+
+class UploadProvenance(BaseModel):
+    """Where a Source Video came from when it arrived from a Paired Device."""
+
+    upload_id: str
+    device_id: str
+    device_label: str
+    owner_login: str
+    original_filename: str
+    created_at: str
+    completed_at: str
+    verified_at: str
+    verification_method: str
+    sha256: str
+    # Reported by the phone; untrusted presentation metadata only.
+    client_last_modified: Optional[int] = None
+    client_capture_metadata: Optional[dict] = None
 
 
 class ProjectSourceVideo(BaseModel):
     filename: str
     imported_at: str
+    source_uuid: str = Field(default_factory=new_uuid)
+    size_bytes: Optional[int] = None
+    sha256: Optional[str] = None
+    fingerprint: Optional[SourceFingerprint] = None
+    provenance: Optional[UploadProvenance] = None
 
     @field_validator("filename")
     @classmethod
@@ -75,6 +122,7 @@ class ProjectSourceVideo(BaseModel):
 
 class ProjectManifest(BaseModel):
     schema_version: int = PROJECT_SCHEMA_VERSION
+    project_uuid: str = Field(default_factory=new_uuid)
     name: str
     created_at: str
     harness: str = DEFAULT_HARNESS_ID
@@ -85,7 +133,7 @@ class ProjectManifest(BaseModel):
     @field_validator("schema_version")
     @classmethod
     def schema_version_must_be_supported(cls, value: int) -> int:
-        if value != PROJECT_SCHEMA_VERSION:
+        if not OLDEST_SUPPORTED_PROJECT_SCHEMA_VERSION <= value <= PROJECT_SCHEMA_VERSION:
             raise ValueError(f"unsupported schema_version: {value}")
         return value
 
@@ -134,7 +182,7 @@ def create_project(
         name=project_folder.name,
         created_at=created_at,
         source_videos=[
-            ProjectSourceVideo(filename=filename, imported_at=created_at)
+            new_source_video(project_folder, filename, created_at)
             for filename in source_video_filenames
         ],
     )
@@ -157,8 +205,9 @@ def rescan_project(
     existing_by_filename = {video.filename: video for video in manifest.source_videos}
     imported_at = format_timestamp(now())
     reconciled_videos = [
-        existing_by_filename.get(filename)
-        or ProjectSourceVideo(filename=filename, imported_at=imported_at)
+        refresh_source_video(project_folder, existing_by_filename[filename])
+        if filename in existing_by_filename
+        else new_source_video(project_folder, filename, imported_at)
         for filename in scanned_filenames
     ]
 
@@ -167,6 +216,43 @@ def rescan_project(
     )
     write_project_manifest(project_folder, updated)
     return updated
+
+
+def file_fingerprint(path: Path) -> Optional[SourceFingerprint]:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return SourceFingerprint(size=stat.st_size, mtime_ns=stat.st_mtime_ns, inode=stat.st_ino)
+
+
+def new_source_video(project_folder: Path, filename: str, imported_at: str) -> ProjectSourceVideo:
+    fingerprint = file_fingerprint(project_folder / filename)
+    return ProjectSourceVideo(
+        filename=filename,
+        imported_at=imported_at,
+        size_bytes=fingerprint.size if fingerprint else None,
+        fingerprint=fingerprint,
+    )
+
+
+def refresh_source_video(project_folder: Path, video: ProjectSourceVideo) -> ProjectSourceVideo:
+    """Keep identity (UUID, provenance) and notice when the file changed on disk.
+
+    A changed fingerprint drops the stored hash, so nothing reuses a digest for
+    bytes that are no longer there; the UUID and provenance stay with the name.
+    """
+    current = file_fingerprint(project_folder / video.filename)
+    if current is None or current == video.fingerprint:
+        return video
+    changed = video.fingerprint is not None
+    return video.model_copy(
+        update={
+            "fingerprint": current,
+            "size_bytes": current.size,
+            "sha256": None if changed else video.sha256,
+        }
+    )
 
 
 def delete_project_files(project_folder: Path) -> List[str]:
@@ -186,13 +272,42 @@ def open_project(project_folder: Path) -> ProjectManifest:
         raise ProjectNotFoundError(f"Project manifest not found: {manifest_path}")
 
     try:
-        return ProjectManifest.model_validate_json(
-            manifest_path.read_text(encoding="utf-8")
-        )
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+        saved_version = raw.get("schema_version") if isinstance(raw, dict) else None
+        if isinstance(saved_version, int) and saved_version > PROJECT_SCHEMA_VERSION:
+            raise ProjectTooNewError(NEWER_PROJECT_MESSAGE)
+        manifest = ProjectManifest.model_validate(raw)
     except (json.JSONDecodeError, ValidationError) as exc:
         raise InvalidProjectManifestError(
             f"Invalid project manifest: {manifest_path}"
         ) from exc
+
+    if manifest.schema_version < PROJECT_SCHEMA_VERSION:
+        manifest = migrate_manifest(project_folder, manifest)
+    return manifest
+
+
+def migrate_manifest(project_folder: Path, manifest: ProjectManifest) -> ProjectManifest:
+    """Upgrade an older manifest in place: UUIDs are minted once and persisted.
+
+    The rewrite is atomic and only attempted when the folder is writable; a
+    read-only Project still opens (its UUIDs are then minted per open).
+    """
+    upgraded = manifest.model_copy(
+        update={
+            "schema_version": PROJECT_SCHEMA_VERSION,
+            "source_videos": [
+                refresh_source_video(project_folder, video)
+                for video in manifest.source_videos
+            ],
+        }
+    )
+    if has_write_permission(project_state_dir(project_folder)):
+        try:
+            write_project_manifest(project_folder, upgraded)
+        except OSError:
+            pass
+    return upgraded
 
 
 def write_project_manifest(project_folder: Path, manifest: ProjectManifest) -> None:

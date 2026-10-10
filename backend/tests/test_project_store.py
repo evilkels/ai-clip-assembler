@@ -8,8 +8,11 @@ from src.project_store import (
     FRAME_SCORES_SCHEMA_VERSION,
     InvalidProjectManifestError,
     NoSourceVideosFoundError,
+    PROJECT_SCHEMA_VERSION,
     ProjectFolderNotWritableError,
+    ProjectTooNewError,
     UnsafeProjectFolderError,
+    UploadProvenance,
     create_or_open_project,
     create_project,
     delete_project_files,
@@ -24,6 +27,7 @@ from src.project_store import (
     rescan_project,
     timeline_document_path,
     write_frame_scores,
+    write_project_manifest,
     write_timeline_document,
     write_review_session,
 )
@@ -358,7 +362,7 @@ def test_open_project_rejects_unsupported_schema_version(tmp_path):
     (manifest_folder / "project.json").write_text(
         """
         {
-          "schema_version": 2,
+          "schema_version": 99,
           "name": "footage",
           "created_at": "2026-05-30T19:00:00Z",
           "harness": "pi_agent",
@@ -371,7 +375,10 @@ def test_open_project_rejects_unsupported_schema_version(tmp_path):
         encoding="utf-8",
     )
 
-    with pytest.raises(InvalidProjectManifestError):
+    with pytest.raises(
+        InvalidProjectManifestError,
+        match="This Project was saved by a newer version of the app",
+    ):
         open_project(project_folder)
 
 
@@ -699,3 +706,140 @@ def test_read_review_session_migrates_v1_bare_versions_without_rewriting(tmp_pat
     version_set = session.messages[0].payload["version_set"]
     assert version_set["versions"][0]["sequence_fingerprint"]
     assert path.read_text(encoding="utf-8") == raw
+
+
+# --- manifest v2: durable identity (plan 041 task 1.3) ------------------------
+
+
+V1_MANIFEST = {
+    "schema_version": 1,
+    "name": "footage",
+    "created_at": "2026-05-30T19:00:00Z",
+    "harness": "manual",
+    "cloud_ai_consent": False,
+    "source_videos": [
+        {"filename": "A.MP4", "imported_at": "2026-05-30T19:00:00Z"},
+        {"filename": "B.mov", "imported_at": "2026-05-30T19:00:00Z"},
+    ],
+    "settings_overrides": {},
+}
+
+
+def _write_v1_project(tmp_path):
+    project_folder = tmp_path / "footage"
+    (project_folder / "clipassembler").mkdir(parents=True)
+    (project_folder / "A.MP4").write_bytes(b"aaaa")
+    (project_folder / "B.mov").write_bytes(b"bbbbbb")
+    manifest_path = project_folder / "clipassembler" / "project.json"
+    manifest_path.write_text(json.dumps(V1_MANIFEST), encoding="utf-8")
+    return project_folder, manifest_path
+
+
+def test_v1_manifest_gets_uuids_that_survive_close_and_reopen(tmp_path):
+    project_folder, manifest_path = _write_v1_project(tmp_path)
+
+    first = open_project(project_folder)
+    second = open_project(project_folder)
+
+    assert first.schema_version == PROJECT_SCHEMA_VERSION
+    assert json.loads(manifest_path.read_text())["schema_version"] == PROJECT_SCHEMA_VERSION
+    assert first.project_uuid and first.project_uuid == second.project_uuid
+    assert [v.source_uuid for v in first.source_videos] == [
+        v.source_uuid for v in second.source_videos
+    ]
+    assert len({v.source_uuid for v in first.source_videos}) == 2
+    a = first.source_videos[0]
+    assert a.size_bytes == 4
+    assert a.fingerprint is not None and a.fingerprint.size == 4
+    assert a.sha256 is None and a.provenance is None
+
+
+def test_v1_manifest_in_read_only_project_still_opens(tmp_path, monkeypatch):
+    project_folder, manifest_path = _write_v1_project(tmp_path)
+    before = manifest_path.read_bytes()
+    monkeypatch.setattr("src.project_store.has_write_permission", lambda _path: False)
+
+    manifest = open_project(project_folder)
+
+    assert manifest.schema_version == PROJECT_SCHEMA_VERSION
+    assert manifest_path.read_bytes() == before
+
+
+def test_manifest_from_a_newer_app_is_refused_and_left_alone(tmp_path):
+    project_folder, manifest_path = _write_v1_project(tmp_path)
+    payload = dict(V1_MANIFEST, schema_version=PROJECT_SCHEMA_VERSION + 1)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    before = manifest_path.read_bytes()
+
+    with pytest.raises(ProjectTooNewError, match="saved by a newer version of the app"):
+        open_project(project_folder)
+
+    assert manifest_path.read_bytes() == before
+
+
+def test_rescan_keeps_uuids_and_provenance_for_files_still_present(tmp_path):
+    project_folder, _ = _write_v1_project(tmp_path)
+    manifest = open_project(project_folder)
+    provenance = UploadProvenance(
+        upload_id="up1",
+        device_id="dev1",
+        device_label="iPhone",
+        owner_login="owner@example.test",
+        original_filename="IMG_1.MOV",
+        created_at="2026-10-10T10:00:00Z",
+        completed_at="2026-10-10T10:01:00Z",
+        verified_at="2026-10-10T10:01:05Z",
+        verification_method="sha256-disk-reread",
+        sha256="ab" * 32,
+        client_last_modified=1,
+    )
+    with_hash = [
+        manifest.source_videos[0].model_copy(update={"provenance": provenance, "sha256": "ab" * 32}),
+        manifest.source_videos[1],
+    ]
+    write_project_manifest(project_folder, manifest.model_copy(update={"source_videos": with_hash}))
+    before = open_project(project_folder)
+    (project_folder / "B.mov").unlink()
+    (project_folder / "C.mp4").write_bytes(b"c")
+
+    after = rescan_project(project_folder)
+
+    by_name = {v.filename: v for v in after.source_videos}
+    assert set(by_name) == {"A.MP4", "C.mp4"}
+    assert after.project_uuid == before.project_uuid
+    assert by_name["A.MP4"].source_uuid == before.source_videos[0].source_uuid
+    assert by_name["A.MP4"].provenance == provenance
+    assert by_name["A.MP4"].sha256 == "ab" * 32
+    assert by_name["C.mp4"].source_uuid not in {v.source_uuid for v in before.source_videos}
+    assert by_name["C.mp4"].size_bytes == 1
+
+
+def test_rescan_drops_a_stored_hash_when_the_file_changed_on_disk(tmp_path):
+    project_folder, _ = _write_v1_project(tmp_path)
+    manifest = open_project(project_folder)
+    hashed = manifest.source_videos[0].model_copy(update={"sha256": "cd" * 32})
+    write_project_manifest(
+        project_folder,
+        manifest.model_copy(update={"source_videos": [hashed, manifest.source_videos[1]]}),
+    )
+    (project_folder / "A.MP4").write_bytes(b"replaced with longer bytes")
+
+    after = rescan_project(project_folder)
+
+    video = {v.filename: v for v in after.source_videos}["A.MP4"]
+    assert video.sha256 is None
+    assert video.source_uuid == hashed.source_uuid
+    assert video.size_bytes == len(b"replaced with longer bytes")
+
+
+def test_new_project_has_project_uuid_and_source_identity(tmp_path):
+    project_folder = tmp_path / "fresh"
+    project_folder.mkdir()
+    (project_folder / "X.mp4").write_bytes(b"xx")
+
+    manifest = create_project(project_folder, now=fixed_now)
+
+    assert manifest.schema_version == PROJECT_SCHEMA_VERSION
+    assert manifest.project_uuid
+    assert manifest.source_videos[0].source_uuid
+    assert manifest.source_videos[0].fingerprint.size == 2

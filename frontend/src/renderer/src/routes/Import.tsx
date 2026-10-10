@@ -113,7 +113,19 @@ export function ImportPage() {
   const [generationPreferences, setGenerationPreferences] =
     useState<ClipGenerationPreferences>(() => preferencesFromGenerationStats(generationStats));
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
-  const analyzedIds = useMemo(() => new Set(clips.map((clip) => clip.file_id)), [clips]);
+  // Files finished during the current run: Candidate Clips and generation stats
+  // only refresh when the whole batch completes.
+  const [completedThisRun, setCompletedThisRun] = useState<Set<string>>(new Set());
+  const previousRunningNameRef = useRef<string | null>(null);
+  const analyzedIds = useMemo(() => {
+    const ids = new Set(clips.map((clip) => clip.file_id));
+    const statFileNames = new Set(Object.keys(generationStats?.per_file ?? {}));
+    for (const video of uploadedVideos) {
+      if (statFileNames.has(video.file_name)) ids.add(video.file_id);
+    }
+    for (const fileId of completedThisRun) ids.add(fileId);
+    return ids;
+  }, [clips, generationStats, uploadedVideos, completedThisRun]);
   // Analyzed files default to unchecked so a rescan targets the new batch.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
@@ -259,6 +271,7 @@ export function ImportPage() {
       return;
     }
     setCancelling(false);
+    setCompletedThisRun(new Set());
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
@@ -377,6 +390,14 @@ export function ImportPage() {
   const hasVideos = uploadedVideos.length > 0;
   const activeProgress = isAnalyzing ? progress ?? analysisStatus : analysisStatus;
   const runningFileName = isAnalyzing ? activeProgress.file_name ?? null : null;
+
+  useEffect(() => {
+    const previous = previousRunningNameRef.current;
+    previousRunningNameRef.current = runningFileName;
+    if (!previous || !runningFileName || previous === runningFileName) return;
+    const finished = uploadedVideos.find((video) => video.file_name === previous);
+    if (finished) setCompletedThisRun((ids) => new Set(ids).add(finished.file_id));
+  }, [runningFileName, uploadedVideos]);
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
   const eta = estimatedRemaining(activeProgress, activePercent);
 

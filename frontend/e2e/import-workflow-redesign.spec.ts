@@ -25,7 +25,10 @@ const videos = [
   },
 }));
 
-async function openImportFixture(page: Page): Promise<void> {
+async function openImportFixture(
+  page: Page,
+  options: { progressFiles?: Array<{ file_name: string; video_index: number }> } = {},
+): Promise<void> {
   let analysisStarted = false;
   let analysisCancelled = false;
   let analysisPollCount = 0;
@@ -115,6 +118,20 @@ async function openImportFixture(page: Page): Promise<void> {
     }
     if (url.pathname.endsWith('/analyze/status')) {
       analysisPollCount += 1;
+      const sequenced = options.progressFiles?.[Math.min(analysisPollCount, options.progressFiles.length) - 1];
+      if (sequenced && analysisStarted) {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            phase: 'analyzing',
+            step: 'frame_extraction',
+            video_total: 3,
+            elapsed_sec: 18,
+            ...sequenced,
+          }),
+        });
+        return;
+      }
       const terminal = analysisPollCount > 1;
       await route.fulfill({
         contentType: 'application/json',
@@ -247,6 +264,22 @@ test('completed analysis clears Running and marks the analyzed source', async ({
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('analyzed');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
   await expect(page.locator('.source-video-name', { hasText: 'Shoreline sunrise.MP4' })).toBeVisible();
+});
+
+test('a finished video reads Analyzed while the rest of the batch is still running', async ({ page }) => {
+  await openImportFixture(page, {
+    progressFiles: [
+      { file_name: 'Shoreline sunrise.MP4', video_index: 1 },
+      { file_name: 'Valley pass.MOV', video_index: 2 },
+    ],
+  });
+
+  await page.getByRole('button', { name: 'Analyze all 3' }).click();
+  const row = (name: string) => page.locator('[data-source-video-row]', { hasText: name });
+  await expect(row('Valley pass.MOV')).toContainText('Running');
+  await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
+  await expect(row('Forest orbit.MP4')).toContainText('— Not analyzed');
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
 });
 
 test('selection bar selects and deselects the complete source set', async ({ page }) => {

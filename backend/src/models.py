@@ -252,3 +252,92 @@ class TimelineDocument(BaseModel):
     # Item presence drives the timeline; this preserves an explicit "rejected"
     # state distinct from "not yet reviewed" so the Review Board can grey it out.
     decisions: Dict[str, str] = Field(default_factory=dict)
+
+
+# --- Remote View DTOs (the phone's typed view of the Mac) ---------------------
+# Emitted to frontend/src/renderer/src/types/generated.ts for the phone entry.
+# The phone sees opaque IDs (Project UUID, Source UUID) and never a file path.
+
+
+class RemoteHealth(BaseModel):
+    ok: bool = True
+    instance: str
+
+
+class RemotePairRequest(BaseModel):
+    token: str = Field(max_length=200)
+    label: Optional[str] = Field(default=None, max_length=80)
+
+
+class RemotePairStarted(BaseModel):
+    pending_id: str
+
+
+class RemotePairPoll(BaseModel):
+    state: Literal["pending", "approved", "denied", "expired"]
+    csrf_token: Optional[str] = None
+    device_label: Optional[str] = None
+
+
+class RemoteSessionRenewed(BaseModel):
+    csrf_token: str
+
+
+class RemoteMe(BaseModel):
+    device_label: str
+    user_agent: str = ""
+    owner_login: str
+    mac_name: str
+    csrf_token: str
+    session_active: bool
+    approved_at: str
+    session_started_at: Optional[str] = None
+    # "direct", "relayed" or "unknown", as the Mac's Tailscale reports it.
+    network_path: Literal["direct", "relayed", "unknown"] = "unknown"
+    devices_connected: int = 0
+
+
+class RemoteNowOnMac(BaseModel):
+    state: Literal["idle", "analyzing", "failed"]
+    phase: Optional[str] = None
+    percent: Optional[float] = None
+    message: Optional[str] = None
+    elapsed_sec: Optional[float] = None
+    updated_at: Optional[float] = None
+
+
+class RemoteSource(BaseModel):
+    source_uuid: str
+    name: str
+    duration_sec: Optional[float] = None
+    size_bytes: Optional[int] = None
+    imported_at: str
+    from_phone: bool = False
+
+
+class RemoteProjectSummary(BaseModel):
+    id: str
+    name: str
+    source_count: int
+    clip_count: int
+    state: Literal["not_analyzed", "analyzing", "ready"]
+    percent: Optional[float] = None
+
+
+class RemoteProjectList(BaseModel):
+    projects: List[RemoteProjectSummary]
+
+
+class RemoteProjectDetail(BaseModel):
+    id: str
+    name: str
+    source_count: int
+    clip_count: int
+    last_analyzed_at: Optional[str] = None
+    now_on_mac: RemoteNowOnMac
+    sources: List[RemoteSource]
+
+
+class RemoteError(BaseModel):
+    reason: str
+    message: Optional[str] = None

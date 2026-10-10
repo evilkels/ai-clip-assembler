@@ -101,6 +101,77 @@ export interface Proposal {
   based_on_timeline_revision?: number;
   status?: "pending" | "accepted" | "rejected" | "superseded";
 }
+export interface RemoteError {
+  reason: string;
+  message?: string | null;
+}
+export interface RemoteHealth {
+  ok?: boolean;
+  instance: string;
+}
+export interface RemoteMe {
+  device_label: string;
+  user_agent?: string;
+  owner_login: string;
+  mac_name: string;
+  csrf_token: string;
+  session_active: boolean;
+  approved_at: string;
+  session_started_at?: string | null;
+  network_path?: "direct" | "relayed" | "unknown";
+  devices_connected?: number;
+}
+export interface RemoteNowOnMac {
+  state: "idle" | "analyzing" | "failed";
+  phase?: string | null;
+  percent?: number | null;
+  message?: string | null;
+  elapsed_sec?: number | null;
+  updated_at?: number | null;
+}
+export interface RemotePairPoll {
+  state: "pending" | "approved" | "denied" | "expired";
+  csrf_token?: string | null;
+  device_label?: string | null;
+}
+export interface RemotePairRequest {
+  token: string;
+  label?: string | null;
+}
+export interface RemotePairStarted {
+  pending_id: string;
+}
+export interface RemoteProjectDetail {
+  id: string;
+  name: string;
+  source_count: number;
+  clip_count: number;
+  last_analyzed_at?: string | null;
+  now_on_mac: RemoteNowOnMac;
+  sources: RemoteSource[];
+}
+export interface RemoteSource {
+  source_uuid: string;
+  name: string;
+  duration_sec?: number | null;
+  size_bytes?: number | null;
+  imported_at: string;
+  from_phone?: boolean;
+}
+export interface RemoteProjectList {
+  projects: RemoteProjectSummary[];
+}
+export interface RemoteProjectSummary {
+  id: string;
+  name: string;
+  source_count: number;
+  clip_count: number;
+  state: "not_analyzed" | "analyzing" | "ready";
+  percent?: number | null;
+}
+export interface RemoteSessionRenewed {
+  csrf_token: string;
+}
 export interface ReviewMessage {
   message_id: string;
   role: "agent" | "editor";

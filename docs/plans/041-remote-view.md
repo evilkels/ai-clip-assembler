@@ -203,7 +203,7 @@ These corrections replace the stale draft's claims:
   - Lifetimes: pairing token single use for 5 min; active session 15 min idle; device credential 30 days unused or 90 days absolute, rotated on renewal.
   - Rate limits: 5 failed pairings per identity per 10 min, and 30 per 10 min globally.
   - Exposure: `{project_uuid: {folder_path, shown}}`, with `shown` false by default.
-- [ ] 1.6 Add `backend/src/remote/app.py`, a separate FastAPI app with an ordered gate, and the Phase 1 routes. Done when `backend/tests/test_remote_gate.py` shows the cases below.
+- [x] 1.6 Add `backend/src/remote/app.py`, a separate FastAPI app with an ordered gate, and the Phase 1 routes. Done when `backend/tests/test_remote_gate.py` shows the cases below.
   - Gate order:
     1. Lease active, else 503 `{"reason": "remote_off"}`.
     2. Path starts with the current ingress segment, else a bare 404.

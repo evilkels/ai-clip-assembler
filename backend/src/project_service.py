@@ -56,6 +56,9 @@ class ProjectService:
         self._projects = projects
         self._opener = opener
         self._guard = threading.Lock()
+        # Serializes "is it open? else open it" so two callers (the desktop and
+        # a phone, or two phones) never create two runtime Projects per folder.
+        self.open_lock = threading.RLock()
         self._project_locks: Dict[str, threading.RLock] = {}
         self._folder_locks: Dict[Path, int] = {}
 
@@ -212,15 +215,16 @@ class ProjectService:
         UUID is the one the Editor exposed, so a replaced or moved folder is
         not silently exposed in its place.
         """
-        existing = self.find_open_by_uuid(project_uuid)
-        if existing is not None:
-            return existing
-        manifest = open_project(Path(folder))
-        if manifest.project_uuid != project_uuid:
-            raise ProjectNotFoundError("Project folder no longer matches the exposed Project")
-        already = self.find_open(Path(folder))
-        if already is not None:
-            return already
-        if self._opener is None:
-            raise ProjectStoreError("No Project opener is configured")
-        return self._opener(Path(folder))
+        with self.open_lock:
+            existing = self.find_open_by_uuid(project_uuid)
+            if existing is not None:
+                return existing
+            manifest = open_project(Path(folder))
+            if manifest.project_uuid != project_uuid:
+                raise ProjectNotFoundError("Project folder no longer matches the exposed Project")
+            already = self.find_open(Path(folder))
+            if already is not None:
+                return already
+            if self._opener is None:
+                raise ProjectStoreError("No Project opener is configured")
+            return self._opener(Path(folder))

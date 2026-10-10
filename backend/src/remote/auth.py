@@ -457,6 +457,11 @@ class RemoteAuth:
             self._persisted_seen[device.device_id] = now
             self._save_devices_quietly()
 
+    def session_started_at(self, session_cookie: Optional[str]) -> Optional[float]:
+        with self._lock:
+            session = self._sessions.get(hash_credential(session_cookie or ""))
+            return session.created_at if session is not None else None
+
     def renew_session(self, device_cookie: Optional[str]) -> Renewal:
         """New session and a rotated device credential for a valid device cookie."""
         with self._lock:

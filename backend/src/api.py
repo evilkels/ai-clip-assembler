@@ -284,6 +284,11 @@ def open_folder_project(folder_path: Path) -> str:
     The same folder, however it is reached (symlink, ``..``, trailing slash),
     resolves to one runtime Project instead of minting a new one per open.
     """
+    with project_service.open_lock:
+        return _open_folder_project_locked(folder_path)
+
+
+def _open_folder_project_locked(folder_path: Path) -> str:
     existing = project_service.find_open(folder_path)
     if existing is not None:
         return existing

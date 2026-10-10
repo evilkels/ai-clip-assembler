@@ -117,6 +117,8 @@ export function ImportPage() {
   // only refresh when the whole batch completes.
   const [completedThisRun, setCompletedThisRun] = useState<Set<string>>(new Set());
   const runBatchRef = useRef<UploadedVideo[]>([]);
+  // A stale poll or request from an earlier run must not touch a newer run's marks.
+  const runIdRef = useRef(0);
   const previousRunningRef = useRef<{ index: number; name: string } | null>(null);
   const analyzedIds = useMemo(() => {
     const ids = new Set(clips.map((clip) => clip.file_id));
@@ -274,6 +276,7 @@ export function ImportPage() {
       }
       return;
     }
+    const runId = ++runIdRef.current;
     setCancelling(false);
     runBatchRef.current = uploadedVideos.filter((video) => selectedIds.includes(video.file_id));
     previousRunningRef.current = null;
@@ -309,12 +312,14 @@ export function ImportPage() {
         setAnalysisStatus({ phase: 'error', error: message });
       }
     } finally {
-      setProgress(null);
-      setCancelling(false);
-      // Finished, failed or cancelled: the stored results are authoritative now,
-      // so cancelled files must not stay marked (and deselected) as analyzed.
-      runBatchRef.current = [];
-      setCompletedThisRun(new Set());
+      if (runIdRef.current === runId) {
+        setProgress(null);
+        setCancelling(false);
+        // Finished, failed or cancelled: the stored results are authoritative now,
+        // so cancelled files must not stay marked (and deselected) as analyzed.
+        runBatchRef.current = [];
+        setCompletedThisRun(new Set());
+      }
     }
   }, [
     uploadedVideos,
@@ -344,9 +349,11 @@ export function ImportPage() {
   const isAnalyzingNow = analysisStatus.phase === 'analyzing';
   useEffect(() => {
     if (!isAnalyzingNow || !projectId) return;
+    const runId = runIdRef.current;
     const poll = () => {
       getAnalysisStatus(projectId)
         .then((status) => {
+          if (runIdRef.current !== runId) return;
           if (status.phase === 'analyzing') {
             setProgress(status);
             setAnalysisStatus(status);
@@ -357,6 +364,9 @@ export function ImportPage() {
           ) {
             setProgress(null);
             setAnalysisStatus(status);
+            // The run is over even if its request has not settled yet.
+            runBatchRef.current = [];
+            setCompletedThisRun(new Set());
           }
         })
         .catch(() => {

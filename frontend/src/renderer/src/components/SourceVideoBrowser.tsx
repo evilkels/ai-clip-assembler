@@ -66,6 +66,18 @@ function fileExtension(fileName: string): string {
   return dot > 0 && dot < fileName.length - 1 ? fileName.slice(dot + 1).toUpperCase() : 'VIDEO';
 }
 
+const analysisRevisionIds = new WeakMap<object, number>();
+let nextAnalysisRevision = 0;
+function analysisRevision(results: object | null): number {
+  if (!results) return 0;
+  let id = analysisRevisionIds.get(results);
+  if (id === undefined) {
+    id = ++nextAnalysisRevision;
+    analysisRevisionIds.set(results, id);
+  }
+  return id;
+}
+
 /** Posters exist only after analysis; everything else shows the file extension. */
 function SourceVideoPoster({
   projectId,
@@ -78,23 +90,46 @@ function SourceVideoPoster({
   analyzed: boolean;
   analysisResults: object | null;
 }) {
-  // A failure only counts for the analysis it happened under.
-  const [failedUnder, setFailedUnder] = useState<{ results: object | null } | null>(null);
-  const failed = failedUnder !== null && failedUnder.results === analysisResults;
+  const revision = analysisRevision(analysisResults);
   return (
     <div className="source-video-poster" aria-hidden="true">
-      {projectId && analyzed && !failed ? (
-        <img
-          src={buildClipPosterUrl(projectId, video.file_id, 0)}
-          loading="lazy"
-          decoding="async"
-          alt=""
-          onError={() => setFailedUnder({ results: analysisResults })}
-        />
-      ) : (
-        <span>{fileExtension(video.file_name)}</span>
-      )}
+      {/* One element per analysis revision: a failure (even a late one) belongs to
+          the revision that requested it, so a fresh analysis always retries. */}
+      <SourceVideoPosterImage
+        key={`${video.file_id}:${revision}`}
+        projectId={projectId}
+        video={video}
+        analyzed={analyzed}
+        revision={revision}
+      />
     </div>
+  );
+}
+
+function SourceVideoPosterImage({
+  projectId,
+  video,
+  analyzed,
+  revision,
+}: {
+  projectId: string | null;
+  video: UploadedVideo;
+  analyzed: boolean;
+  revision: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  return projectId && analyzed && !failed ? (
+    <img
+      // The revision makes the URL distinct, so the browser cannot hand this
+      // element a still-pending request that belongs to the previous analysis.
+      src={`${buildClipPosterUrl(projectId, video.file_id, 0)}&rev=${revision}`}
+      loading="lazy"
+      decoding="async"
+      alt=""
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <span>{fileExtension(video.file_name)}</span>
   );
 }
 

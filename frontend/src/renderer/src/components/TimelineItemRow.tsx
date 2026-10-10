@@ -123,7 +123,7 @@ export function TimelineItemRow({
 
   return (
     <li
-      className={`timeline-item-row${selected ? ' selected' : ''}`}
+      className={`timeline-item-row${selected ? ' selected' : ''}${showControls ? '' : ' compact'}`}
       data-testid="timeline-item-row"
       data-timeline-editor-item-id={item.item_id}
     >
@@ -139,8 +139,10 @@ export function TimelineItemRow({
         </button>
         <span className="pill-rank">#{index + 1}</span>
         <span className="timeline-item-name">{name}</span>
-        <SourceAudioBadge hasAudio={sourceAudio.hasAudio} channels={sourceAudio.channels} />
-        <span className="draft-summary">{effective}s on timeline</span>
+        <span className="timeline-item-meta">
+          <SourceAudioBadge hasAudio={sourceAudio.hasAudio} channels={sourceAudio.channels} />
+          <span className="draft-summary">{effective}s on timeline</span>
+        </span>
         <div className="timeline-item-order">
           <button
             type="button"

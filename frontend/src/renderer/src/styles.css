@@ -2362,7 +2362,12 @@ a {
 
 .version-player {
   position: relative;
+  /* aspect-ratio and --player-aspect are set inline from the first clip's
+     source. A portrait box is capped at 440px tall and narrowed to match. */
   aspect-ratio: 16 / 9;
+  max-height: 440px;
+  max-width: calc(440px * var(--player-aspect, 16 / 9));
+  margin-inline: auto;
   overflow: hidden;
   background: #05070a;
 }
@@ -2737,7 +2742,7 @@ a {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text);
+  color: #fff;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -2751,7 +2756,7 @@ a {
   padding: 2px 6px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: #fff;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -3340,6 +3345,8 @@ a {
 .timeline-preview {
   position: relative;
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
   place-items: center;
   flex: 1 1 auto;
   min-height: 220px;
@@ -3348,35 +3355,50 @@ a {
   background: #05070a;
 }
 
-.timeline-preview .clip-preview,
-.timeline-preview .clip-preview video {
+.timeline-preview-frame {
+  /* The picture row is a size container so the outline can be the largest box
+     of the sequence's aspect that fits it, whichever side is the tighter one. */
+  container-type: size;
+  display: grid;
+  place-items: center;
+  width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
 }
 
 .timeline-preview .clip-preview {
-  width: min(100%, 720px);
+  /* aspect-ratio is set inline and --preview-aspect on the frame, both from the
+     first clip's source, so the outline hugs the picture for portrait and
+     landscape alike. */
+  width: min(100cqw, calc(100cqh * var(--preview-aspect, 16 / 9)));
+  height: auto;
+  min-height: 0;
   border-radius: var(--radius-lg);
 }
 
 .timeline-preview .clip-preview video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   aspect-ratio: auto;
 }
 
 .timeline-preview-meta {
-  position: absolute;
-  inset: auto 32px 30px;
+  position: static;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   min-width: 0;
+  max-width: 100%;
   padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-0) 78%, transparent);
   color: var(--text-muted);
   font: 11px var(--font-mono);
-  backdrop-filter: blur(8px);
 }
 
 .timeline-preview-meta strong {
@@ -3616,7 +3638,9 @@ a {
 
 .tl-clip-dur {
   font-size: 10px;
-  color: rgba(230, 232, 236, 0.7);
+  /* --text-dim holds >= 4.5:1 against both ends of the block gradient in both
+     themes; --text-muted does not. */
+  color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 
@@ -4451,7 +4475,7 @@ a {
   padding: 14px 18px;
   border-top: 0;
 }
-.timeline-editor-list { list-style: none; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.timeline-editor-list { list-style: none; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow-x: hidden; overflow-y: auto; }
 .timeline-item-row {
   border: 1px solid transparent;
   border-radius: 8px;
@@ -4484,6 +4508,27 @@ a {
 }
 .timeline-item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
 .timeline-item-order { margin-left: auto; display: flex; gap: 6px; }
+.timeline-item-meta { display: contents; }
+/* Rail rows (no inline controls): the filename gets the first line to itself
+   beside the order buttons, and the audio badge and duration wrap beneath it so
+   nothing overflows the 300-320px rail. */
+.timeline-item-row.compact .timeline-item-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+.timeline-item-row.compact .timeline-item-order { grid-column: 4; grid-row: 1; gap: 2px; }
+.timeline-item-row.compact .timeline-item-order .btn { padding-inline: 8px; }
+.timeline-item-row.compact .timeline-item-meta {
+  grid-column: 3 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
 .timeline-item-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 0; align-items: end; }
 .timeline-item-controls label { display: grid; min-width: 0; gap: 5px; color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .timeline-item-controls input { width: 100%; min-width: 0; box-sizing: border-box; }

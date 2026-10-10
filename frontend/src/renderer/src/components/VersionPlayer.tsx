@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
+import { sequenceAspect } from '../lib/displayAspect';
+import { useReview } from '../state/ReviewContext';
 import type { Version } from '../types/version';
 import { ClipPreview } from './ClipPreview';
 import { useSequencePlayer } from './useSequencePlayer';
@@ -42,18 +44,21 @@ export function VersionPlayer({
   );
   const player = useSequencePlayer({ projectId, segments, loop: true });
   const scale = version.items[player.currentIndex]?.transform.scale ?? 1;
+  const { uploadedVideos } = useReview();
+  const aspect = sequenceAspect(version.items[0]?.file_id, uploadedVideos);
 
   return (
     <>
       <div
         className={`version-player${expanded ? ' expanded' : ''}`}
         data-testid={testId}
+        style={{ aspectRatio: aspect, '--player-aspect': aspect } as CSSProperties}
       >
         <ClipPreview
           {...player.previewProps}
           playing={playing}
           scale={scale}
-          label={version.title}
+          ariaLabel={version.title}
           testId={`${testId}-video`}
         />
         {onExpand ? (

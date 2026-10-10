@@ -1472,6 +1472,7 @@ a {
 .source-video-sort { all: unset; cursor: pointer; }
 
 .source-video-thumbs {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
@@ -1501,10 +1502,12 @@ a {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.1em;
+  overflow: hidden;
 }
+.source-video-poster img { width: 100%; height: 100%; object-fit: cover; }
 .source-video-card-head { gap: 7px; min-width: 0; }
 
-.source-video-compact { display: grid; border-top: 1px solid var(--border); }
+.source-video-compact { grid-column: 1 / -1; display: grid; border-top: 1px solid var(--border); }
 .source-video-compact-row {
   gap: 10px;
   min-height: 38px;

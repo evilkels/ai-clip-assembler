@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { SourceVideoSelectionBar } from './SourceVideoSelectionBar';
+import { buildClipPosterUrl } from '../api/client';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
 import {
   isSourceVideoRunning,
@@ -13,6 +14,9 @@ import {
 import type { UploadedVideo } from '../types/clip';
 
 interface Props {
+  projectId: string | null;
+  /** Identity changes with every completed analysis, so a poster that 404ed retries. */
+  analysisResults: object | null;
   videos: UploadedVideo[];
   analyzedIds: ReadonlySet<string>;
   deselected: ReadonlySet<string>;
@@ -57,11 +61,85 @@ function formatResolution(metadata: NonNullable<UploadedVideo['metadata']>): str
   return `${width}×${height}${height > width ? ' ↕' : ''}`;
 }
 
+function fileExtension(fileName: string): string {
+  const dot = fileName.lastIndexOf('.');
+  return dot > 0 && dot < fileName.length - 1 ? fileName.slice(dot + 1).toUpperCase() : 'VIDEO';
+}
+
+const analysisRevisionIds = new WeakMap<object, number>();
+let nextAnalysisRevision = 0;
+function analysisRevision(results: object | null): number {
+  if (!results) return 0;
+  let id = analysisRevisionIds.get(results);
+  if (id === undefined) {
+    id = ++nextAnalysisRevision;
+    analysisRevisionIds.set(results, id);
+  }
+  return id;
+}
+
+/** Posters exist only after analysis; everything else shows the file extension. */
+function SourceVideoPoster({
+  projectId,
+  video,
+  analyzed,
+  analysisResults,
+}: {
+  projectId: string | null;
+  video: UploadedVideo;
+  analyzed: boolean;
+  analysisResults: object | null;
+}) {
+  const revision = analysisRevision(analysisResults);
+  return (
+    <div className="source-video-poster" aria-hidden="true">
+      {/* One element per analysis revision: a failure (even a late one) belongs to
+          the revision that requested it, so a fresh analysis always retries. */}
+      <SourceVideoPosterImage
+        key={`${video.file_id}:${revision}`}
+        projectId={projectId}
+        video={video}
+        analyzed={analyzed}
+        revision={revision}
+      />
+    </div>
+  );
+}
+
+function SourceVideoPosterImage({
+  projectId,
+  video,
+  analyzed,
+  revision,
+}: {
+  projectId: string | null;
+  video: UploadedVideo;
+  analyzed: boolean;
+  revision: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  return projectId && analyzed && !failed ? (
+    <img
+      // The revision makes the URL distinct, so the browser cannot hand this
+      // element a still-pending request that belongs to the previous analysis.
+      src={`${buildClipPosterUrl(projectId, video.file_id, 0)}&rev=${revision}`}
+      loading="lazy"
+      decoding="async"
+      alt=""
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <span>{fileExtension(video.file_name)}</span>
+  );
+}
+
 function sortArrow(sort: SourceVideoSort, key: SourceVideoSortKey): string {
   return sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 }
 
 export function SourceVideoBrowser({
+  projectId,
+  analysisResults,
   videos,
   analyzedIds,
   deselected,
@@ -214,7 +292,13 @@ export function SourceVideoBrowser({
                 className={`source-video-card${checked ? '' : ' is-deselected'}`}
                 data-source-video-row
               >
-                <div className="source-video-poster" aria-hidden="true"><span>MP4</span></div>
+                <SourceVideoPoster
+                  key={`${projectId}:${video.file_id}:${analyzedIds.has(video.file_id)}`}
+                  projectId={projectId}
+                  video={video}
+                  analyzed={analyzedIds.has(video.file_id)}
+                  analysisResults={analysisResults}
+                />
                 <div className="source-video-card-head">{selectionBox(video)}<strong title={video.file_name}>{video.file_name}</strong></div>
                 <span>{video.metadata ? formatClock(video.metadata.duration_sec) : 'Pending'} · {analysisLabel(video)}</span>
               </article>

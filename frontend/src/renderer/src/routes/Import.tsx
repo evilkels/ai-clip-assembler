@@ -16,7 +16,7 @@ import {
   type HarnessInfo,
 } from '../api/client';
 import { usePublishGateActions, type GateActions } from '../state/StepGateContext';
-import type { ClipGenerationPreferences } from '../types/clip';
+import type { ClipGenerationPreferences, UploadedVideo } from '../types/clip';
 import { preferencesFromGenerationStats } from '../lib/clipGenerationPreferences';
 import type { SourceVideoSort, SourceVideoSortKey } from '../lib/sourceVideoView';
 
@@ -30,7 +30,7 @@ const STEP_LABELS: Record<string, string> = {
   motion_analysis: 'Motion analysis',
   frame_extraction: 'Extracting frames',
   scene_detection: 'Detecting scenes',
-  scoring_clips: 'Scoring clips with AI',
+  scoring_clips: 'Scoring clips',
   complete: 'Complete',
 };
 
@@ -113,7 +113,25 @@ export function ImportPage() {
   const [generationPreferences, setGenerationPreferences] =
     useState<ClipGenerationPreferences>(() => preferencesFromGenerationStats(generationStats));
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
-  const analyzedIds = useMemo(() => new Set(clips.map((clip) => clip.file_id)), [clips]);
+  // Files finished during the current run: Candidate Clips and generation stats
+  // only refresh when the whole batch completes.
+  const [completedThisRun, setCompletedThisRun] = useState<Set<string>>(new Set());
+  const runBatchRef = useRef<UploadedVideo[]>([]);
+  // A stale poll or request from an earlier run must not touch a newer run's marks.
+  const runIdRef = useRef(0);
+  const previousRunningRef = useRef<{ index: number; name: string } | null>(null);
+  const analyzedIds = useMemo(() => {
+    const ids = new Set(clips.map((clip) => clip.file_id));
+    for (const key of Object.keys(generationStats?.per_file ?? {})) {
+      // Keyed by file_id; the file_name match covers older stats.
+      const video =
+        uploadedVideos.find((candidate) => candidate.file_id === key) ??
+        uploadedVideos.find((candidate) => candidate.file_name === key);
+      if (video) ids.add(video.file_id);
+    }
+    for (const fileId of completedThisRun) ids.add(fileId);
+    return ids;
+  }, [clips, generationStats, uploadedVideos, completedThisRun]);
   // Analyzed files default to unchecked so a rescan targets the new batch.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = useState(false);
@@ -258,7 +276,11 @@ export function ImportPage() {
       }
       return;
     }
+    const runId = ++runIdRef.current;
     setCancelling(false);
+    runBatchRef.current = uploadedVideos.filter((video) => selectedIds.includes(video.file_id));
+    previousRunningRef.current = null;
+    setCompletedThisRun(new Set());
     setAnalysisStatus({ phase: 'analyzing', message: 'Preparing analysis' });
     setProgress({ phase: 'analyzing', message: 'Preparing analysis' });
     try {
@@ -290,10 +312,17 @@ export function ImportPage() {
         setAnalysisStatus({ phase: 'error', error: message });
       }
     } finally {
-      setProgress(null);
-      setCancelling(false);
+      if (runIdRef.current === runId) {
+        setProgress(null);
+        setCancelling(false);
+        // Finished, failed or cancelled: the stored results are authoritative now,
+        // so cancelled files must not stay marked (and deselected) as analyzed.
+        runBatchRef.current = [];
+        setCompletedThisRun(new Set());
+      }
     }
   }, [
+    uploadedVideos,
     projectId,
     selectedHarness,
     cloudAiConsent,
@@ -320,9 +349,11 @@ export function ImportPage() {
   const isAnalyzingNow = analysisStatus.phase === 'analyzing';
   useEffect(() => {
     if (!isAnalyzingNow || !projectId) return;
+    const runId = runIdRef.current;
     const poll = () => {
       getAnalysisStatus(projectId)
         .then((status) => {
+          if (runIdRef.current !== runId) return;
           if (status.phase === 'analyzing') {
             setProgress(status);
             setAnalysisStatus(status);
@@ -333,6 +364,9 @@ export function ImportPage() {
           ) {
             setProgress(null);
             setAnalysisStatus(status);
+            // The run is over even if its request has not settled yet.
+            runBatchRef.current = [];
+            setCompletedThisRun(new Set());
           }
         })
         .catch(() => {
@@ -377,6 +411,31 @@ export function ImportPage() {
   const hasVideos = uploadedVideos.length > 0;
   const activeProgress = isAnalyzing ? progress ?? analysisStatus : analysisStatus;
   const runningFileName = isAnalyzing ? activeProgress.file_name ?? null : null;
+
+  const runningVideoIndex = isAnalyzing ? activeProgress.video_index ?? null : null;
+  useEffect(() => {
+    const previous = previousRunningRef.current;
+    const current =
+      runningFileName && runningVideoIndex ? { index: runningVideoIndex, name: runningFileName } : null;
+    previousRunningRef.current = current;
+    if (!previous || !current) return;
+    if (previous.index === current.index && previous.name === current.name) return;
+    // The backend walks the selected batch in order, so video_index pins the file
+    // even when several files share a name.
+    const batch = runBatchRef.current;
+    const indexed = batch[previous.index - 1];
+    const finished =
+      indexed?.file_name === previous.name
+        ? indexed
+        : batch.find((video) => video.file_name === previous.name);
+    if (finished) setCompletedThisRun((ids) => new Set(ids).add(finished.file_id));
+  }, [runningFileName, runningVideoIndex]);
+
+  useEffect(() => {
+    runBatchRef.current = [];
+    previousRunningRef.current = null;
+    setCompletedThisRun(new Set());
+  }, [projectId]);
   const activePercent = activeProgress.phase === 'analyzing' ? progressPercent(activeProgress) : null;
   const eta = estimatedRemaining(activeProgress, activePercent);
 
@@ -410,7 +469,7 @@ export function ImportPage() {
       <WorkflowHeader
         title="Import"
         step="Step 01 / 04"
-        description="Choose a footage folder or upload drone footage. Analyze to detect stable clip candidates."
+        description="Choose a footage folder or upload video files. Analyze to detect stable clip candidates."
         actions={(
           <>
             <button type="button" className="btn primary" onClick={handleOpenFolder} disabled={openingFolder}>
@@ -464,6 +523,8 @@ export function ImportPage() {
         {hasVideos && (
           <div className="import-workstation" data-import-workstation>
             <SourceVideoBrowser
+              projectId={projectId}
+              analysisResults={generationStats}
               videos={uploadedVideos}
               analyzedIds={analyzedIds}
               deselected={deselected}

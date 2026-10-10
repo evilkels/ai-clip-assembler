@@ -25,11 +25,42 @@ const videos = [
   },
 }));
 
-async function openImportFixture(page: Page): Promise<void> {
+async function openImportFixture(
+  page: Page,
+  options: {
+    progressFiles?: Array<{ file_name: string; video_index: number }>;
+    /** Keys of generation_stats.per_file, which the backend keys by file_id. */
+    statsKeys?: string[];
+    videoList?: typeof videos;
+    postersReady?: boolean;
+    /** Poster requests stay pending until /__test/poster-flush. */
+    holdPosters?: boolean;
+  } = {},
+): Promise<void> {
+  const sourceVideos = options.videoList ?? videos;
+  let postersReady = options.postersReady ?? true;
+  let holdPosters = options.holdPosters ?? false;
+  const heldPosters: Array<(status: number) => void> = [];
+  let statusOverride: string | null = null;
+  const generationStats = () => (options.statsKeys
+    ? {
+        per_file: Object.fromEntries(
+          options.statsKeys.map((key) => [key, {
+            candidates_generated: 0,
+            candidates_kept: 0,
+            scenes_total: 0,
+            scenes_at_cap: 0,
+            preferences: {},
+          }]),
+        ),
+        totals: { candidates_generated: 0, candidates_kept: 0, scenes_total: 0, scenes_at_cap: 0, videos: options.statsKeys.length },
+        preferences: {},
+      }
+    : null);
   let analysisStarted = false;
   let analysisCancelled = false;
   let analysisPollCount = 0;
-  let releaseAnalysis: (() => void) | null = null;
+  const pendingAnalyses: Array<(empty: boolean) => void> = [];
   await page.addInitScript((path) => {
     Object.assign(window, {
       clipAssembler: {
@@ -57,13 +88,30 @@ async function openImportFixture(page: Page): Promise<void> {
             created_at: '2026-08-12T10:00:00Z',
             harness: 'manual',
             cloud_ai_consent: false,
-            source_videos: videos.map((video) => ({ filename: video.file_name, imported_at: '2026-08-12T10:00:00Z' })),
+            source_videos: sourceVideos.map((video) => ({ filename: video.file_name, imported_at: '2026-08-12T10:00:00Z' })),
             settings_overrides: {},
           },
-          videos,
-          generation_stats: null,
+          videos: sourceVideos,
+          generation_stats: generationStats(),
         }),
       });
+      return;
+    }
+    if (url.pathname.endsWith('/poster')) {
+      // Only the shoreline poster renders; the rest 404 like an unavailable frame.
+      const status = holdPosters
+        ? await new Promise<number>((resolve) => { heldPosters.push(resolve); })
+        : postersReady && url.pathname.includes('/videos/shoreline/') ? 200 : 404;
+      // The page aborts a request whose element unmounted; fulfilling it then throws.
+      await route.fulfill(status === 200
+        ? {
+            contentType: 'image/png',
+            body: Buffer.from(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+              'base64',
+            ),
+          }
+        : { status, body: '' }).catch(() => undefined);
       return;
     }
     if (url.pathname === '/harnesses') {
@@ -73,8 +121,8 @@ async function openImportFixture(page: Page): Promise<void> {
     if (url.pathname.endsWith('/analyze')) {
       analysisStarted = true;
       analysisPollCount = 0;
-      await new Promise<void>((resolve) => { releaseAnalysis = resolve; });
-      analysisStarted = false;
+      const emptyResult = await new Promise<boolean>((resolve) => { pendingAnalyses.push(resolve); });
+      analysisStarted = pendingAnalyses.length > 0;
       const cancelled = analysisCancelled;
       if (cancelled) {
         await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ detail: 'Analysis cancelled' }) });
@@ -86,7 +134,7 @@ async function openImportFixture(page: Page): Promise<void> {
           project_id: 'import-redesign-project',
           harness_id: 'manual',
           status: 'complete',
-          clips: [{
+          clips: emptyResult ? [] : [{
             clip_id: 'analyzed-clip',
             file_id: 'shoreline',
             file_name: 'Shoreline sunrise.MP4',
@@ -96,15 +144,36 @@ async function openImportFixture(page: Page): Promise<void> {
             smoothness_score: 8,
             overall_score: 8,
           }],
+          generation_stats: generationStats(),
           sequence: { items: [] },
           recommendation: { profile: 'cinematic_highlight', target_duration_sec: 120, format: 'fcpxml' },
         }),
       });
       return;
     }
+    if (url.pathname === '/__test/posters-ready') {
+      postersReady = true;
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    if (url.pathname === '/__test/status-override') {
+      statusOverride = url.searchParams.get('phase');
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    if (url.pathname === '/__test/poster-flush') {
+      // Requests from before re-analysis fail late; a request made for the new results succeeds.
+      holdPosters = false;
+      postersReady = true;
+      const held = heldPosters.splice(0);
+      held.forEach((resolve, index) => resolve(held.length > 1 && index === held.length - 1 ? 200 : 404));
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
     if (url.pathname === '/__test/release-analysis') {
-      releaseAnalysis?.();
-      releaseAnalysis = null;
+      // `which=first` settles only the oldest pending request; otherwise all of them.
+      const release = url.searchParams.get('which') === 'first' ? pendingAnalyses.splice(0, 1) : pendingAnalyses.splice(0);
+      for (const resolve of release) resolve(url.searchParams.get('empty') === '1');
       await route.fulfill({ status: 204, body: '' });
       return;
     }
@@ -115,6 +184,24 @@ async function openImportFixture(page: Page): Promise<void> {
     }
     if (url.pathname.endsWith('/analyze/status')) {
       analysisPollCount += 1;
+      if (statusOverride) {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ phase: statusOverride }) });
+        return;
+      }
+      const sequenced = options.progressFiles?.[Math.min(analysisPollCount, options.progressFiles.length) - 1];
+      if (sequenced && analysisStarted && !analysisCancelled) {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            phase: 'analyzing',
+            step: 'frame_extraction',
+            video_total: 3,
+            elapsed_sec: 18,
+            ...sequenced,
+          }),
+        });
+        return;
+      }
       const terminal = analysisPollCount > 1;
       await route.fulfill({
         contentType: 'application/json',
@@ -247,6 +334,196 @@ test('completed analysis clears Running and marks the analyzed source', async ({
   await page.getByRole('combobox', { name: 'Analysis filter' }).selectOption('analyzed');
   await expect(page.locator('[data-source-video-row]')).toHaveCount(1);
   await expect(page.locator('.source-video-name', { hasText: 'Shoreline sunrise.MP4' })).toBeVisible();
+});
+
+test('a finished video reads Analyzed while the rest of the batch is still running', async ({ page }) => {
+  await openImportFixture(page, {
+    progressFiles: [
+      { file_name: 'Shoreline sunrise.MP4', video_index: 1 },
+      { file_name: 'Valley pass.MOV', video_index: 2 },
+    ],
+  });
+
+  await page.getByRole('button', { name: 'Analyze all 3' }).click();
+  const row = (name: string) => page.locator('[data-source-video-row]', { hasText: name });
+  await expect(row('Valley pass.MOV')).toContainText('Running');
+  await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
+  await expect(row('Forest orbit.MP4')).toContainText('— Not analyzed');
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+});
+
+test('Thumbs and Compact views span the browser; posters fall back to the file extension', async ({ page }) => {
+  await openImportFixture(page, {
+    statsKeys: ['shoreline', 'valley'],
+  });
+
+  const browserWidth = await page.locator('[data-source-video-browser]').evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+
+  await page.getByRole('button', { name: 'Thumbs' }).click();
+  const thumbs = page.locator('[data-view-mode="thumbs"]');
+  await expect(thumbs).toBeVisible();
+  const thumbsWidth = await thumbs.evaluate((element) => element.getBoundingClientRect().width);
+  expect(thumbsWidth).toBeGreaterThan(browserWidth * 0.9);
+
+  const card = (name: string) => page.locator('.source-video-card', { hasText: name });
+  const analyzedPoster = card('Shoreline sunrise.MP4').locator('.source-video-poster img');
+  await expect(analyzedPoster).toHaveAttribute('src', /\/videos\/shoreline\/poster\?at_ms=0&rev=\d+$/);
+  await expect
+    .poll(() => analyzedPoster.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  // Poster request failed (404): placeholder shows the real extension.
+  await expect(card('Valley pass.MOV').locator('.source-video-poster')).toHaveText('MOV');
+  // Not analyzed yet: no poster request, extension placeholder.
+  await expect(card('Forest orbit.MP4').locator('.source-video-poster')).toHaveText('MP4');
+  await expect(card('Forest orbit.MP4').locator('.source-video-poster img')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Compact' }).click();
+  const compact = page.locator('[data-view-mode="compact"]');
+  await expect(compact).toBeVisible();
+  const compactWidth = await compact.evaluate((element) => element.getBoundingClientRect().width);
+  expect(compactWidth).toBeGreaterThan(browserWidth * 0.9);
+});
+
+test('a cancelled run drops its per-run Analyzed marks and re-selects those videos', async ({ page }) => {
+  await openImportFixture(page, {
+    progressFiles: [
+      { file_name: 'Shoreline sunrise.MP4', video_index: 1 },
+      { file_name: 'Valley pass.MOV', video_index: 2 },
+    ],
+  });
+
+  await page.getByRole('button', { name: 'Analyze all 3' }).click();
+  const row = (name: string) => page.locator('[data-source-video-row]', { hasText: name });
+  await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
+  await page.getByRole('button', { name: 'Abort' }).click();
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+
+  await expect(page.getByText('Analysis cancelled. Adjust your selection and analyze again when ready.')).toBeVisible();
+  await expect(row('Shoreline sunrise.MP4')).toContainText('— Not analyzed');
+  await expect(page.getByRole('checkbox', { name: 'Select Shoreline sunrise.MP4' })).toBeChecked();
+  await expect(page.getByText('3 of 3 selected')).toBeVisible();
+});
+
+test('progress only credits files from the run batch, even when names repeat', async ({ page }) => {
+  const twin = (file_id: string, index: number) => ({
+    ...videos[0],
+    file_id,
+    file_name: 'Clip.MOV',
+    metadata: { ...videos[0].metadata, file_id, file_name: 'Clip.MOV', size_bytes: 1000 + index },
+  });
+  await openImportFixture(page, {
+    videoList: [twin('twin-a', 0), twin('twin-b', 1), { ...videos[1], file_id: 'tail', file_name: 'Tail.MOV' }],
+    progressFiles: [
+      { file_name: 'Clip.MOV', video_index: 1 },
+      { file_name: 'Clip.MOV', video_index: 2 },
+      { file_name: 'Tail.MOV', video_index: 3 },
+    ],
+  });
+  await page.getByRole('checkbox', { name: 'Select all videos' }).check();
+  // Deselect the first twin: the batch is [twin-b, tail], so index 1 is twin-b.
+  await page.locator('[data-source-video-row]').first().getByRole('checkbox').uncheck();
+  await page.getByRole('button', { name: 'Analyze 2 videos' }).click();
+
+  const rows = page.locator('[data-source-video-row]');
+  await expect(rows.nth(1)).toContainText('✓ Analyzed');
+  await expect(rows.nth(0)).toContainText('— Not analyzed');
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+});
+
+test('a legacy upload with a UUID file_id and zero candidates reads Analyzed from its stats', async ({ page }) => {
+  const legacy = (file_id: string, file_name: string) => ({
+    ...videos[0],
+    file_id,
+    file_name,
+    metadata: { ...videos[0].metadata, file_id, file_name },
+  });
+  await openImportFixture(page, {
+    videoList: [
+      legacy('3f2b8c1e-9a4d-4e6b-8f10-7c5d2a9e1b34', 'IMG_0042.MOV'),
+      legacy('9d1e5a70-2c3b-4f88-a6d4-0b7e8c1f2a55', 'IMG_0043.MOV'),
+      legacy('c4a7e2b9-6d10-4a3f-9e58-1f2b3c4d5e66', 'IMG_0044.MOV'),
+    ],
+    // The first is keyed by file_id; the second only by file name (older stats).
+    statsKeys: ['3f2b8c1e-9a4d-4e6b-8f10-7c5d2a9e1b34', 'IMG_0043.MOV'],
+  });
+
+  const row = (name: string) => page.locator('[data-source-video-row]', { hasText: name });
+  await expect(row('IMG_0042.MOV')).toContainText('✓ Analyzed');
+  await expect(row('IMG_0043.MOV')).toContainText('✓ Analyzed');
+  await expect(row('IMG_0044.MOV')).toContainText('— Not analyzed');
+});
+
+test('a poster that 404ed recovers once the next analysis completes', async ({ page }) => {
+  await openImportFixture(page, { statsKeys: ['shoreline'], postersReady: false });
+
+  await page.getByRole('button', { name: 'Thumbs' }).click();
+  const card = page.locator('.source-video-card', { hasText: 'Shoreline sunrise.MP4' });
+  await expect(card.locator('.source-video-poster')).toHaveText('MP4');
+  await expect(card.locator('.source-video-poster img')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Analyze 2 videos' }).click();
+  await expect(page.getByRole('button', { name: 'Abort' })).toBeVisible();
+  // The new frames exist now; completing the analysis retries the poster.
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/posters-ready'));
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+  const poster = card.locator('.source-video-poster img');
+  await expect(poster).toBeVisible();
+  await expect
+    .poll(() => poster.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+});
+
+test('a poster request from before re-analysis cannot fail the new results when its 404 arrives late', async ({ page }) => {
+  await openImportFixture(page, { statsKeys: ['shoreline'], holdPosters: true });
+
+  await page.getByRole('button', { name: 'Thumbs' }).click();
+  const card = page.locator('.source-video-card', { hasText: 'Shoreline sunrise.MP4' });
+  await expect(card.locator('.source-video-poster img')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Analyze 2 videos' }).click();
+  await expect(page.getByRole('button', { name: 'Abort' })).toBeVisible();
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+  await expect(page.getByText('Analysis complete. Head to Review to see clip candidates.')).toBeVisible();
+
+  // Only now do the held requests answer: the old one 404s, the new one succeeds.
+  await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/poster-flush'));
+  const poster = card.locator('.source-video-poster img');
+  await expect(poster).toBeVisible();
+  await expect
+    .poll(() => poster.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+});
+
+test('a terminal poll clears the run marks at once and a late first request cannot clear a newer run', async ({ page }) => {
+  await openImportFixture(page, {
+    progressFiles: [
+      { file_name: 'Shoreline sunrise.MP4', video_index: 1 },
+      { file_name: 'Valley pass.MOV', video_index: 2 },
+    ],
+  });
+  const row = (name: string) => page.locator('[data-source-video-row]', { hasText: name });
+  const flag = (path: string) => page.evaluate((url) => fetch(`http://127.0.0.1:8000${url}`), path);
+
+  await page.getByRole('button', { name: 'Analyze all 3' }).click();
+  await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
+  await expect(row('Valley pass.MOV')).toContainText('Running');
+
+  // The poll reports the run cancelled while its request is still pending.
+  await flag('/__test/status-override?phase=cancelled');
+  await expect(row('Shoreline sunrise.MP4')).toContainText('— Not analyzed');
+  await expect(page.getByRole('checkbox', { name: 'Select Shoreline sunrise.MP4' })).toBeChecked();
+  await flag('/__test/status-override?phase=');
+
+  // A retry starts a second run; the first request then settles late.
+  await page.getByRole('button', { name: 'Analyze all 3' }).click();
+  await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
+  await expect(row('Valley pass.MOV')).toContainText('Running');
+  await flag('/__test/release-analysis?which=first&empty=1');
+  await expect(page.getByText('Analysis complete. Head to Review to see clip candidates.')).toBeVisible();
+  await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
+  await flag('/__test/release-analysis');
 });
 
 test('selection bar selects and deselects the complete source set', async ({ page }) => {

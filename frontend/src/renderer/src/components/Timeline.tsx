@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -187,6 +188,14 @@ export function Timeline({
       return clamped;
     });
   }, [totalDuration]);
+
+  // The timecode span has no React children: paintPlayhead overwrites its
+  // textContent during playback, which would orphan React-managed text nodes.
+  useLayoutEffect(() => {
+    if (timecodeRef.current) {
+      timecodeRef.current.textContent = `${formatClock(playheadRef.current)} / ${formatClock(totalDuration)}`;
+    }
+  }, [playhead, totalDuration]);
 
   const paintPlayhead = useCallback((timelineSec: number) => {
     playheadRef.current = timelineSec;
@@ -672,9 +681,7 @@ export function Timeline({
             ▶
           </button>
           <PreviewAudioControl anySourceHasAudio={anySourceHasAudio} />
-          <span className="timecode" ref={timecodeRef}>
-            {formatClock(playhead)} / {formatClock(totalDuration)}
-          </span>
+          <span className="timecode" ref={timecodeRef} />
           {currentSegment && (
             <span className="timeline-current" title={currentSegment.fileName}>
               {currentSegment.fileName}

@@ -815,6 +815,27 @@ test('forward play is video-driven: monotonic advance, stable src, zero seeking 
   expect(seekCount, 'video must not be hard-seeked during steady forward play').toBe(0);
 });
 
+test('transport clock keeps following Timeline edits after play and stop', async ({ page }) => {
+  const { projectId } = await setupTimeline(page, [fixtureA()]);
+  const items = await replaceWithItems(page, projectId, [
+    { offset: 0, duration: 4, speed: 1 },
+    { offset: 4, duration: 2, speed: 1 },
+  ]);
+  const clock = page.locator('.timeline-toolbar .timecode');
+  await expect(clock).toHaveText(/ \/ 0:06\.0$/);
+
+  await page.getByTestId('transport-play').click();
+  await expect(clock).not.toHaveText(/^0:00\.0 /);
+  await page.getByTestId('transport-stop').click();
+
+  // Playback painted the clock imperatively; later edits must still reach it.
+  await postTimelineOperation(page, projectId, 'set_speed', { item_id: items[0].item_id, speed: 2 });
+  await expect(clock).toHaveText(/ \/ 0:04\.0$/);
+
+  await postTimelineOperation(page, projectId, 'remove_item', { item_id: items[1].item_id });
+  await expect(clock).toHaveText(/ \/ 0:02\.0$/);
+});
+
 /** Find the index of the first Timeline Item whose visible file name differs
  * from the first item's — i.e. the actual Source Video boundary — rather
  * than assuming the boundary sits between item 0 and item 1. */

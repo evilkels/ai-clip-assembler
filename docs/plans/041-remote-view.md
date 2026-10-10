@@ -181,7 +181,7 @@ These corrections replace the stale draft's claims:
 
 ## Phase 1: Secure connection, verified upload, see what the Mac is doing
 
-- [ ] 1.1 Add `backend/src/durable_io.py` with `write_text_atomic(path, text)` and route every JSON write through it. Done when `backend/tests/test_durable_io.py` makes `os.fsync` and `os.replace` raise and shows the previous file byte-identical, no temp file left behind and the error raised, and `test_project_store.py` and `test_app_settings.py` pass.
+- [x] 1.1 Add `backend/src/durable_io.py` with `write_text_atomic(path, text)` and route every JSON write through it. Done when `backend/tests/test_durable_io.py` makes `os.fsync` and `os.replace` raise and shows the previous file byte-identical, no temp file left behind and the error raised, and `test_project_store.py` and `test_app_settings.py` pass.
   - The write goes to a sibling temp file, then write, flush, `os.fsync` (`fcntl.F_FULLFSYNC` on macOS when available), `os.replace`, and an fsync of the parent directory. Errors propagate (§6.2).
   - Callers: `project_store.py` `write_project_manifest` (:197), `write_analysis_results` (:256), `write_frame_scores` (:287), `write_review_session` (:314), `write_timeline_document` (:384), and `app_settings.py:88`.
 - [ ] 1.2 Commit before acknowledging. Done when `test_timeline_ops.py` and `test_timeline_service.py` show a raising writer leaves `document`, `revision`, the undo stack and the redo stack unchanged and publishes no event, and `test_api.py` shows `POST /timeline/op` returns 500 with "Couldn't save the Timeline" in that case.

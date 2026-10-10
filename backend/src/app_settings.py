@@ -17,6 +17,8 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+from .durable_io import write_text_atomic
+
 # Persisted alongside project state (relative to the backend working directory,
 # matching how PROJECTS_DIR is rooted).
 SETTINGS_FILE = Path(".ai-clip-assembler/settings.json")
@@ -85,7 +87,5 @@ def update_settings(changes: dict) -> dict:
             overrides[key] = value
         _overrides = overrides
         SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        SETTINGS_FILE.write_text(
-            json.dumps(overrides, indent=2) + "\n", encoding="utf-8"
-        )
+        write_text_atomic(SETTINGS_FILE, json.dumps(overrides, indent=2) + "\n")
     return get_settings()

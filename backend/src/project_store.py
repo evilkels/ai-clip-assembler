@@ -9,6 +9,7 @@ from typing import Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from .durable_io import write_text_atomic
 from .models import CreativeVersion, ReviewSession, TimelineDocument, TimelineItem, VersionSet
 from .review_state import sequence_fingerprint
 
@@ -195,9 +196,9 @@ def open_project(project_folder: Path) -> ProjectManifest:
 
 
 def write_project_manifest(project_folder: Path, manifest: ProjectManifest) -> None:
-    project_manifest_path(project_folder).write_text(
+    write_text_atomic(
+        project_manifest_path(project_folder),
         manifest.model_dump_json(indent=2) + "\n",
-        encoding="utf-8",
     )
 
 
@@ -253,7 +254,7 @@ def write_analysis_results(
     }
     path = analysis_results_path(project_folder)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_text_atomic(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_analysis_results(project_folder: Path) -> Optional[dict]:
@@ -284,7 +285,7 @@ def write_frame_scores(project_folder: Path, per_file: dict) -> None:
     }
     path = frame_scores_path(project_folder)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_text_atomic(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_frame_scores(project_folder: Path) -> Optional[dict]:
@@ -311,7 +312,7 @@ def review_session_path(project_folder: Path) -> Path:
 def write_review_session(project_folder: Path, session: ReviewSession) -> None:
     path = review_session_path(project_folder)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(session.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    write_text_atomic(path, session.model_dump_json(indent=2) + "\n")
 
 
 def read_review_session(project_folder: Path) -> Optional[ReviewSession]:
@@ -381,7 +382,7 @@ def write_timeline_document(project_folder: Path, document: TimelineDocument) ->
     """Persist the backend-authoritative Timeline Document for a project."""
     path = timeline_document_path(project_folder)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(document.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    write_text_atomic(path, document.model_dump_json(indent=2) + "\n")
 
 
 def read_timeline_document(project_folder: Path) -> Optional[TimelineDocument]:

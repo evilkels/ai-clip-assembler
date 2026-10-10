@@ -63,8 +63,7 @@ from .project_store import (
     project_state_dir,
     read_analysis_results,
     read_frame_scores,
-    rescan_project,
-    write_project_manifest,
+    project_manifest_path,
     write_analysis_results,
     write_frame_scores,
     write_timeline_document,
@@ -77,6 +76,7 @@ from .review_agent import (
     run_editor_script,
     run_review_turn,
 )
+from .project_service import ProjectLockedError, ProjectService
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
     SourceClip,
@@ -147,6 +147,7 @@ async def write_runtime_on_startup():
     )
 
 projects = {}
+project_service = ProjectService(projects, opener=lambda folder: open_folder_project(folder))
 PROJECTS_DIR = Path(".ai-clip-assembler/projects")
 VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 _active_project_id: Optional[str] = None
@@ -262,11 +263,63 @@ async def create_project():
     return {"project_id": project_id}
 
 
+def _folder_open_payload(project_id: str) -> dict:
+    project = projects[project_id]
+    return {
+        "project_id": project_id,
+        "project_folder": project["project_folder"],
+        "project": project["project"],
+        "videos": project["videos"],
+        "clips": project["clips"],
+        "timeline": project["timeline"],
+        "selected_harness": project["selected_harness"],
+        "effective_harness": project.get("harness_id"),
+        "generation_stats": project.get("generation_stats"),
+    }
+
+
+def open_folder_project(folder_path: Path) -> str:
+    """Open (or create) a folder Project and return its single runtime ID.
+
+    The same folder, however it is reached (symlink, ``..``, trailing slash),
+    resolves to one runtime Project instead of minting a new one per open.
+    """
+    existing = project_service.find_open(folder_path)
+    if existing is not None:
+        return existing
+    if project_manifest_path(folder_path).exists():
+        project_service.acquire_folder(folder_path)
+    manifest = create_or_open_folder_project(folder_path)
+    project_service.acquire_folder(folder_path)
+
+    project_id = str(uuid.uuid4())
+    videos = videos_from_manifest(folder_path, manifest)
+    restored = read_analysis_results(folder_path)
+    frame_scores = read_frame_scores(folder_path)
+    projects[project_id] = {
+        "project_id": project_id,
+        "project_folder": str(folder_path),
+        "project": manifest.model_dump(),
+        "videos": videos,
+        "clips": restored["clips"] if restored else [],
+        "timeline": restored.get("timeline") if restored else None,
+        "cloud_ai_consent": manifest.cloud_ai_consent,
+        "selected_harness": manifest.harness,
+        "harness_id": restored.get("harness_id") if restored else None,
+        "frame_scores": frame_scores,
+        "generation_stats": restored.get("generation_stats") if restored else None,
+    }
+    _proposal_store.configure_project(project_id, folder_path)
+    return project_id
+
+
 @app.post("/projects/from-folder")
 async def create_project_from_folder(request: ProjectFolderRequest):
     folder_path = Path(request.folder_path).expanduser()
     try:
-        manifest = create_or_open_folder_project(folder_path)
+        project_id = open_folder_project(folder_path)
+    except ProjectLockedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except NoSourceVideosFoundError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ProjectFolderNotWritableError as exc:
@@ -279,39 +332,7 @@ async def create_project_from_folder(request: ProjectFolderRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ProjectStoreError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    project_id = str(uuid.uuid4())
-    videos = videos_from_manifest(folder_path, manifest)
-    restored = read_analysis_results(folder_path)
-    frame_scores = read_frame_scores(folder_path)
-    clips = restored["clips"] if restored else []
-    timeline = restored.get("timeline") if restored else None
-    generation_stats = restored.get("generation_stats") if restored else None
-    projects[project_id] = {
-        "project_id": project_id,
-        "project_folder": str(folder_path),
-        "project": manifest.model_dump(),
-        "videos": videos,
-        "clips": clips,
-        "timeline": timeline,
-        "cloud_ai_consent": manifest.cloud_ai_consent,
-        "selected_harness": manifest.harness,
-        "harness_id": restored.get("harness_id") if restored else None,
-        "frame_scores": frame_scores,
-        "generation_stats": generation_stats,
-    }
-    _proposal_store.configure_project(project_id, folder_path)
-    return {
-        "project_id": project_id,
-        "project_folder": str(folder_path),
-        "project": manifest.model_dump(),
-        "videos": videos,
-        "clips": clips,
-        "timeline": timeline,
-        "selected_harness": manifest.harness,
-        "effective_harness": restored.get("harness_id") if restored else None,
-        "generation_stats": generation_stats,
-    }
+    return _folder_open_payload(project_id)
 
 
 @app.put("/projects/{project_id}/cloud-ai-consent")
@@ -323,14 +344,17 @@ async def update_cloud_ai_consent(project_id: str, request: CloudAiConsentReques
     manifest_payload = project.get("project")
     if project.get("project_folder") and manifest_payload:
         try:
-            manifest = create_or_open_folder_project(Path(project["project_folder"]))
-            updated = manifest.model_copy(update={"cloud_ai_consent": request.consented})
-            write_project_manifest(Path(project["project_folder"]), updated)
+            project_service.update_manifest(
+                project_id,
+                lambda manifest: manifest.model_copy(
+                    update={"cloud_ai_consent": request.consented}
+                ),
+                create_if_missing=True,
+            )
         except ProjectStoreError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (FileNotFoundError, NotADirectoryError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        project["project"] = updated.model_dump()
 
     project["cloud_ai_consent"] = request.consented
 
@@ -346,10 +370,11 @@ def persist_selected_harness(project_id: str, harness_id: str) -> None:
     project = projects[project_id]
     folder = project.get("project_folder")
     if folder:
-        manifest = create_or_open_folder_project(Path(folder))
-        updated = manifest.model_copy(update={"harness": harness_id})
-        write_project_manifest(Path(folder), updated)
-        project["project"] = updated.model_dump()
+        project_service.update_manifest(
+            project_id,
+            lambda manifest: manifest.model_copy(update={"harness": harness_id}),
+            create_if_missing=True,
+        )
     project["selected_harness"] = harness_id
 
 
@@ -392,7 +417,7 @@ async def rescan_project_sources(project_id: str):
 
     folder_path = Path(project["project_folder"])
     try:
-        manifest = rescan_project(folder_path)
+        manifest = project_service.rescan(project_id)
     except ProjectStoreError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -417,7 +442,9 @@ async def delete_project_owned_files(project_id: str):
     if not project.get("project_folder"):
         raise HTTPException(status_code=400, detail="Delete project files is only available for folder projects")
 
-    deleted = delete_project_files(Path(project["project_folder"]))
+    with project_service.lock(project_id):
+        deleted = delete_project_files(Path(project["project_folder"]))
+    project_service.release_folder(Path(project["project_folder"]))
     global _active_project_id
     if _active_project_id == project_id:
         _active_project_id = None
@@ -1831,13 +1858,14 @@ def persist_project_results(project_id: str) -> None:
     if not project or not project.get("project_folder"):
         return
     try:
-        write_analysis_results(
-            Path(project["project_folder"]),
-            harness_id=project.get("harness_id") or "manual",
-            clips=project.get("clips", []),
-            timeline=project.get("timeline"),
-            generation_stats=project.get("generation_stats"),
-        )
+        with project_service.lock(project_id):
+            write_analysis_results(
+                Path(project["project_folder"]),
+                harness_id=project.get("harness_id") or "manual",
+                clips=project.get("clips", []),
+                timeline=project.get("timeline"),
+                generation_stats=project.get("generation_stats"),
+            )
     except OSError as exc:
         logger.warning("Could not persist analysis results for %s: %s", project_id, exc)
         raise ProjectSaveError() from exc

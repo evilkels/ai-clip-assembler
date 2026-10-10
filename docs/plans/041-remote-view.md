@@ -192,7 +192,7 @@ These corrections replace the stale draft's claims:
   - Add `ProjectManifest.project_uuid`. `ProjectSourceVideo` gains `source_uuid`, `size_bytes`, `sha256: Optional[str]`, `fingerprint {size, mtime_ns, inode}` and `provenance: Optional[UploadProvenance]` (fields per §4.2).
   - Older versions load, get UUIDs, and are rewritten atomically when the folder is writable.
   - The desktop `file_id` stays the filename (`api.py:1680`). Remote routes expose only `source_uuid`.
-- [ ] 1.4 Add `backend/src/project_service.py`: one owner per canonical Project root. Done when tests show the same folder opened through a symlink returns the same `project_id`, a rescan and an ingest committing from two threads both survive in the manifest, and a second process holding the folder gets 409.
+- [x] 1.4 Add `backend/src/project_service.py`: one owner per canonical Project root. Done when tests show the same folder opened through a symlink returns the same `project_id`, a rescan and an ingest committing from two threads both survive in the manifest, and a second process holding the folder gets 409.
   - `create_project_from_folder` (`api.py:245`) returns the existing runtime `project_id` when `Path.resolve()` of the folder is already open, instead of minting a new one at `:270`.
   - A `threading.RLock` per Project serializes state transitions only, never network I/O or FFmpeg: rescan (`api.py:365`), consent/AI writes (`api.py:297`), selected harness (`api.py:324`), analysis result persistence, delete files (`api.py:392`), and later ingest and render snapshots.
   - An OS lock (`fcntl.flock(LOCK_EX | LOCK_NB)` on `clipassembler/.lock`, held while the Project is open) refuses a second backend: 409 "This Project is open in another copy of the app".

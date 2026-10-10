@@ -10,7 +10,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src import api, review_agent
+from src import api, project_service, review_agent
 from src.clip_assembly import AssemblyPreferences
 from src.frame_extraction import FFmpegUnavailableError
 from src.models import (
@@ -189,7 +189,7 @@ def test_update_cloud_ai_consent_keeps_memory_unchanged_when_persist_fails(monke
     def fail_write(*_args, **_kwargs):
         raise api.ProjectStoreError("manifest write failed")
 
-    monkeypatch.setattr(api, "write_project_manifest", fail_write)
+    monkeypatch.setattr(project_service, "write_project_manifest", fail_write)
 
     response = client.put(
         f"/projects/{project_id}/cloud-ai-consent",

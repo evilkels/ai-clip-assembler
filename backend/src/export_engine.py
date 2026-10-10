@@ -40,7 +40,7 @@ def snap_frame_rate(fps: float) -> float:
 
 
 def seconds_to_timecode(seconds: float, fps: float = 30) -> str:
-    base = int(round(snap_frame_rate(fps)))
+    base = max(1, int(round(snap_frame_rate(fps))))
     total_frames = int(round(seconds * fps_exact(fps)))
     frames = total_frames % base
     total_seconds = total_frames // base
@@ -62,7 +62,7 @@ def _fcpx_frame_duration_parts(fps: float) -> tuple[int, int]:
     ):
         if fps == rate:
             return numerator, denominator
-    rounded = int(round(fps))
+    rounded = max(1, int(round(fps)))
     return 100, 100 * rounded
 
 

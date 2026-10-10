@@ -26,6 +26,7 @@ from src.export_engine import (
     seconds_to_frames,
     seconds_to_timecode,
     snap_frame_rate,
+    timeline_dimensions,
 )
 
 
@@ -1017,3 +1018,27 @@ def test_generate_edl_flattens_speed_instead_of_emitting_retime_commands():
 def test_generate_edl_notes_flattening_when_transform_present():
     edl = generate_edl("T", [_transform_clip(scale=1.4)], fps=30)
     assert "flatten" in edl.lower()
+
+
+def test_choose_timeline_fps_majority_counts_timeline_items_not_max_rate():
+    videos = {
+        "pal": {"metadata": {"fps": 25}},
+        "fast": {"metadata": {"fps": 60}},
+    }
+    clips = [{"file_id": "pal"}, {"file_id": "pal"}, {"file_id": "pal"}, {"file_id": "fast"}]
+
+    assert choose_timeline_fps(videos, clips) == 25
+
+
+def test_timeline_dimensions_follow_the_first_timeline_source_not_the_first_project_source():
+    videos = {
+        "unused-landscape": {"metadata": {"display_resolution": [1920, 1080]}},
+        "iphone-portrait": {"metadata": {"display_resolution": [1080, 1920]}},
+    }
+
+    assert timeline_dimensions(videos, [{"file_id": "iphone-portrait"}]) == [1080, 1920]
+
+
+def test_sub_one_fps_rates_keep_a_nonzero_frame_base():
+    assert seconds_to_timecode(30.4, fps=0.25) == "00:00:30:00"
+    assert fcpx_frame_duration(0.25) == 1

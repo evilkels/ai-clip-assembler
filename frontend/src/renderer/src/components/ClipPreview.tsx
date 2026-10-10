@@ -11,6 +11,8 @@ interface ClipPreviewProps {
   endSec: number;
   /** Names the video and captions it in-frame; omit when the owner shows the name itself. */
   label?: string;
+  /** Accessible name for the video; falls back to `label`. */
+  ariaLabel?: string;
   currentTimeSec?: number;
   playing?: boolean;
   loop?: boolean;
@@ -47,6 +49,7 @@ export function ClipPreview({
   startSec,
   endSec,
   label,
+  ariaLabel,
   currentTimeSec,
   playing = false,
   loop = true,
@@ -168,7 +171,7 @@ export function ClipPreview({
         muted={muted}
         preload="metadata"
         playsInline
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
         style={{ transform: scale !== 1 ? `scale(${scale})` : undefined }}
         onLoadedMetadata={(event) => {
           if (!seek) event.currentTarget.currentTime = targetTime;

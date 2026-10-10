@@ -226,6 +226,11 @@ test('portrait source: Suggested-cut players are tall and carry no in-video titl
   // The title renders once, under the player; the ▶ button has nothing to overlap.
   await expect(page.locator('.version-player .clip-preview-label')).toHaveCount(0);
   await expect(page.getByTestId('version-card').first().locator('.version-card-heading strong')).toHaveText('Walk and Talk');
+  // Dropping the visual label must not drop the video's accessible name.
+  const cards = page.getByTestId('version-card');
+  for (const [index, title] of ['Walk and Talk', 'Quick Cut'].entries()) {
+    await expect(cards.nth(index).locator('.version-player video')).toHaveAttribute('aria-label', title);
+  }
 });
 
 test('landscape source: Suggested-cut players stay 16:9', async ({ page }) => {
@@ -252,6 +257,29 @@ test('landscape source: Timeline preview is 16:9', async ({ page }) => {
   await expect(page.getByTestId('timeline-preview-stage')).toBeVisible();
   await expectAspect(page, '.timeline-preview .clip-preview', 16 / 9);
 });
+
+for (const orientation of ['landscape', 'portrait'] as const) {
+  test(`${orientation} source: a tall stored preview in a narrow window keeps the outline at the source aspect`, async ({ page }) => {
+    // Tall and narrow enough that the 720px preview row is wider than the
+    // Timeline column: the width-bound case. (Below 1100px the layout stacks
+    // and the stored height no longer survives, so stay above that.)
+    await page.setViewportSize({ width: 1150, height: 1500 });
+    await page.addInitScript(() =>
+      localStorage.setItem('ai-clip-assembler:timeline-preview-height:v1', '720'),
+    );
+    await openFixture(page, orientation, 'timeline-selection', '/timeline');
+    await expect(page.getByTestId('timeline-preview-stage')).toBeVisible();
+    const target = orientation === 'landscape' ? 16 / 9 : 9 / 16;
+    await expectAspect(page, '.timeline-preview .clip-preview', target);
+    expect((await boxOf(page, '.timeline-preview')).height).toBeGreaterThan(700);
+    const preview = await boxOf(page, '.timeline-preview .clip-preview');
+    const stage = await boxOf(page, '.timeline-preview');
+    expect(preview.left).toBeGreaterThanOrEqual(stage.left);
+    expect(preview.right).toBeLessThanOrEqual(stage.right);
+    expect(preview.top).toBeGreaterThanOrEqual(stage.top);
+    expect(preview.bottom).toBeLessThanOrEqual(stage.bottom);
+  });
+}
 
 for (const theme of ['light', 'dark'] as const) {
   test(`All items rail shows filenames and every control without sideways scrolling · ${theme}`, async ({ page }) => {

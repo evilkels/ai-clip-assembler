@@ -58,6 +58,7 @@ export function VersionPlayer({
           {...player.previewProps}
           playing={playing}
           scale={scale}
+          ariaLabel={version.title}
           testId={`${testId}-video`}
         />
         {onExpand ? (

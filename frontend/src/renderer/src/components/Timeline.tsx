@@ -623,16 +623,21 @@ export function Timeline({
             '--timeline-preview-height': `${previewHeight}px`,
           } as CSSProperties}
         >
-          <ClipPreview
-            {...previewProps}
-            label={previewSegment.fileName}
-            aspect={previewAspect}
-            scale={previewSegment.scale}
-            testId="timeline-preview-video"
-            muted={previewMuted}
-            volume={volume}
-            onAudioBlocked={() => setMuted(true)}
-          />
+          <div
+            className="timeline-preview-frame"
+            style={{ '--preview-aspect': previewAspect } as CSSProperties}
+          >
+            <ClipPreview
+              {...previewProps}
+              label={previewSegment.fileName}
+              aspect={previewAspect}
+              scale={previewSegment.scale}
+              testId="timeline-preview-video"
+              muted={previewMuted}
+              volume={volume}
+              onAudioBlocked={() => setMuted(true)}
+            />
+          </div>
           <div className="timeline-preview-meta">
               <SourceAudioBadge hasAudio={previewAudio.hasAudio} channels={previewAudio.channels} />
               <strong

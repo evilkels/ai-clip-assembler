@@ -3355,21 +3355,33 @@ a {
   background: #05070a;
 }
 
-.timeline-preview .clip-preview,
-.timeline-preview .clip-preview video {
+.timeline-preview-frame {
+  /* The picture row is a size container so the outline can be the largest box
+     of the sequence's aspect that fits it, whichever side is the tighter one. */
+  container-type: size;
+  display: grid;
+  place-items: center;
+  width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
 }
 
 .timeline-preview .clip-preview {
-  /* aspect-ratio is set inline from the first clip's source, so the outline
-     hugs the picture for portrait and landscape alike. */
-  width: auto;
-  max-width: 100%;
+  /* aspect-ratio is set inline and --preview-aspect on the frame, both from the
+     first clip's source, so the outline hugs the picture for portrait and
+     landscape alike. */
+  width: min(100cqw, calc(100cqh * var(--preview-aspect, 16 / 9)));
+  height: auto;
+  min-height: 0;
   border-radius: var(--radius-lg);
 }
 
 .timeline-preview .clip-preview video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   aspect-ratio: auto;
 }
 
@@ -3626,7 +3638,9 @@ a {
 
 .tl-clip-dur {
   font-size: 10px;
-  color: var(--text-muted);
+  /* --text-dim holds >= 4.5:1 against both ends of the block gradient in both
+     themes; --text-muted does not. */
+  color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 

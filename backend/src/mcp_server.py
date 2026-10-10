@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from typing import Callable, List, Optional
 
-from .timeline_ops import OPERATIONS, TimelineController, TimelineOpError
+from .timeline_ops import OPERATIONS, TimelineController, TimelineOpError, TimelinePersistError
 
 
 SERVER_NAME = "ai-clip-assembler"
@@ -148,7 +148,7 @@ class TimelineMCPServer:
                 clip_id = args.get("clip_id")
                 return _text_result(self._list_frame_paths(project_id, clip_id))
             return _text_result(f"unknown tool: {name}", is_error=True)
-        except TimelineOpError as exc:
+        except (TimelineOpError, TimelinePersistError) as exc:
             return _text_result(str(exc), is_error=True)
         except KeyError as exc:
             return _text_result(f"not found: {exc}", is_error=True)

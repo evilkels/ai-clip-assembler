@@ -16,7 +16,7 @@ from typing import Awaitable, Callable, Dict, Mapping, Optional, Set
 
 from .models import TimelineDocument
 from .review_state import review_context_fingerprint, sequence_fingerprint
-from .timeline_ops import SourceClip, TimelineController
+from .timeline_ops import SourceClip, TimelineController, TimelinePersistError
 
 
 TIMELINE_CHANGED = "timeline-changed"
@@ -97,6 +97,7 @@ class TimelineLifecycle:
                 document,
                 sources,
                 on_change=self._make_on_change(project_id),
+                persist=self._make_persist(project_id),
             )
             self._controllers[project_id] = controller
         else:
@@ -128,11 +129,20 @@ class TimelineLifecycle:
     def unsubscribe(self, project_id: str, queue: "asyncio.Queue[dict]") -> None:
         self._broker.unsubscribe(project_id, queue)
 
+    def _make_persist(self, project_id: str):
+        def persist(document: TimelineDocument) -> None:
+            project = self._project_lookup(project_id)
+            if project is None:
+                return
+            try:
+                self._document_writer(project, document)
+            except OSError as exc:
+                raise TimelinePersistError() from exc
+
+        return persist
+
     def _make_on_change(self, project_id: str) -> OnChange:
         async def on_change(document: TimelineDocument) -> None:
-            project = self._project_lookup(project_id)
-            if project is not None:
-                self._document_writer(project, document)
             await self._broker.publish(
                 project_id,
                 {"type": TIMELINE_CHANGED, "version": document.version},

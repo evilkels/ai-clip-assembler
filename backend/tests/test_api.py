@@ -3332,3 +3332,44 @@ def test_enrich_clips_refreshes_capture_time_from_source_metadata():
 
     assert clips[0]["source_created_at"] == "2026-10-10T10:58:12.000000Z"
     assert clips[1]["source_created_at"] == "2026-10-10T16:02:53.000000Z"
+
+
+def test_timeline_op_persist_failure_returns_500_and_changes_nothing(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+    assert _op(client, project_id, "include", clip_id="clip-1").status_code == 200
+    queue = api._timeline_lifecycle.subscribe(project_id)
+    while not queue.empty():
+        queue.get_nowait()
+
+    def boom(_folder, _document):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(api, "write_timeline_document", boom)
+    response = _op(client, project_id, "include", clip_id="clip-2")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Couldn't save the Timeline"
+    document = client.get(f"/projects/{project_id}/timeline/document").json()["document"]
+    assert document["revision"] == 1
+    assert [item["source_clip_id"] for item in document["items"]] == ["clip-1"]
+    assert queue.empty()
+    undo = client.post(f"/projects/{project_id}/timeline/undo")
+    assert undo.status_code == 500
+
+
+def test_persist_project_results_failure_is_a_500_not_a_log_line(monkeypatch, tmp_path):
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+
+    def boom(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(api, "write_analysis_results", boom)
+    response = client.put(
+        f"/projects/{project_id}/timeline",
+        json={"clips": [{"clip_id": "clip-1", "start_sec": 1.0, "end_sec": 4.0}], "decisions": {}},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Couldn't save the Project results"

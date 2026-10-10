@@ -20,7 +20,7 @@ from typing import List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 # Load repo-root .env before harness imports: PI_* are read at import time.
@@ -82,6 +82,7 @@ from .timeline_ops import (
     SourceClip,
     TimelineController,
     TimelineOpError,
+    TimelinePersistError,
     TimelineRevisionConflict,
 )
 from .timeline_service import TimelineLifecycle
@@ -112,6 +113,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class ProjectSaveError(Exception):
+    """A Project file could not be written; the route answers 500."""
+
+    MESSAGE = "Couldn't save the Project results"
+
+    def __init__(self, message: str = MESSAGE) -> None:
+        super().__init__(message)
+
+
+@app.exception_handler(ProjectSaveError)
+async def project_save_error_handler(_request, exc: ProjectSaveError):
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@app.exception_handler(TimelinePersistError)
+async def timeline_persist_error_handler(_request, exc: TimelinePersistError):
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.on_event("startup")
@@ -993,14 +1013,15 @@ def _initial_timeline_document(project: dict, sources: dict[str, SourceClip]) ->
 
 
 def _write_timeline_for_project(project: dict, document: TimelineDocument) -> None:
-    project["timeline_document"] = document.model_dump()
+    """Save the document durably, then mirror it in memory.
+
+    A write error propagates (the controller turns it into
+    ``TimelinePersistError``), and memory only changes after the file did.
+    """
     folder = project.get("project_folder")
     if folder:
-        try:
-            write_timeline_document(Path(folder), document)
-        except OSError as exc:
-            project_id = project.get("project_id", "unknown")
-            logger.warning("Could not persist timeline document for %s: %s", project_id, exc)
+        write_timeline_document(Path(folder), document)
+    project["timeline_document"] = document.model_dump()
 
 
 _timeline_lifecycle = TimelineLifecycle(
@@ -1804,7 +1825,8 @@ def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:
 def persist_project_results(project_id: str) -> None:
     """Write clips + timeline to <project>/clipassembler/analysis/results.json
     so re-opening a folder project restores the Review Board. No-op for
-    legacy upload projects, which have no folder to persist into."""
+    legacy upload projects, which have no folder to persist into. A failed
+    write raises ``ProjectSaveError`` (mapped to a 500 by the app handler)."""
     project = projects.get(project_id)
     if not project or not project.get("project_folder"):
         return
@@ -1818,6 +1840,7 @@ def persist_project_results(project_id: str) -> None:
         )
     except OSError as exc:
         logger.warning("Could not persist analysis results for %s: %s", project_id, exc)
+        raise ProjectSaveError() from exc
 
 
 def project_work_dir(project_id: str) -> Path:

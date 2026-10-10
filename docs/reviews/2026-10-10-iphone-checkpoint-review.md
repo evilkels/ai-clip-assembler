@@ -41,3 +41,6 @@ Resume by writing the task 5.1 retest addendum from the preserved evidence, chec
 ## PR-quality follow-up
 
 The missing Phase 5 addendum was subsequently written from the saved evidence in the [original report](2026-10-10-iphone-footage-test.md#phase-5-retest-addendum--2026-10-10), including every original finding and its verification limit. Task 5.1 is now checked in PR #107; progress is 11/14 implementation tasks, with both human checks open. The saved FCPXML was revalidated against the 1.10 DTD. Earlier checkpoint counts above describe the state at takeover.
+
+
+Regression proof: `PYTHONPATH=. <python> -m pytest tests/test_review_agent.py -k chronological_versions -q` with the PR tests copied into an isolated `89118ea` checkout produced two failures: the old fallback has no capture-time input and its filename fallback opens with `IMG_1029.mov` instead of `IMG_1022.mov`. The same two tests passed on the PR branch (2 passed, 25 deselected). The temporary checkout is removed after this proof.

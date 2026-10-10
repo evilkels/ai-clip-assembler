@@ -291,7 +291,7 @@ These corrections replace the stale draft's claims:
     - An analysis thread's progress reaches a remote subscriber.
     - Revoke closes that device's stream with `revoked`.
 - [ ] 1.11 Add `frontend/src/main/tailscaleCli.ts` and `frontend/src/main/remoteViewController.ts` for Serve ownership. Done when `frontend/tests/main/remoteViewController.test.ts` runs against a fake CLI and shows the cases below.
-  - Checkpoint 2026-10-10: controller, CLI wrapper and fake-CLI tests saved unchanged in `e0d3d4a`; task remains open pending independent testing and review. Resume at 1.11, then 1.12; later phases remain open.
+  - Checkpoint 2026-10-10 (draft PR #108): controller, CLI wrapper and fake-CLI tests saved unchanged in `e0d3d4a`; task remains open. [Independent review and test record](../reviews/2026-10-10-remote-view-checkpoint.md) lists five distinct implementation findings and three failing controller tests. Resume at 1.11 and the recorded findings, then 1.12; later phases remain open.
   - Locate the CLI in order: `/Applications/Tailscale.app/Contents/MacOS/Tailscale`, `/opt/homebrew/bin/tailscale`, `/usr/local/bin/tailscale`. Run it with `execFile`, fixed argv and a 10 s timeout.
   - From `status --json`: `BackendState === "Running"`, `Self.DNSName` without the trailing dot, and the owner login from `User[Self.UserID].LoginName`.
   - Preflight from `serve status --json`: refuse if `<host>:8448` has any handler except one matching the owner record, or `AllowFunnel["<host>:8448"]` is true. Use the 1.2 copy.

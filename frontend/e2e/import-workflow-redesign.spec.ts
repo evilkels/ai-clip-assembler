@@ -27,7 +27,10 @@ const videos = [
 
 async function openImportFixture(
   page: Page,
-  options: { progressFiles?: Array<{ file_name: string; video_index: number }> } = {},
+  options: {
+    progressFiles?: Array<{ file_name: string; video_index: number }>;
+    statsFileNames?: string[];
+  } = {},
 ): Promise<void> {
   let analysisStarted = false;
   let analysisCancelled = false;
@@ -64,8 +67,37 @@ async function openImportFixture(
             settings_overrides: {},
           },
           videos,
-          generation_stats: null,
+          generation_stats: options.statsFileNames
+            ? {
+                per_file: Object.fromEntries(
+                  options.statsFileNames.map((name) => [name, {
+                    candidates_generated: 0,
+                    candidates_kept: 0,
+                    scenes_total: 0,
+                    scenes_at_cap: 0,
+                    preferences: {},
+                  }]),
+                ),
+                totals: { candidates_generated: 0, candidates_kept: 0, scenes_total: 0, scenes_at_cap: 0, videos: 2 },
+                preferences: {},
+              }
+            : null,
         }),
+      });
+      return;
+    }
+    if (url.pathname.endsWith('/poster')) {
+      // Only the shoreline poster renders; the rest 404 like an unavailable frame.
+      if (!url.pathname.includes('/videos/shoreline/')) {
+        await route.fulfill({ status: 404, body: '' });
+        return;
+      }
+      await route.fulfill({
+        contentType: 'image/png',
+        body: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+          'base64',
+        ),
       });
       return;
     }
@@ -280,6 +312,40 @@ test('a finished video reads Analyzed while the rest of the batch is still runni
   await expect(row('Shoreline sunrise.MP4')).toContainText('✓ Analyzed');
   await expect(row('Forest orbit.MP4')).toContainText('— Not analyzed');
   await page.evaluate(() => fetch('http://127.0.0.1:8000/__test/release-analysis'));
+});
+
+test('Thumbs and Compact views span the browser; posters fall back to the file extension', async ({ page }) => {
+  await openImportFixture(page, {
+    statsFileNames: ['Shoreline sunrise.MP4', 'Valley pass.MOV'],
+  });
+
+  const browserWidth = await page.locator('[data-source-video-browser]').evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+
+  await page.getByRole('button', { name: 'Thumbs' }).click();
+  const thumbs = page.locator('[data-view-mode="thumbs"]');
+  await expect(thumbs).toBeVisible();
+  const thumbsWidth = await thumbs.evaluate((element) => element.getBoundingClientRect().width);
+  expect(thumbsWidth).toBeGreaterThan(browserWidth * 0.9);
+
+  const card = (name: string) => page.locator('.source-video-card', { hasText: name });
+  const analyzedPoster = card('Shoreline sunrise.MP4').locator('.source-video-poster img');
+  await expect(analyzedPoster).toHaveAttribute('src', /\/videos\/shoreline\/poster\?at_ms=0$/);
+  await expect
+    .poll(() => analyzedPoster.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  // Poster request failed (404): placeholder shows the real extension.
+  await expect(card('Valley pass.MOV').locator('.source-video-poster')).toHaveText('MOV');
+  // Not analyzed yet: no poster request, extension placeholder.
+  await expect(card('Forest orbit.MP4').locator('.source-video-poster')).toHaveText('MP4');
+  await expect(card('Forest orbit.MP4').locator('.source-video-poster img')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Compact' }).click();
+  const compact = page.locator('[data-view-mode="compact"]');
+  await expect(compact).toBeVisible();
+  const compactWidth = await compact.evaluate((element) => element.getBoundingClientRect().width);
+  expect(compactWidth).toBeGreaterThan(browserWidth * 0.9);
 });
 
 test('selection bar selects and deselects the complete source set', async ({ page }) => {

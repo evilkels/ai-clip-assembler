@@ -485,6 +485,7 @@ export function ImportPage() {
         {hasVideos && (
           <div className="import-workstation" data-import-workstation>
             <SourceVideoBrowser
+              projectId={projectId}
               videos={uploadedVideos}
               analyzedIds={analyzedIds}
               deselected={deselected}

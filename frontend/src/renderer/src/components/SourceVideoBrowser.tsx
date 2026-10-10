@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { SourceVideoSelectionBar } from './SourceVideoSelectionBar';
+import { buildClipPosterUrl } from '../api/client';
 import { formatBytes, formatClock, formatDate } from '../lib/format';
 import {
   isSourceVideoRunning,
@@ -13,6 +14,7 @@ import {
 import type { UploadedVideo } from '../types/clip';
 
 interface Props {
+  projectId: string | null;
   videos: UploadedVideo[];
   analyzedIds: ReadonlySet<string>;
   deselected: ReadonlySet<string>;
@@ -57,11 +59,45 @@ function formatResolution(metadata: NonNullable<UploadedVideo['metadata']>): str
   return `${width}×${height}${height > width ? ' ↕' : ''}`;
 }
 
+function fileExtension(fileName: string): string {
+  const dot = fileName.lastIndexOf('.');
+  return dot > 0 && dot < fileName.length - 1 ? fileName.slice(dot + 1).toUpperCase() : 'VIDEO';
+}
+
+/** Posters exist only after analysis; everything else shows the file extension. */
+function SourceVideoPoster({
+  projectId,
+  video,
+  analyzed,
+}: {
+  projectId: string | null;
+  video: UploadedVideo;
+  analyzed: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="source-video-poster" aria-hidden="true">
+      {projectId && analyzed && !failed ? (
+        <img
+          src={buildClipPosterUrl(projectId, video.file_id, 0)}
+          loading="lazy"
+          decoding="async"
+          alt=""
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span>{fileExtension(video.file_name)}</span>
+      )}
+    </div>
+  );
+}
+
 function sortArrow(sort: SourceVideoSort, key: SourceVideoSortKey): string {
   return sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 }
 
 export function SourceVideoBrowser({
+  projectId,
   videos,
   analyzedIds,
   deselected,
@@ -214,7 +250,12 @@ export function SourceVideoBrowser({
                 className={`source-video-card${checked ? '' : ' is-deselected'}`}
                 data-source-video-row
               >
-                <div className="source-video-poster" aria-hidden="true"><span>MP4</span></div>
+                <SourceVideoPoster
+                  key={`${projectId}:${video.file_id}:${analyzedIds.has(video.file_id)}`}
+                  projectId={projectId}
+                  video={video}
+                  analyzed={analyzedIds.has(video.file_id)}
+                />
                 <div className="source-video-card-head">{selectionBox(video)}<strong title={video.file_name}>{video.file_name}</strong></div>
                 <span>{video.metadata ? formatClock(video.metadata.duration_sec) : 'Pending'} · {analysisLabel(video)}</span>
               </article>

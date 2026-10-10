@@ -23,4 +23,6 @@ A fresh Sol/high CLI reviewer checked Standards and Spec separately. Spec: no fi
 
 ## Served verification
 
-The controller applies only the reviewed `app.js` to the running prototype, preserving a backup first. A fresh live-browser polling check and its result will be recorded below. Physical iPhone confirmation remains plan 043 H1.
+The controller applied the reviewed `app.js` and versioned HTML script reference to the running prototype, preserving backups first. The server caches static assets for an hour; the version query ensures reload requests the repaired script. No server restart or footage/state changes were required.
+
+A live browser at the iPhone viewport (430×932) retained all four original thumbnail nodes over 8.1 seconds of polling: **4/4 retained, zero grid replacements**. The loaded script was `/app.js?v=20261010-refresh`. This checks the actual served app, but uses a desktop browser user agent; physical iPhone confirmation remains plan 043 H1. The dedicated synthetic browser regression also passed after the script-reference change (1 passed).

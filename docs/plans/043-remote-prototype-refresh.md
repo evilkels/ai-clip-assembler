@@ -8,14 +8,14 @@ The owner's screen recording on 2026-10-10 showed periodic thumbnail flicker. Br
 
 The prototype is served from a machine-local directory and is separate from the unfinished production Remote View implementation in [PR #108](https://github.com/evilkels/ai-clip-assembler/pull/108), [plan 041](https://github.com/evilkels/ai-clip-assembler/blob/feat/remote-view/docs/plans/041-remote-view.md). This plan preserves only its browser assets, a synthetic API harness and the refresh regression. It does not import private footage, exports, pairing state or the machine-specific server.
 
-Decisions: compare Project snapshots excluding only `server_time`, retain the complete response as application data, and keep meaningful polling changes observable. Preserve existing design and interactions. The controller may update only the served `app.js` after the tracked fix passes independent review.
+Decisions: compare Project snapshots excluding only `server_time`, retain the complete response as application data, and keep meaningful polling changes observable. Preserve existing design and interactions. The controller may update the served `app.js` and its HTML script-version reference after the tracked fix passes independent review. The version reference ensures a page reload bypasses the prototype's one-hour static-asset cache.
 
 ## Phase 1: Preserve, fix and verify
 
 - [x] 1.1 Preserve the prototype browser assets under `docs/designs/remote-view/prototype/` with a synthetic API harness. Done when it runs without the machine-specific server or private data.
 - [x] 1.2 Ignore server clock changes when deciding whether to repaint. Done when two otherwise identical poll responses retain the same thumbnail nodes.
 - [x] 1.3 Add a browser regression for unchanged polls and meaningful changes. Done when it fails on the pre-fix code, passes after the fix, and a changed decision or progress is rendered.
-- [ ] 1.4 Independently review and verify the served prototype. Done when the original no-change polling loop retains its image nodes and the PR records the checked change and results.
+- [x] 1.4 Independently review and verify the served prototype. Done when the original no-change polling loop retains its image nodes and the PR records the checked change and results.
 
 ## Human tasks
 

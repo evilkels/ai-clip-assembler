@@ -76,6 +76,7 @@ from .review_agent import (
     run_editor_script,
     run_review_turn,
 )
+from .project_events import ProgressGate, analysis_event
 from .project_service import ProjectLockedError, ProjectService
 from .runtime_descriptor import set_active_project, write_runtime_descriptor
 from .timeline_ops import (
@@ -439,6 +440,19 @@ async def rescan_project_sources(project_id: str):
     }
 
 
+@app.get("/projects/{project_id}/sources")
+async def get_project_sources(project_id: str):
+    """The Project's current Source Videos (cheap: the in-memory projection)."""
+    if project_id not in projects:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects[project_id]
+    return {
+        "project_id": project_id,
+        "project": project.get("project"),
+        "videos": project.get("videos", []),
+    }
+
+
 @app.delete("/projects/{project_id}/files")
 async def delete_project_owned_files(project_id: str):
     if project_id not in projects:
@@ -539,12 +553,22 @@ async def get_project_video_poster(
     )
 
 
+def publish_project_event(project_id: str, payload: dict) -> None:
+    """Fan a Project event out to every desktop and phone subscriber (any thread)."""
+    _timeline_lifecycle.publish_threadsafe(project_id, payload)
+
+
+_progress_gate = ProgressGate()
+
+
 def set_analysis_progress(project_id: str, **fields) -> None:
     progress = projects[project_id].setdefault("analysis_progress", {})
     now = time.time()
     progress.setdefault("started_at", now)
     fields.setdefault("updated_at", now)
     progress.update(fields)
+    if _progress_gate.allow(project_id, progress.get("phase")):
+        publish_project_event(project_id, analysis_event(progress))
 
 
 @app.get("/projects/{project_id}/analyze/status")
@@ -1063,6 +1087,9 @@ _timeline_lifecycle = TimelineLifecycle(
     document_writer=_write_timeline_for_project,
     candidate_lister=lambda project_id: get_mcp_server()._list_candidates(project_id),
 )
+
+
+project_events = _timeline_lifecycle
 
 
 def invalidate_timeline_controller(project_id: str) -> None:

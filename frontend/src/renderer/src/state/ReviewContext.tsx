@@ -28,6 +28,7 @@ import {
   removeRecentProject,
   regenerateDraft as requestDraft,
   rederiveClips as requestClipRederive,
+  fetchProjectSources,
   rescanProject,
   subscribeTimelineEvents,
   TimelineRevisionConflictError,
@@ -291,9 +292,18 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   // live in the GUI.
   useEffect(() => {
     if (!projectId) return;
-    const unsubscribe = subscribeTimelineEvents(projectId, () => {
-      void refreshTimelineDocument();
-    });
+    const unsubscribe = subscribeTimelineEvents(
+      projectId,
+      () => {
+        void refreshTimelineDocument();
+      },
+      () => {
+        // Footage arrived (a verified import from a phone): refresh the list.
+        fetchProjectSources(projectId)
+          .then((result) => setUploadedVideos(result.videos))
+          .catch(() => {});
+      },
+    );
     return unsubscribe;
   }, [projectId, refreshTimelineDocument]);
 

@@ -91,6 +91,7 @@ class RemoteHarness:
             project_service=api.project_service,
             projects=api.projects,
             ui_dir=ui_dir,
+            events=api.project_events,
         )
         if uploads is not None:
             self.runtime.uploads = uploads
@@ -197,3 +198,130 @@ class Tus:
     def status(self, upload_id, chunks=False):
         suffix = "?chunks=true" if chunks else ""
         return self.phone.get(f"{self.base}/upload-status/{upload_id}{suffix}")
+
+
+class LiveServer:
+    """The remote ASGI app on a real loopback socket (the TestClient cannot stream SSE)."""
+
+    def __init__(self, asgi_app):
+        import asyncio
+        import contextlib
+        import threading
+
+        import uvicorn
+
+        class Server(uvicorn.Server):
+            @contextlib.contextmanager
+            def capture_signals(self):
+                yield
+
+        self.loop = asyncio.new_event_loop()
+        self.server = Server(
+            uvicorn.Config(asgi_app, host="127.0.0.1", port=0, lifespan="off", log_level="warning")
+        )
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        import time
+
+        deadline = time.monotonic() + 10
+        while not self.server.started:
+            assert time.monotonic() < deadline, "server did not start"
+            time.sleep(0.01)
+        self.port = self.server.servers[0].sockets[0].getsockname()[1]
+
+    def _run(self):
+        import asyncio
+
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self.server.serve())
+
+    def stop(self):
+        self.server.should_exit = True
+        self.server.force_exit = True
+        self._thread.join(timeout=5)
+
+
+class SSEClient:
+    """Reads one event stream on a thread so tests can wait with timeouts."""
+
+    def __init__(self, url, headers):
+        import queue
+        import threading
+
+        import httpx
+
+        self.events = queue.Queue()
+        self.status = None
+        self.closed = threading.Event()
+        self._stop = threading.Event()
+
+        def run():
+            try:
+                with httpx.stream("GET", url, headers=headers, timeout=None) as response:
+                    self.status = response.status_code
+                    if response.status_code != 200:
+                        self.events.put(("error", response.read().decode()))
+                        return
+                    name, data = "message", []
+                    for line in response.iter_lines():
+                        if self._stop.is_set():
+                            return
+                        if line.startswith(":"):
+                            self.events.put(("comment", line[1:].strip()))
+                        elif line.startswith("event:"):
+                            name = line[6:].strip()
+                        elif line.startswith("data:"):
+                            data.append(line[5:].strip())
+                        elif line == "":
+                            if data or name != "message":
+                                import json as _json
+
+                                payload = _json.loads(data[0]) if data else None
+                                self.events.put((name, payload))
+                            name, data = "message", []
+            except Exception as exc:  # connection torn down by the server
+                self.events.put(("closed", repr(exc)))
+            finally:
+                self.closed.set()
+
+        self._thread = threading.Thread(target=run, daemon=True)
+        self._thread.start()
+
+    def next(self, timeout=5):
+        import queue
+
+        try:
+            return self.events.get(timeout=timeout)
+        except queue.Empty:
+            raise AssertionError("no event within %.1fs" % timeout) from None
+
+    def next_matching(self, name, timeout=5):
+        import time
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            event = self.next(max(0.05, deadline - time.monotonic()))
+            if event[0] == name:
+                return event[1]
+        raise AssertionError(f"no {name!r} event")
+
+    def expect_quiet(self, seconds=0.4, ignore=("comment",)):
+        import queue
+        import time
+
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            try:
+                event = self.events.get(timeout=max(0.01, deadline - time.monotonic()))
+            except queue.Empty:
+                return
+            assert event[0] in ignore, event
+
+    def stop(self):
+        self._stop.set()
+
+
+def live_headers(phone):
+    """Headers a real browser would send: cookies from the phone's jar, identity, CSRF."""
+    cookies = "; ".join(f"{name}={value}" for name, value in phone.client.cookies.items())
+    return phone.headers(extra={"Cookie": cookies})

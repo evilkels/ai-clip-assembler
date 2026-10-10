@@ -563,7 +563,9 @@ def _is_within(candidate: Path, root: Path) -> bool:
 def register_extensions(app: FastAPI, runtime: RemoteRuntime) -> None:
     """Route groups that live in their own modules, registered before the catch-alls."""
     from ..uploads.routes import register_upload_routes
+    from .events import register_event_routes
 
+    register_event_routes(app, runtime)
     register_upload_routes(app, runtime)
 
 

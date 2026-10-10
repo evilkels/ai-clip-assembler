@@ -62,12 +62,17 @@ class RemoteRuntime:
         project_service: ProjectService,
         projects: MutableMapping[str, dict],
         ui_dir: Optional[Path] = None,
+        events=None,
     ) -> None:
         self.store = store
         self.auth = auth
         self.project_service = project_service
         self.projects = projects
         self.ui_dir = Path(ui_dir) if ui_dir else None
+        # Project event source (subscribe_bounded / unsubscribe), the app's
+        # TimelineLifecycle in production.
+        self.events = events
+        self.sse_ping_sec = 15.0
         self._lease = threading.Event()
         self._lock = threading.RLock()
         self._streams: List[StreamHandle] = []

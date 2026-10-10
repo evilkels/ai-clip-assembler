@@ -281,7 +281,7 @@ These corrections replace the stale draft's claims:
     - A lost finalize response replays the receipt.
     - A desktop rescan racing a publish keeps both.
     - Revoke during `publishing` does not interrupt the publication.
-- [ ] 1.10 Add Project events and remote status (after 1.4). Done when `backend/tests/test_project_events.py` shows the cases below, and `e2e/import-workflow-redesign.spec.ts` (or a new stubbed spec) shows the source list refreshing on `sources-changed`.
+- [x] 1.10 Add Project events and remote status (after 1.4). Done when `backend/tests/test_project_events.py` shows the cases below, and `e2e/import-workflow-redesign.spec.ts` (or a new stubbed spec) shows the source list refreshing on `sources-changed`.
   - Generalise `TimelineEventBroker` (`timeline_service.py:32`) into a Project event broker with thread-safe publish (`loop.call_soon_threadsafe`).
   - `set_analysis_progress` (`api.py:490`) publishes `analysis-progress`, throttled to 1 per second plus every phase change. Ingest publishes `sources-changed`. `timeline-changed` stays as is.
   - The desktop `/projects/{id}/events` (`api.py:1095`) carries all three. The renderer refreshes the source list on `sources-changed`.

@@ -398,6 +398,7 @@ def build_lifecycle(loop: asyncio.AbstractEventLoop, fd: int) -> RemoteLifecycle
         project_service=api.project_service,
         projects=api.projects,
         ui_dir=Path(ui_dir) if ui_dir else None,
+        events=api.project_events,
     )
     try:
         timeout = float(os.environ.get("CLIP_ASSEMBLER_LEASE_TIMEOUT_SEC", HEARTBEAT_LEASE_SEC))

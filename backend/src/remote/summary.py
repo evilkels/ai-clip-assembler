@@ -13,16 +13,9 @@ from ..models import (
     RemoteProjectSummary,
     RemoteSource,
 )
+from ..project_events import analysis_percent
 from ..project_store import analysis_results_path
 
-# Where each analysis step sits inside one video's share of the run.
-_STEP_FRACTION = {
-    "starting": 0.0,
-    "motion_analysis": 0.05,
-    "frame_extraction": 0.35,
-    "scene_detection": 0.6,
-    "scoring_clips": 0.75,
-}
 _STEP_LABEL = {
     "starting": "Preparing",
     "motion_analysis": "Checking stability",
@@ -31,20 +24,6 @@ _STEP_LABEL = {
     "scoring_clips": "Scoring clips",
     "complete": "Complete",
 }
-
-
-def analysis_percent(progress: dict) -> Optional[float]:
-    """Rough 0-100 progress for an analysing run, from the Mac's own counters."""
-    total = progress.get("video_total") or 0
-    if total <= 0:
-        return None
-    index = max(1, int(progress.get("video_index") or 1))
-    fraction = _STEP_FRACTION.get(progress.get("step") or "starting", 0.0)
-    clip_total = progress.get("clip_total") or 0
-    if progress.get("step") == "scoring_clips" and clip_total > 0:
-        fraction = 0.75 + 0.25 * min(1.0, (progress.get("clip_index") or 0) / clip_total)
-    value = ((index - 1) + fraction) / total
-    return round(min(100.0, max(0.0, value * 100.0)), 1)
 
 
 def now_on_mac(project: dict) -> RemoteNowOnMac:

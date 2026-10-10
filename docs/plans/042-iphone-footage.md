@@ -41,8 +41,8 @@ Decisions so far:
 
 ## Phase 3: Vertical previews
 
-- [ ] 3.1 Size the Suggested-cut player and the Timeline preview to the source's display aspect, and move the preview info bar off the picture. Done when the portrait spec measures a player with width / height < 0.7 and a preview within 3 % of 9/16.
-- [ ] 3.2 Make track durations and candidate badges legible in light theme, and keep the All items rail free of horizontal overflow. Done when the rail spec finds ✕ inside the rail and `scrollWidth <= clientWidth`.
+- [x] 3.1 Size the Suggested-cut player and the Timeline preview to the source's display aspect, and move the preview info bar off the picture. Done when the portrait spec measures a player with width / height < 0.7 and a preview within 3 % of 9/16. (PR #106)
+- [x] 3.2 Make track durations and candidate badges legible in light theme, and keep the All items rail free of horizontal overflow. Done when the rail spec finds ✕ inside the rail and `scrollWidth <= clientWidth`. (PR #106)
 
 ## Phase 4: Export handoff
 

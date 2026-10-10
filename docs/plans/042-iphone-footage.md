@@ -46,8 +46,8 @@ Decisions so far:
 
 ## Phase 4: Export handoff
 
-- [ ] 4.1 Name the EDL title, the FCPXML event and project, and the Resolve sequence after the Project folder. Done when the API test with `Bike Ride — 2026-10-10` passes and the FCPXML passes the DTD.
-- [ ] 4.2 Preselect FCPXML on Export and label the raw duration "Source media used". Done when the export specs and `export-receipt` baselines pass.
+- [x] 4.1 Name the EDL title, the FCPXML event and project, and the Resolve sequence after the Project folder. Done when the API test with `Bike Ride — 2026-10-10` passes and the FCPXML passes the DTD. (PR #105)
+- [x] 4.2 Preselect FCPXML on Export and label the raw duration "Source media used". Done when the export specs and `export-receipt` baselines pass. (PR #105)
 
 ## Phase 5: Verify
 

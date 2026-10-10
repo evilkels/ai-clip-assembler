@@ -984,7 +984,7 @@ test('export format cards control one explicit handoff and keep receipt actions 
   const cards = page.locator('[data-testid^="export-format-card-"]');
   await expect(cards).toHaveCount(3);
   await expect(page.locator('.export-format-cards .btn')).toHaveCount(0);
-  await expect(page.getByTestId('export-format-card-edl')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('export-format-card-fcpxml')).toHaveAttribute('aria-pressed', 'true');
 
   const edlCard = page.getByTestId('export-format-card-edl');
   await edlCard.focus();
@@ -1032,6 +1032,7 @@ test('export reads the authoritative Timeline without a legacy write', async ({ 
   });
 
   await page.goto('/#/export');
+  await page.getByTestId('export-format-card-edl').click();
   await page.getByTestId('export-selected').click();
 
   const after = await page.request
@@ -1099,6 +1100,7 @@ test('export asks before overwrite and retries exactly once', async ({ page }) =
     });
   });
   await page.goto('/#/export');
+  await page.getByTestId('export-format-card-edl').click();
   page.once('dialog', (dialog) => void dialog.accept());
   await page.getByTestId('export-selected').click();
 

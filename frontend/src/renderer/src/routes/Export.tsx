@@ -95,7 +95,7 @@ function formatDuration(seconds: number): string {
 
 export function ExportPage() {
   const { clips, timelineItems, projectId, projectFolder } = useReview();
-  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('edl');
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('fcpxml');
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportResults, setExportResults] = useState<
     Partial<Record<ExportFormat, DisplayExportResult>>
@@ -326,7 +326,7 @@ export function ExportPage() {
                     )}
                   </div>
                   <div className="export-receipt-detail">
-                    Backend report: {formatDuration(result.total_duration_sec)} · {result.status}
+                    Source media used: {formatDuration(result.total_duration_sec)} · {result.status}
                   </div>
                   {result.warnings.length > 0 && (
                     <div role="status" data-testid={`export-warning-${format.id}`} className="export-warning">

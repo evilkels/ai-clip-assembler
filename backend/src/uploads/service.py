@@ -24,6 +24,7 @@ from . import store
 from .ingest import FinalizeContext, IngestMixin, hash_file  # noqa: F401
 from .naming import UploadRejected, storage_error, validate_metadata
 from .store import (
+    ACTIVE_STATES,
     UNFINISHED_STATES,
     ChunkReceipt,
     StagingUnsafe,
@@ -214,6 +215,7 @@ class UploadService(IngestMixin):
         self._workers: Dict[str, threading.Thread] = {}
         self._recovered: set = set()
         self._lock = threading.RLock()
+        self._admission_lock = threading.Lock()
         self._folders: Dict[Path, _Folder] = {}
         self._active: Dict[str, int] = {}
         self._active_total = 0
@@ -224,23 +226,30 @@ class UploadService(IngestMixin):
         root = Path(project_root).resolve()
         with self._lock:
             folder = self._folders.get(root)
-            if folder is None:
-                try:
-                    uploads = store.load_project_uploads(root)
-                except StagingUnsafe as exc:
-                    raise UploadRejected(500, "staging_unsafe", str(exc)) from exc
-                folder = self._folders[root] = _Folder(root, uploads)
-                for upload in uploads.values():
-                    self._sync_ledger(upload)
-            return folder
+            if folder is not None:
+                return folder
+        with self._admission_lock:
+            with self._lock:
+                folder = self._folders.get(root)
+                if folder is None:
+                    try:
+                        uploads = store.load_project_uploads(root)
+                    except StagingUnsafe as exc:
+                        raise UploadRejected(500, "staging_unsafe", str(exc)) from exc
+                    folder = self._folders[root] = _Folder(root, uploads)
+                    for upload in uploads.values():
+                        self._sync_ledger(upload)
+                return folder
 
     def forget(self, project_root: Path) -> None:
         """Drop the cached view of a Project (tests simulate a restart with this)."""
-        with self._lock:
-            folder = self._folders.pop(Path(project_root).resolve(), None)
-        if folder:
-            for upload in folder.uploads.values():
-                self.ledger.release(upload.upload_id)
+        with self._admission_lock:
+            with self._lock:
+                folder = self._folders.pop(Path(project_root).resolve(), None)
+            if folder:
+                with folder.lock:
+                    for upload in folder.uploads.values():
+                        self.ledger.release(upload.upload_id)
 
     def _sync_ledger(self, upload: Upload) -> None:
         if upload.record.state in UNFINISHED_STATES and not upload.damaged:
@@ -285,47 +294,75 @@ class UploadService(IngestMixin):
                             409, "idempotency_conflict", "That key was used for a different file"
                         )
                     return existing, True
-            unfinished = [
-                u
-                for u in folder.uploads.values()
-                if u.record.device_id == device_id and u.record.state in UNFINISHED_STATES
-            ]
-            if len(unfinished) >= MAX_UNFINISHED_PER_DEVICE:
-                raise UploadRejected(
-                    429, "too_many_uploads", "Too many unfinished uploads from this phone"
-                )
-            if not self.ledger.can_fit(folder.root, length):
-                raise UploadRejected(
-                    507, "insufficient_storage", "The Mac is low on space for this file."
-                )
-            upload_id = uuid.uuid4().hex
-            try:
-                directory = store.new_upload_directory(folder.root, upload_id)
-            except StagingUnsafe as exc:
-                raise UploadRejected(500, "staging_unsafe", str(exc)) from exc
-            record = UploadRecord(
-                upload_id=upload_id,
-                device_id=device_id,
-                device_label=device_label,
-                owner_login=owner_login,
-                length=length,
-                filename=metadata.filename,
-                original_filename=metadata.original_filename,
-                filetype=metadata.filetype,
-                client_last_modified=metadata.client_last_modified,
-                idempotency_key=idempotency_key,
-                created_at=self.clock(),
+        upload_id = uuid.uuid4().hex
+        if not self.ledger.reserve_if_fits(folder.root, upload_id, length):
+            raise UploadRejected(
+                507, "insufficient_storage", "The Mac is low on space for this file."
             )
-            try:
-                (directory / store.DATA_NAME).touch()
-                store.write_record(directory, record)
-            except OSError as exc:
-                store.remove_staging(directory)
-                raise storage_error(exc) from exc
-            upload = Upload(record=record, directory=directory, updated_at=record.created_at)
-            folder.uploads[upload_id] = upload
-            self.ledger.set(upload_id, length)
-            return upload, False
+        admitted = False
+        directory = None
+        try:
+            with self._admission_lock:
+                with folder.lock:
+                    for existing in folder.uploads.values():
+                        if (
+                            existing.record.device_id == device_id
+                            and existing.record.idempotency_key == idempotency_key
+                        ):
+                            if (
+                                existing.record.length != length
+                                or existing.record.original_filename != metadata.original_filename
+                            ):
+                                raise UploadRejected(
+                                    409, "idempotency_conflict", "That key was used for a different file"
+                                )
+                            return existing, True
+                unfinished = [
+                    upload for known_folder in self._folders.values()
+                    for upload in self._uploads_snapshot(known_folder)
+                    if upload.record.device_id == device_id and upload.record.state in ACTIVE_STATES
+                ]
+                if len(unfinished) >= MAX_UNFINISHED_PER_DEVICE:
+                    raise UploadRejected(
+                        429, "too_many_uploads", "Too many unfinished uploads from this phone"
+                    )
+                try:
+                    directory = store.new_upload_directory(folder.root, upload_id)
+                    record = UploadRecord(
+                        upload_id=upload_id,
+                        device_id=device_id,
+                        device_label=device_label,
+                        owner_login=owner_login,
+                        length=length,
+                        filename=metadata.filename,
+                        original_filename=metadata.original_filename,
+                        filetype=metadata.filetype,
+                        client_last_modified=metadata.client_last_modified,
+                        idempotency_key=idempotency_key,
+                        created_at=self.clock(),
+                    )
+                    (directory / store.DATA_NAME).touch()
+                    store.write_record(directory, record)
+                except StagingUnsafe as exc:
+                    raise UploadRejected(500, "staging_unsafe", str(exc)) from exc
+                except OSError as exc:
+                    raise storage_error(exc) from exc
+                upload = Upload(record=record, directory=directory, updated_at=record.created_at)
+                with folder.lock:
+                    folder.uploads[upload_id] = upload
+                admitted = True
+                return upload, False
+        finally:
+            if not admitted:
+                self.ledger.release(upload_id)
+                if directory is not None:
+                    store.remove_staging(directory)
+
+    @staticmethod
+    def _uploads_snapshot(folder: _Folder) -> list:
+        """Copy one Project's registry while holding only its folder lock."""
+        with folder.lock:
+            return list(folder.uploads.values())
 
     # -- lookup ------------------------------------------------------------------------
 
@@ -379,6 +416,11 @@ class UploadService(IngestMixin):
                 raise UploadRejected(409, "offset_mismatch", "Upload-Offset does not match")
             if upload.offset + content_length > record.length:
                 raise UploadRejected(413, "exceeds_length", "The chunk goes past the file length")
+            remaining = record.length - upload.offset
+            if not self.ledger.can_fit(folder.root, remaining, excluding=upload.upload_id):
+                raise UploadRejected(
+                    507, "insufficient_storage", "The Mac is low on space for this file."
+                )
             self._transfer_started(record.device_id)
             started = True
             return ChunkWriter(self, folder, upload, algorithm, digest, content_length)
@@ -445,12 +487,17 @@ class UploadService(IngestMixin):
         Uploads already ``verifying`` or ``publishing`` are not interrupted: the
         import completes, because the bytes are verified and belong to the Project.
         """
-        with self._lock:
-            folders = list(self._folders.values())
-        for folder in folders:
-            for upload in list(folder.uploads.values()):
-                if upload.record.device_id == device_id and upload.record.state in UNFINISHED_STATES:
-                    self._request_cancel(folder, upload)
+        with self._admission_lock:
+            with self._lock:
+                folders = list(self._folders.values())
+            uploads = [
+                (folder, upload)
+                for folder in folders
+                for upload in self._uploads_snapshot(folder)
+            ]
+        for folder, upload in uploads:
+            if upload.record.device_id == device_id and upload.record.state in UNFINISHED_STATES:
+                self._request_cancel(folder, upload)
 
     # -- expiry ----------------------------------------------------------------------------
 
@@ -458,8 +505,10 @@ class UploadService(IngestMixin):
         """Expire stale uploads. Removes only app-owned staging; leaves tombstones."""
         folder = self.folder(project_root)
         now = self.clock()
-        with folder.lock:
-            for upload in list(folder.uploads.values()):
+        with self._admission_lock:
+            with folder.lock:
+                uploads = list(folder.uploads.values())
+            for upload in uploads:
                 state = upload.record.state
                 if state in ("verifying", "publishing"):
                     continue
@@ -467,6 +516,9 @@ class UploadService(IngestMixin):
                     if not upload.lock.acquire(blocking=False):
                         continue
                     try:
+                        if (upload.record.state not in UNFINISHED_STATES
+                                or now - upload.updated_at <= UPLOAD_TTL_SEC):
+                            continue
                         record = upload.record.model_copy(
                             update={"state": "expired", "ended_at": now}
                         )
@@ -480,15 +532,18 @@ class UploadService(IngestMixin):
                     now - (upload.record.ended_at or upload.updated_at) > TOMBSTONE_TTL_SEC
                 ):
                     store.remove_staging(upload.directory)
-                    del folder.uploads[upload.upload_id]
+                    with folder.lock:
+                        del folder.uploads[upload.upload_id]
                 elif state == "imported" and now - (upload.record.ended_at or 0) > UPLOAD_TTL_SEC:
                     store.remove_staging(upload.directory)
-                    del folder.uploads[upload.upload_id]
+                    with folder.lock:
+                        del folder.uploads[upload.upload_id]
 
     def sweep_all(self) -> None:
         """Expire stale uploads in every Project this process has loaded."""
-        with self._lock:
-            roots = list(self._folders)
+        with self._admission_lock:
+            with self._lock:
+                roots = list(self._folders)
         for root in roots:
             try:
                 self.sweep(root)
@@ -527,5 +582,3 @@ class UploadService(IngestMixin):
 def iter_pieces(data: bytes, size: int) -> Iterator[bytes]:
     for index in range(0, len(data), size):
         yield data[index : index + size]
-
-

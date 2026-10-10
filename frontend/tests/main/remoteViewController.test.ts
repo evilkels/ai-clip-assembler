@@ -843,9 +843,6 @@ test('the backend closing the gate by itself turns Remote View off and removes o
   await r.controller.enable();
 
   r.backend.emit({ event: 'state', enabled: false, reason: 'lease-expired', pending: [], devices: [], connected: 0, exposure: [] });
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
-
   const state = await r.controller.getState();
   assert.equal(state.status, 'off');
   assert.equal(r.serveText(), before);
@@ -857,10 +854,7 @@ test('EOF from the backend marks Remote View off and removes our handler', async
   await r.controller.enable();
 
   r.backend.lose();
-  await new Promise((resolve) => setTimeout(resolve, 50));
-
-  assert.equal(r.controller.getState !== undefined, true);
-  const state = (r.controller as unknown as { state: { status: string } }).state;
+  const state = await r.controller.getState();
   assert.equal(state.status, 'off');
   assert.equal(r.serveText(), before);
 });

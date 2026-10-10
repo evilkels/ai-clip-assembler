@@ -52,3 +52,21 @@ The three failures are in `frontend/tests/main/remoteViewController.test.ts`:
 Browser execution is blocked by an existing Python backend on port 8000; it was not stopped or reused. No fixes were made. Local dependency environments are not checkpoint artifacts.
 
 Standards: 3 findings; highest severity P1 durability/recovery. Spec: 3 findings; highest severity P1 reservation race. There are **five distinct findings** across the axes; the reservation race appears in both.
+
+
+## Quality follow-up
+
+The controller reconciled current main in an isolated worktree (merge `718e772`) while preserving both ADR entries and regenerating the plan index. The original checkout remains available for the stalled thread. This follow-up repairs the five distinct initial findings and the three controller cleanup failures; it does not complete later Remote View phases.
+
+An external implementer and two independent Sol/high CLI review passes checked the source against Standards and Spec. Repairs include genuine directory I/O error propagation, recovery skipping live workers under upload locks, atomic capacity check/reservation, disk sampling under the ledger lock, per-chunk capacity rechecks, per-device quotas across Projects, coherent registry snapshots, reservation cleanup on every failed admission, and shared/awaited backend shutdown. The directory-flush regression injects `EIO` through the real directory-descriptor path, preserving the post-publication error boundary. Creation/capacity and registry regressions were demonstrated red before repair.
+
+The last independent review identified four P2 findings. The controller repaired two with red/green proof: chunk-capacity sampling now uses the ledger lock, and expiry rechecks state/progress after taking the upload lock (4 focused cases passed, Ruff passed). **Two remain open and block readiness:**
+
+1. Collision naming in `backend/src/uploads/ingest.py` still iterates the mutable upload registry. Snapshot it safely and shorten recovery's folder-lock scope to avoid a Project/folder lock inversion; add meaningful concurrent publication coverage.
+2. The registry loading/sweeping regression still uses a one-second scheduling window. Replace that with explicit handshakes and preserve demonstrable failure on the prior implementation.
+
+These are continuation work within tasks 1.8/1.9 before 1.12. Draft PR #108 remains a checkpoint, not merge-ready. Task 1.11 is now checked: all 122 main-process cases pass, including the three original failures, without sleeps or private controller-state reads. Plan progress is 11/36 implementation tasks; owner gates remain 1/7.
+
+Validation of settled source is recorded below. An earlier full run overlapped the implementer's lock changes and test execution: 863 passed, 3 skipped, with one obsolete admission-test failure and a timing-sensitive native-sort failure. That result is retained as history rather than claimed as final proof. The existing local backend on port 8000 still prevents the default browser suite, so CI supplies that gate. The prototype polling regression is separately green in PR #109.
+
+The main-reconciliation commit required bypassing the local React Doctor hook for that commit only: it rejected inherited renderer changes (38 existing warnings). ESLint, Ruff, typecheck and plan checks passed; no hook configuration was changed. The implementer's initial full backend run lacked `lxml`; the controller used an existing dependency environment and ran the full suite successfully before the follow-up, 863 passed / 3 skipped.

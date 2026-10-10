@@ -181,6 +181,8 @@ These corrections replace the stale draft's claims:
 
 ## Phase 1: Secure connection, verified upload, see what the Mac is doing
 
+Quality follow-up (draft PR #108): tasks 1.1–1.11 are checkpointed, with 1.11's 122 main-process cases passing. Before continuation at 1.12, finish the two P2 review follow-ups within 1.8/1.9: synchronized collision-name snapshots with safe recovery lock ordering, and deterministic loading/sweeping regression handshakes. See the [review follow-up](../reviews/2026-10-10-remote-view-checkpoint.md). Neither the draft nor Phase 1 is ready for delivery.
+
 - [x] 1.1 Add `backend/src/durable_io.py` with `write_text_atomic(path, text)` and route every JSON write through it. Done when `backend/tests/test_durable_io.py` makes `os.fsync` and `os.replace` raise and shows the previous file byte-identical, no temp file left behind and the error raised, and `test_project_store.py` and `test_app_settings.py` pass.
   - The write goes to a sibling temp file, then write, flush, `os.fsync` (`fcntl.F_FULLFSYNC` on macOS when available), `os.replace`, and an fsync of the parent directory. Errors propagate (§6.2).
   - Callers: `project_store.py` `write_project_manifest` (:197), `write_analysis_results` (:256), `write_frame_scores` (:287), `write_review_session` (:314), `write_timeline_document` (:384), and `app_settings.py:88`.
@@ -290,8 +292,8 @@ These corrections replace the stale draft's claims:
   - Test cases for the done criterion:
     - An analysis thread's progress reaches a remote subscriber.
     - Revoke closes that device's stream with `revoked`.
-- [ ] 1.11 Add `frontend/src/main/tailscaleCli.ts` and `frontend/src/main/remoteViewController.ts` for Serve ownership. Done when `frontend/tests/main/remoteViewController.test.ts` runs against a fake CLI and shows the cases below.
-  - Checkpoint 2026-10-10 (draft PR #108): controller, CLI wrapper and fake-CLI tests saved unchanged in `e0d3d4a`; task remains open. [Independent review and test record](../reviews/2026-10-10-remote-view-checkpoint.md) lists five distinct implementation findings and three failing controller tests. Resume at 1.11 and the recorded findings, then 1.12; later phases remain open.
+- [x] 1.11 Add `frontend/src/main/tailscaleCli.ts` and `frontend/src/main/remoteViewController.ts` for Serve ownership. Done when `frontend/tests/main/remoteViewController.test.ts` runs against a fake CLI and shows the cases below.
+  - Checkpoint and quality follow-up 2026-10-10 (draft PR #108): controller, CLI wrapper and fake-CLI tests were preserved, then the three cleanup failures repaired. All 122 main-process tests now pass. [Independent review and test record](../reviews/2026-10-10-remote-view-checkpoint.md) preserves the initial findings and subsequent repairs. Resume at 1.12; later phases and physical-phone delivery gates remain open. The separately served prototype refresh fix is plan 043 / PR #109.
   - Locate the CLI in order: `/Applications/Tailscale.app/Contents/MacOS/Tailscale`, `/opt/homebrew/bin/tailscale`, `/usr/local/bin/tailscale`. Run it with `execFile`, fixed argv and a 10 s timeout.
   - From `status --json`: `BackendState === "Running"`, `Self.DNSName` without the trailing dot, and the owner login from `User[Self.UserID].LoginName`.
   - Preflight from `serve status --json`: refuse if `<host>:8448` has any handler except one matching the owner record, or `AllowFunnel["<host>:8448"]` is true. Use the 1.2 copy.

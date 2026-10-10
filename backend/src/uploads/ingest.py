@@ -112,21 +112,21 @@ class IngestMixin:
                 update={"state": "verifying", "whole_sha256": sha256, "finalize_key": idempotency_key}
             )
             store.write_record(upload.directory, upload.record)
+            if background:
+                worker = threading.Thread(
+                    target=self._finalize_guarded,
+                    args=(ctx, upload),
+                    name=f"finalize-{upload.upload_id[:8]}",
+                    daemon=True,
+                )
+                self._workers[upload.upload_id] = worker
+                worker.start()
         except OSError as exc:
             upload.record = record
             raise storage_error(exc) from exc
         finally:
             upload.lock.release()
-        if background:
-            worker = threading.Thread(
-                target=self._finalize_guarded,
-                args=(ctx, upload),
-                name=f"finalize-{upload.upload_id[:8]}",
-                daemon=True,
-            )
-            self._workers[upload.upload_id] = worker
-            worker.start()
-        else:
+        if not background:
             self._finalize_guarded(ctx, upload)
         return "verifying"
 
@@ -140,15 +140,16 @@ class IngestMixin:
             worker.join(timeout)
 
     def _finalize_guarded(self, ctx: FinalizeContext, upload: Upload) -> None:
-        try:
-            self._finalize_sync(ctx, upload)
-        except _Failure as failure:
-            self._fail(upload, failure.code, failure.message)
-        except Exception as exc:  # unexpected: leave a safe, honest outcome
-            logger.exception("Finalizing upload %s failed", upload.upload_id)
-            if upload.record.state == "publishing":
-                return  # journalled: recovery finishes it, nothing is lost
-            self._fail(upload, "import_failed", f"The Mac couldn't finish the import ({type(exc).__name__})")
+        with upload.lock:
+            try:
+                self._finalize_sync(ctx, upload)
+            except _Failure as failure:
+                self._fail(upload, failure.code, failure.message)
+            except Exception as exc:  # unexpected: leave a safe, honest outcome
+                logger.exception("Finalizing upload %s failed", upload.upload_id)
+                if upload.record.state == "publishing":
+                    return  # journalled: recovery finishes it, nothing is lost
+                self._fail(upload, "import_failed", f"The Mac couldn't finish the import ({type(exc).__name__})")
 
     def _fail(self, upload: Upload, code: str, message: str) -> None:
         upload.record = upload.record.model_copy(
@@ -427,19 +428,27 @@ class IngestMixin:
         """Finish or roll back journalled publications after a restart (§6.1)."""
         ctx = FinalizeContext(project_root, project_id)
         folder = self.folder(ctx.root)
-        for upload in list(folder.uploads.values()):
-            state = upload.record.state
-            try:
-                if state == "verifying":
-                    # Verification has no side effects: let the phone ask again.
-                    upload.record = upload.record.model_copy(update={"state": "received"})
-                    store.write_record(upload.directory, upload.record)
-                elif state == "publishing":
-                    self._recover_publication(ctx, upload)
-            except _Failure as failure:
-                self._fail(upload, failure.code, failure.message)
-            except Exception:
-                logger.exception("Recovering upload %s failed", upload.upload_id)
+        with folder.lock:
+            for upload in list(folder.uploads.values()):
+                if not upload.lock.acquire(blocking=False):
+                    continue
+                try:
+                    if self._worker_alive(upload.upload_id):
+                        continue
+                    state = upload.record.state
+                    try:
+                        if state == "verifying":
+                            # Verification has no side effects: let the phone ask again.
+                            upload.record = upload.record.model_copy(update={"state": "received"})
+                            store.write_record(upload.directory, upload.record)
+                        elif state == "publishing":
+                            self._recover_publication(ctx, upload)
+                    except _Failure as failure:
+                        self._fail(upload, failure.code, failure.message)
+                    except Exception:
+                        logger.exception("Recovering upload %s failed", upload.upload_id)
+                finally:
+                    upload.lock.release()
         self.sweep(ctx.root)
         self._recovered.add(ctx.root)
 

@@ -1,6 +1,7 @@
 import errno
 import hashlib
 import os
+import threading
 from pathlib import Path
 
 import pytest
@@ -464,6 +465,210 @@ def test_free_space_floor_and_reservation_ledger(tmp_path):
         create(s2, make_root(tmp_path, "p3"), 2 * GIB, key="key-00000009")
 
 
+def test_cross_project_admission_reserves_capacity_atomically(tmp_path, monkeypatch):
+    ledger = ReservationLedger(lambda _path: (20 * GIB, 0, 7 * GIB))
+    service = service_for(ledger=ledger)
+    roots = [make_root(tmp_path, "p1"), make_root(tmp_path, "p2")]
+    for root in roots:
+        service.folder(root)
+    first_staging = threading.Event()
+    second_done = threading.Event()
+    outcomes = []
+    new_directory = store.new_upload_directory
+    write_record = store.write_record
+
+    def pause_first_staging(root, upload_id):
+        if root == roots[0]:
+            first_staging.set()
+            assert second_done.wait(5)
+        return new_directory(root, upload_id)
+
+    def fail_first_record(directory, record):
+        if directory.is_relative_to(roots[0]):
+            raise OSError(errno.EIO, "first Project staging failed")
+        return write_record(directory, record)
+
+    monkeypatch.setattr(store, "new_upload_directory", pause_first_staging)
+    monkeypatch.setattr(store, "write_record", fail_first_record)
+
+    def admit_first():
+        try:
+            create(service, roots[0], 2 * GIB, key="key-00000000")
+        except UploadRejected as exc:
+            outcomes.append(("first", exc.status, exc.code))
+
+    def admit_second():
+        try:
+            assert first_staging.wait(5)
+            try:
+                upload, _ = create(service, roots[1], 2 * GIB, key="key-00000001")
+                outcomes.append(("second-created", upload.upload_id))
+            except UploadRejected as exc:
+                outcomes.append(("second", exc.status, exc.code))
+        finally:
+            second_done.set()
+
+    threads = [threading.Thread(target=admit_first), threading.Thread(target=admit_second)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    assert all(not thread.is_alive() for thread in threads)
+    assert outcomes == [
+        ("second", 507, "insufficient_storage"),
+        ("first", 500, "storage_error"),
+    ]
+    assert ledger.total() == 0
+    create(service, roots[1], 2 * GIB, key="key-00000002")
+
+
+@pytest.mark.parametrize("check", ["reserve", "chunk"])
+def test_reservation_admission_samples_disk_while_reduction_is_serialized(check):
+    free = {"bytes": 7 * GIB}
+    sampled = threading.Event()
+    reduce = threading.Event()
+    reduced = threading.Event()
+    ledger = None
+
+    def disk_usage(_path):
+        # A chunk completing after this sample can consume those bytes while
+        # reducing its reservation. Sampling must share the ledger lock.
+        sampled_free = free["bytes"]
+        sampled.set()
+        if not ledger._lock.locked():
+            assert reduced.wait(5)
+        return (20 * GIB, 13 * GIB, sampled_free)
+
+    ledger = ReservationLedger(disk_usage)
+    ledger.set("completing-upload", 2 * GIB)
+
+    def complete_chunk():
+        assert sampled.wait(5)
+        free["bytes"] = 5 * GIB
+        reduce.set()
+        ledger.set("completing-upload", 0)
+        reduced.set()
+
+    completion = threading.Thread(target=complete_chunk)
+    completion.start()
+    admitted = (ledger.reserve_if_fits("project", "new-upload", 2 * GIB)
+                if check == "reserve" else ledger.can_fit("project", 2 * GIB))
+    assert reduce.wait(5)
+    assert reduced.wait(5)
+    completion.join(timeout=5)
+    assert not completion.is_alive()
+    assert admitted is False
+    assert ledger.reserved("new-upload") == 0
+
+
+def test_external_free_space_loss_rejects_chunk_before_checkpoint(tmp_path):
+    state = {"free": 15 * GIB}
+    ledger = ReservationLedger(lambda _p: (100 * GIB, 0, state["free"]))
+    service = service_for(ledger=ledger)
+    root = make_root(tmp_path)
+    upload, _ = create(service, root, 2 * GIB)
+    state["free"] = 11 * GIB
+
+    with pytest.raises(UploadRejected) as error:
+        service.begin_chunk(root, upload, offset=0, content_length=1,
+                            checksum_header=chunk_checksum(b"x"))
+    assert (error.value.status, error.value.code) == (507, "insufficient_storage")
+    assert upload.offset == 0
+    assert upload.data_path.stat().st_size == 0
+
+
+def test_unfinished_upload_quota_is_shared_across_project_folders(tmp_path):
+    service = service_for()
+    roots = [make_root(tmp_path, "quota-a"), make_root(tmp_path, "quota-b")]
+    uploads = []
+    for index in range(MAX_UNFINISHED_PER_DEVICE):
+        upload, _ = create(service, roots[index % len(roots)], 100, key=f"key-{index:08d}")
+        uploads.append((roots[index % len(roots)], upload))
+
+    replay, replayed = create(service, roots[0], 100, key="key-00000000")
+    assert replayed and replay.upload_id == uploads[0][1].upload_id
+
+    with pytest.raises(UploadRejected) as error:
+        create(service, roots[0], 100, key="key-99999999")
+    assert (error.value.status, error.value.code) == (429, "too_many_uploads")
+
+    service.terminate(*uploads[0])
+    create(service, roots[0], 100, key="key-99999999")
+
+
+def test_admission_serializes_folder_loading_and_releases_reservation_on_failure(tmp_path):
+    clock = Clock()
+    service = service_for(
+        clock=clock, ledger=ReservationLedger(lambda _path: (20 * GIB, 0, 20 * GIB))
+    )
+    first_root = make_root(tmp_path, "loading-a")
+    second_root = make_root(tmp_path, "loading-b")
+    third_root = make_root(tmp_path, "loading-c")
+    service.folder(first_root)
+    service.folder(second_root)
+    expiring, _ = create(service, second_root, 100, device="other-device", key="key-87654321")
+    service.terminate(second_root, expiring)
+    clock.advance(TOMBSTONE_TTL_SEC + 1)
+    scan_started = threading.Event()
+    mutation_attempted = threading.Event()
+
+    class PausingRegistry(dict):
+        def values(self):
+            iterator = iter(super().values())
+            scan_started.set()
+            yield next(iterator)
+            # Existing folder loading mutates this live registry under a
+            # different lock. Give that mutation a chance to occur mid-scan;
+            # on serialized admission it waits until this snapshot completes.
+            mutation_attempted.wait(1)
+            yield from iterator
+
+        def __setitem__(self, key, value):
+            mutation_attempted.set()
+            return super().__setitem__(key, value)
+
+    service._folders = PausingRegistry(service._folders)
+    outcomes = []
+
+    def admit():
+        try:
+            upload, _ = create(service, first_root, 100, key="key-12345678")
+            outcomes.append(("created", upload.upload_id))
+        except Exception as exc:
+            outcomes.append(("error", type(exc).__name__, str(exc)))
+
+    def load_and_sweep():
+        try:
+            assert scan_started.wait(5)
+            service.folder(third_root)
+            service.sweep(third_root)
+            outcomes.append(("loaded", str(third_root)))
+        except Exception as exc:
+            outcomes.append(("load-error", type(exc).__name__))
+
+    def sweep():
+        try:
+            assert scan_started.wait(5)
+            service.sweep(second_root)
+            outcomes.append(("swept", str(second_root)))
+        except Exception as exc:
+            outcomes.append(("sweep-error", type(exc).__name__))
+
+    threads = [
+        threading.Thread(target=admit),
+        threading.Thread(target=load_and_sweep),
+        threading.Thread(target=sweep),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+    assert all(not thread.is_alive() for thread in threads)
+    assert sorted(outcome[0] for outcome in outcomes) == ["created", "loaded", "swept"], outcomes
+    assert service.ledger.total() == 100
+    assert expiring.upload_id not in service.folder(second_root).uploads
+
+
 def test_ledger_tracks_remaining_bytes_and_releases_on_completion_and_cancel(tmp_path):
     ledger = ReservationLedger(lambda _p: (10**15, 0, 10**15))
     service = service_for(ledger=ledger)
@@ -829,3 +1034,28 @@ def test_disabling_remote_view_stops_an_in_flight_transfer_without_acknowledging
     world.h.runtime.close_lease()
     writer.abort()  # what the route does when its stream handle closes
     assert upload.offset == 0 and upload.data_path.read_bytes() == b""
+
+
+def test_sweep_rechecks_verification_after_taking_upload_lock(tmp_path):
+    now = [0.0]
+    service = service_for(clock=lambda: now[0])
+    root = make_root(tmp_path)
+    upload, _ = create(service, root, 100)
+    now[0] = UPLOAD_TTL_SEC + 1
+    original_lock = upload.lock
+
+    class FinalizerWinsLock:
+        def acquire(self, blocking=True):
+            acquired = original_lock.acquire(blocking=blocking)
+            if acquired:
+                upload.record = upload.record.model_copy(update={"state": "verifying"})
+            return acquired
+
+        def release(self):
+            original_lock.release()
+
+    upload.lock = FinalizerWinsLock()
+    service.sweep(root)
+    assert upload.record.state == "verifying"
+    assert upload.data_path.exists()
+    assert service.ledger.reserved(upload.upload_id) == 100

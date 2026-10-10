@@ -424,6 +424,53 @@ def test_a_crash_after_each_step_recovers_to_exactly_one_source_video(world, ste
     assert len(files_with_content(world, CONTENT)) == 1
 
 
+def test_recovery_skips_a_live_verification_while_recovering_a_stalled_publication(world):
+    entered = threading.Event()
+    release = threading.Event()
+    service = make_service()
+    stalled = receive(service, world, CONTENT, "A.MOV")
+
+    def crash_after_journal(step):
+        if step == "after_journal":
+            raise SimulatedCrash(step)
+
+    service.fault = crash_after_journal
+    with pytest.raises(SimulatedCrash):
+        finalize(service, world, stalled, CONTENT)
+    service.fault = lambda _step: None
+
+    live = receive(service, world, b"different video bytes", "B.MOV")
+
+    def hold_verification(step):
+        if step == "after_reread":
+            entered.set()
+            assert release.wait(5)
+
+    service.fault = hold_verification
+    assert service.finalize(
+        world.ctx, live, sha256=hashlib.sha256(b"different video bytes").hexdigest(),
+        idempotency_key="fin-key-0002", background=True,
+    ) == "verifying"
+    assert entered.wait(5)
+
+    service.recover(world.folder, world.pid)
+
+    assert stalled.record.state == "imported"
+    assert live.record.state == "verifying"
+    # A duplicate finalize must observe the existing worker, not start a second verifier.
+    assert finalize(service, world, live, b"different video bytes") == "verifying"
+    assert live.record.state == "verifying"
+    from src.uploads.naming import UploadRejected
+
+    with pytest.raises(UploadRejected) as busy:
+        service.terminate(world.folder, live)
+    assert busy.value.status == 409
+
+    release.set()
+    service.wait(live.upload_id)
+    assert live.record.state == "imported"
+
+
 @pytest.mark.parametrize("step", ["after_journal", "after_manifest"])
 def test_recovery_survives_a_foreign_file_taking_the_name_during_the_outage(world, step):
     service = make_service()

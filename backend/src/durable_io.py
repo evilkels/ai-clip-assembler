@@ -2,11 +2,13 @@
 
 ``write_text_atomic`` writes a sibling temporary file, flushes it to stable
 storage, atomically replaces the destination and flushes the parent directory.
-A failure at any step leaves the previous file byte-identical, removes the
-temporary file and raises, so a caller can never mistake a failed save for a
-durable one (ADR 0003).
+Failures before replacement preserve the previous file and remove the temporary
+file. A parent-directory flush failure after replacement propagates while the
+new file remains published, so callers cannot mistake it for a durable save
+(ADR 0003).
 """
 
+import errno
 import os
 import tempfile
 from pathlib import Path
@@ -17,6 +19,8 @@ try:  # macOS: plain fsync does not reach the platters; F_FULLFSYNC does.
 except ImportError:  # pragma: no cover - non-POSIX
     fcntl = None  # type: ignore[assignment]
 
+_UNSUPPORTED_FLUSH_ERRORS = {errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP}
+
 
 def fsync_fd(fd: int) -> None:
     """Flush *fd* to stable storage, using ``F_FULLFSYNC`` where available."""
@@ -25,21 +29,20 @@ def fsync_fd(fd: int) -> None:
         try:
             fcntl.fcntl(fd, full)
             return
-        except OSError:
-            pass  # filesystem does not support it; fall back to fsync
+        except OSError as exc:
+            if exc.errno not in _UNSUPPORTED_FLUSH_ERRORS:
+                raise
     os.fsync(fd)
 
 
 def fsync_directory(directory: Union[str, Path]) -> None:
     """Flush directory metadata so a rename or link survives power loss."""
-    try:
-        fd = os.open(str(directory), os.O_RDONLY)
-    except OSError:
-        return
+    fd = os.open(str(directory), os.O_RDONLY)
     try:
         fsync_fd(fd)
-    except OSError:
-        pass  # some filesystems refuse directory fsync; the file itself is flushed
+    except OSError as exc:
+        if exc.errno not in _UNSUPPORTED_FLUSH_ERRORS:
+            raise
     finally:
         os.close(fd)
 
@@ -63,6 +66,8 @@ def write_bytes_atomic(path: Union[str, Path], data: bytes, mode: int = 0o644) -
         except OSError:
             pass
         raise
+    # Once replaced, a directory flush failure is reported but cannot roll the
+    # publication back to the previous contents.
     fsync_directory(directory)
 
 

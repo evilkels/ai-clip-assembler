@@ -287,6 +287,7 @@ export class RemoteViewController {
   private currentOwner: string | undefined;
   private unsubscribers: Array<() => void> = [];
   private lastPath: 'direct' | 'relayed' | 'unknown' = 'unknown';
+  private backendDisableTask: Promise<void> | undefined;
 
   constructor(deps: RemoteViewDeps) {
     this.deps = deps;
@@ -383,6 +384,7 @@ export class RemoteViewController {
 
   async getState(): Promise<RemoteViewState> {
     await this.loadPrefs();
+    await this.backendDisableTask;
     if (this.deps.backend && this.state.status !== 'starting') {
       try {
         this.mergeBackendState(await this.deps.backend.request('get_state'));
@@ -390,6 +392,7 @@ export class RemoteViewController {
         // keep the last known state; a lost channel is handled by onLost
       }
     }
+    await this.backendDisableTask;
     return this.state;
   }
 
@@ -428,7 +431,16 @@ export class RemoteViewController {
     await this.afterBackendDisabled('control channel closed');
   }
 
-  private async afterBackendDisabled(reason: string): Promise<void> {
+  private afterBackendDisabled(reason: string): Promise<void> {
+    if (this.backendDisableTask) return this.backendDisableTask;
+    const task = this.finishBackendDisabled(reason);
+    this.backendDisableTask = task.finally(() => {
+      this.backendDisableTask = undefined;
+    });
+    return this.backendDisableTask;
+  }
+
+  private async finishBackendDisabled(reason: string): Promise<void> {
     this.deps.log?.(`[remote-view] backend closed the gate: ${reason}`);
     this.stopWatch();
     await this.removeOwnedHandler().catch(() => undefined);
@@ -556,7 +568,6 @@ export class RemoteViewController {
       this.setStep('serving', 'blocked');
       const message =
         'Remote View is off: another Tailscale Serve entry changed while it was turning on. Nothing else was changed.';
-      await this.rollback();
       this.fail('conflict', message, { conflict: { kind: 'handler-changed', message } });
     }
 

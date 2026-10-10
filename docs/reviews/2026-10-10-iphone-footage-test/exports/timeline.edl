@@ -1,0 +1,16 @@
+TITLE: AI Clip Assembler
+FCM: NON-DROP FRAME
+
+* NOTE: EDL cannot represent Speed and Transform; it was flattened. Export FCPXML or Resolve XML to preserve it.
+
+001  AX       AA/V  C        00:00:00:00 00:00:09:00 00:00:00:00 00:00:09:00
+* FROM CLIP NAME: IMG_1023.mov
+
+002  AX       AA/V  C        00:00:09:00 00:00:12:00 00:00:09:00 00:00:12:00
+* FROM CLIP NAME: IMG_1023.mov
+
+003  AX       AA/V  C        00:00:00:00 00:00:08:00 00:00:12:00 00:00:20:00
+* FROM CLIP NAME: IMG_1028.mov
+
+004  AX       AA/V  C        00:00:00:00 00:00:10:24 00:00:20:00 00:00:30:24
+* FROM CLIP NAME: IMG_1029.mov

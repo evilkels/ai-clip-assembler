@@ -18,7 +18,7 @@ export function TimelineEditor({
   selectedId?: string | null;
   onSelectedItemChange?: (itemId: string | null) => void;
 } = {}) {
-  const { projectId, timelineItems, clips, applyTimelineOperation } = useReview();
+  const { projectId, timelineItems, clips, applyTimelineOperation, error } = useReview();
 
   if (!projectId) return null;
 
@@ -35,6 +35,7 @@ export function TimelineEditor({
       data-testid="timeline-editor"
       data-timeline-item-rail="true"
     >
+      {error && <p className="settings-error" role="alert">{error}</p>}
       {selectedItem && selectedProjection ? (
         <div className="timeline-inspector" data-testid="timeline-inspector">
           <div className="timeline-inspector-heading">

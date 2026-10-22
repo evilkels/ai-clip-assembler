@@ -1,7 +1,7 @@
 ---
 type: Review
 title: Real-Footage QA Review — 2026-06-11
-description: The current analysis wait is acceptable.
+description: "Records real-footage QA observations about analysis feedback, clip quality, and the editing workflow."
 status: draft
 created: 2026-06-11
 ---

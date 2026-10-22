@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: QA flows for the drone clip extraction workflow
-description: The end-to-end flows that decide whether the app takes several long drone files and produces a clip selection usable in DaVinci are defined and run, so the folder-model, sidebar and AI-collaboration work can be called "done".
+description: "Defines end-to-end drone-footage QA flows and the evidence needed to accept import, analysis, editing, and export."
 status: draft
 created: 2026-05-30
-plan_status: null
+plan_status: active
 ---
 # QA flows for the drone clip extraction workflow
 

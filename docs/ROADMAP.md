@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Roadmap to v1.0.0
-description: The order of work from v0.4.0 to a stable Mac v1.0.0.
+description: "Orders the milestones, product rules, and owner actions needed to reach a stable macOS v1.0.0 release."
 status: draft
 ---
 # Roadmap to v1.0.0

@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: 'Review visual editing: the AI edits like a Resolve console'
-description: The Editor asks for a story cut in the Review chat; the In-App Review Agent looks across the whole Candidate Clip library, writes a Script, runs it, fixes its own errors, and answers with exactly one Proposal the Editor can preview, apply
+description: "Plans an AI editing loop that inspects the clip library, runs and repairs Scripts, and returns one previewable Proposal."
 status: draft
 created: 2026-09-29
+plan_status: active
 ---
 # Review visual editing: the AI edits like a Resolve console
 

@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: Self-contained macOS runtime tools
-description: Every architecture-specific DMG ships the PyInstaller backend plus one verified ffmpeg/ffprobe pair with vidstabdetect, so the packaged app runs without developer tools on a clean Mac.
+description: "Packages verified FFmpeg and ffprobe tools with the backend so the macOS app works without developer dependencies."
 status: draft
 created: 2026-07-14
-plan_status: null
+plan_status: active
 ---
 # Self-contained macOS runtime tools
 

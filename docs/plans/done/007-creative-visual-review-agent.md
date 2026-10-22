@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: 'Plan 007: Make the In-App Review Agent a visual creative curator'
-description: 'The agent was text-only and stateless: raw candidate/timeline JSON, forced into one short sentence, no Frame Samples.'
+description: "Adds bounded Frame Samples and conversation context so the Review Agent can curate visually distinct cuts."
 status: draft
 created: 2026-06-21
+plan_status: done
 ---
 # Plan 007: Make the In-App Review Agent a visual creative curator
 

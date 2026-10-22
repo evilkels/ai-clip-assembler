@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Authoritative Timeline and Truthful Export Design
-description: The backend owns the Timeline Document, but the main Timeline and Export pages still project it through acceptedOrder and per-Candidate-Clip trims.
+description: "Specifies lossless Timeline item projection and export without legacy mutations or collapsed repeated placements."
 status: draft
 created: 2026-08-10
 ---

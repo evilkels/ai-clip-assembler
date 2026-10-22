@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: Review Timeline Video Preview Playwright Implementation Plan
-description: Add backend-backed video preview playback to Review and Timeline, plus a browser QA route that can be driven by Playwright.
+description: "Adds backend-backed Review and Timeline video previews and a browser-accessible QA route."
 status: draft
 created: 2026-06-10
+plan_status: done
 ---
 # Review Timeline Video Preview Playwright Implementation Plan
 

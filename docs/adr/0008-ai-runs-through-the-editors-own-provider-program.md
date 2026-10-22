@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: '0008: AI runs through the Editor''s own Claude Code or Codex, which the app never installs'
-description: Accepted (2026-10-08).
+description: "Routes AI through the Editor's installed Claude Code or Codex program without installing vendor software inside the app."
 status: draft
 created: 2026-10-08
-decision_status: null
+decision_status: accepted
 ---
 # 0008: AI runs through the Editor's own Claude Code or Codex, which the app never installs
 

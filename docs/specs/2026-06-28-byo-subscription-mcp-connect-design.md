@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: 'Design: Bring Your Own Subscription via MCP'
-description: Consumer Claude/ChatGPT subscriptions provide no programmatic API the app can call.
+description: "Specifies local MCP connections that let Editors review and edit through their own desktop AI subscriptions."
 status: draft
 created: 2026-06-28
 ---

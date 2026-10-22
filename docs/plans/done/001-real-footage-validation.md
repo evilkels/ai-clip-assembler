@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 001: Instrument analysis timing and produce the real-footage validation runbook'
-description: 'Status: DONE (2026-06-11).'
+description: "Records analysis timing instrumentation and the measured real-footage validation runbook."
 status: draft
 created: 2026-06-11
 plan_status: done

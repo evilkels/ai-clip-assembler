@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: '043: Remote View prototype refresh stability'
-description: The running Remote View prototype keeps its clip cards and thumbnails in place when background polling reports no visible change.
+description: "Stabilizes Remote View polling so unchanged project responses preserve existing clip cards and thumbnails."
 status: draft
 created: 2026-10-10
-plan_status: null
+plan_status: active
 ---
 # 043: Remote View prototype refresh stability
 

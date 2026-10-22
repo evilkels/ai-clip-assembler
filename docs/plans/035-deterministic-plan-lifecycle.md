@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: '035: Deterministic plan lifecycle'
-description: A plan's status, its row in the index and its move to done/ follow mechanically from its checkboxes, so plan statuses stop drifting and need no reconciliation passes.
+description: "Plans checkbox-derived plan status, generated index rows, and automatic archival of closed plans."
 status: draft
 created: 2026-10-06
-plan_status: null
+plan_status: active
 ---
 # 035: Deterministic plan lifecycle
 

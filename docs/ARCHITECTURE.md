@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Architecture
-description: 'AI Clip Assembler is a local-first desktop app: Electron frontend + FastAPI backend.'
+description: "Explains the Electron and FastAPI architecture, local analysis pipeline, Timeline authority, persistence, and agent integration."
 status: draft
 ---
 # Architecture

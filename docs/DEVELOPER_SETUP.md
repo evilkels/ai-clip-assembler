@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Developer Setup
-description: Set up local development, run both app halves, and test on the macOS target.
+description: "Explains how to prepare local dependencies, run the desktop app and backend, and verify changes on macOS."
 status: draft
 ---
 # Developer Setup

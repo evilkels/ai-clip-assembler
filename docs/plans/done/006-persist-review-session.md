@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: 'Plan 006: Persist project-scoped review conversations and Proposals'
-description: ReviewChatPanel owned messages in component-local state, so navigating away destroyed the conversation and re-triggered kickoff on return.
+description: "Persists Project review conversations and Proposals across navigation and restarts."
 status: draft
 created: 2026-06-21
+plan_status: done
 ---
 # Plan 006: Persist project-scoped review conversations and Proposals
 

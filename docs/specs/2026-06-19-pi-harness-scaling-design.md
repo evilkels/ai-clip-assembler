@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Pi Harness Scaling — Design Spike
-description: 'The default AI harness (pi_agent) scores candidate clips one pi subprocess call at a time, 180 s timeout each, and is all-or-nothing within a video: the first clip that fails or returns unusable JSON aborts AI scoring for that video and'
+description: "Evaluates Pi scoring throughput and failure handling using measured benchmarks and design alternatives."
 status: draft
 created: 2026-06-19
 ---

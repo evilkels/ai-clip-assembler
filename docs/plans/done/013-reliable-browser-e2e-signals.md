@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 013: Make browser E2E signals deterministic and meaningful'
-description: Make a red browser run mean a user-visible regression rather than an ambiguous locator or stale fixture assumption.
+description: "Makes browser regression tests deterministic so failures identify visible product regressions."
 status: draft
 created: 2026-07-22
 plan_status: done

@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: '0003: Projects persist as folders with JSON and FFmpeg-derived metadata'
-description: Local-first storage rules out a database service, and drone/action-footage Editors already organize raw files into folders on disk.
+description: "Stores Project state in a folder alongside source media using JSON and FFmpeg-derived metadata."
 status: draft
 created: 2026-07-14
-decision_status: null
+decision_status: accepted
 ---
 # 0003: Projects persist as folders with JSON and FFmpeg-derived metadata
 

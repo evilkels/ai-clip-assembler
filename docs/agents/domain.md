@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Domain Docs
-description: How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+description: "Explains how agents use the root glossary and architecture decisions when exploring and changing the domain model."
 status: draft
 ---
 # Domain Docs

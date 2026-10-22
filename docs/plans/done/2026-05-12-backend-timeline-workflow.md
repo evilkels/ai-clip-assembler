@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Backend Timeline Workflow Implementation Plan
-description: Add backend timeline replacement and export behavior matching the PRD's editable timeline workflow for drone-video testing.
+description: "Implements backend Timeline replacement and export behavior for the editable drone-footage workflow."
 status: draft
 created: 2026-05-12
 plan_status: done

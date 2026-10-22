@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: Review Model Sign-In — Review Follow-ups
-description: Reconcile those decisions in this plan or the architecture record, verify cited paths and tests still match the implementation, then mark DONE.
+description: "Records sign-in cleanup, OAuth validation, Pi resolution, callback handling, and reconciliation with the shipped tests."
 status: draft
 created: 2026-07-21
+plan_status: done
 ---
 # Review Model Sign-In — Review Follow-ups
 

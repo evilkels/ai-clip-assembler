@@ -1,7 +1,7 @@
 ---
 type: Review
 title: 'PR #62 Pocock Review'
-description: Reviewed git diff main...f38b8d1 and git log main..f38b8d1 --oneline.
+description: "Reviews PR 62 for repository standards and conformance to the authoritative Timeline and export design."
 status: draft
 created: 2026-08-12
 ---

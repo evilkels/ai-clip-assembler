@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: Clip Quality, Composition & Review UX Improvements
-description: 'A real 3-video analysis run showed the *output* quality, not runtime, was the weak link: clips felt "cut from the start" because detected scene boundaries were computed but never used for cut points; smoothness scoring was a crude'
+description: "Improves scene-aware clip selection, composition, smoothness scoring, and Review feedback from real-footage findings."
 status: draft
 created: 2026-06-15
+plan_status: done
 ---
 # Clip Quality, Composition & Review UX Improvements
 

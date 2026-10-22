@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Brand and Media Prompt Ideas
-description: Use these prompts to generate project media separately.
+description: "Collects prompts for the app icon, logo, README hero, and other project media assets."
 status: draft
 ---
 # Brand and Media Prompt Ideas

@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Connected Review Pipeline Design
-description: Make Review behave as one understandable editing workflow rather than four adjacent surfaces.
+description: "Specifies shared state and interaction rules for Review chat, Version previews, Source Clips, and the Working Timeline."
 status: draft
 created: 2026-06-21
 ---

@@ -1,7 +1,7 @@
 ---
 type: Review
 title: qa_user_manual_review
-description: ''
+description: "Records manual drone-footage feedback requesting clearer analysis progress and failure reporting."
 status: draft
 created: 2026-06-10
 ---

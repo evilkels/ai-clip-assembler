@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: '0005: Harness and In-App Review Agent are chosen independently, under one consent gate'
-description: Accepted (2026-09-03).
+description: "Keeps scoring and the Review Agent independent while recording the consent and Pi policies later replaced by ADRs 0007 and 0008."
 status: draft
 created: 2026-09-03
-decision_status: null
+decision_status: accepted
 ---
 # 0005: Harness and In-App Review Agent are chosen independently, under one consent gate
 

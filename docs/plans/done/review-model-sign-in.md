@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: Review Model Sign-In
-description: Editors can authenticate the internal pi_agent Review model with an OpenAI ChatGPT subscription from Settings.
+description: "Adds Settings-based authentication for the internal Pi Review model using an OpenAI ChatGPT subscription."
 status: draft
 created: 2026-07-21
+plan_status: done
 ---
 # Review Model Sign-In
 

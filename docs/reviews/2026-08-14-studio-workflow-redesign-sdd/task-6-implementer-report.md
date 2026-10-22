@@ -1,7 +1,7 @@
 ---
 type: Review
 title: Task 6 implementer report
-description: 'Review-fix verification: typecheck PASS; frontend lint PASS; main tests PASS (69/69); focused Export E2E PASS (4/4); diff-check PASS.'
+description: "Records Export format cards, handoff summaries, success receipts, guarded file reveal, and verification results."
 status: draft
 created: 2026-09-02
 ---

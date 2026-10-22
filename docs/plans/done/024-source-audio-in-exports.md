@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 024: Source audio in exports'
-description: Every export writer is currently video-only.
+description: "Carries source audio into FCPXML, Resolve XML, and EDL exports with appropriate links and format warnings."
 status: draft
 created: 2026-08-13
 plan_status: done

@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 016: Fix edit creation — no duplicate clips, no unusable slivers, agent-influenced selection'
-description: STEPS 1–2 DONE; STEP 3 SUPERSEDED by plan 018; STEP 4 TODO.
+description: "Records duplicate and sliver prevention in draft selection and hands remaining selection work to later plans."
 status: draft
 created: 2026-07-22
 plan_status: done

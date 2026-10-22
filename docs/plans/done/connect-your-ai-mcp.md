@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Connect Your AI MCP Implementation Plan
-description: Let Editors connect Claude Desktop or Codex to AI Clip Assembler so their own MCP-capable desktop client can inspect Candidate Clips and edit the live Timeline Document through the existing MCP tools.
+description: "Connects Claude Desktop or Codex to the local MCP tools for inspecting Candidate Clips and editing the live Timeline."
 status: draft
 created: 2026-06-28
 plan_status: done

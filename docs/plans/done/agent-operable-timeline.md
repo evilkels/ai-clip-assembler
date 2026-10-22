@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Agent-Operable Timeline
-description: 'Superseded by: review-visual-editing (pan preview and propose → apply E2E carried over; chat token streaming dropped for v1.0.0).'
+description: "Preserves the original agent-operable Timeline plan and hands remaining preview and apply work to the visual-editing plan."
 status: draft
 created: 2026-06-19
 plan_status: done

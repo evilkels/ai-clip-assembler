@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: '032: Exports that open in Final Cut Pro and DaVinci Resolve'
-description: FCPXML opens in Final Cut Pro and Resolve XML opens in DaVinci Resolve with no relink dialog, from an export of the Timeline as it is; a DTD check and golden fixtures in CI guard both files on every PR.
+description: "Plans valid FCPXML and Resolve XML exports with automated fixtures and real editing-app import checks."
 status: draft
 created: 2026-09-11
-plan_status: null
+plan_status: active
 ---
 # 032: Exports that open in Final Cut Pro and DaVinci Resolve
 

@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Authoritative Timeline Items Implementation Plan
-description: Make the Timeline page render, play, and edit every backend-authoritative Timeline Item without collapsing repeated Candidate Clips.
+description: "Makes Timeline rendering, playback, and editing preserve every authoritative item, including repeated source placements."
 status: draft
 created: 2026-08-12
 plan_status: done

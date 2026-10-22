@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan: Project = Folder On Disk'
-description: A Project had no concrete on-disk representation.
+description: "Establishes Projects as on-disk folders with persistent state and media kept in place."
 status: draft
 created: 2026-05-30
 plan_status: done

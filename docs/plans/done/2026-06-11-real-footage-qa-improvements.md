@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Real-footage QA improvements
-description: Turn real-footage findings into persistent, truthful editing behavior while separating changes that required labeled footage or new product contracts.
+description: "Turns real-footage QA findings into persistent editing behavior while identifying work that needs additional evidence."
 status: draft
 created: 2026-06-11
 plan_status: done

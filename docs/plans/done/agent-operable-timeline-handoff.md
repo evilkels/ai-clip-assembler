@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Executor handoff: Agent-Operable Timeline'
-description: One backend-authoritative Timeline Document and reversible Operations core now serve GUI edits, an embedded /mcp server, live sync, and a propose-mode in-app review agent.
+description: "Records the delivered shared Timeline Document, Operations core, MCP interface, and propose-mode Review Agent."
 status: draft
 created: 2026-06-19
 plan_status: done

@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 011: Decompose api.py — extract the analysis pipeline into a service layer (slice 1)'
-description: 'backend/src/api.py was 1679 lines: 32 routes, a 250-line analysis pipeline, timeline-controller lifecycle, MCP wiring, review endpoints, and ~34 direct mutations of a module-global projects dict.'
+description: "Extracts the analysis pipeline from the API module into a service without changing its behavior."
 status: draft
 created: 2026-07-22
 plan_status: done

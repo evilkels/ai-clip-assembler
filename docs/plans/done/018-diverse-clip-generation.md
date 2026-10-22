@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Diverse Clip Generation — Implementation Plan (Plan 018)
-description: Make clip generation produce a diverse library of distinct best fragments (no temporal duplicates, no look-alike monotony) and drive diversity-aware multi-format edits; relocate the six generation controls to the Import page.
+description: "Builds a diverse Candidate Clip library and diversity-aware draft selection with generation controls on Import."
 status: draft
 created: 2026-07-22
 plan_status: done

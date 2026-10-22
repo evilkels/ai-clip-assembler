@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: '0002: Backend-authoritative Timeline Document via a shared Operations core'
-description: 'The Timeline needs to be editable from more than one place at once: the GUI, external agents (Claude Code, Cursor, Codex) over MCP, and the in-app Review Agent.'
+description: "Makes the backend Timeline Document and shared reversible Operations core authoritative for GUI and agent edits."
 status: draft
 created: 2026-07-14
-decision_status: null
+decision_status: accepted
 ---
 # 0002: Backend-authoritative Timeline Document via a shared Operations core
 

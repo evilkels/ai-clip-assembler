@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: Connected Review Pipeline Implementation Plan
-description: Connect agent chat, the three playable Version proposals, Source Clips, and the authoritative Working Timeline with optimistic chat messages, durable provenance, conflict-safe application, and visible state relationships between all four
+description: "Connects agent chat, Version previews, Source Clips, and the Working Timeline with durable provenance and safe application."
 status: draft
 created: 2026-06-21
+plan_status: done
 ---
 # Connected Review Pipeline Implementation Plan
 

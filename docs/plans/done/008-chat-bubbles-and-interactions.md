@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 008: Present review chat as an accessible conversation'
-description: The review chat rendered each message as a bare <p>; CSS only changed alignment/opacity, so turns read as unstructured text.
+description: "Presents Review chat as an accessible conversation using distinct message bubbles and interaction states."
 status: draft
 created: 2026-06-21
 plan_status: done

@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Logo Decisions — AI Clip Assembler
-description: Variant A — "Cut the chaos" (precise 3D material
+description: "Records the selected logo concept, asset files, visual treatment, and directions for future variants."
 status: draft
 ---
 # Logo Decisions — AI Clip Assembler

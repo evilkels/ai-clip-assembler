@@ -1,7 +1,7 @@
 ---
 type: Review
 title: 'Task 1 Report: Runtime Descriptor And Active Project'
-description: ''
+description: "Records runtime-descriptor and active-Project implementation work and its focused verification."
 status: draft
 created: 2026-06-28
 ---

@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Backend Timeline Workflow Design
-description: Extend the FastAPI backend so the real app workflow for testing drone videos can run end-to-end with backend support for project creation, multi-video upload, manual analysis, editable timeline replacement, clip retrieval, and export that
+description: "Specifies backend support for Project creation, video analysis, editable Timeline replacement, and faithful export."
 status: draft
 created: 2026-05-12
 ---

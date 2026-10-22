@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Literal Design Conformance
-description: The Claude Design export is authoritative for application layout, visual hierarchy, density, typography, colors, radii, borders, and route composition.
+description: "Defines approved design exports as the visual authority while preserving existing behavior and backend contracts."
 status: draft
 created: 2026-09-01
 ---

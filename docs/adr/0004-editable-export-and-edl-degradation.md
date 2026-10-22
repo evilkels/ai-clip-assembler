@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: '0004: Exports are editable handoffs; EDL deliberately flattens Speed/Transform'
-description: An Export serializes the Timeline Document into a professional editing app so the Editor can keep refining the cut there — it is a handoff, not a final render.
+description: "Treats exports as editable handoffs and records the deliberate loss of Speed and Transform in EDL."
 status: draft
 created: 2026-07-14
-decision_status: null
+decision_status: accepted
 ---
 # 0004: Exports are editable handoffs; EDL deliberately flattens Speed/Transform
 

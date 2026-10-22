@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Updating and removing the app
-description: 'Two things keep an installed copy of AI Clip Assembler current: the app tells you when a newer release exists, and scripts/app-wizard.sh performs the update or removal.'
+description: "Explains update notifications, the install and removal wizard, and the release process."
 status: draft
 ---
 # Updating and removing the app

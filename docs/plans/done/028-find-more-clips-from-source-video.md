@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Find More Clips From A Source Video Implementation Plan
-description: Let an editor append additional Candidate Clips from one Source
+description: "Preserves the unbuilt Find More Clips plan superseded by plan 019's cached-analysis expansion workflow."
 status: draft
 created: 2026-08-13
 plan_status: done

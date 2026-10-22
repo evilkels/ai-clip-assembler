@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Agent-Operable Timeline Design
-description: One backend-authoritative Timeline Document is edited by the GUI, in-app review agent, and external MCP clients through one Operations core.
+description: "Specifies one backend-authoritative Timeline Document and Operations core for GUI and agent editing."
 status: draft
 created: 2026-06-19
 ---

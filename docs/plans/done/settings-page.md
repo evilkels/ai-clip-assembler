@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan: Settings Page'
-description: 'One settings surface, two intended scopes: global (~/Library/Application Support/AIClipAssembler/settings.json) and per-project (clipassembler/project.json::settings_overrides, falling back to global).'
+description: "Introduces a Settings surface for global preferences and per-Project overrides."
 status: draft
 created: 2026-05-30
 plan_status: done

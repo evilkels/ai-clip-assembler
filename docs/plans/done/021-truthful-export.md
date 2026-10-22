@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Truthful Export Implementation Plan
-description: Export the current authoritative Timeline without a legacy pre-export mutation and display the backend's complete result and degradation warnings.
+description: "Exports the authoritative Timeline directly and displays complete export results and degradation warnings."
 status: draft
 created: 2026-08-12
 plan_status: done

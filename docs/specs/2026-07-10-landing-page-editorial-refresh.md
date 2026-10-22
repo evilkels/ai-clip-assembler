@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Landing Page Editorial Refresh
-description: Approved for implementation on 2026-07-10.
+description: "Specifies the landing page's editorial visual direction, product explanation, and download emphasis."
 status: draft
 created: 2026-07-10
 ---

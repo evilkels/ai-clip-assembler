@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: 'Plan 031: App restyle conformance — the sections the build has not caught up to'
-description: The restyle was applied to this codebase in two earlier passes (studio-workflow-redesign and literal-design-conformance), both closed 2026-09-02.
+description: "Tracks the remaining differences between the desktop app and the approved restyle across all workflow screens."
 status: draft
 created: 2026-09-03
-plan_status: done
+plan_status: active
 ---
 # Plan 031: App restyle conformance — the sections the build has not caught up to
 

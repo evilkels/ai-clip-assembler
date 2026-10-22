@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: Compare-Versions Review UI — Implementation Plan
-description: Rebuild the Review screen so the user compares several complete candidate cuts ("Versions") side-by-side and adopts one, instead of scanning a flat grid of individual clip cards.
+description: "Rebuilds Review around side-by-side playable Version proposals that the Editor can compare and adopt."
 status: draft
 created: 2026-06-21
+plan_status: done
 ---
 # Compare-Versions Review UI — Implementation Plan
 

@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Landing Page Restyle Implementation Plan
-description: 'Rebuild site/index.html to the Claude Design landing handoff: a dark-default (light-toggleable) page whose fold proves the product''s judgement with a six-frame contact sheet of real scored footage, followed by a timeline-ruler divider,'
+description: "Implements the approved dark and light landing-page design with real scored footage and a download-focused layout."
 status: draft
 created: 2026-09-01
 plan_status: done

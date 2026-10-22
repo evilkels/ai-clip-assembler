@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 005: Separate rich Candidate Clip discovery from draft selection'
-description: Real source IMG_0888.MOV (49.03s) had three detected Scenes but only one persisted Candidate Clip — Pi couldn't recover Scenes 2/3 because it only saw clips that deterministic assembly had already kept.
+description: "Separates Candidate Clip discovery from draft selection so review agents retain a richer scene-aware library."
 status: draft
 created: 2026-06-21
 plan_status: done

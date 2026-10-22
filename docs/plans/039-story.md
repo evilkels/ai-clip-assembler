@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: '039: Story in the edit'
-description: The Editor and the In-App Review Agent put Markers (a note pinned to a moment) and Story Sections (named runs of Timeline Items) on the Timeline; they survive undo, show on the Timeline page, and export as markers to DaVinci Resolve and
+description: "Adds Markers and Story Sections that survive undo and carry story context into exported editing timelines."
 status: draft
 created: 2026-10-08
-plan_status: null
+plan_status: active
 ---
 # 039: Story in the edit
 

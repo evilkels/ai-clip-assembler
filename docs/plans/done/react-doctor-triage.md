@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: React Doctor Triage
-description: Fix the defects react-doctor actually found, and stop treating
+description: "Resolves confirmed React Doctor defects and Project-switch races while preserving unresolved architecture decisions."
 status: draft
 created: 2026-05-30
 plan_status: done

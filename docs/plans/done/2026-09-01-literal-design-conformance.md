@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Literal Design Conformance Implementation Plan
-description: 'Finish PR #68 by making the Electron application and landing page literally conform to the approved Claude designs while preserving existing product behavior.'
+description: "Completes literal app and landing-page conformance to approved designs while retaining existing behavior."
 status: draft
 created: 2026-09-01
 plan_status: done

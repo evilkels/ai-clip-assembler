@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: '040: Release QA'
-description: Every release passes these human checks on the packaged app before it is tagged.
+description: "Collects human checks for Review scripting and keyboard access on each packaged release."
 status: draft
 created: 2026-10-08
-plan_status: null
+plan_status: active
 ---
 # 040: Release QA
 

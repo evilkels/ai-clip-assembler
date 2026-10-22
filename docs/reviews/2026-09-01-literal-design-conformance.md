@@ -1,7 +1,7 @@
 ---
 type: Review
 title: Literal design conformance review
-description: This record supersedes the earlier “complete” wording in the studio and landing plans.
+description: "Records app and landing-page comparison against approved designs and distinguishes automated acceptance from human checks."
 status: draft
 created: 2026-09-01
 ---

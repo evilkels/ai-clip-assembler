@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan: Project Sidebar'
-description: This file stays as the authoritative record of the sidebar's data source and decided interactions, which nothing else restates.
+description: "Preserves the sidebar's data source and interaction decisions after remaining shell work moved to follow-up plans."
 status: draft
 created: 2026-05-30
 plan_status: done

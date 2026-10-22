@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Triage Labels
-description: The skills speak in terms of five canonical triage roles.
+description: "Maps canonical issue triage roles to this repository's GitHub labels."
 status: draft
 ---
 # Triage Labels

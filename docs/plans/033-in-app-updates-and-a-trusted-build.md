@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: 'Plan 033: Updates that install themselves, on an app macOS already trusts'
-description: So every release costs the Editor a browser download, a Gatekeeper refusal, a trip to System Settings › Privacy & Security to approve the app, and a drag into Applications.
+description: "Plans signed, trusted macOS releases with automatic in-app updates and recovery behavior."
 status: draft
 created: 2026-09-11
-plan_status: null
+plan_status: active
 ---
 # Plan 033: Updates that install themselves, on an app macOS already trusts
 

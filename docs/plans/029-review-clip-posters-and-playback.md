@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: 'Plan 029: Poster-first Candidate Clip cards and play-once previews'
-description: Grid is the default Review view (SourceClipsPanel.tsx:82) and every ClipCard mounts a real <video preload="metadata"> (ClipCard.tsx:139-142).
+description: "Plans static Candidate Clip posters and controlled play-once previews to reduce Review loading and media work."
 status: draft
 created: 2026-09-02
+plan_status: active
 ---
 # Plan 029: Poster-first Candidate Clip cards and play-once previews
 

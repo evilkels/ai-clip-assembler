@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Docs
-description: Map of this directory.
+description: "Points readers to the documentation index and its grouped page descriptions."
 status: draft
 ---
 # Docs

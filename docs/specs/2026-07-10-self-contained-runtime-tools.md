@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Self-Contained macOS Runtime Tools
-description: Approved design; implementation plan pending review.
+description: "Specifies a self-contained macOS installation with a packaged backend and local analysis tools."
 status: draft
 created: 2026-07-10
 ---

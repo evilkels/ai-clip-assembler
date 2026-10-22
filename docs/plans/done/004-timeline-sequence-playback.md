@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 004: Make Timeline play the assembled sequence, video-driven and stutter-free'
-description: 'Real-footage QA found Timeline playback broken and janky, for two reasons: (1) two unsynchronized clocks — a requestAnimationFrame-driven React playhead vs.'
+description: "Records video-driven assembled-sequence playback and explicit seeking without competing playback clocks."
 status: draft
 created: 2026-06-11
 plan_status: done

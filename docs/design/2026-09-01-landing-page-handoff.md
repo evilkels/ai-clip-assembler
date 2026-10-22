@@ -1,7 +1,7 @@
 ---
 type: Note
 title: 'Handoff: AI Clip Assembler — Landing Page Redesign'
-description: wordmark, platform badge, thin nav, primary download affordance.
+description: "Describes the approved landing-page layout, themes, real-footage scoring presentation, and implementation handoff."
 status: draft
 ---
 # Handoff: AI Clip Assembler — Landing Page Redesign

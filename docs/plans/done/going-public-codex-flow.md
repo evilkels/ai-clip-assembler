@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Going-public roadmap — Codex CLI flow
-description: 'Superseded by: ROADMAP (2026-10-08; trust and installability now live in plans 038, 033 and self-contained-runtime-tools).'
+description: "Preserves the public-launch roadmap superseded by the v1.0.0 roadmap and its AI, trust, and packaging plans."
 status: draft
 created: 2026-07-02
 plan_status: done

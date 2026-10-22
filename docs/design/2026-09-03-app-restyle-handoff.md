@@ -1,7 +1,7 @@
 ---
 type: Note
 title: 'Handoff: AI Clip Assembler — App Restyle (Import · Review · Timeline · Export · Settings)'
-description: The companion app-reference.dc.html (1.8 MB, fixed 1440px, inline styles) is the authority wherever it and this document disagree.
+description: "Describes the approved desktop app restyle across Import, Review, Timeline, Export, Settings, and Diagnostics."
 status: draft
 ---
 <!--

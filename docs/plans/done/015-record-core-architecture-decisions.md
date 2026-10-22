@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 015: Record the core architecture decisions as ADRs'
-description: ADRs state a durable decision and consequences, then link to implementation detail.
+description: "Records the settled local-first, Timeline authority, Project persistence, and export constraints as architecture decisions."
 status: draft
 created: 2026-07-14
 plan_status: done

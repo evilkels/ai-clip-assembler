@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Demo Recording Guide
-description: Maintainer runbook for the truthful 45–60s proof-of-work demo in landing-page-polish-and-launch.md.
+description: "Defines the footage, capture steps, shot list, and approval evidence for a truthful product demo."
 status: draft
 ---
 # Demo Recording Guide

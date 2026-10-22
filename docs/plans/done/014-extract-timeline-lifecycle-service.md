@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 014: Extract Timeline lifecycle coordination from the API module'
-description: Move Timeline Document reconstruction, controller caching, durable-write callbacks, snapshots, and event publication out of api.py while keeping GUI and MCP on one backend-authoritative Timeline Document and Operations core.
+description: "Moves Timeline reconstruction, controller caching, durable writes, and event publication into a lifecycle service."
 status: draft
 created: 2026-07-14
 plan_status: done

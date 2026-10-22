@@ -1,10 +1,10 @@
 ---
 type: Plan
 title: Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
-description: Make All Clips the clearly stated Candidate Clip authority and
+description: "Plans a clearly authoritative Candidate Clip library and more diverse Suggested Edits beyond the shipped quota fix."
 status: draft
 created: 2026-08-13
-plan_status: null
+plan_status: proposed
 ---
 # Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
 

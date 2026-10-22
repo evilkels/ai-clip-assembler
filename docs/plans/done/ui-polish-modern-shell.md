@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan: Modern professional UI shell'
-description: 'Previous status (retained for history): PARTIAL, and its central library decision is now contradicted by what shipped (reconciled 2026-08-13).'
+description: "Preserves the earlier shell-polish proposal superseded by the studio redesign and shell follow-ups."
 status: draft
 created: 2026-05-30
 plan_status: done

@@ -1,7 +1,7 @@
 ---
 type: Review
 title: 'Design audit: Review (`1b`), Timeline (`3a`), Export (`3b`) against the restyle reference'
-description: Plan 031 recorded that only the shell and Import had been diffed element by element.
+description: "Audits Review, Timeline, and Export against the restyle reference and identifies remaining conformance work."
 status: draft
 created: 2026-09-03
 ---

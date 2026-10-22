@@ -1,7 +1,7 @@
 ---
 type: Note
 title: Plans
-description: Single home for written plans; the order they ship in is ROADMAP.md.
+description: "Indexes active and closed plans with checkbox-derived progress and links to the roadmap and parked work."
 status: draft
 ---
 # Plans

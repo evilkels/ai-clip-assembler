@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Studio Workflow Redesign Implementation Plan
-description: Apply the approved Claude Design studio system to the shared desktop shell and the Import, Review, Timeline, and Export workflows without changing backend authority or product behavior.
+description: "Applies the approved studio design to the desktop shell and core workflows while preserving product behavior."
 status: draft
 created: 2026-08-14
 plan_status: done

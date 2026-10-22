@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Project Shell Header and Project List Redesign
-description: Put the current project's identity in one place above the whole
+description: "Consolidates Project identity, recent Projects, and shell navigation in the shared header and sidebar."
 status: draft
 created: 2026-08-12
 plan_status: done

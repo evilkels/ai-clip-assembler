@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: 'Plan 002: Design spike — make pi harness scoring survive a realistic session'
-description: DONE (2026-06-19). Priority P2, depends on none (pairs with plan 001).
+description: "Records the design spike and benchmarks for making Pi scoring reliable across realistic sessions."
 status: draft
 created: 2026-06-11
 plan_status: done

@@ -1,7 +1,7 @@
 ---
 type: Review
 title: iPhone footage checkpoint review — 2026-10-10
-description: The owner requested preservation of the stalled work as-is, a plan/PR status check, and independent tester and code-review agents.
+description: "Records plan 042's checkpoint, independent code and behavior reviews, and remaining iPhone-footage work."
 status: draft
 created: 2026-10-10
 ---

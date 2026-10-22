@@ -1,7 +1,7 @@
 ---
 type: Review
 title: Task 7 implementer report
-description: Packaged Electron/macOS presentation, real footage, Final Cut Pro, DaVinci Resolve, and NLE relink/orientation checks remain human work.
+description: "Records integrated studio-workflow acceptance results and the packaged-app and editing-app checks still requiring a human."
 status: draft
 created: 2026-09-02
 ---

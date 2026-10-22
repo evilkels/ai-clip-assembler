@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: 'Research: a sandboxed Lua runtime for Review-chat timeline scripting'
-description: Question. An Editor (or the In-App Review Agent) will paste a short Lua script into the Review chat, like pasting a script into DaVinci Resolve's console, and it edits the Timeline.
+description: "Evaluates a sandboxed Lua runtime that records Timeline Operations without exposing host capabilities."
 status: draft
 created: 2026-09-29
 ---

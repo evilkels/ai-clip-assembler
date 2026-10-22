@@ -1,9 +1,10 @@
 ---
-type: Review
+type: Plan
 title: 'Plan 017: Review-page clarity and polish'
-description: Make Candidate Clips discoverable and explain Suggested cuts, clip-generation controls, include/exclude, and the Working Timeline.
+description: "Records Review clarity and smoothness improvements while assigning poster and broader library work to other plans."
 status: draft
 created: 2026-07-22
+plan_status: done
 ---
 # Plan 017: Review-page clarity and polish
 

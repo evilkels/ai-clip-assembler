@@ -1,0 +1,123 @@
+Verification review, round 2: docs/reviews/2026-10-22-roadmap-overview/index.html (read-only)
+
+Every round-1 must-fix is resolved: the four from Codex, the four from Claude and B1 from the source-blind check. M1 is resolved too. Each work block now says on the page where it lives (code on main, a branch that is not merged yet, or not started), so the amber "Gaida" status no longer hides that difference. One new issue would probably fail C5 again under a strict reading of the contract: on a phone, the item titles in the work table are standalone links only 19 px tall. Everything else is Latvian polish. No files were edited; GitHub was only read through the API; the browser was an isolated agent-browser session, now closed.
+
+Base path for the lines below: /Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html (written as index.html:N)
+
+ROUND-1 MUST-FIX STATUS
+
+Codex C1, evidence links: RESOLVED
+- index.html:394 noscript: "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md" and ".../docs/reviews/2026-10-22-repo-audit.md"
+- index.html:415: "<a href="https://github.com/.../2026-10-22-repo-audit.md">22.10.2026 auditam</a>"
+- index.html:427: "...repo-audit.md#owner-checks-before-tagging" and "#draft-v050-release-notes"
+- No relative "../" links remain (grep).
+- Checked with gh api: all 12 main-branch documents, 041 on feat/remote-view, Actions run 39805366014 (2df0169, success, "Tests"), release v0.4.0 (published 2026-10-04) and issues #80/#84/#88/#89 (all open) exist.
+- Both anchors match the audit headings "### Owner checks before tagging" and "### Draft v0.5.0 release notes" (GitHub drops the dots from the slug).
+
+Codex C2 / Claude N11, contrast of the accent buttons: RESOLVED
+- index.html:54: "--accent-ink: light-dark(oklch(1 0 none), oklch(from #1a0308 l c h));"
+- index.html:222: "color: var(--accent-ink);"
+- Calculated contrast: white on #e11d48 is 4.70:1 (light theme); #1a0308 on #ff4d6d is 6.16:1 (dark theme). Both meet the 4.5:1 minimum.
+- The rendered Copy button in the browser used the dark pair.
+
+Codex C3, Q2 approval of the final privacy text: RESOLVED
+- index.html:1226: "Plānots teksts no 038 D18; tas apraksta mērķa uzvedību ... Pilnais piedāvātais teksts: “When AI is on, ... Disconnecting stops it everywhere.”"
+- This matches plans/038-ai-connection.md:273-279 word for word.
+- index.html:1228: "Apstiprinu šo tekstu"
+
+Claude M1, "Gaida" status hides main vs not started: RESOLVED (one small gap on phone, under nice-to-have N1)
+- Every item now carries a delivery label, for example:
+  - index.html:574 "Kods main; gaida kvalitātes vērtējumu"
+  - :587 "Kods main; gaida montāžas lietotņu testus"
+  - :630 "Nav sākts; vispirms 2. posms"
+  - :641 "Nav sākts; vispirms 3. posms"
+  - :652 "Nav sākts; vispirms 4. posms"
+  - :686 "Draft zarā; apturēts, 11/36"
+- The labels are drawn at index.html:1438 (desktop track) and :1430 (phone bars).
+- At 1440 px the label shows under every pill. At 390 px it shows in the bar of each group that has one item. That covers all of 1, 1b, 3, 4 and 5: "1 Gaida / Kods main; gaida kvalitātes vērtējumu" versus "1 Gaida / Nav sākts; vispirms 2. posms".
+- Each table note also names where the work lives (:569, :627, :682).
+- Keeping dependency-blocked items as "Gaida" is consistent with the legend "pārbaudi vai atkarību" (:461). The reader can now tell code on main from not started from a parked draft.
+- Milestone 7 is now "progress" (:669) with "Daļa jau v0.4.0; parakstīšana nav sākta" (:674). The source supports this: self-contained-runtime-tools.md:32-34 has 1.1-1.3 "shipped before v0.4.0", and 033 Phase 1 is all unchecked.
+- The status-count sentence now reads correctly (:398, rendered): "Darba bloki kopā: 16. Izlaisti: 1; sagatavoti: 4; iesākti: 4; gaida: 6; plānoti: 1."
+
+Claude M2, v0.5.0 owner checks: RESOLVED
+- Ernesto's list, index.html:427: "Pirms v0.5.0 uzstādīt kandidāta DMG tīrā arm64 un x64 Mac, pārbaudīt versiju un atjauninājuma paziņojumu. Ja #101 iekļauts, pārbaudīt AI kļūdas un datu robežu; pēc Final Cut testa atbildēt #80 ..."
+- Same line: "Pirms 7. posma nodrošināt Apple dalību un notarizēta DMG pārbaudi."
+- Q5, index.html:1268, covers clean arm64/x64 Macs, the app/backend version, the update notice, H.264 and HEVC/HDR footage, save/reopen, Final Cut and Resolve imports, a moved folder, Lua/keyboard, the #101 failure cases plus the allowed payload, and the #80 reply.
+- This matches all five owner checks in audit §5.
+
+Claude M3, "Spēlētājs" (game player): RESOLVED
+- index.html:410: "Atskaņotājs rāda portreta kadrus pareizā formātā."
+- :428: "Atskaņotāju paredzēts paturēt kā Proposal Preview."
+- No "Spēlētāj" remains anywhere on the page (grep).
+
+Claude M4, audit numbers that look like GitHub numbers: RESOLVED
+- index.html:415: "A = 8. oktobra audita punkts; N = 22. oktobra jaunais atradums."
+- :417 uses "A4", "A3/A8/A9/A12", "A10 un N2–N4", "A5/A6/A11".
+- The mapping matches the audit: §2 rows 3/8/9/12 (rederive, rescan, late SSE, receipt), 10 (Resolve), 5/6/11 (#101 pending); §3 N10/N12 for #108 (:682).
+
+B1, source-blind C5 touch size of standalone status links: RESOLVED
+- index.html:370: ".toc a, a.pill { min-block-size:44px; }"
+- Re-measured at 390x844 with every disclosure open: 11 visible a.pill, smallest 44 px; phone group bars 60-101 px.
+- At 1440 the side-rail links are 8 × 44 px; at 1000 the sticky nav links are 44 px tall and 44-90 px wide.
+- No horizontal overflow at 390 (scrollWidth 390) or 1440.
+
+#101, #111 and #112 are internally consistent:
+- #101 OPEN (:792), item 2 "PR #101 vēl atvērts" (:614)
+- #111 OPEN (:744), OKF "PR #111 atvērts" (:719)
+- #112 MERGED 2026-10-22 (:807), audit "#112 sapludināts 22.10.2026" (:731)
+
+NEW MUST-FIX
+
+1. Item-title links in the phone table are 19 px tall and stand alone in their cell, so they would likely fail a strict C5 re-run.
+   - Where: index.html:1466: "<td>${t.planUrl ? `<a href="${href(t.planUrl)}">${rich(t.title)}</a>` : rich(t.title)}</td>"
+   - Measured at 390 px with the list open:
+     - "Baseline" 59.9×19, "Exports that open" 123.7×19, "Trusted release" 107.8×19
+     - "Remote View prototype refresh stability" 216.5×42.25
+   - On a phone each title is the only content of its flex cell (:283), so the in-sentence exemption does not apply. That is the same "standalone, no larger hit area" pattern that failed B1.
+   - Not a problem: in-sentence links pass as inline text. These are the lede link (:397), the intro links (:415, :427), the footer link (:431) and the #NN references after table notes (:1454).
+   - Fix: add ".all-items td:nth-child(2) > a { display:inline-flex; align-items:center; min-block-size:44px; }" inside the 640 px media block (:276-287), or to all widths.
+
+No other must-fix. Privacy is clean:
+- Grep finds no /Users paths, tokens or other clients ("token" matches only the CSS comment "tokens.css").
+- Facts re-checked against the sources: D18, Commercial Terms (ROADMAP.md:84), 042 Phase 6 unchecked (042:57-61), the 90-day Final Cut trial (032:246), 99 USD (033:75).
+
+SCORES (1-5)
+
+- Audience fit / first screen: 5.
+  - The 390 and 1440 screenshots show the lede (released v0.4.0 / main / v0.5.0 checks), the counts, the legend and the first track groups with their delivery labels above the fold.
+- Conceptual correctness: 5.
+  - Status, delivery location and owner checks match ROADMAP, plans 032/033/037/038/042, the runtime-tools plan and audit §2/§3/§5.
+- Latvian: 4.
+  - Clear and second-person. A few awkward or ambiguous phrases remain (nice-to-have list below).
+- Privacy and claims: 5.
+  - Claims are hedged ("nav apliecināti", "nepierāda", "plānots teksts"). Only owner-appropriate private GitHub links.
+- Structure / accessibility / ARIA / noscript / responsive: 4.
+  - In place: the track region plus a screen-reader-only h2 (:403, :1434); h3 grouping on the fix cards (:416); noscript content plus hiding of JavaScript-only sections (:369, :394); 44 px pills, nav and summaries; no overflow.
+  - Minus the table-title target above.
+- Business realism: 4.
+  - 99 USD with "verify at enrollment" (:1282); the trial treated as a plan option whose availability must be confirmed (:1254).
+  - Revenue/ROI: N/A.
+
+NICE-TO-HAVE
+
+- N1. On a phone, 041's "Gaida" has no delivery label in its bar.
+  - Where: index.html:1430, `inGroup.length===1 && inGroup[0].delivery`.
+  - At 390 the experiment bar reads only "2 darba bloki: 1 Sagatavots, 1 Gaida". "Draft zarā; apturēts" is one tap away in the table.
+  - Fix: for groups with several items, list "id: delivery" for each item, e.g. "041: Draft zarā; apturēts · 043: Prototipa kods main".
+- N2. Number agreement in the bars.
+  - Where: index.html:1430 `${n} ${esc(statuses[k].label)}`.
+  - Renders "2 Sagatavots, 1 Iesākts". Use "Sagatavots: 2, Iesākts: 1", the same form as the :398 counts.
+- N3. index.html:1268, "Šī atbilde nepalaiž tagošanu." This reads as "does not launch tagging".
+  - Fix: "Šī atbilde nav tagošanas priekšnoteikums."
+  - In the same line, "iziet īstu drone/iPhone H.264 un HEVC/HDR materiālu" → "pārbaudīt ar īstu drona/iPhone H.264 un HEVC/HDR materiālu".
+- N4. index.html:427, ordinals and calques.
+  - "Iziet CI" → "Sagaidīt zaļu CI".
+  - "Turpināt 3 → 4 → 5; 6 izmanto jau gatavo atlasītāju. 7 parakstīšanas darbu sākt laikus." → "Turpināt 3. → 4. → 5. posmu; 6. posms izmanto jau gatavo atlasītāju. 7. posma parakstīšanas darbu sākt laikus."
+  - "uzstādīt kandidāta DMG tīrā arm64 un x64 Mac" → "uzstādīt kandidāta DMG uz tīriem arm64 un x64 Mac datoriem".
+- N5. index.html:397, "tev jāpārbauda īstie materiāli, Final Cut Pro un Resolve". As written it says to test the apps themselves.
+  - Fix: "tev jāpārbauda darbs ar īstiem materiāliem un imports Final Cut Pro un Resolve".
+- N6. index.html:408, "saglabāta formāta maiņa" is unclear.
+  - Fix: "formāta maiņa tagad nonāk Timeline".
+
+Verdict: all round-1 must-fixes are resolved, including M1. The only blocker is the 44 px target for the phone table's title links, so C5 is not in doubt; after that fix the page is ready, apart from the final status-only metadata refresh of the three changing PRs.

@@ -1,0 +1,12 @@
+C1 and C4 pass. C5 still fails: the repaired pills now have 44px hit areas, but nearby table PR links remain too small for touch. No input is needed; the remaining fix is in those table links.
+
+- **C1 — PASS, rerun.** At 1280×800 and 390×844, the opening screen distinguishes released v0.4.0, unreleased main, and v0.5.0 owner checks. Document width exactly matched each viewport, including with all 16 disclosures open.
+- **C4 — PASS, rerun.** Both widths produced filter counts **1/4/4/6/1**, and **Visi** restored all 16 rows. After selecting Plānots, desktop track and phone outcome pills revealed their own rows. A phone group bar opened the closed table and narrowed it to its matching row.
+- **C5 — FAIL, rerun.**
+  - **Repair verified:** all 27 visible desktop item pills and 11 phone outcome pills measured **44px high**. Hit testing confirmed the full centerline height; clicking a phone pill 2px below its top activated it. Desktop navigation measured **200×44px**; phone navigation was at least **44×44px**.
+  - **Remaining failure:** full-table `#91` links measured **33.02×19.5px**, and `#100` links **40.76×19.5px**, at both widths. No expanded hit area was detected. Clicking 6px above `#91` did nothing; clicking inside activated it and opened the containing PR disclosure.
+  - All 16 disclosures opened and closed. Space and Enter toggled the table disclosure; Tab/Shift+Tab reached PR links with a visible 3px focus outline. Enter activated PR and item links. All eight desktop section links navigated while disclosures stayed closed.
+  - The portrait image loaded successfully with descriptive alt text.
+- **C2/C3/C6 — PASS carried forward from round 1; not rerun.**
+
+Verification used only the supplied contract and browser DOM/rendered UI in a dedicated tab. No files were edited, no source/tests/git/reports were read, and GitHub was not mutated. Physical iPhone testing remains out of scope.

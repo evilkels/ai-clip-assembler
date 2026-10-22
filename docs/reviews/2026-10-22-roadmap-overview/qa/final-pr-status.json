@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-22T16:23:06.242014+00:00",
+  "prs": [
+    {
+      "mergedAt": null,
+      "number": 101,
+      "state": "OPEN"
+    },
+    {
+      "mergedAt": null,
+      "number": 111,
+      "state": "OPEN"
+    },
+    {
+      "mergedAt": "2026-10-22T15:46:47Z",
+      "number": 112,
+      "state": "MERGED"
+    }
+  ]
+}

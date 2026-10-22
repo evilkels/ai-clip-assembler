@@ -1,0 +1,30 @@
+{
+  "pageSha256": "7025c6a281c3657f4e4dca9157e4a063e101d40d970bdd2492eb4cdb25f5052b",
+  "phoneClosedHeight": 7878,
+  "phoneBudget": 8000,
+  "statuses": {
+    "live": 1,
+    "built": 4,
+    "progress": 4,
+    "waiting": 6,
+    "planned": 1
+  },
+  "pageCheck": "4/4 pass; screenshots inspected in both themes",
+  "webkit": "10/10 pass; 393x665,360x640,375x548,412x780,430x740 in both themes",
+  "links": "44 GitHub links returned HTTP 200",
+  "privacy": "PASS for owner-only page/font/shot bundle; no public tunnel",
+  "reviews": "Codex and Claude round1; Claude verifier resolved content issues; source-blind r4 closes all touch targets",
+  "repoChecks": [
+    "python3 scripts/plans.py check: PASS",
+    "python3 scripts/tests/test_site_contract.py -v: 7 PASS (site workflow does not target docs/reviews HTML)"
+  ],
+  "scope": "Static overview and evidence; no app build or real-footage/NLE/physical-iPhone QA performed",
+  "disagreements": [
+    "032 code merged but H1-H5 and #80 retest open",
+    "042 remains11/14 plus two human gates despite merged UI PRs",
+    "101 and111 remain open;112 is merged; no expected merge counted",
+    "041 draft11/36 and parked with N10/N12;043 is a separate prototype fix",
+    "Versions retirement is a pending owner choice; not a completed removal",
+    "7 has partial runtime work before v0.4.0; signing/notarization/updates remain"
+  ]
+}

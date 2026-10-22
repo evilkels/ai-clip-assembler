@@ -1,0 +1,10 @@
+{
+  "scope": "index.html, bundled fonts/license and cropped product screenshot; owner-only review evidence is not a share bundle",
+  "patternHits": [],
+  "forbiddenPersonalPaths": false,
+  "imageInspected": true,
+  "externalAssets": false,
+  "pass": true,
+  "audience": "Owner Ernesto; private repository links and unpublished work are intentional",
+  "publicTunnelOpened": false
+}

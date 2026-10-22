@@ -3,7 +3,7 @@
 Local-first desktop video editor: Electron + React in `frontend/`, FastAPI +
 Python in `backend/`. Order of work: `docs/ROADMAP.md`. Vocabulary: `GLOSSARY.md`. System design:
 `docs/ARCHITECTURE.md`. Harness contract: `docs/HARNESS_SPEC.md`. Docs map:
-`docs/README.md`.
+`docs/index.md`.
 
 ## Agent skills
 
@@ -34,3 +34,14 @@ Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`
   delegation briefs) are git-ignored and never committed. Delegated work is
   tracked as tasks in its `docs/plans/` plan; a record worth keeping goes in
   `docs/reviews/`.
+
+## Docs (OKF)
+
+`docs/` is an OKF v0.2 bundle using the types in Ernesto's vault
+(`~/ernesto-os/_system/types/`: Plan, Spec, Review, Decision, Note).
+Every `.md` in `docs/` starts with frontmatter: `type`, `title`,
+`description`, `status`; plans add `plan_status`, decisions add
+`decision_status`; `created` is optional. Standard relative markdown links
+only. Before committing docs changes run
+`python3 ~/ernesto-os/tools/okf.py validate --root .`.
+Vault page for this repo: `~/ernesto-os/10-projects/ai-clip-assembler/ai-clip-assembler-code.md`.

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '019: Find more clips'
+description: "Plans More clips and Longer clips actions that append cached Candidate Clips without changing the Timeline or existing decisions."
+status: draft
+created: 2026-07-22
+plan_status: active
+---
 # 019: Find more clips
 
 A **Find more** button beside each Source Video on the Review Board with two

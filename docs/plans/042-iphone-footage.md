@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '042: iPhone footage end to end'
+description: "Tracks iPhone frame rates, capture order, orientation, vertical previews, and exports through the complete editing workflow."
+status: draft
+created: 2026-10-10
+plan_status: active
+---
 # 042: iPhone footage end to end
 
 A folder of iPhone clips goes from Import to an export that opens at the

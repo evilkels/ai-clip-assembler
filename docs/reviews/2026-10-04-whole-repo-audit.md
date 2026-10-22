@@ -1,3 +1,10 @@
+---
+type: Review
+title: Whole-repo audit — 2026-10-04
+description: "Records a whole-repository audit of correctness, tests, architecture, and the Review scripting branch."
+status: draft
+created: 2026-10-04
+---
 # Whole-repo audit — 2026-10-04
 
 Target: `feat/review-chat-scripting` at `3543c6e` (main `f15906d` + open PR #86, plan 034 Lua scripting).

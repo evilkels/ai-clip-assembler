@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0001: Local-first processing with explicit per-project cloud consent'
+description: "Records local-first processing and the original per-project cloud consent policy, whose consent scope is superseded by ADR 0007."
+status: draft
+created: 2026-07-14
+decision_status: accepted
+---
 # 0001: Local-first processing with explicit per-project cloud consent
 
 ## Status

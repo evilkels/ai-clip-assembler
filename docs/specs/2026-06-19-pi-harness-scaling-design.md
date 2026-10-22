@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Pi Harness Scaling — Design Spike
+description: "Evaluates Pi scoring throughput and failure handling using measured benchmarks and design alternatives."
+status: draft
+created: 2026-06-19
+---
 # Pi Harness Scaling — Design Spike
 
 Date: 2026-06-19

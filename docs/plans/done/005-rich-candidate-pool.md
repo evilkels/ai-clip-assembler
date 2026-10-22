@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 005: Separate rich Candidate Clip discovery from draft selection'
+description: "Separates Candidate Clip discovery from draft selection so review agents retain a richer scene-aware library."
+status: draft
+created: 2026-06-21
+plan_status: done
+---
 # Plan 005: Separate rich Candidate Clip discovery from draft selection
 
 ## Status

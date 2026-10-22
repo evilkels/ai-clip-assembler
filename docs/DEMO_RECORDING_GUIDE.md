@@ -1,3 +1,9 @@
+---
+type: Note
+title: Demo Recording Guide
+description: "Defines the footage, capture steps, shot list, and approval evidence for a truthful product demo."
+status: draft
+---
 # Demo Recording Guide
 
 Maintainer runbook for the truthful 45–60s proof-of-work demo in

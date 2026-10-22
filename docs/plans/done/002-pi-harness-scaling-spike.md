@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 002: Design spike — make pi harness scoring survive a realistic session'
+description: "Records the design spike and benchmarks for making Pi scoring reliable across realistic sessions."
+status: draft
+created: 2026-06-11
+plan_status: done
+---
 # Plan 002: Design spike — make pi harness scoring survive a realistic session
 
 ## Status

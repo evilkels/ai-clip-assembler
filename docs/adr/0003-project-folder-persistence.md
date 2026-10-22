@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0003: Projects persist as folders with JSON and FFmpeg-derived metadata'
+description: "Stores Project state in a folder alongside source media using JSON and FFmpeg-derived metadata."
+status: draft
+created: 2026-07-14
+decision_status: accepted
+---
 # 0003: Projects persist as folders with JSON and FFmpeg-derived metadata
 
 ## Status

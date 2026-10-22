@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 015: Record the core architecture decisions as ADRs'
+description: "Records the settled local-first, Timeline authority, Project persistence, and export constraints as architecture decisions."
+status: draft
+created: 2026-07-14
+plan_status: done
+---
 # Plan 015: Record the core architecture decisions as ADRs
 
 Status: DONE (2026-07-09) in `93b0d37`. Four records and the index shipped;

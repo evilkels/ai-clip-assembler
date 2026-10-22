@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Shell Follow-ups
+description: "Collects deferred shell interactions and score-chip verification after the studio redesign."
+status: draft
+created: 2026-09-02
+plan_status: proposed
+---
 # Shell Follow-ups
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

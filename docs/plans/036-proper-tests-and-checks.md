@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '036: Proper tests and checks'
+description: "Aligns local, commit-hook, and CI checks while correcting tests that fail to prove their stated behavior."
+status: draft
+created: 2026-10-06
+plan_status: active
+---
 # 036: Proper tests and checks
 
 Every check that guards a PR runs the same way locally, in the pre-commit hook

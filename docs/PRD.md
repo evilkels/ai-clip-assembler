@@ -1,3 +1,9 @@
+---
+type: Note
+title: 'Product Requirement Document: AI Clip Assembler'
+description: "Defines the product goals, target users, editing workflow, and requirements for a local-first video editor."
+status: draft
+---
 # Product Requirement Document: AI Clip Assembler
 
 ## Overview

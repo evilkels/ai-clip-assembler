@@ -1,3 +1,9 @@
+---
+type: Note
+title: User Guide
+description: "Guides Editors from opening footage through reviewing Candidate Clips, editing the Timeline, and exporting a cut."
+status: draft
+---
 # User Guide
 
 AI Clip Assembler turns raw drone/action footage into a tight 1–3 minute

@@ -1,3 +1,9 @@
+---
+type: Note
+title: MCP Server — controlling the timeline with an external agent
+description: "Documents how external agents connect to the local MCP server and edit the shared Timeline through reversible Operations."
+status: draft
+---
 # MCP Server — controlling the timeline with an external agent
 
 The AI Clip Assembler backend embeds a local **MCP Server** (Model Context

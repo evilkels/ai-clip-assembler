@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Authoritative Timeline and Truthful Export Design
+description: "Specifies lossless Timeline item projection and export without legacy mutations or collapsed repeated placements."
+status: draft
+created: 2026-08-10
+---
 # Authoritative Timeline and Truthful Export Design
 
 **Date:** 2026-08-10  

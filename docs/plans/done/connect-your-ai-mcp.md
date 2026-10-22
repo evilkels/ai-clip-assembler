@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Connect Your AI MCP Implementation Plan
+description: "Connects Claude Desktop or Codex to the local MCP tools for inspecting Candidate Clips and editing the live Timeline."
+status: draft
+created: 2026-06-28
+plan_status: done
+---
 # Connect Your AI MCP Implementation Plan
 
 **Status:** DONE (2026-07-02) — Tasks 1-6 implemented, automated verification green. Task 7's live-client smoke test was intentionally not run (requires a human with Claude Desktop/Codex).

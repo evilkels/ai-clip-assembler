@@ -1,3 +1,9 @@
+---
+type: Note
+title: Updating and removing the app
+description: "Explains update notifications, the install and removal wizard, and the release process."
+status: draft
+---
 # Updating and removing the app
 
 Two things keep an installed copy of AI Clip Assembler current: the app tells you

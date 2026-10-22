@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Connected Review Pipeline Design
+description: "Specifies shared state and interaction rules for Review chat, Version previews, Source Clips, and the Working Timeline."
+status: draft
+created: 2026-06-21
+---
 # Connected Review Pipeline Design
 
 Date: 2026-06-21 · Status: Approved (shipped) · Owner: Elvijs

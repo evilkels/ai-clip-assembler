@@ -1,3 +1,9 @@
+---
+type: Note
+title: QA Plan
+description: "Records feature acceptance checks and known issues across analysis, review, Timeline editing, agents, and exports."
+status: draft
+---
 # QA Plan
 
 Drone-first acceptance for local import, Manual/Pi scoring, Candidate Clip

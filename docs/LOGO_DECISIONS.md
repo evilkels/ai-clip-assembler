@@ -1,3 +1,9 @@
+---
+type: Note
+title: Logo Decisions — AI Clip Assembler
+description: "Records the selected logo concept, asset files, visual treatment, and directions for future variants."
+status: draft
+---
 # Logo Decisions — AI Clip Assembler
 
 **Decision date:** 2026-06-27

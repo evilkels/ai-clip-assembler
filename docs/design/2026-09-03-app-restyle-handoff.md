@@ -1,3 +1,9 @@
+---
+type: Note
+title: 'Handoff: AI Clip Assembler — App Restyle (Import · Review · Timeline · Export · Settings)'
+description: "Describes the approved desktop app restyle across Import, Review, Timeline, Export, Settings, and Diagnostics."
+status: draft
+---
 <!--
 Supplied by the design owner 2026-09-03 as `design-proper-improvement.zip`
 (`design_handoff_app/README.md`), checked in verbatim below the horizontal rule

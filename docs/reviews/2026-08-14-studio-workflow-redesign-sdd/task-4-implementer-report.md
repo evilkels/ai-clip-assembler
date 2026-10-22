@@ -1,3 +1,10 @@
+---
+type: Review
+title: Task 4 implementer report
+description: "Records the three-zone Review redesign, Version controls, stale-state handling, and verification results."
+status: draft
+created: 2026-09-02
+---
 # Task 4 implementer report
 
 ## Scope delivered

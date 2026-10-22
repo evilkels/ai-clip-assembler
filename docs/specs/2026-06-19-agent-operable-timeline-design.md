@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Agent-Operable Timeline Design
+description: "Specifies one backend-authoritative Timeline Document and Operations core for GUI and agent editing."
+status: draft
+created: 2026-06-19
+---
 # Agent-Operable Timeline Design
 
 Date: 2026-06-19 · Status: Approved · Owner: Elvijs · Implementation plan:

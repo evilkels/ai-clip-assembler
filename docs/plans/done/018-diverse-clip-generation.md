@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Diverse Clip Generation — Implementation Plan (Plan 018)
+description: "Builds a diverse Candidate Clip library and diversity-aware draft selection with generation controls on Import."
+status: draft
+created: 2026-07-22
+plan_status: done
+---
 # Diverse Clip Generation — Implementation Plan (Plan 018)
 
 **Status:** CODE COMPLETE (2026-07-21) — all five phases A–E landed on `feature/diverse-clip-generation`. Filed here (2026-08-13) as the delivery record for that code. One non-code task remained and has been split into its own plan: **the SigLIP ONNX model is not yet exported or bundled** — see [`025-bundle-siglip-embedding-model.md`](../later/025-bundle-siglip-embedding-model.md). `backend/models/README.md` records the model decision but the `.onnx` file itself does not exist in the repo/build. Until plan 025 lands, `default_embedding_provider()` returns `None` and every candidate falls into its own Look Group — diversity features are inert (a documented no-op degradation, not a bug) in real runs.

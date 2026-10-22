@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Authoritative Timeline Items Implementation Plan
+description: "Makes Timeline rendering, playback, and editing preserve every authoritative item, including repeated source placements."
+status: draft
+created: 2026-08-12
+plan_status: done
+---
 # Authoritative Timeline Items Implementation Plan
 
 > **Status:** DONE (2026-08-10; review-fix pass verified in `a707f96`)

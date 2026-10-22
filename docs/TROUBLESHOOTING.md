@@ -1,3 +1,9 @@
+---
+type: Note
+title: Troubleshooting & FAQ
+description: "Explains common local setup, analysis, AI, playback, and export failures and their remedies."
+status: draft
+---
 # Troubleshooting & FAQ
 
 Common issues when running AI Clip Assembler locally, and how to fix them.

@@ -1,3 +1,9 @@
+---
+type: Note
+title: Plans
+description: "Indexes active and closed plans with checkbox-derived progress and links to the roadmap and parked work."
+status: draft
+---
 # Plans
 
 Single home for written plans; the order they ship in is [`ROADMAP.md`](../ROADMAP.md). Each row summarises; the plan file holds the

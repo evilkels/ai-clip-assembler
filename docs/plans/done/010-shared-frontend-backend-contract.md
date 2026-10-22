@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 010: Generate frontend domain types from the backend, killing hand-maintained contract drift'
+description: "Generates frontend domain types from backend models and checks that the shared contract stays current."
+status: draft
+created: 2026-07-22
+plan_status: done
+---
 # Plan 010: Generate frontend domain types from the backend, killing hand-maintained contract drift
 
 ## Status

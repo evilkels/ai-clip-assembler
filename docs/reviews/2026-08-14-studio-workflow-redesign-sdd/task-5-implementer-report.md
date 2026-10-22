@@ -1,3 +1,10 @@
+---
+type: Review
+title: Task 5 implementer report
+description: "Records authoritative Timeline projection, the selected-item inspector, playback fixes, and regression evidence."
+status: draft
+created: 2026-09-02
+---
 # Task 5 implementer report
 
 Status: DONE

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
+description: "Plans a clearly authoritative Candidate Clip library and more diverse Suggested Edits beyond the shipped quota fix."
+status: draft
+created: 2026-08-13
+plan_status: proposed
+---
 # Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

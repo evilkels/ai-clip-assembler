@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Project Sidebar'
+description: "Preserves the sidebar's data source and interaction decisions after remaining shell work moved to follow-up plans."
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Project Sidebar
 
 Status: **CLOSED 2026-09-03 — SUPERSEDED.** Everything this plan deferred has

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 004: Make Timeline play the assembled sequence, video-driven and stutter-free'
+description: "Records video-driven assembled-sequence playback and explicit seeking without competing playback clocks."
+status: draft
+created: 2026-06-11
+plan_status: done
+---
 # Plan 004: Make Timeline play the assembled sequence, video-driven and stutter-free
 
 ## Status

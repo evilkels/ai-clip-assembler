@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 003: Spike — bundle the FastAPI backend into the packaged Electron app'
+description: "Preserves the backend packaging spike that was superseded by production DMG packaging."
+status: draft
+created: 2026-06-11
+plan_status: done
+---
 # Plan 003: Spike — bundle the FastAPI backend into the packaged Electron app
 
 ## Status

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Project = Folder On Disk'
+description: "Establishes Projects as on-disk folders with persistent state and media kept in place."
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Project = Folder On Disk
 
 **Status: CLOSED 2026-09-03 — DONE.** Implementation and automated QA are

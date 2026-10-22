@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 007: Make the In-App Review Agent a visual creative curator'
+description: "Adds bounded Frame Samples and conversation context so the Review Agent can curate visually distinct cuts."
+status: draft
+created: 2026-06-21
+plan_status: done
+---
 # Plan 007: Make the In-App Review Agent a visual creative curator
 
 ## Status

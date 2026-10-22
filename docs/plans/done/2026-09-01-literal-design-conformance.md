@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Literal Design Conformance Implementation Plan
+description: "Completes literal app and landing-page conformance to approved designs while retaining existing behavior."
+status: draft
+created: 2026-09-01
+plan_status: done
+---
 # Literal Design Conformance Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

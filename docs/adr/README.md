@@ -1,3 +1,9 @@
+---
+type: Note
+title: Architecture Decision Records
+description: "Indexes the numbered architecture decisions and explains their purpose and naming convention."
+status: draft
+---
 # Architecture Decision Records
 
 One file per decision, numbered (`0001-<slug>.md`), recording durable,

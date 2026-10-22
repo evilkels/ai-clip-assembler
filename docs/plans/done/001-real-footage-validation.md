@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 001: Instrument analysis timing and produce the real-footage validation runbook'
+description: "Records analysis timing instrumentation and the measured real-footage validation runbook."
+status: draft
+created: 2026-06-11
+plan_status: done
+---
 # Plan 001: Instrument analysis timing and produce the real-footage validation runbook
 
 **Status**: DONE (2026-06-11). **Planned at:** commit `6a39ed1`, 2026-06-10.

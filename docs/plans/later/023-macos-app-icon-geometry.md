@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 023: Correct macOS app icon geometry'
+description: "Plans a macOS icon geometry correction after v1.0.0."
+status: draft
+created: 2026-08-13
+plan_status: proposed
+---
 # Plan 023: Correct macOS app icon geometry
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

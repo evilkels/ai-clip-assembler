@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Self-contained macOS runtime tools
+description: "Packages verified FFmpeg and ffprobe tools with the backend so the macOS app works without developer dependencies."
+status: draft
+created: 2026-07-14
+plan_status: active
+---
 # Self-contained macOS runtime tools
 
 Every architecture-specific DMG ships the PyInstaller backend plus one verified

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 033: Updates that install themselves, on an app macOS already trusts'
+description: "Plans signed, trusted macOS releases with automatic in-app updates and recovery behavior."
+status: draft
+created: 2026-09-11
+plan_status: active
+---
 # Plan 033: Updates that install themselves, on an app macOS already trusts
 
 Status: TODO · Priority P2 · Effort L · Risk HIGH · Category distribution + trust

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 012: Transparent, adjustable clip generation (live re-derive)'
+description: "Persists frame scores and supports transparent clip regeneration from cached analysis with adjustable controls."
+status: draft
+created: 2026-07-22
+plan_status: done
+---
 # Plan 012: Transparent, adjustable clip generation (live re-derive)
 
 ## Status

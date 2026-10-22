@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0004: Exports are editable handoffs; EDL deliberately flattens Speed/Transform'
+description: "Treats exports as editable handoffs and records the deliberate loss of Speed and Transform in EDL."
+status: draft
+created: 2026-07-14
+decision_status: accepted
+---
 # 0004: Exports are editable handoffs; EDL deliberately flattens Speed/Transform
 
 ## Status

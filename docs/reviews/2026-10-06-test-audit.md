@@ -1,3 +1,10 @@
+---
+type: Review
+title: Test audit — 2026-10-06
+description: "Audits backend, frontend, and workflow tests for misleading assertions and missing behavioral proof."
+status: draft
+created: 2026-10-06
+---
 # Test audit — 2026-10-06
 
 Read-only discovery under the `test-audit` skill, run as three Codex Sol

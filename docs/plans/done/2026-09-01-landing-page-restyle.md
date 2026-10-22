@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Landing Page Restyle Implementation Plan
+description: "Implements the approved dark and light landing-page design with real scored footage and a download-focused layout."
+status: draft
+created: 2026-09-01
+plan_status: done
+---
 # Landing Page Restyle Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

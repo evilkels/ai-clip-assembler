@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0002: Backend-authoritative Timeline Document via a shared Operations core'
+description: "Makes the backend Timeline Document and shared reversible Operations core authoritative for GUI and agent edits."
+status: draft
+created: 2026-07-14
+decision_status: accepted
+---
 # 0002: Backend-authoritative Timeline Document via a shared Operations core
 
 ## Status

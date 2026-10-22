@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Landing page polish and launch backlog
+description: "Plans product proof, a release-matched download, and a measured launch loop for the public landing page."
+status: draft
+created: 2026-07-14
+plan_status: active
+---
 # Landing page polish and launch backlog
 
 The landing page carries proof, a release-matched download and a measured launch

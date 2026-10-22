@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Executor handoff: Agent-Operable Timeline'
+description: "Records the delivered shared Timeline Document, Operations core, MCP interface, and propose-mode Review Agent."
+status: draft
+created: 2026-06-19
+plan_status: done
+---
 # Executor handoff: Agent-Operable Timeline
 
 Status: EXECUTED 2026-06-19 in `431f51e`…`d012b60`; phases A1→A2→B→C were

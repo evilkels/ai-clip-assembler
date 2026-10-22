@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Review Timeline Video Preview Playwright Implementation Plan
+description: "Adds backend-backed Review and Timeline video previews and a browser-accessible QA route."
+status: draft
+created: 2026-06-10
+plan_status: done
+---
 # Review Timeline Video Preview Playwright Implementation Plan
 
 **Status:** DONE — implemented and verified on `feature/project-folder-model`, completed 2026-06-10.

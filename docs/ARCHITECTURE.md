@@ -1,3 +1,9 @@
+---
+type: Note
+title: Architecture
+description: "Explains the Electron and FastAPI architecture, local analysis pipeline, Timeline authority, persistence, and agent integration."
+status: draft
+---
 # Architecture
 
 ## Overview

@@ -1,3 +1,9 @@
+---
+type: Note
+title: AI Harness Interface Specification
+description: "Documents the AI harness input, output, and fallback contracts, with the legacy provider model superseded by ADR 0008."
+status: draft
+---
 # AI Harness Interface Specification
 
 ## Design Principles

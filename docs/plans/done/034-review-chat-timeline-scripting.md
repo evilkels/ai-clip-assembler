@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 034 — Review chat timeline scripting (Lua)
+description: "Implements sandboxed Lua Review Scripts that produce previewable, reversible Timeline Proposals."
+status: draft
+created: 2026-09-29
+plan_status: done
+---
 # 034 — Review chat timeline scripting (Lua)
 
 Status: 🟢 done — planned 2026-09-29; S1–S6 complete. Branch: `feat/review-chat-scripting`. Decision record:

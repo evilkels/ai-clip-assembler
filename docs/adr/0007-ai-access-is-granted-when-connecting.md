@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0007: AI Access is granted once, when the Editor connects a Provider'
+description: "Grants AI Access once when connecting a Provider and retains an AI switch for each Project."
+status: draft
+created: 2026-10-08
+decision_status: accepted
+---
 # 0007: AI Access is granted once, when the Editor connects a Provider
 
 ## Status

@@ -1,3 +1,10 @@
+---
+type: Spec
+title: 'Research: a sandboxed Lua runtime for Review-chat timeline scripting'
+description: "Evaluates a sandboxed Lua runtime that records Timeline Operations without exposing host capabilities."
+status: draft
+created: 2026-09-29
+---
 # Research: a sandboxed Lua runtime for Review-chat timeline scripting
 
 Date: 2026-09-29 · Branch: `research/rcs-lua-runtime` · Scope: research only, no

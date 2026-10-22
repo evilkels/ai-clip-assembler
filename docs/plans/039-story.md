@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '039: Story in the edit'
+description: "Adds Markers and Story Sections that survive undo and carry story context into exported editing timelines."
+status: draft
+created: 2026-10-08
+plan_status: active
+---
 # 039: Story in the edit
 
 The Editor and the In-App Review Agent put Markers (a note pinned to a moment)

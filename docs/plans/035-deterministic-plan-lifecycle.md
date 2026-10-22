@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '035: Deterministic plan lifecycle'
+description: "Plans checkbox-derived plan status, generated index rows, and automatic archival of closed plans."
+status: draft
+created: 2026-10-06
+plan_status: active
+---
 # 035: Deterministic plan lifecycle
 
 A plan's status, its row in the index and its move to `done/` follow

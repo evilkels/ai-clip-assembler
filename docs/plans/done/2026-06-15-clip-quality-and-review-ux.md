@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Clip Quality, Composition & Review UX Improvements
+description: "Improves scene-aware clip selection, composition, smoothness scoring, and Review feedback from real-footage findings."
+status: draft
+created: 2026-06-15
+plan_status: done
+---
 # Clip Quality, Composition & Review UX Improvements
 
 **Planned at:** commit `3fdad32`, 2026-06-15. **Status: all 5 phases landed** (2026-06-15). Backend 160 tests green, frontend typecheck clean.

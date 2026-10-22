@@ -1,3 +1,9 @@
+---
+type: Note
+title: Real-Footage Validation Runbook
+description: "Defines measured real-footage checks for analysis time, clip recall, and export relinking."
+status: draft
+---
 # Real-Footage Validation Runbook
 
 ## Purpose

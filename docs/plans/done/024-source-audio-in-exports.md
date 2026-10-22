@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 024: Source audio in exports'
+description: "Carries source audio into FCPXML, Resolve XML, and EDL exports with appropriate links and format warnings."
+status: draft
+created: 2026-08-13
+plan_status: done
+---
 # Plan 024: Source audio in exports
 
 Status: DONE (2026-08-13) · Shipped in PR #65; user confirmed real-footage and Resolve QA showed no problems

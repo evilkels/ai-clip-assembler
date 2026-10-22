@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Settings Page'
+description: "Introduces a Settings surface for global preferences and per-Project overrides."
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Settings Page
 
 **Status: DONE (2026-07-03)** — shipped as the Settings & Diagnostics modal in `frontend/src/renderer/src/components/SettingsModal.tsx` (`8523ed9`) plus theme switching (`cd1ef24`).

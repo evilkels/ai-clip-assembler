@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Connected Review Pipeline Implementation Plan
+description: "Connects agent chat, Version previews, Source Clips, and the Working Timeline with durable provenance and safe application."
+status: draft
+created: 2026-06-21
+plan_status: done
+---
 # Connected Review Pipeline Implementation Plan
 
 **Status:** DONE (2026-06-28, reconcile pass). Planned at commit `f6dedc6`, 2026-06-21. Design spec: `docs/specs/2026-06-21-connected-review-pipeline-design.md`. Depends on plans 005-008.

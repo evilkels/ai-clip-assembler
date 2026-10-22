@@ -1,3 +1,10 @@
+---
+type: Review
+title: Task 7 implementer report
+description: "Records integrated studio-workflow acceptance results and the packaged-app and editing-app checks still requiring a human."
+status: draft
+created: 2026-09-02
+---
 # Task 7 implementer report
 
 Status: DONE — AUTOMATED QA COMPLETE; HUMAN CHECKS PENDING

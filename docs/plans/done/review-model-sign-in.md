@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Review Model Sign-In
+description: "Adds Settings-based authentication for the internal Pi Review model using an OpenAI ChatGPT subscription."
+status: draft
+created: 2026-07-21
+plan_status: done
+---
 # Review Model Sign-In
 
 Status: DONE (2026-07-19). Automated checks are green; real OAuth/package smoke remains manual QA.

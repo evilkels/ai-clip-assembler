@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Review Model Sign-In — Review Follow-ups
+description: "Records sign-in cleanup, OAuth validation, Pi resolution, callback handling, and reconciliation with the shipped tests."
+status: draft
+created: 2026-07-21
+plan_status: done
+---
 # Review Model Sign-In — Review Follow-ups
 
 Status: **DONE (2026-09-10).** The remaining plan/spec reconciliation matches

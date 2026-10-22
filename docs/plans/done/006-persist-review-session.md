@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 006: Persist project-scoped review conversations and Proposals'
+description: "Persists Project review conversations and Proposals across navigation and restarts."
+status: draft
+created: 2026-06-21
+plan_status: done
+---
 # Plan 006: Persist project-scoped review conversations and Proposals
 
 ## Status

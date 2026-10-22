@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Playwriter Electron Frontend Design
+description: "Specifies browser-accessible Electron renderer QA and playable Review and Timeline previews."
+status: draft
+created: 2026-06-10
+---
 # Playwriter Electron Frontend Design
 
 ## Goal

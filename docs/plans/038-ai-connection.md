@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '038: AI Connection — honest AI errors, then Claude or ChatGPT through the Editor''s own program'
+description: "Plans honest typed AI failures, restricted payloads, and connections through the Editor's own Claude Code or Codex program."
+status: draft
+created: 2026-10-08
+plan_status: active
+---
 # 038: AI Connection — honest AI errors, then Claude or ChatGPT through the Editor's own program
 
 Supersedes: [030](done/030-truthful-ai-usage.md) (its one open step, "consent must be discoverable", is carried here as 5.6).

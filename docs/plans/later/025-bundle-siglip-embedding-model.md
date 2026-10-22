@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '025: Export and bundle the SigLIP embedding model'
+description: "Plans exporting and bundling the SigLIP embedding model for local visual diversity scoring."
+status: draft
+created: 2026-08-13
+plan_status: proposed
+---
 # 025: Export and bundle the SigLIP embedding model
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '037: Extraction quality'
+description: "Improves deterministic Candidate Clip coverage and length so Short, Medium, and Long drafts use the available footage."
+status: draft
+created: 2026-10-08
+plan_status: active
+---
 # 037: Extraction quality
 
 More and longer Candidate Clips from each Source Video, and Short, Medium and

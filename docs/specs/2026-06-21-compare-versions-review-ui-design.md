@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Compare-Versions Review UI Design
+description: "Specifies the first compare-Versions Review interface with playable candidate cuts and an adoption workflow."
+status: draft
+created: 2026-06-21
+---
 # Compare-Versions Review UI Design
 
 Date: 2026-06-21

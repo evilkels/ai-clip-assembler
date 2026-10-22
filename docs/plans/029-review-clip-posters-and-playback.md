@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 029: Poster-first Candidate Clip cards and play-once previews'
+description: "Plans static Candidate Clip posters and controlled play-once previews to reduce Review loading and media work."
+status: draft
+created: 2026-09-02
+plan_status: active
+---
 # Plan 029: Poster-first Candidate Clip cards and play-once previews
 
 Status: PHASES 1-3 DONE (2026-09-03) · STEPS 4.3-4.4 AND PHASE 5 TODO · Priority P1 · Effort M · Risk LOW · Category performance + UX

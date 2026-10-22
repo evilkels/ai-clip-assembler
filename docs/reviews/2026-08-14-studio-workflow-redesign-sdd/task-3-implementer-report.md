@@ -1,3 +1,10 @@
+---
+type: Review
+title: Task 3 implementer report
+description: "Records the Candidate Clip browser redesign, view modes, filtering, and regression-test evidence."
+status: draft
+created: 2026-09-02
+---
 # Task 3 implementer report
 
 ## Scope delivered

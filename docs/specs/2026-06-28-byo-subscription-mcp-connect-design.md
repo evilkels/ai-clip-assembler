@@ -1,3 +1,10 @@
+---
+type: Spec
+title: 'Design: Bring Your Own Subscription via MCP'
+description: "Specifies local MCP connections that let Editors review and edit through their own desktop AI subscriptions."
+status: draft
+created: 2026-06-28
+---
 # Design: Bring Your Own Subscription via MCP
 
 Date: 2026-06-28 · Status: Approved, pending implementation plan. Related:

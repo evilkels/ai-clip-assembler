@@ -1,3 +1,10 @@
+---
+type: Review
+title: Task 6 implementer report
+description: "Records Export format cards, handoff summaries, success receipts, guarded file reveal, and verification results."
+status: draft
+created: 2026-09-02
+---
 # Task 6 implementer report
 
 Status: DONE

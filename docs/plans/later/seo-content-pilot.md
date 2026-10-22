@@ -1,3 +1,11 @@
+---
+type: Plan
+title: SEO content pilot — video culling workflow
+description: "Plans one evidence-backed video-culling guide and measures its performance before expanding search content."
+status: draft
+created: 2026-07-19
+plan_status: proposed
+---
 # SEO content pilot — video culling workflow
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

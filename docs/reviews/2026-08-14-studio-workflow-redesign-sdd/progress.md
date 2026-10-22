@@ -1,3 +1,10 @@
+---
+type: Review
+title: 'SDD ledger — plan: docs/plans/2026-08-14-studio-workflow-redesign.md'
+description: "Records studio-redesign task completion, review outcomes, verification evidence, and deferred follow-ups."
+status: draft
+created: 2026-09-02
+---
 # SDD ledger — plan: docs/plans/2026-08-14-studio-workflow-redesign.md
 
 Branch: redesign/studio-workflows

@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0009: Exports link media by absolute file URL'
+description: "Links exported media using absolute file URLs so editing apps can locate source files without relinking."
+status: draft
+created: 2026-10-08
+decision_status: accepted
+---
 # 0009: Exports link media by absolute file URL
 
 ## Status

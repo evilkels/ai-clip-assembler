@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Compare-Versions Review UI — Implementation Plan
+description: "Rebuilds Review around side-by-side playable Version proposals that the Editor can compare and adopt."
+status: draft
+created: 2026-06-21
+plan_status: done
+---
 # Compare-Versions Review UI — Implementation Plan
 
 **Status:** DONE (2026-06-21). Planned at commit `2d0f918`. Spec (behavioural source of truth): `docs/specs/2026-06-21-compare-versions-review-ui-design.md`.

@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0006: Review scripts compile to Proposals'
+description: "Compiles sandboxed Review Scripts into reversible Proposals that the Editor previews and applies."
+status: draft
+created: 2026-09-29
+decision_status: accepted
+---
 # 0006: Review scripts compile to Proposals
 
 ## Status

@@ -1,3 +1,10 @@
+---
+type: Review
+title: Remote View prototype refresh regression — 2026-10-10
+description: "Records the Remote View refresh regression, its changing-clock cause, and the repair's verification."
+status: draft
+created: 2026-10-10
+---
 # Remote View prototype refresh regression — 2026-10-10
 
 ## Symptom and cause

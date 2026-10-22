@@ -1,3 +1,11 @@
+---
+type: Plan
+title: QA flows for the drone clip extraction workflow
+description: "Defines end-to-end drone-footage QA flows and the evidence needed to accept import, analysis, editing, and export."
+status: draft
+created: 2026-05-30
+plan_status: active
+---
 # QA flows for the drone clip extraction workflow
 
 The end-to-end flows that decide whether the app takes several long drone files

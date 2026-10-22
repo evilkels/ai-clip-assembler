@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Landing Page Editorial Refresh
+description: "Specifies the landing page's editorial visual direction, product explanation, and download emphasis."
+status: draft
+created: 2026-07-10
+---
 # Landing Page Editorial Refresh
 
 ## Status

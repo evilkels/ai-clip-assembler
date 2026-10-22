@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 014: Extract Timeline lifecycle coordination from the API module'
+description: "Moves Timeline reconstruction, controller caching, durable writes, and event publication into a lifecycle service."
+status: draft
+created: 2026-07-14
+plan_status: done
+---
 # Plan 014: Extract Timeline lifecycle coordination from the API module
 
 Status: DONE (2026-07-09) in `1c88a22`. Executor verification: 94 focused

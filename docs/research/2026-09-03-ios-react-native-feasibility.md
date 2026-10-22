@@ -1,3 +1,9 @@
+---
+type: Note
+title: Does AI Clip Assembler have potential as an iPhone app built with React Native?
+description: "Assesses the product fit and technical feasibility of an iPhone version built with React Native."
+status: draft
+---
 # Does AI Clip Assembler have potential as an iPhone app built with React Native?
 
 **Date:** 2026-09-03

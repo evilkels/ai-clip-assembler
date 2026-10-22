@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Literal Design Conformance
+description: "Defines approved design exports as the visual authority while preserving existing behavior and backend contracts."
+status: draft
+created: 2026-09-01
+---
 # Literal Design Conformance
 
 **Status:** Approved 2026-09-01

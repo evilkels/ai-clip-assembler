@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Plan 024 implementation notes
+description: "Records source-audio export details, per-track Resolve link indexing, and limitations of the first-audio-stream contract."
+status: draft
+created: 2026-08-13
+plan_status: done
+---
 # Plan 024 implementation notes
 
 ## Writers

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Backend Timeline Workflow Implementation Plan
+description: "Implements backend Timeline replacement and export behavior for the editable drone-footage workflow."
+status: draft
+created: 2026-05-12
+plan_status: done
+---
 # Backend Timeline Workflow Implementation Plan
 
 **Status: implemented and verified.**

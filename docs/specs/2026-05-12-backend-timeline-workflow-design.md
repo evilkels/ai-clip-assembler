@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Backend Timeline Workflow Design
+description: "Specifies backend support for Project creation, video analysis, editable Timeline replacement, and faithful export."
+status: draft
+created: 2026-05-12
+---
 # Backend Timeline Workflow Design
 
 ## Goal

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Modern professional UI shell'
+description: "Preserves the earlier shell-polish proposal superseded by the studio redesign and shell follow-ups."
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Modern professional UI shell
 
 > **CLOSED AS SUPERSEDED (2026-09-02).** This plan prescribed a shadcn/ui and

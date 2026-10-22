@@ -29,13 +29,18 @@ export async function openClips(page: Page): Promise<void> {
 }
 
 export interface AnalysisMetadataFixture {
-  used_ai?: boolean;
-  warning?: string;
+  failure?: {
+    kind: string;
+    provider: 'claude' | 'chatgpt';
+    action: 'open_providers' | 'sign_in' | 'retry' | 'wait' | 'none';
+    message: string;
+  };
+  clips_left?: number;
   per_video: Array<{
     file_id: string;
     file_name: string;
-    used_ai?: boolean;
-    warning?: string;
+    failure?: AnalysisMetadataFixture['failure'];
+    clips_left?: number;
   }>;
 }
 

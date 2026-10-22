@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getDiagnostics, type Diagnostics } from '../api/client';
+import { getDiagnostics } from '../api/client';
+import type { DiagnosticsResult } from '../types/generated';
+import type { SettingsPanel } from './SettingsModal';
 
 function ranAgoLabel(ranAt: number): string {
   const minutes = Math.floor((Date.now() - ranAt) / 60_000);
@@ -7,8 +9,8 @@ function ranAgoLabel(ranAt: number): string {
   return `RAN ${minutes} MIN AGO`;
 }
 
-export function DiagnosticsTabPanel() {
-  const [data, setData] = useState<Diagnostics | null>(null);
+export function DiagnosticsTabPanel({ onOpenSettings }: { onOpenSettings: (panel: SettingsPanel) => void }) {
+  const [data, setData] = useState<DiagnosticsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [ranAt, setRanAt] = useState<number | null>(null);
@@ -29,61 +31,48 @@ export function DiagnosticsTabPanel() {
     run();
   }, [run]);
 
-  const review = data?.review_model;
-  const guidance = review?.guidance ?? [];
+  const provider = data?.provider === 'chatgpt' ? 'ChatGPT' : data?.provider === 'claude' ? 'Claude' : data?.provider;
 
   return (
     <div className="settings-panel diagnostics-panel">
       {running && <p className="settings-muted">Checking…</p>}
       {error && <p className="settings-error" role="alert">{error}</p>}
 
-      {review && !running && (
+      {data && !running && (
         <>
-          <div className={`diagnostics-status-card ${review.reachable ? 'reachable' : 'unreachable'}`} data-testid="diagnostics-result">
+          <div className={`diagnostics-status-card ${data.reachable ? 'reachable' : 'unreachable'}`} data-testid="diagnostics-result">
             <div className="diagnostics-status-row">
               <span className="diagnostics-ring" aria-hidden="true" />
-              <span className={`diagnostics-badge ${review.reachable ? 'ok' : 'fail'}`}>
-                {review.reachable ? 'Reachable' : 'Not reachable'}
+              <span className={`diagnostics-badge ${data.reachable ? 'ok' : 'fail'}`}>
+                {data.reachable ? 'Reachable' : 'Not reachable'}
               </span>
+              <span className="diagnostics-status-summary">{provider}</span>
               <span className="diagnostics-status-summary">
-                {review.reachable
-                  ? review.elapsed_sec != null
-                    ? `Replied in ${review.elapsed_sec}s`
+                {data.reachable
+                  ? data.elapsed_sec != null
+                    ? `Replied in ${data.elapsed_sec}s`
                     : 'Replied'
                   : 'Check failed'}
               </span>
               {ranAt != null && (
                 <span className="settings-diagnostics-stamp">{ranAgoLabel(ranAt)}</span>
               )}
-              <button type="button" className={review.reachable ? 'btn' : 'btn primary'} onClick={run}>
-                {review.reachable ? 'Run again' : 'Run check again'}
-              </button>
+              {data.reachable || !data.failure || !['open_providers', 'sign_in'].includes(data.failure.action) ? (
+                <button type="button" className={data.reachable ? 'btn' : 'btn primary'} onClick={run}>
+                  {data.reachable ? 'Run again' : 'Run check again'}
+                </button>
+              ) : (
+                <button type="button" className="btn primary" onClick={() => onOpenSettings('ai')}>
+                  Open AI settings
+                </button>
+              )}
             </div>
-            {!review.reachable && review.detail && <p className="diagnostics-detail">{review.detail}</p>}
+            {!data.reachable && data.failure?.message && <p className="diagnostics-detail">{data.failure.message}</p>}
           </div>
-
-          {review.reachable ? (
-            <dl className="diagnostics-list">
-              <div><dt>Provider</dt><dd>{review.provider}</dd></div>
-              <div><dt>Model</dt><dd>{review.model}</dd></div>
-              <div><dt>Executable</dt><dd>{review.binary.found ? review.binary.resolved : `Not found on PATH (${review.binary.configured})`}</dd></div>
-              {review.elapsed_sec != null && <div><dt>Round trip</dt><dd>{review.elapsed_sec}s</dd></div>}
-            </dl>
-          ) : (
-            <div className="diagnostics-guidance">
-              <h4 className="diagnostics-guidance-title">How to fix this</h4>
-              <ol className="diagnostics-guidance-steps">
-                {guidance.map((step, index) => <li key={index}>{step}</li>)}
-              </ol>
-              <p className="diagnostics-guidance-note">
-                Environment-variable steps only take effect after quitting and reopening the app. Until then Import falls back to rule-based scoring, so your project still works.
-              </p>
-            </div>
-          )}
         </>
       )}
 
-      {!review && !running && !error && <p className="settings-muted">No diagnostics result yet.</p>}
+      {!data && !running && !error && <p className="settings-muted">No diagnostics result yet.</p>}
     </div>
   );
 }

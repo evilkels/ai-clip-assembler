@@ -1,0 +1,9 @@
+desktop 1440px -> qa/check/desktop.png
+  ok
+mobile 390px -> qa/check/mobile-01.png, qa/check/mobile-02.png
+  closed height 7878px (budget 8000px)
+  ok
+mobile-dark 390px -> qa/check/mobile-dark-01.png, qa/check/mobile-dark-02.png
+  ok
+desktop-dark 1440px -> qa/check/desktop-dark.png
+  ok

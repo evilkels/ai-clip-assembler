@@ -114,7 +114,7 @@ export function SettingsModal({ initialPanel = 'ai', initialTab, onClose }: Sett
           <div className="settings-content-body">
             {settingsPanel === 'ai' && <AiAssistancePanel />}
             {settingsPanel === 'connections' && <ConnectionsTabPanel />}
-            {settingsPanel === 'diagnostics' && <DiagnosticsTabPanel />}
+            {settingsPanel === 'diagnostics' && <DiagnosticsTabPanel onOpenSettings={setSettingsPanel} />}
             {settingsPanel === 'general' && <GeneralSettingsPanel />}
           </div>
         </div>

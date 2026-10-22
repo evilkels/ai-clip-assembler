@@ -6,7 +6,7 @@ import { ProjectRenameEditor } from '../components/ProjectRenameEditor';
 import { recentProjectDisplayName, sortRecentProjects } from '../lib/projectSort';
 import { importGate, reviewGate, timelineGate } from '../lib/stepGate';
 import { useReview } from '../state/ReviewContext';
-import { SettingsModal, type SettingsPanel } from '../components/SettingsModal';
+import { useOpenSettings } from '../state/SettingsPanelContext';
 
 // Keep the mark in Vite's asset graph so the development renderer and the
 // packaged Electron renderer resolve the same branded asset.
@@ -92,7 +92,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
     analysisStatus,
   } = useReview();
   const [error, setError] = useState<string | null>(null);
-  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel | null>(null);
+  const openSettings = useOpenSettings();
   const [editingFolderPath, setEditingFolderPath] = useState<string | null>(null);
   const [removingProject, setRemovingProject] = useState<
     { folderPath: string; displayName: string } | null
@@ -285,20 +285,16 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
             <span className="sidebar-action-label">Upload files instead</span>
           </button>
         )}
-        <button className="sidebar-action" type="button" aria-label="Settings" onClick={() => setSettingsPanel('general')}>
+        <button className="sidebar-action" type="button" aria-label="Settings" onClick={() => openSettings('general')}>
             <span className="sidebar-action-icon" aria-hidden="true">⚙</span>
             <span className="sidebar-action-label">Settings</span>
         </button>
-        <button className="sidebar-action" type="button" aria-label="Diagnostics" onClick={() => setSettingsPanel('diagnostics')}>
+        <button className="sidebar-action" type="button" aria-label="Diagnostics" onClick={() => openSettings('diagnostics')}>
           <span className="sidebar-action-icon" aria-hidden="true">◇</span>
           <span className="sidebar-action-label">Diagnostics</span>
         </button>
         {error && <div className="sidebar-error">{error}</div>}
       </div>
-
-      {settingsPanel && (
-        <SettingsModal initialPanel={settingsPanel} onClose={() => setSettingsPanel(null)} />
-      )}
 
       {removingProject && (
         <ConfirmDialog

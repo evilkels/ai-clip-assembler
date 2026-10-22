@@ -28,6 +28,7 @@ export interface ReviewConversation {
   runningScript: boolean;
   error: string | null;
   send: (text: string, existingMessageId?: string) => Promise<void>;
+  retryKickoff: () => Promise<void>;
   runScript: (source: string, rerunOfProposalId?: string, existingMessageId?: string) => Promise<void>;
   resolveProposal: (proposalId: string, accept: boolean) => Promise<void>;
   /** Proposals whose Apply hit a revision conflict: the Timeline moved since they were made. */
@@ -208,6 +209,23 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     [busy, deliver],
   );
 
+  const retryKickoff = useCallback(async () => {
+    if (!projectId || busy) return;
+    await serialize(async () => {
+      if (activeProject.current !== projectId) return;
+      setError(null);
+      setBusy(true);
+      try {
+        const result = await reviewKickoff(projectId);
+        if (activeProject.current === projectId) applySession(result.session);
+      } catch {
+        if (activeProject.current === projectId) setError('The opening turn could not be completed.');
+      } finally {
+        if (activeProject.current === projectId) setBusy(false);
+      }
+    });
+  }, [applySession, busy, projectId, serialize]);
+
   const runScript = useCallback(
     async (source: string, rerunOfProposalId?: string, existingMessageId?: string) => {
       if (!source.trim() || busy) return;
@@ -336,6 +354,7 @@ export function useReviewConversation(projectId: string | null): ReviewConversat
     runningScript,
     error,
     send,
+    retryKickoff,
     runScript,
     resolveProposal,
     staleProposalIds,

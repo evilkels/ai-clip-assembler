@@ -1,0 +1,43 @@
+The overview accurately separates released v0.4.0, unreleased main changes and unfinished work. Three fixes remain: broken evidence links, insufficient button contrast and an incomplete privacy-text approval. No files were edited or git commands run.
+
+**Scores**
+
+- **Audience fit / first screen: 4/5.** The opening explains what improved, what remains unreleased and what Ernesto must check. Detailed decisions require substantial scrolling.
+- **Conceptual correctness: 4/5.** Release date, extraction measurements and remaining 032/042 checks match the sources. Remote View and iOS research are clearly distinguished from delivered features.
+- **Latvian: 4/5.** Generally readable; several mistranslations and awkward phrases need correction below.
+- **Privacy and claims: 4/5.** No secrets, personal paths or other-client references found in the HTML or included image. Browser resource requests stayed local. Q2 needs more precise approval wording.
+- **Structure / accessibility / responsive: 3/5.** Native disclosures, labelled controls, pressed states and visible focus are present. The four supplied screenshots support the reported responsive checks; phone height is **7,373 / 8,000 px**. Contrast and no-JavaScript presentation need attention.
+- **Business realism: 4/5.** v0.5.0 remains a recommendation with human acceptance gates. Revenue, ROI and commercial forecasts: **N/A**.
+
+**Must-fix**
+
+1. **Evidence links fail in the supplied preview.**  
+   [index.html:422](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:422) quotes `href="../2026-10-22-repo-audit.md#owner-checks-before-tagging"`. The audit, roadmap and retest links resolve to **404** at `http://127.0.0.1:8769/`; this also breaks both no-JavaScript fallback links at line 389.  
+   **Fix:** use canonical GitHub document links with the existing anchors for these evidence destinations.
+
+2. **Light-theme action text misses minimum contrast.**  
+   [index.html:220](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:220): `background: var(--accent); … color: var(--paper)`. The actual pairing, `#f7f7f8` on `#e11d48`, measures **4.387:1** at **15px/700**, below the **4.5:1** normal-text requirement. This affects “Kopēt atbildes” and selected answers. [W3C contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).  
+   **Fix:** use white text for this light-theme pairing; preserve a separate suitable dark-theme pairing.
+
+3. **Q2 cannot complete approval of the final privacy wording.**  
+   [index.html:1201](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:1201): “Vai apstiprināt … privātuma tekstu?” offers “Apstiprinu D18 virzienu”, while displaying only a summary. Plan 038/H3 requires approval of the actual D18 statement, including Scripts/results, scope across projects, per-project control and Disconnect.  
+   **Fix:** show the complete proposed D18 wording, explicitly labelled as planned behaviour, and change the approval option to “Apstiprinu šo tekstu”.
+
+**Nice-to-have**
+
+- **Correct Latvian wording:**
+  - [index.html:405](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:405): “Spēlētājs rāda” → **“Atskaņotājs rāda”**; “Project vārdā nosaukts eksports” → **“eksports ar Project nosaukumu”**.
+  - [index.html:666](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:666): “Fiziska iPhone vārti nav izieti” → **“Pārbaudes īstā iPhone vēl nav veiktas.”**
+  - [index.html:1251](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:1251): “Vajag palīdzēt sagatavot” → **“Vajadzīga palīdzība sagatavošanā.”**
+  - [index.html:1286](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:1286): “Ja neatbild” → **“Ja neatbildi”**.
+
+- **Make the no-JavaScript state tidy.**  
+  [index.html:393](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:393) leaves “Uzskaitīti … darba bloki” without numbers; line 400 leaves unnamed, inert buttons. Hide script-dependent counts and controls until initialization.
+
+- **Expose 043’s remaining acceptance check in the overview.**  
+  [index.html:675](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:675) marks it “Sagatavots”, while its note and plan retain iPhone H1. Add **“Gaida iPhone apstiprinājumu”** beside the main status.
+
+- **Capture desktop screenshots after animations finish.**  
+  [index.html:287](/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:287) animates track pills from zero opacity. Both supplied desktop screenshots caught them mostly invisible; the settled live preview displays them correctly.
+
+**Verdict: Revise before acceptance; the factual foundation is sound, with three must-fix issues.**

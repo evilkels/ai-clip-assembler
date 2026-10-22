@@ -1,0 +1,1740 @@
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>AI Clip Assembler — ceļš līdz v1.0.0 · 22.10.2026</title>
+
+<script>
+  document.documentElement.classList.add("js");
+  try {
+    const theme = localStorage.getItem("plan-overview-theme");
+    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  } catch {}
+</script>
+<style>
+  /* Brand: frontend/src/renderer/src/styles/tokens.css (paired app palettes, 14px cards, pill radii); fonts.css (IBM Plex). Status hues beyond app green/amber are chosen for distinct meaning in both themes. */
+  :root {
+    color-scheme: light dark;
+    --font: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --ink: light-dark(oklch(from #14161a l c h), oklch(from #f4f5f7 l c h));
+    --ink-soft: light-dark(oklch(from #52585f l c h), oklch(from #a2a8b2 l c h));
+    --paper: light-dark(oklch(from #f7f7f8 l c h), oklch(from #0d0f12 l c h));
+    --panel: light-dark(oklch(from #ffffff l c h), oklch(from #12151a l c h));
+    --line: light-dark(oklch(from #dcdce2 l c h), oklch(from #343a43 l c h));
+    --chip: light-dark(oklch(from #f1f2f4 l c h), oklch(from #23272e l c h));
+    --accent: light-dark(oklch(from #e11d48 l c h), oklch(from #ff4d6d l c h));
+    /* One pair per status: wash (fill) and dot. Colour carries meaning, so
+       keep them distinct from the brand accent and from each other. */
+    --live-wash: light-dark(oklch(0.94 0.04 155), oklch(0.28 0.045 155));
+    --live-dot: light-dark(oklch(from #1f9d57 l c h), oklch(from #5fd18b l c h));
+    --built-wash: light-dark(oklch(0.95 0.035 350), oklch(0.29 0.05 350));
+    --built-dot: light-dark(oklch(0.57 0.17 350), oklch(0.78 0.14 350));
+    --progress-wash: light-dark(oklch(0.94 0.04 290), oklch(0.28 0.05 290));
+    --progress-dot: light-dark(oklch(0.49 0.15 290), oklch(0.78 0.13 290));
+    --waiting-wash: light-dark(oklch(0.95 0.045 80), oklch(0.3 0.055 80));
+    --waiting-dot: light-dark(oklch(from #b07d12 l c h), oklch(from #e6b450 l c h));
+    --planned-wash: light-dark(oklch(1 0 none), oklch(0.19 0 none));
+    --planned-dot: light-dark(oklch(0.72 0 none), oklch(0.7 0 none));
+    --discarded-dot: light-dark(oklch(0.82 0 none), oklch(0.55 0 none));
+    --bad: light-dark(oklch(from #dc2626 l c h), oklch(from #f0443a l c h));
+    /* Risk chips: green, amber, red. Each chip also says its level in words. */
+    --risk-low-wash: light-dark(oklch(0.95 0.05 150), oklch(0.3 0.06 150));
+    --risk-low-ink: light-dark(oklch(0.4 0.11 150), oklch(0.84 0.12 150));
+    --risk-medium-wash: light-dark(oklch(0.95 0.06 85), oklch(0.32 0.06 85));
+    --risk-medium-ink: light-dark(oklch(0.45 0.1 70), oklch(0.86 0.12 85));
+    --risk-high-wash: light-dark(oklch(0.94 0.05 25), oklch(0.32 0.07 25));
+    --risk-high-ink: light-dark(oklch(0.48 0.17 27), oklch(0.82 0.11 25));
+    --sticky-bg: var(--paper);
+    --tap: 44px;
+    /* App accent-ink from tokens.css: white in light, deep rose-black in dark. */
+    --accent-ink: light-dark(oklch(1 0 none), oklch(from #1a0308 l c h));
+    --nav-h: 52px;
+    --radius-pill: 999px;
+    --radius-panel: 14px;
+    --measure: 68ch;
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  [id] { scroll-margin-top: calc(var(--nav-h) + 12px); }
+  body { margin: 0; font-family: var(--font); font-size: 17px; line-height: 1.55; color: var(--ink); background: var(--paper); }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  code {
+    font-family: var(--mono); font-size: 0.86em; background: var(--chip);
+    padding: 0.08em 0.38em; border-radius: 6px;
+    overflow-wrap: anywhere; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .page-content { min-width: 0; }
+  .toc { display: none; }
+
+  .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: center; padding: 28px 0 0; color: var(--ink-soft); font-size: 15px; }
+  .top-meta { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; justify-content: flex-end; gap: 16px; flex-wrap: wrap; }
+  .theme { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--chip); }
+  .theme button { min-width: var(--tap); min-height: var(--tap); border: 0; border-radius: var(--radius-pill); padding: 0 9px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; }
+  .theme button[aria-pressed="true"] { background: var(--panel); color: var(--ink); }
+  .theme button:active { transform: scale(0.97); }
+  .hero { padding: 56px 0 24px; }
+  .hero h1 { font-size: clamp(36px, 6vw, 72px); line-height: 1.03; letter-spacing: -0.03em; margin: 0 0 20px; max-width: 16ch; }
+  .lede { font-size: 20px; max-width: var(--measure); color: var(--ink-soft); margin: 0; }
+  .lede strong { color: var(--ink); }
+
+  /* Status pill: the page's unit of meaning */
+  .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-pill); padding: 4px 12px 4px 10px;
+    font-size: 14px; font-weight: 600; line-height: 1.25; text-decoration: none; color: var(--ink); border: 1px solid transparent; }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--dot); }
+  .pill .id { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .pill.small { font-size: 13px; padding: 2px 10px 2px 8px; }
+  .s-live { background: var(--live-wash); --dot: var(--live-dot); }
+  .s-built { background: var(--built-wash); --dot: var(--built-dot); }
+  .s-progress { background: var(--progress-wash); --dot: var(--progress-dot); }
+  .s-waiting { background: var(--waiting-wash); --dot: var(--waiting-dot); }
+  .s-planned { background: var(--planned-wash); border-color: var(--line); --dot: var(--planned-dot); }
+  .s-discarded { background: transparent; border-color: var(--line); color: var(--ink-soft); text-decoration: line-through; --dot: var(--discarded-dot); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 28px 0 0; padding: 0; list-style: none; }
+  .legend li { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-soft); }
+
+  /* Section nav: sticky and sideways-scrolling under 1180px; the side rail (.toc) takes over above. */
+  nav.sections { position: sticky; top: 0; z-index: 10; margin: 24px -24px 0; background: var(--sticky-bg);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  nav.sections ul { display: flex; gap: 2px; min-height: var(--nav-h); margin: 0; padding: 0 16px; list-style: none; align-items: center;
+    overflow-x: auto; scrollbar-width: none; }
+  nav.sections a { display: flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 10px; border-bottom: 2px solid transparent;
+    font-size: 15px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+  nav.sections a[aria-current="true"] { border-bottom-color: var(--accent); }
+  .count { font-size: 13px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  /* Collapsed by default: every <summary> is a full-width 44px target. */
+  summary { display: flex; align-items: center; gap: 8px; min-height: var(--tap); cursor: pointer; font-weight: 600; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; margin-inline-start: auto; color: var(--ink-soft); font-weight: 400; }
+  details[open] > summary::after { content: "−"; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 14px 16px; margin-bottom: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  .chip { display: inline-flex; align-items: center; border-radius: var(--radius-pill); padding: 2px 10px; font-size: 13px; font-weight: 600; background: var(--chip); }
+  .risk-low { background: var(--risk-low-wash); color: var(--risk-low-ink); }
+  .risk-medium { background: var(--risk-medium-wash); color: var(--risk-medium-ink); }
+  .risk-high { background: var(--risk-high-wash); color: var(--risk-high-ink); }
+
+  /* The track: the one bold element */
+  .track { margin: 36px 0 8px; border-top: 2px solid var(--ink); }
+  .group { display: grid; grid-template-columns: 260px 1fr; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .group h3 { margin: 0; font-size: 17px; }
+  .group h3 small { display: block; font-weight: 400; color: var(--ink-soft); font-size: 14px; margin-top: 2px; }
+  .group .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* Under 640px a group is a status bar that opens its items in the table, not a wall of pills. */
+  .group .bar { display: none; }
+  .bar .segs { display: flex; height: 10px; border-radius: var(--radius-pill); overflow: hidden; background: var(--chip); }
+  .bar .segs span { background: var(--dot); }
+  .bar small { display: block; margin-top: 6px; font-size: 14px; color: var(--ink-soft); }
+
+  section { padding: 72px 0 0; }
+  @media (max-width: 640px) { section { padding-top: 48px; } }
+  section > h2 { font-size: clamp(28px, 3.4vw, 40px); letter-spacing: -0.025em; line-height: 1.1; margin: 0 0 12px; }
+  section > p.intro { max-width: var(--measure); color: var(--ink-soft); margin: 0 0 28px; }
+  .refs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+  /* Outcomes */
+  .outcomes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; }
+  .outcome { padding: 22px 0; border-top: 1px solid var(--line); }
+  .outcome.wide { grid-column: 1 / -1; }
+  .outcome h3 { margin: 0 0 8px; font-size: 19px; }
+  .outcome p { margin: 0; max-width: 60ch; }
+  .outcome ul { margin: 10px 0 0; padding-left: 1.1em; }
+  .outcome li { margin: 4px 0; }
+
+  /* Fixed bugs */
+  .fix-group { margin: 0 0 40px; }
+  .fix-group > h3 { font-size: 21px; margin: 0 0 4px; }
+  .fix-group > p { margin: 0 0 18px; color: var(--ink-soft); max-width: var(--measure); }
+  .fix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 28px; padding: 20px 22px; background: var(--panel);
+    border: 1px solid var(--line); border-left: 5px solid var(--bad); border-radius: var(--radius-panel); margin-bottom: 12px; }
+  .fix.pre-existing { border-left-color: var(--accent); }
+  .fix h4 { margin: 0; font-size: 17px; grid-column: 1 / -1; }
+  .fix dl { margin: 0; }
+  .fix dt { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+  .fix dd { margin: 2px 0 0; font-size: 15.5px; }
+
+  /* Pull requests */
+  .prs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+  .pr { display: block; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); text-decoration: none; }
+  .pr:target { outline: 3px solid var(--accent); }
+  .pr .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; color: var(--ink-soft); }
+  .pr .num { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .pr .title { margin: 8px 0 10px; font-weight: 600; line-height: 1.35; }
+  .pr .meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--ink-soft); }
+  .pr .meta .bad { color: var(--bad); font-weight: 600; }
+  .pr-state { font-size: 12.5px; font-weight: 700; border-radius: var(--radius-pill); padding: 2px 9px; }
+  .pr-state.MERGED { background: var(--progress-wash); }
+  .pr-state.OPEN { background: var(--live-wash); }
+  .pr-state.DRAFT, .pr-state.CLOSED { background: var(--chip); }
+  .pr-list { margin: 18px 0 0; padding: 0; list-style: none; font-size: 15px; }
+  .pr-list li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); }
+
+  /* Item table */
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+  .all-items > summary { margin: 0 0 12px; }
+  .filters button { min-height: var(--tap); font: inherit; font-size: 14px; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 0 14px; border-radius: var(--radius-pill); cursor: pointer; }
+  .filters button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 720px; }
+  th, td { text-align: left; padding: 12px 16px; vertical-align: top; border-bottom: 1px solid var(--line); }
+  th { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:target td { background: var(--chip); }
+  td .pill { white-space: nowrap; }
+
+  /* Screenshots and before/after */
+  figure { margin: 0; }
+  figure img { display: block; width: 100%; height: auto; }
+  .frame { display: block; border-radius: var(--radius-panel); overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+  figcaption { font-size: 14.5px; margin-top: 10px; color: var(--ink-soft); max-width: 60ch; }
+  figcaption strong { color: var(--ink); }
+  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 28px; }
+  .shots > .wide { grid-column: 1 / -1; }
+  .ba { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .ba .tag { display: inline-block; font-size: 14px; font-weight: 700; margin: 0 0 6px; color: var(--ink-soft); }
+  .ba .after .tag { color: var(--ink); }
+  .ba + figcaption { grid-column: 1 / -1; }
+  .slider { position: relative; }
+  .slider .after-img { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--split, 50%)); }
+  .slider .handle { position: absolute; top: 0; bottom: 0; left: var(--split, 50%); width: 2px; background: var(--ink); pointer-events: none; }
+  .slider + input[type="range"] { width: 100%; min-height: var(--tap); margin: 4px 0 0; accent-color: var(--accent); }
+
+  /* Decisions: the reader's action. */
+  .decision h3 { margin: 8px 0 0; font-size: 17px; line-height: 1.35; }
+  .decision .if-nothing { margin: 8px 0 0; font-size: 15.5px; }
+  .decision .if-nothing b { display: block; font-size: 13px; color: var(--ink-soft); }
+  .decision details > div { font-size: 16px; padding: 0 0 8px; }
+  .answers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr)); gap: 8px; margin: 8px 0 0; padding: 0; border: 0; }
+  .answers button, .answer-bar button { min-height: var(--tap); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--panel); color: var(--ink);
+    font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; padding: 0 14px; }
+  .answers button[aria-pressed="true"], .answer-bar .primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .answer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+  .answer-bar p { margin: 0 auto 0 0; font-weight: 700; }
+  .answer-bar textarea { width: 100%; min-height: 160px; font: inherit; font-size: 15px; }
+
+  /* What was removed: line totals and evidence. */
+  .loc-wrap { width: fit-content; max-width: 100%; margin-bottom: 12px; }
+  .loc { width: auto; min-width: 0; font-variant-numeric: tabular-nums; }
+  .loc th, .loc td { padding: 8px 12px; }
+  .loc td + td, .loc th + th { text-align: right; }
+  .loc tr.total td { font-weight: 700; }
+  .add { color: var(--live-dot); }
+  .del { color: var(--bad); }
+  .evidence { margin: 0; padding: 0 0 8px; list-style: none; }
+  .evidence li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 15.5px; }
+
+  /* Waiting on */
+  .waiting { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 28px; }
+  .waiting h3 { margin: 0 0 10px; font-size: 19px; }
+  .waiting ul { margin: 0; padding-left: 1.1em; }
+  .waiting li { margin: 0 0 10px; }
+
+  footer { padding: 80px 0 56px; color: var(--ink-soft); font-size: 14.5px; }
+  footer p { max-width: var(--measure); margin: 0 0 6px; }
+
+  @media (min-width: 1180px) {
+    .wrap { max-width: 1400px; }
+    .layout { grid-template-columns: 200px minmax(0, 1120px); gap: 40px; align-items: start; }
+    .page-content { max-width: 1120px; }
+    nav.sections { display: none; }
+    .toc { display: block; position: sticky; inset-block-start: 24px; align-self: start; max-height: calc(100dvh - 48px); overflow-y: auto; padding-block-start: 32px; }
+    .toc ul { margin: 0; padding: 0; list-style: none; }
+    .toc a { display: block; border-inline-start: 2px solid transparent; padding: 5px 10px; color: var(--ink-soft); font-size: 14px; line-height: 1.35; text-decoration: none; }
+    .toc a[aria-current="true"] { border-inline-start-color: var(--accent); color: var(--ink); font-weight: 600; }
+  }
+  @media print {
+    :root, :root[data-theme="light"], :root[data-theme="dark"] { color-scheme: light; }
+    .toc, .theme, nav.sections { display: none !important; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+    .theme button { transition: transform 160ms ease-out; }
+  }
+
+  @media (max-width: 860px) {
+    .group, .outcomes, .shots, .fix, .ba { grid-template-columns: 1fr; }
+    .group { gap: 10px; }
+    .hero { padding-top: 36px; }
+  }
+  @media (max-width: 640px) {
+    .group .pills { display: none; }
+    .group .bar { display: block; min-height: var(--tap); text-decoration: none; }
+  }
+  /* Narrow screens: each item row becomes a small card, so "where it stands" is never off screen. */
+  @media (max-width: 640px) {
+    .all-items table { min-width: 0; }
+    .all-items thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .all-items tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    .all-items tr:last-child { border-bottom: 0; }
+    .all-items td { padding: 0; border: 0; }
+    .all-items td.num { flex: none; }
+    .all-items td:nth-child(2) { flex: 1 1 80%; min-width: 0; font-weight: 600; }
+    .all-items td:nth-child(3), .all-items td:nth-child(4) { margin-top: 8px; font-size: 13.5px; color: var(--ink-soft); }
+    .all-items td:nth-child(5) { flex-basis: 100%; margin-top: 6px; }
+    .all-items tr[hidden] { display: none; }
+  }
+
+
+@font-face { font-family:"IBM Plex Sans"; src:url("fonts/ibm-plex-sans-latin-var.woff2") format("woff2"); font-weight:400 700; font-display:swap; }
+@font-face { font-family:"IBM Plex Mono"; src:url("fonts/ibm-plex-mono-latin-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
+:root { --title-size:clamp(2.1rem, 1.5rem + 2.4vw, 3.8rem); --section-space:clamp(2rem, 1.4rem + 2vw, 3.5rem); overflow-wrap:break-word; scroll-padding-block-start:var(--nav-h); }
+.brand { font-weight:700; color:var(--ink); }
+.hero { padding-block:32px 8px; }
+.hero h1 { font-size:var(--title-size); max-inline-size:22ch; }
+.lede { font-size:18px; }
+section { padding-block-start:var(--section-space); }
+section > h2 { font-size:clamp(1.6rem, 1.3rem + 1vw, 2.1rem); }
+section > p.intro { margin-block-end:18px; }
+.track { border-block-start:4px solid var(--accent); }
+.group { grid-template-columns:minmax(0, 1.35fr) minmax(0, 1fr); padding-block:12px; }
+.group h3 { font-size:16px; }
+.group .pills { align-items:center; }
+.outcomes, .waiting { grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr)); }
+.decision h3 { font-size:19px; margin-block:8px; }
+.decision .if-nothing { margin-block:8px; }
+.decision details { margin-block:8px; }
+.decision .answers { margin-block-start:8px; }
+.status-counts { margin-block:16px; font-size:15px; color:var(--ink-soft); }
+.release-gate { border-inline-start:3px solid var(--waiting-dot); padding-inline-start:16px; margin-block:18px 0; font-size:16px; }
+.prs { grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr)); }
+.pr .title, .pr-list { font-size:15px; }
+.pr-list li { flex-wrap:wrap; overflow-wrap:anywhere; }
+.pr-list .num, a.num { display:inline-flex; align-items:center; min-block-size:44px; }
+.pr .meta { overflow-wrap:anywhere; }
+figure { margin:0; }
+figure img { display:block; inline-size:100%; block-size:auto; border-radius:8px; }
+figcaption { margin-block-start:12px; font-size:15px; color:var(--ink-soft); }
+.outcome > details { margin-block-start:12px; }
+.fix dl { margin-block:8px; }
+.fix h4 { font-size:18px; margin-block:8px; }
+.evidence li { margin-block:8px; }
+.link-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr)); gap:8px 24px; }
+.link-list a { display:inline-block; min-block-size:44px; padding-block:8px; }
+button, summary, a { touch-action:manipulation; }
+:is(button,summary,a):active { opacity:0.75; }
+.theme { display:none; }
+.js .theme { display:inline-flex; }
+@media (max-width:640px) {
+ .top { padding-block-start:16px; gap:8px; }
+ .top-meta { justify-content:flex-start; gap:8px 12px; font-size:13px; }
+ .top-meta > span:first-child { display:none; }
+ .theme button { padding-inline:7px; }
+ .hero h1 { font-size:32px; }
+ .lede { font-size:16px; line-height:1.5; }
+ .legend { margin-block-start:16px; gap:6px 12px; }
+ .legend li { font-size:13px; }
+ .legend li > .pill { font-size:12px; }
+ .legend li { flex-basis:auto; }
+ .group { gap:6px; padding-block:10px; }
+ .group h3 { font-size:15px; }
+ .group h3 small { font-size:13px; }
+ .group .bar { padding-block:6px; min-block-size:44px; }
+ .group .bar small { font-size:13px; }
+ .group .bar .segs { block-size:6px; }
+ .track { margin-block-start:20px; }
+ .all-items td, .pr-list li { overflow-wrap:anywhere; }
+ nav.sections { background:var(--paper); backdrop-filter:none; }
+}
+
+
+/* Owner scan: compact decision choices and track, full evidence behind disclosures. */
+nav.sections a { min-inline-size:44px; }
+@media (max-width:640px) {
+ .decision { padding-block:10px; }
+ .decision .chips { margin-block-start:0; }
+ .decision .answers { display:flex; flex-wrap:wrap; gap:6px; }
+ .decision .answers button { flex:1 1 auto; min-block-size:44px; padding:6px 10px; border-radius:8px; }
+ .decision h3 { font-size:18px; }
+ .decision .if-nothing { font-size:14px; }
+ .hero { padding-block:20px 4px; }
+ .status-counts { margin-block:10px; font-size:14px; }
+ .group h3 small { margin-block-start:0; }
+ .group .bar { padding-block:4px; }
+ section { padding-block-start:32px; }
+ .legend li { gap:6px; }
+}
+
+html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
+.toc a, a.pill { min-block-size:44px; }
+.delivery { display:block; font-size:13px; font-weight:500; color:var(--ink-soft); }
+.group .pills { align-content:center; }
+.group .pills .delivery { flex-basis:100%; }
+
+/* Standalone evidence links in the item table also need a complete touch target. */
+#rows a, a.num { display:inline-flex; align-items:center; min-block-size:44px; min-inline-size:44px; }
+
+footer { padding-block:40px 32px; }
+@media(max-width:640px) { .group { grid-template-columns:1fr; padding-block:8px; gap:4px; } section { padding-block-start:28px; } }
+noscript a { display:inline-flex; align-items:center; min-block-size:44px; min-inline-size:44px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="layout">
+  <nav class="toc" aria-label="Šajā lapā"><ul id="toc-links"></ul></nav>
+  <div class="page-content">
+  <header class="top">
+    <span class="brand">AI Clip Assembler</span>
+    <div class="top-meta"><span>Īpašnieka pārskats</span>
+      <span>Atjaunots <time data-updated datetime="2026-10-22T16:20:09.512Z">22. okt. 2026, 19:20</time></span>
+      <div class="theme" role="group" aria-label="Izskats">
+        <button type="button" data-theme-choice="system" aria-pressed="true">Auto</button>
+        <button type="button" data-theme-choice="light" aria-pressed="false">Gaišs</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">Tumšs</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+<noscript><p>Darbu josla, statusu skaitļi, lēmumi, PR saraksts un tabula prasa JavaScript. <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md">Lasīt pilno roadmap</a> un <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md">repo auditu</a>.</p></noscript>
+    <div class="hero" id="top-of-page">
+      <h1>Ceļš līdz v1.0.0</h1>
+      <p class="lede">Kopš v0.4.0 izlaiduma 2026. gada 4. oktobrī <strong>ir uzlabota pirmā montāža, eksports un iPhone materiālu apstrāde</strong>. Šīs izmaiņas jau ir <code>main</code> zarā, bet vēl nav nevienā izlaidumā. Nākamais ieteiktais izlaidums ir v0.5.0; pirms tā jānovērš auditā minētie datu saglabāšanas riski un tev jāpārbauda darbs ar īstiem materiāliem un imports Final Cut Pro un Resolve. AI pieslēgšanas vednis un v1.0.0 vēl ir priekšā.</p>
+      <p class="status-counts">Darba bloki kopā: <span data-count="items"></span>. Izlaisti: <span data-count="status:live"></span>; sagatavoti: <span data-count="status:built"></span>; iesākti: <span data-count="status:progress"></span>; gaida: <span data-count="status:waiting"></span>; plānoti: <span data-count="status:planned"></span>. Tie nav pabeigtu posmu vai testu skaitļi.</p>
+      <ul class="legend" id="legend" aria-label="Statusu nozīme"></ul>
+    </div>
+    <nav class="sections" aria-label="Sadaļas"><ul id="section-links"></ul></nav>
+
+    <div class="track" id="track" role="region" aria-label="Ceļš līdz v1.0.0" data-nav="Ceļš"></div>
+
+    <section id="decide" aria-labelledby="decide-h" data-nav="Lēmumi" data-count="decisions"><h2 id="decide-h">Ernesto, tava izvēle</h2><p class="intro">Atbildes glabājas tikai šajā pārlūkā. Kopē tās ziņā, kad esi gatavs; lapa neko nenosūta. S = stundas, M = dienas, L = nedēļa vai vairāk darba.</p><div id="decision-cards"></div><div class="card answer-bar" id="answer-bar"><p aria-live="polite" id="answer-count"></p><button type="button" class="primary" id="copy-answers"></button><button type="button" id="clear-answers"></button><textarea id="answer-text" readonly hidden aria-label="Atbildes kā teksts"></textarea></div></section>
+
+    <section id="done" aria-labelledby="done-h" data-nav="Iegūts" ><h2 id="done-h">Kas jau mainījies</h2><p class="intro">Rezultāti pārbaudīti plānos un sapludinātajos PR. “Sagatavots” attiecas uz <code>main</code>; kvalitātes vērtējums un montāžas lietotņu testi nav aizstāti ar CI.</p><div class="outcomes">
+<article class="outcome"><h3>Pirmā montāža izmanto vairāk materiāla</h3><p>Vairāki nepārklājoši klipi no vienas stabilas epizodes, atsevišķas kvotas katram Source Video un formāta maiņa tagad nonāk Timeline.</p><details><summary>Mērījumi no 037</summary><p>Estepona: 5 → 13 Candidate Clips, mediāna 3 → 20 s, pārklājums 15 → 185 s. Detox: Medium 13 → 240 s; Long 10 → 333 s no 480 s mērķa. Tie ir plāna mērījumi, nevis šodien atkārtots kvalitātes tests.</p></details><div class="refs" data-refs="1"></div></article>
+<article class="outcome"><h3>Eksports saglabā pašreizējo montāžu</h3><p>Tukša Timeline vairs neatdzīvina vecos klipus. FCPXML iziet 1.10 DTD struktūras pārbaudi; mediju saites ir absolūtas.</p><details><summary>Kas vēl jāpierāda</summary><p>032 cilvēka testi ir atvērti. Audits norāda uz jauktu avotu Resolve metadatiem un neizmantotu FCP resursu risku. Savietojamību drīkst solīt tikai pēc īsta importa.</p></details><div class="refs" data-refs="1b"></div></article>
+<article class="outcome wide"><h3>iPhone materiāli paliek pareizā secībā un kadrējumā</h3><p>Nominālais 59,94 kadri/s, uzņemšanas laiks, vertikāli Review un Timeline priekšskatījumi, eksports ar Project nosaukumu un precizēta Import norise.</p><details><summary>Redzēt retesta pierādījumu</summary><figure><img src="shots/01-review-portrait.png" width="850" height="650" alt="Review Suggested cuts ar vertikāliem iPhone klipiem un izvēlētu Short formātu"><figcaption><strong>Review.</strong> 10.10.2026 Electron retests, testa projekts, bez AI; saglabāts ar #107 (<code>1bacf0a</code>). Atskaņotājs rāda portreta kadrus pareizā formātā. Projekta josla ar personīgo mapes ceļu ir izgriezta. Šis attēls nepierāda AI kļūdu apstrādi; īsts HDR un NLE imports nav apliecināti. Vecais stāvoklis nav pievienots, jo nav salīdzināma, droši apgriezta pāra.</figcaption></figure></details><div class="refs" data-refs="1c"></div></article>
+<article class="outcome"><h3>Plāni rāda vienu darbu secību</h3><p>Roadmap, plānu indekss un produkta termini ir saskaņoti. Izlaistās v0.4.0 un <code>main</code> robeža ir pārbaudāma.</p><div class="refs" data-refs="v0.4.0 0"></div></article>
+<article class="outcome"><h3>Eksperiments un izpēte ir skaidri nodalīti</h3><p>#109 salabo tikai prototipa atsvaidzināšanu; #110 ir iOS izpēte. Audits nosauc atlikušos riskus un kandidāta pārbaudes.</p><div class="refs" data-refs="043 iOS audit"></div></article>
+</div></section>
+
+    <section id="fixed" aria-labelledby="fixed-h" data-nav="Riski" ><h2 id="fixed-h">Labojumi un atvērtie riski</h2><p class="intro">Ieraksti seko 22.10.2026 auditam. A = 8. oktobra audita punkts; N = 22. oktobra jaunais atradums. “Izlabots kodā” nenozīmē, ka īpašnieks jau pārbaudījis nākamo DMG.</p>
+<details class="card"><summary>Izlabots kodā: eksports un iPhone plūsma</summary><h3>Iepriekš pastāvējušas kļūdas</h3><article class="fix pre-existing"><h4>Final Cut noraidīja XML, bet testi bija zaļi</h4><dl><dt>Iepriekšējā kļūda</dt><dd>#80 un 10.10. retests: <code>asset</code> struktūra neatbilda DTD.</dd><dt>Labojums</dt><dd>#100, <code>16b2593</code>: <code>media-rep</code>, resursu formāti un racionālie laiki.</dd><dt>Pārbaudīts</dt><dd>Plānā 032 fiksēti DTD/golden testi; audits min zaļu Tests run uz <code>2df0169</code>. Final Cut tests vēl jāveic.</dd></dl></article><article class="fix pre-existing"><h4>Suggested cuts neievēroja uzņemšanas secību</h4><dl><dt>Iepriekšējā kļūda</dt><dd>Retestā Cinematic Highlight un Long Scenic sāka ar visaugstāk novērtēto klipu, pat ja tas uzņemts pēdējais.</dd><dt>Labojums</dt><dd>#107, <code>2df0169</code>: hronoloģiskos griezumus kārto pēc capture time, tad klipa sākuma.</dd><dt>Pārbaudīts</dt><dd>PR un 042/5.1 retests ar saglabātu ierakstu; automātiskais Tests run uz šī merge ir zaļš. Daļai profilu saglabājas apzināta score-first atlase.</dd></dl></article></details>
+<details class="card"><summary>Atvērts: saglabāšana un uzticama nodošana</summary><ul class="evidence"><li>Audita N1 un A4: pārtraukta saglabāšana var sabojāt saglabāto projektu, un kļūda lietotājam netiek parādīta. Vispirms jānodrošina atomāra saglabāšana un atjaunošana.</li><li>A3/A8/A9/A12: rederive/rescan un novēlotas atbildes var sajaukt saglabāto stāvokli, projektu vai export receipt.</li><li>A10 un N2–N4: jauktu avotu Resolve metadati, nepareizas skaitļu robežas, nulles kadra eksports un nevajadzīgi FCP resursi prasa labojumus.</li><li>#84 paliek atvērts: grounded visual editing un thematic cut proposals; saistīts ar 4. posmu. #88 (Windows) un #89 (Linux) ir pēc v1.0.0.</li><li id="ai-audit-note">A5/A6/A11 vēl nevar saukt par izlabotiem <code>main</code> zarā, kamēr #101 nav sapludināts un pārbaudīts.</li></ul></details></section>
+
+    
+
+    
+
+    <section id="prs" aria-labelledby="prs-h" data-nav="PR" ><h2 id="prs-h">Izmaiņu ieraksts</h2><p class="intro">Sapludinājums pievieno kodu <code>main</code>, bet neizveido lietotnes izlaidumu. Kartītēs redzamas pēdējās GitHub pārbaudes nolasīšanas brīdī; tās nav šīs lapas testi. </p><details class="card"><summary>PR statusi, nosaukumi un pārbaudes</summary><div class="prs" id="pr-cards"></div></details></section>
+
+    <section id="items" aria-labelledby="items-h" data-nav="Visi" data-count="items"><h2 id="items-h">Visi posmi un darba bloki</h2><p class="intro">Saglabāti roadmap numuri 0–7, arī 1b un 1c. Tabula ietver atsevišķus eksperimenta un dokumentu blokus; statuss aptver arī atvērtos cilvēka testus.</p><details class="all-items" id="all-items"><summary id="all-items-label"></summary><div class="filters" role="group" aria-label="Atlasīt pēc statusa" id="filters"></div><div class="table-wrap"><table><thead><tr><th scope="col">#</th><th scope="col">Darbs</th><th scope="col">Statuss</th><th scope="col" id="group-col">Posms</th><th scope="col">Kur tas ir</th></tr></thead><tbody id="rows"></tbody></table></div></details></section>
+
+    <section id="waiting" aria-labelledby="waiting-h" data-nav="Tālāk" ><h2 id="waiting-h">Nākamās darbības</h2><p class="intro">v0.5.0 ir audita ieteikums, nevis publicēts izlaidums. Owner checks before tagging un Draft v0.5.0 release notes ir pilnais saraksts.</p><details class="card"><summary>Darbu secība un īpašnieka pārbaudes</summary><p>Kvadrātiekavās norādīts roadmap posms.</p><div class="waiting"><div><h3>Ieviešanas darbs</h3><ol><li>Pabeigt #101 un pārbaudīt precīzo sapludināto commit [2].</li><li>Novērst audita saglabāšanas un eksporta riskus; vēl nepieskaitīt citu aktīvo zaru darbu pie main.</li><li>Sagaidīt zaļu CI un sagatavot abu Mac arhitektūru kandidāta DMG; tikai pēc īpašnieka pārbaudēm gatavot versijas maiņu un tagu.</li><li>Turpināt 3. → 4. → 5. posmu; 6. posms izmanto jau gatavo atlasītāju. 7. posma parakstīšanas darbu sākt laikus.</li></ol></div><div><h3>Ernesto</h3><ul><li>Iziet 037/H1 un 032/042 īsto materiālu un abu montāžas lietotņu testus [1, 1b, 1c].</li><li>Pārbaudīt save/reopen, rescan, ātrumu, skaņu, kadrējumu un īstu HEVC/HDR pirms v0.5.0.</li><li>Atbildēt uz sešiem lēmumiem; pirms 3. posma piegādes pieņemt Anthropic Commercial Terms (nodoms jau apstiprināts).</li><li>Pirms v0.5.0 uzstādīt kandidāta DMG uz tīriem arm64 un x64 Mac datoriem, pārbaudīt versiju un atjauninājuma paziņojumu. Ja #101 iekļauts, pārbaudīt AI kļūdas un datu robežu; pēc Final Cut testa atbildēt #80 ar lūgumu atkārtot pārbaudi.</li><li>Pirms 7. posma nodrošināt Apple dalību un notarizēta DMG pārbaudi. Sponsora saite un papildu testa materiāli paliek īpašnieka darbības ārpus koda.</li></ul></div></div></details>
+<details class="card"><summary>Kur avoti atšķiras un ko vēl nesolām</summary><ul class="evidence"><li>032 nosaukums sola atveramu eksportu, bet cilvēka H1–H5 ir tukši un #80 atvērts. Tādēļ 1b ir “Gaida”.</li><li>042 vairāki sapludināti PR nav visa plāna beigas: 11/14, Phase 6 un abi cilvēka uzdevumi paliek.</li><li id="snapshot-difference">Audits fiksē 2df0169; #101 un #111 stāvoklis šajā lapā seko jaunākajai GitHub nolasīšanai, audits #111 nepiemin.</li><li>Roadmap 4. posma nosaukums paliek spēkā; Versions noņemšana joprojām ir īpašnieka jautājums. Atskaņotāju paredzēts paturēt kā Proposal Preview.</li><li>#108 eksperimentam īpašnieks devis vietu pirms v1.0.0, bet tas nav ierakstīts roadmap 0–7 tabulā. #109 nav šī eksperimenta piegāde.</li><li>Native iOS memo un OKF dokumentu profils nav lietotnes funkcijas. Runtime tools daļa bija jau v0.4.0; v1.0.0 uzticamības solījums vēl nav izpildīts.</li></ul></details></section>
+  </main>
+
+  <footer><p>Avots: docs/ROADMAP.md, saskaņots 08.10.2026; lasīts no <code>be95328</code> un salīdzināts ar <code>origin/main</code> 22.10.2026 (atšķirību nebija). Pārbaudīti PR, issues un <code>git log v0.4.0..origin/main</code>; jaunā izlaiduma vai produkcijas pārbaude nav veikta.</p><details><summary>Plāni un pierādījumi</summary><ul class="link-list"><li><a href="https://github.com/evilkels/ai-clip-assembler/releases/tag/v0.4.0">v0.4.0 · izlaists 04.10.2026</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#owner-checks-before-tagging">Owner checks before tagging</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#draft-v050-release-notes">Draft v0.5.0 release notes</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md">0 · Baseline</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/037-extraction-quality.md">1 · A first cut worth keeping, without AI</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/032-valid-fcpxml-and-nle-verification.md">1b · Exports that open</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/042-iphone-footage.md">1c · iPhone footage end to end</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md">2 · Honest AI errors</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md">3 · Connect Claude or ChatGPT</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/review-visual-editing.md">4 · The AI edits like a Resolve console</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/039-story.md">5 · Story in the edit</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/019-clip-library-generation-and-expansion.md">6 · Find more clips</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/033-in-app-updates-and-a-trusted-build.md">7 · Trusted release</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/043-remote-prototype-refresh.md">043 · Remote View prototype refresh stability</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md">audit · Repo audit 2026-10-22</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/feat/remote-view/docs/plans/041-remote-view.md">041 · Remote View (draft zars)</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-10-iphone-footage-test.md">iPhone retesta pilnais ieraksts</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/actions/runs/39805366014">Audita minētais CI uz 2df0169</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/80">#80 · Final Cut importa retests</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/84">#84 · Grounded visual editing</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/88">#88 · Windows</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/89">#89 · Linux</a></li></ul></details><p>Īpašnieka vajadzībām. Nav analītikas vai ārēju resursu; atbildes paliek pārlūkā. Ja plāns un pārbaudāmais ieraksts atšķiras, lapa seko ierakstam un to pasaka. Laiks: Europe/Riga.</p></footer>
+  </div>
+</div>
+</div>
+
+
+<script type="application/json" id="overview-data">
+{
+  "groupLabel": "Posms / joma",
+  "itemWords": [
+    "darba bloks",
+    "darba bloki"
+  ],
+  "prCardLimit": 3,
+  "repo": "https://github.com/evilkels/ai-clip-assembler",
+  "statuses": {
+    "live": {
+      "label": "Izlaists",
+      "meaning": "GitHub izlaidumā"
+    },
+    "built": {
+      "label": "Sagatavots",
+      "meaning": "main; nav jaunā izlaidumā"
+    },
+    "progress": {
+      "label": "Iesākts",
+      "meaning": "daļēji pabeigts"
+    },
+    "waiting": {
+      "label": "Gaida",
+      "meaning": "pārbaudi vai atkarību"
+    },
+    "planned": {
+      "label": "Plānots",
+      "meaning": "vēl nav sākts"
+    }
+  },
+  "groups": [
+    {
+      "id": "release",
+      "name": "Izlaistā versija",
+      "sub": "Atskaites punkts kopš 04.10.2026"
+    },
+    {
+      "id": "m0",
+      "name": "0 · Baseline",
+      "sub": "Plāni un produkta valoda"
+    },
+    {
+      "id": "m1",
+      "name": "1 · A first cut worth keeping, without AI",
+      "sub": "037 · Kvalitāte bez AI"
+    },
+    {
+      "id": "m1b",
+      "name": "1b · Exports that open",
+      "sub": "032 · Paralēli pirmajai montāžai"
+    },
+    {
+      "id": "m1c",
+      "name": "1c · iPhone footage end to end",
+      "sub": "042 · Pirms AI pārbaudēm"
+    },
+    {
+      "id": "m2",
+      "name": "2 · Honest AI errors",
+      "sub": "038 · Phases 1–2"
+    },
+    {
+      "id": "m3",
+      "name": "3 · Connect Claude or ChatGPT",
+      "sub": "038 · Phases 3–6; pēc tam dokumentācija"
+    },
+    {
+      "id": "m4",
+      "name": "4 · The AI edits like a Resolve console",
+      "sub": "review-visual-editing · Pēc īstajiem AI savienojumiem"
+    },
+    {
+      "id": "m5",
+      "name": "5 · Story in the edit",
+      "sub": "039 · Pēc AI rediģēšanas cikla"
+    },
+    {
+      "id": "m6",
+      "name": "6 · Find more clips",
+      "sub": "019 · Nepieciešamais 037 atlasītājs jau ir main"
+    },
+    {
+      "id": "m7",
+      "name": "7 · Trusted release",
+      "sub": "033 + runtime tools · Ceļš līdz Mac v1.0.0"
+    },
+    {
+      "id": "exp",
+      "name": "Atsevišķs eksperiments",
+      "sub": "Remote View nav 0–7 posmu aizstājējs"
+    },
+    {
+      "id": "docs",
+      "name": "Izpēte un uzturēšana",
+      "sub": "Dokumentācija nav jauna lietotnes funkcija"
+    }
+  ],
+  "items": [
+    {
+      "id": "v0.4.0",
+      "short": "Izlaists 04.10.",
+      "title": "v0.4.0",
+      "status": "live",
+      "group": "release",
+      "note": "GitHub Release publicēts 04.10.2026. Šis pārskats nesauc jaunāko main par izlaistu versiju.",
+      "prs": [],
+      "delivery": "Izlaidumā"
+    },
+    {
+      "id": "0",
+      "short": "Saskaņoti plāni",
+      "title": "Baseline",
+      "status": "built",
+      "group": "m0",
+      "note": "Plāni, glossary un ADR saskaņoti; #98 sapludināts 08.10.2026. Tas neapliecina visu vēsturisko plānu slēgšanu.",
+      "prs": [
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md",
+      "delivery": "Dokumenti main"
+    },
+    {
+      "id": "1",
+      "short": "Jāpārbauda kvalitāte",
+      "title": "A first cut worth keeping, without AI",
+      "status": "waiting",
+      "group": "m1",
+      "note": "Kods main kopš #99; 20 s noklusējums. Estepona 5→13 klipi, mediāna 3→20 s; Detox Medium 13→240 s. 037/H1 gaida īpašnieka vērtējumu.",
+      "prs": [
+        99
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/037-extraction-quality.md",
+      "delivery": "Kods main; gaida kvalitātes vērtējumu"
+    },
+    {
+      "id": "1b",
+      "short": "Gaida NLE testu",
+      "title": "Exports that open",
+      "status": "waiting",
+      "group": "m1b",
+      "note": "Automātiskā XML struktūras pārbaude ir main (#100), bet 032/H1–H5 nav izpildīti. #80 paliek atvērts; jauktu avotu Resolve metadati vēl jālabo.",
+      "prs": [
+        100
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/032-valid-fcpxml-and-nle-verification.md",
+      "delivery": "Kods main; gaida montāžas lietotņu testus"
+    },
+    {
+      "id": "1c",
+      "short": "Palikusi apdare",
+      "title": "iPhone footage end to end",
+      "status": "progress",
+      "group": "m1c",
+      "note": "042: 11/14 koda uzdevumi atzīmēti; Phase 6 un abi cilvēka testi paliek. #107 retesta ieraksts pierāda kārtību un portreta priekšskatījumus, nevis NLE importu vai īstu HDR.",
+      "prs": [
+        100,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/042-iphone-footage.md",
+      "delivery": "Kods main; Phase 6 nav sākta"
+    },
+    {
+      "id": "2",
+      "short": "AI kļūdu apstrāde",
+      "title": "Honest AI errors",
+      "status": "progress",
+      "group": "m2",
+      "note": "PR #101 vēl atvērts; rebase un pārbaudes nav tas pats, kas sapludinājums. Neuzskaitīt kā main labojumu, kamēr nav sapludināts.",
+      "prs": [
+        101
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md",
+      "delivery": "PR zarā; vēl nav main"
+    },
+    {
+      "id": "3",
+      "short": "AI pieslēgšana",
+      "title": "Connect Claude or ChatGPT",
+      "status": "waiting",
+      "group": "m3",
+      "note": "Gaida 2. posmu. Providers, welcome wizard, Connect and allow un Pi aizstāšana vēl nav ieviesti; atvērts teksts un modeļu izvēle.",
+      "prs": [],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md",
+      "delivery": "Nav sākts; vispirms 2. posms"
+    },
+    {
+      "id": "4",
+      "short": "Viens Proposal",
+      "title": "The AI edits like a Resolve console",
+      "status": "waiting",
+      "group": "m4",
+      "note": "Gaida 3. posmu. Plānā ir visa bibliotēka, Script labošanas cikls un viens Proposal; Versions noņemšanai vajag Q1 atbildi.",
+      "prs": [],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/review-visual-editing.md",
+      "delivery": "Nav sākts; vispirms 3. posms"
+    },
+    {
+      "id": "5",
+      "short": "Stāsta atzīmes",
+      "title": "Story in the edit",
+      "status": "waiting",
+      "group": "m5",
+      "note": "Gaida 4. posmu; Markers un Story Sections vēl nav ieviesti. Jāpārbauda arī to eksports abās montāžas lietotnēs.",
+      "prs": [],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/039-story.md",
+      "delivery": "Nav sākts; vispirms 4. posms"
+    },
+    {
+      "id": "6",
+      "short": "Vairāk klipu",
+      "title": "Find more clips",
+      "status": "planned",
+      "group": "m6",
+      "note": "019 vēl nav sākts; 037 atkarība izpildīta. More clips / Longer clips paredzēti ar saglabātu Timeline un Undo History.",
+      "prs": [],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/019-clip-library-generation-and-expansion.md",
+      "delivery": "Nav sākts; 037 atkarība gatava"
+    },
+    {
+      "id": "7",
+      "short": "Uzticams Mac izlaidums",
+      "title": "Trusted release",
+      "status": "progress",
+      "group": "m7",
+      "note": "Daļa runtime tools bija jau pirms v0.4.0. Parakstīšana, notarizācija, abu arhitektūru tīra Mac testi un automātiskie atjauninājumi vēl priekšā; vajag Apple dalību.",
+      "prs": [],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/033-in-app-updates-and-a-trusted-build.md",
+      "delivery": "Daļa jau v0.4.0; parakstīšana nav sākta"
+    },
+    {
+      "id": "041",
+      "short": "Remote View apturēts",
+      "title": "Remote View",
+      "status": "waiting",
+      "group": "exp",
+      "note": "Draft #108: 11/36 uzdevumi; apturēts. Divi bloķētāji: faila publicēšanas sacensība ar reģistra izmaiņām (N10) un nedeterministisks konkurences tests (N12). Pārbaudes īstā iPhone vēl nav veiktas.",
+      "prs": [
+        108
+      ],
+      "delivery": "Draft zarā; apturēts, 11/36"
+    },
+    {
+      "id": "043",
+      "short": "Prototipa atsvaidze",
+      "title": "Remote View prototype refresh stability",
+      "status": "built",
+      "group": "exp",
+      "note": "#109 main: nemainīgi aptaujas dati vairs nepārzīmē sīktēlus, mainīti dati atjaunojas. Tas ir atsevišķs prototips; īpašnieka iPhone apstiprinājums vēl gaida.",
+      "prs": [
+        109
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/043-remote-prototype-refresh.md",
+      "delivery": "Prototipa kods main; iPhone H1 gaida"
+    },
+    {
+      "id": "iOS",
+      "short": "iOS izpēte",
+      "title": "React Native iOS feasibility research memo",
+      "status": "built",
+      "group": "docs",
+      "note": "#110 main kopš 10.10.2026: izpētes memo; native iOS lietotne nav uzbūvēta.",
+      "prs": [
+        110
+      ],
+      "delivery": "Izpētes dokuments main"
+    },
+    {
+      "id": "OKF",
+      "short": "Dokumentu profils",
+      "title": "OKF v0.2 docs profile",
+      "status": "progress",
+      "group": "docs",
+      "note": "PR #111 atvērts. Tas sakārto dokumentu aprakstus un indeksu, nevis ievieš rediģēšanas funkciju.",
+      "prs": [
+        111
+      ],
+      "delivery": "Dokumentu PR; vēl nav main"
+    },
+    {
+      "id": "audit",
+      "short": "Repo audits",
+      "title": "Repo audit 2026-10-22",
+      "status": "built",
+      "group": "docs",
+      "note": "#112 sapludināts 22.10.2026; audits pārbauda 2df0169 un iesaka v0.5.0. Tas nav kļūdu labojumu PR.",
+      "prs": [
+        112
+      ],
+      "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md",
+      "delivery": "Dokuments main"
+    }
+  ],
+  "prs": [
+    {
+      "number": 111,
+      "title": "docs: adopt OKF v0.2 docs profile",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/111",
+      "state": "OPEN",
+      "mergedAt": null,
+      "closedAt": null,
+      "createdAt": "2026-10-22T15:38:44Z",
+      "baseRefName": "main",
+      "headRefName": "docs/okf-profile",
+      "additions": 1185,
+      "deletions": 28,
+      "changedFiles": 134,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 108,
+      "title": "wip(remote): checkpoint reviewed upload and Serve foundation (plan 041)",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/108",
+      "state": "DRAFT",
+      "mergedAt": null,
+      "closedAt": null,
+      "createdAt": "2026-10-10T18:38:22Z",
+      "baseRefName": "main",
+      "headRefName": "feat/remote-view",
+      "additions": 14847,
+      "deletions": 142,
+      "changedFiles": 58,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 101,
+      "title": "feat(ai): honest AI errors and a locked-down payload (plan 038 Phases 1–2)",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/101",
+      "state": "OPEN",
+      "mergedAt": null,
+      "closedAt": null,
+      "createdAt": "2026-10-08T21:43:55Z",
+      "baseRefName": "main",
+      "headRefName": "feat/038-honest-ai-errors",
+      "additions": 3080,
+      "deletions": 1250,
+      "changedFiles": 49,
+      "checks": {
+        "passed": 0,
+        "failed": 0,
+        "pending": 1,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 112,
+      "title": "docs(reviews): repo audit 2026-10-22",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/112",
+      "state": "MERGED",
+      "mergedAt": "2026-10-22T15:46:47Z",
+      "closedAt": "2026-10-22T15:46:47Z",
+      "createdAt": "2026-10-22T15:44:55Z",
+      "baseRefName": "main",
+      "headRefName": "docs/repo-audit-2026-10-22",
+      "additions": 242,
+      "deletions": 0,
+      "changedFiles": 1,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 107,
+      "title": "fix(review): keep chronological Suggested cuts in shooting order (plan 042)",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/107",
+      "state": "MERGED",
+      "mergedAt": "2026-10-22T15:29:44Z",
+      "closedAt": "2026-10-22T15:29:44Z",
+      "createdAt": "2026-10-10T18:25:31Z",
+      "baseRefName": "main",
+      "headRefName": "fix/suggested-cut-order",
+      "additions": 755,
+      "deletions": 9,
+      "changedFiles": 16,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 109,
+      "title": "fix(remote): stop prototype thumbnail refresh flicker (plan 043)",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/109",
+      "state": "MERGED",
+      "mergedAt": "2026-10-22T15:29:39Z",
+      "closedAt": "2026-10-22T15:29:40Z",
+      "createdAt": "2026-10-10T19:14:50Z",
+      "baseRefName": "main",
+      "headRefName": "fix/remote-prototype-refresh",
+      "additions": 1252,
+      "deletions": 0,
+      "changedFiles": 13,
+      "checks": {
+        "passed": 2,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 110,
+      "title": "docs: add React Native iOS feasibility research memo",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/110",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T19:50:46Z",
+      "closedAt": "2026-10-10T19:50:46Z",
+      "createdAt": "2026-10-10T19:50:43Z",
+      "baseRefName": "main",
+      "headRefName": "docs/native-ios-research",
+      "additions": 399,
+      "deletions": 0,
+      "changedFiles": 2,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 106,
+      "title": "fix(ui): size Review and Timeline previews to vertical footage",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/106",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T18:16:18Z",
+      "closedAt": "2026-10-10T18:16:18Z",
+      "createdAt": "2026-10-10T17:45:23Z",
+      "baseRefName": "main",
+      "headRefName": "fix/vertical-previews",
+      "additions": 526,
+      "deletions": 33,
+      "changedFiles": 27,
+      "checks": {
+        "passed": 0,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 103,
+      "title": "fix(ui): Timeline clock, per-video Analyzed status, Thumbs/Compact layout and copy",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/103",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T17:43:21Z",
+      "closedAt": "2026-10-10T17:43:21Z",
+      "createdAt": "2026-10-10T17:10:44Z",
+      "baseRefName": "main",
+      "headRefName": "fix/editor-ui-fixes",
+      "additions": 480,
+      "deletions": 27,
+      "changedFiles": 25,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 105,
+      "title": "feat(export): name handoffs after the Project, preselect FCPXML",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/105",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T17:35:58Z",
+      "closedAt": "2026-10-10T17:35:58Z",
+      "createdAt": "2026-10-10T17:23:39Z",
+      "baseRefName": "main",
+      "headRefName": "fix/export-ux",
+      "additions": 77,
+      "deletions": 13,
+      "changedFiles": 12,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 104,
+      "title": "docs(plans): plan 042 iPhone footage; move .superpowers records into docs/reviews",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/104",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T17:30:29Z",
+      "closedAt": "2026-10-10T17:30:29Z",
+      "createdAt": "2026-10-10T17:18:04Z",
+      "baseRefName": "main",
+      "headRefName": "chore/plan-041-iphone-footage",
+      "additions": 401,
+      "deletions": 1,
+      "changedFiles": 42,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 100,
+      "title": "Exports that open in Final Cut Pro and DaVinci Resolve (plan 032)",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/100",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T17:07:25Z",
+      "closedAt": "2026-10-10T17:07:25Z",
+      "createdAt": "2026-10-08T20:51:03Z",
+      "baseRefName": "main",
+      "headRefName": "feat/032-exports",
+      "additions": 2886,
+      "deletions": 214,
+      "changedFiles": 39,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 102,
+      "title": "fix(probe): order iPhone footage by recording time, report nominal 59.94",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/102",
+      "state": "MERGED",
+      "mergedAt": "2026-10-10T17:03:56Z",
+      "closedAt": "2026-10-10T17:03:56Z",
+      "createdAt": "2026-10-10T16:56:10Z",
+      "baseRefName": "main",
+      "headRefName": "fix/iphone-capture-metadata",
+      "additions": 278,
+      "deletions": 10,
+      "changedFiles": 4,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 99,
+      "title": "feat(037): extraction quality — several longer windows per run, 20 s default, per-video draft caps, format switch reaches the Timeline",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/99",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T20:10:26Z",
+      "closedAt": "2026-10-08T20:10:26Z",
+      "createdAt": "2026-10-08T17:24:41Z",
+      "baseRefName": "main",
+      "headRefName": "feat/037-extraction-quality",
+      "additions": 687,
+      "deletions": 102,
+      "changedFiles": 13,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 98,
+      "title": "docs(plans): match the plan board to the v1.0.0 roadmap",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/98",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T17:05:38Z",
+      "closedAt": "2026-10-08T17:05:38Z",
+      "createdAt": "2026-10-08T16:47:01Z",
+      "baseRefName": "main",
+      "headRefName": "docs/plans-match-roadmap",
+      "additions": 2357,
+      "deletions": 690,
+      "changedFiles": 37,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 97,
+      "title": "docs: roadmap to v1.0.0, AI Connection terms, ADRs 0007 and 0008",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/97",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T16:23:09Z",
+      "closedAt": "2026-10-08T16:23:09Z",
+      "createdAt": "2026-10-08T16:16:38Z",
+      "baseRefName": "main",
+      "headRefName": "docs/roadmap-v1",
+      "additions": 268,
+      "deletions": 19,
+      "changedFiles": 10,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 96,
+      "title": "Plan 036: tests that can fail, one gate everywhere, reviewable e2e (PRs #93–#95)",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/96",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T16:16:17Z",
+      "closedAt": "2026-10-08T16:16:17Z",
+      "createdAt": "2026-10-08T16:09:46Z",
+      "baseRefName": "main",
+      "headRefName": "docs/align-agent-skills",
+      "additions": 577,
+      "deletions": 303,
+      "changedFiles": 67,
+      "checks": {
+        "passed": 2,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 93,
+      "title": "Plan 036 Phase 3: an e2e suite the owner can review",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/93",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T15:55:44Z",
+      "closedAt": "2026-10-08T15:55:44Z",
+      "createdAt": "2026-10-08T14:55:00Z",
+      "baseRefName": "docs/align-agent-skills",
+      "headRefName": "tests/036-e2e",
+      "additions": 185,
+      "deletions": 15,
+      "changedFiles": 31,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 95,
+      "title": "Plan 036 Phase 2: tests that can fail",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/95",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T15:50:38Z",
+      "closedAt": "2026-10-08T15:50:38Z",
+      "createdAt": "2026-10-08T15:01:55Z",
+      "baseRefName": "docs/align-agent-skills",
+      "headRefName": "tests/036-tests",
+      "additions": 185,
+      "deletions": 242,
+      "changedFiles": 22,
+      "checks": {
+        "passed": 2,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 94,
+      "title": "Plan 036 Phase 1: one gate everywhere, plus CODING_STANDARDS.md",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/94",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T15:45:21Z",
+      "closedAt": "2026-10-08T15:45:21Z",
+      "createdAt": "2026-10-08T14:58:34Z",
+      "baseRefName": "docs/align-agent-skills",
+      "headRefName": "tests/036-gates",
+      "additions": 207,
+      "deletions": 46,
+      "changedFiles": 18,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 92,
+      "title": "docs: align agent-skill setup; plans are the tracker with derived status",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/92",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T15:19:57Z",
+      "closedAt": "2026-10-08T15:19:57Z",
+      "createdAt": "2026-10-06T12:55:59Z",
+      "baseRefName": "main",
+      "headRefName": "docs/align-agent-skills",
+      "additions": 1251,
+      "deletions": 219,
+      "changedFiles": 31,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    },
+    {
+      "number": 91,
+      "title": "Close react-doctor-triage and 017, gate 030, and re-verify plan statuses at v0.4.0",
+      "url": "https://github.com/evilkels/ai-clip-assembler/pull/91",
+      "state": "MERGED",
+      "mergedAt": "2026-10-08T15:06:15Z",
+      "closedAt": "2026-10-08T15:06:16Z",
+      "createdAt": "2026-10-04T10:46:55Z",
+      "baseRefName": "main",
+      "headRefName": "feat/small-plans-batch",
+      "additions": 1070,
+      "deletions": 245,
+      "changedFiles": 45,
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0
+      },
+      "failedChecks": []
+    }
+  ],
+  "answersKey": "ai-clip-assembler-20261022-answers",
+  "decisions": [
+    {
+      "id": "Q1",
+      "short": "Versions galerija",
+      "title": "Vai 4. posmā noņemt Versions galeriju?",
+      "risk": "medium",
+      "size": "L",
+      "ifNothing": "Plāna 3.7. uzdevums un Phase 5 (Versions noņemšana) paliek bloķēti.",
+      "detail": "review-visual-editing D7/H3 iesaka vienu pārskatāmu Proposal. Esošais atskaņotājs paliek un kļūst par Proposal Preview; šī ir plānota aizstāšana, nevis jau veikta dzēšana.",
+      "options": [
+        "Noņemt, paturēt Preview",
+        "Paturēt galeriju",
+        "Jāapspriež"
+      ]
+    },
+    {
+      "id": "Q2",
+      "short": "Privātuma teksts",
+      "title": "Vai apstiprināt Connect and allow un privātuma tekstu?",
+      "risk": "high",
+      "size": "S",
+      "ifNothing": "038/7.3 teksts nevar kļūt par galīgo solījumu.",
+      "detail": "Plānots teksts no 038 D18; tas apraksta mērķa uzvedību, nevis šodien izlaistu funkciju. Pilnais piedāvātais teksts: “When AI is on, the app sends sampled pictures from your footage, file names, clip timings and scores, your current edit, and the Review chat (including scripts and their results) to Claude or ChatGPT through the program signed in on this Mac. Folder paths, video files and audio are never sent. This applies to every project; you can turn AI off per project. Disconnecting stops it everywhere.” Pirms publicēšanas tekstam jāatbilst pārbaudītajai datu robežai.",
+      "options": [
+        "Apstiprinu šo tekstu",
+        "Vajag labot tekstu",
+        "Jāapspriež"
+      ]
+    },
+    {
+      "id": "Q3",
+      "short": "AI modeļi",
+      "title": "Kādus AI modeļus izmantot pēc noklusējuma?",
+      "risk": "medium",
+      "size": "S",
+      "ifNothing": "Ieviešana turas pie plāna pieņēmumiem, bez īpašnieka apstiprinājuma.",
+      "detail": "038 D8/D9 sākumpunkts: Claude Sonnet un lietotāja Codex noklusējums, scoring ar zemu reasoning effort; Advanced ļauj mainīt modeli. Tas vēl nav izlaists savienojums.",
+      "options": [
+        "Sonnet + Codex noklusējums",
+        "Izvēlēšos citus modeļus",
+        "Jāapspriež"
+      ]
+    },
+    {
+      "id": "Q4",
+      "short": "Final Cut piekļuve",
+      "title": "Kā nodrošināt Final Cut Pro pārbaudi?",
+      "risk": "high",
+      "size": "S",
+      "ifNothing": "1b un #80 nevar saņemt īsta importa apstiprinājumu.",
+      "detail": "032/H1–H3 plānā minēts 90 dienu izmēģinājums vai aizņemts Mac; pieejamību pārbaudi pirms lietošanas. Pieraksti Final Cut un lietotnes versiju. DTD pārbaude viena pati neapliecina mediju, skaņas, ātruma un kadrējuma atbilstību.",
+      "options": [
+        "Mans Mac",
+        "Izmēģinājums",
+        "Cits Mac"
+      ]
+    },
+    {
+      "id": "Q5",
+      "short": "v0.5.0 pārbaudes",
+      "title": "Kad vari iziet v0.5.0 kandidāta pārbaudes?",
+      "risk": "high",
+      "size": "M",
+      "ifNothing": "v0.5.0 nedrīkst vēl marķēt kā gatavu.",
+      "detail": "2026-10-22 auditā: pēc bloķējošo labojumu pārbaudes uzstādīt kandidāta DMG uz tīriem arm64 un x64 Mac datoriem, pārbaudīt lietotnes/backend versiju un atjauninājuma paziņojumu; pārbaudīt ar īstu drona/iPhone H.264 un HEVC/HDR materiālu, save/reopen, Final Cut un Resolve importa, pārvietotas mapes un Lua/keyboard testus. Ja #101 ir izlaidumā, pārbaudīt nepieejamu Provider, usage limit, sign-in un tīkla kļūdas, saglabātus agrākos ieteikumus un atļauto nosūtāmo datu kopu. Pēc Final Cut testa atbildēt #80 ar pārbaudītā izlaiduma norādi un lūgumu retestēt. Izvēle šajā lapā neizveido izlaidumu vai tagu.",
+      "options": [
+        "Ieplānošu",
+        "Vēlāk",
+        "Vajag palīdzību"
+      ]
+    },
+    {
+      "id": "Q6",
+      "short": "Apple dalība",
+      "title": "Vai vari nodrošināt Apple Developer dalību pirms 7. posma?",
+      "risk": "medium",
+      "size": "M",
+      "ifNothing": "Parakstīšana un notarizācija paliek bloķēta.",
+      "detail": "033/H1 un roadmap paredz īpašnieka dalību: plānā norādīti 99 USD gadā, cenu pārbaudi reģistrējoties. Sertifikāti un CI konfigurācija nāk pēc tam.",
+      "options": [
+        "Nodrošināšu",
+        "Vēlāk",
+        "Jāapspriež"
+      ]
+    }
+  ],
+  "loc": [],
+  "ui": {
+    "overview": "Pārskats",
+    "all": "Visi",
+    "allItems": "Visi darba bloki ({n})",
+    "earlier": "{n} agrāki darba bloki tabulā",
+    "options": [
+      "Jā",
+      "Vēlāk",
+      "Jāapspriež"
+    ],
+    "risk": {
+      "low": "Zems risks",
+      "medium": "Vidējs risks",
+      "high": "Augsts risks"
+    },
+    "size": "Apjoms {size}",
+    "ifNothing": "Ja neatbildi: ",
+    "more": "Pamatojums un ieteikums",
+    "answer": "Tava atbilde",
+    "answered": "Atbildēts: {n} no {total}",
+    "copy": "Kopēt atbildes",
+    "copied": "Nokopēts",
+    "clear": "Notīrīt",
+    "clearConfirm": "Notīrīt visas atbildes?",
+    "copyHeading": "Atbildes: {title}",
+    "locHead": [
+      "",
+      "Faili",
+      "Pievienots",
+      "Noņemts"
+    ],
+    "kinds": {
+      "code": "Kods",
+      "tests": "Testi",
+      "docs": "Dokumenti",
+      "total": "Kopā"
+    },
+    "change": {
+      "added": "jauns",
+      "deleted": "dzēsts",
+      "renamed": "pārsaukts"
+    },
+    "deletedFiles": "Dzēstie faili",
+    "allFiles": "Visi mainītie faili",
+    "pr": {
+      "OPEN": "atvērts",
+      "DRAFT": "melnraksts",
+      "MERGED": "sapludināts",
+      "CLOSED": "slēgts",
+      "merged": "sapludināts {date}",
+      "closed": "slēgts {date}",
+      "opened": "atvērts {date}",
+      "failing": "{n} neizdevās",
+      "pending": "{n} gaida",
+      "passed": "{n} izdevās",
+      "skipped": "izlaisti: {n}",
+      "none": "nav pārbaužu",
+      "files": "faili: {n}"
+    }
+  }
+}
+</script>
+<script>
+  const themeButtons = [...document.querySelectorAll("[data-theme-choice]")];
+  const setTheme = (choice) => {
+    if (choice === "system") {
+      delete document.documentElement.dataset.theme;
+      try { localStorage.removeItem("plan-overview-theme"); } catch {}
+    } else {
+      document.documentElement.dataset.theme = choice;
+      try { localStorage.setItem("plan-overview-theme", choice); } catch {}
+    }
+    themeButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.themeChoice === choice)));
+  };
+  themeButtons.forEach((button) => button.addEventListener("click", () => setTheme(button.dataset.themeChoice)));
+  setTheme(document.documentElement.dataset.theme || "system");
+
+  const data = JSON.parse(document.getElementById("overview-data").textContent);
+  const { statuses = {}, groups = [], items = [], prs = [], decisions = [], loc = [] } = data;
+  // Every string the script writes. A page in another language overrides each key in data.ui.
+  const ui = {
+    overview: "Overview",
+    all: "All",
+    allItems: "All {n} {items}",
+    earlier: "{n} earlier {items}, in the table below",
+    options: ["Yes, do it", "Later", "Discuss"],
+    risk: { low: "Low risk", medium: "Medium risk", high: "High risk" },
+    size: "Size {size}",
+    ifNothing: "If we do nothing",
+    more: "What is going on, and our advice",
+    answer: "Your answer",
+    answered: "Answered {n} of {total}",
+    copy: "Copy answers", copied: "Copied", clear: "Clear", clearConfirm: "Clear all answers?",
+    copyHeading: "Answers: {title}",
+    locHead: ["", "Files", "Added", "Removed"],
+    kinds: { code: "Code", tests: "Tests", docs: "Docs", total: "Total" },
+    change: { added: "new", deleted: "deleted", renamed: "renamed" },
+    deletedFiles: "Deleted files", allFiles: "Every changed file",
+    pr: { OPEN: "open", DRAFT: "draft", MERGED: "merged", CLOSED: "closed", merged: "merged {date}", closed: "closed {date}", opened: "opened {date}",
+      failing: "{n} failing", pending: "{n} pending", passed: "{n} passed", skipped: "{n} skipped", none: "no checks", files: "{n} files" },
+    ...data.ui,
+  };
+  const fill = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+  const plain = (s) => String(s ?? "").replace(/`/g, "");
+  const href = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? esc(u) : "#");
+  const slug = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, "-");
+  const $ = (id) => document.getElementById(id);
+  const wide = matchMedia("(min-width: 641px)").matches;
+
+  // Broken data shows up as console errors, which scripts/check-page.mjs fails on.
+  const byId = {};
+  for (const t of items) {
+    if (byId[t.id]) console.error(`items: duplicate id ${t.id}`);
+    if (!statuses[t.status]) console.error(`items: ${t.id} has unknown status ${t.status}`);
+    if (!groups.some((g) => g.id === t.group)) console.error(`items: ${t.id} has unknown group ${t.group}`);
+    byId[t.id] = t;
+  }
+  for (const p of prs) if (!Number.isInteger(p.number) || p.error) console.error(`prs: unusable entry ${JSON.stringify(p).slice(0, 120)}`);
+  const cardFor = Object.fromEntries(prs.filter((p) => Number.isInteger(p.number)).map((p) => [p.number, p]));
+  const status = (t) => statuses[t.status] || { label: t.status, meaning: "" };
+  const words = data.itemWords || ["item", "items"];
+  const itemWord = (n) => (n === 1 ? words[0] : words[1]);
+
+  const pill = (t, extra = "", i = 0) =>
+    `<a class="pill s-${slug(t.status)} ${extra}" href="#t-${slug(t.id)}" style="--i:${i}" title="${esc(plain(t.title))}: ${esc(status(t).label)}">` +
+    `<span class="id">${esc(t.id)}</span> ${esc(plain(t.short))}<span class="sr-only">, ${esc(status(t).label)}</span></a>`;
+
+  const legend = $("legend");
+  if (legend && items.length) legend.innerHTML = Object.entries(statuses)
+    .filter(([key]) => items.some((t) => t.status === key))
+    .map(([key, s]) => `<li><span class="pill s-${slug(key)}">${esc(s.label)}</span> ${esc(s.meaning)}</li>`).join("");
+  else if (legend) legend.remove();
+
+  // Under 640px each group shows as a status bar that opens its items in the table.
+  const groupBar = (g, inGroup) => {
+    const counts = Object.keys(statuses).map((k) => [k, inGroup.filter((t) => t.status === k).length]).filter(([, n]) => n);
+    return `<a class="bar" href="#items" data-show-group="${esc(g.id)}"><span class="segs">${counts.map(([k, n]) => `<span class="s-${slug(k)}" style="flex:${n};background:var(--dot)"></span>`).join("")}</span>` +
+      `<small>${inGroup.length} ${esc(itemWord(inGroup.length))}: ${counts.map(([k, n]) => `${esc(statuses[k].label)}: ${n}`).join(", ")}${inGroup.filter(t=>t.delivery).map(t=>`<span class="delivery">${inGroup.length>1 ? esc(t.id)+": " : ""}${esc(t.delivery)}</span>`).join("")}</small></a>`;
+  };
+  let i = 0;
+  const track = $("track");
+  if (track && items.length && groups.length) track.innerHTML = `<h2 class="sr-only">Darba posmu statuss</h2>` + groups.map((g) => {
+    const inGroup = items.filter((t) => t.group === g.id);
+    const body = g.collapsed
+      ? `<a href="#items" data-show-group="${esc(g.id)}">${esc(fill(ui.earlier, { n: inGroup.length, items: itemWord(inGroup.length) }))}</a>`
+      : inGroup.map((t) => pill(t, "", i++) + (t.delivery ? `<span class="delivery">${esc(t.delivery)}</span>` : "")).join("");
+    return `<div class="group"><h3>${esc(g.name)}<small>${esc(g.sub)}</small></h3><div class="pills">${body}</div>${groupBar(g, inGroup)}</div>`;
+  }).join("");
+  else if (track) track.remove();
+
+  document.querySelectorAll("[data-refs]").forEach((el) => {
+    if (!items.length) { el.remove(); return; }
+    const refs = el.dataset.refs.split(/\s+/).filter(Boolean);
+    if (!refs.length) { el.remove(); return; }
+    el.innerHTML = refs.map((id) => {
+      if (!byId[id]) { console.error(`data-refs: unknown item ${id}`); return ""; }
+      return pill(byId[id], "small");
+    }).join("");
+  });
+
+  const prRef = (n) => cardFor[n]
+    ? `<a href="#pr-${Number(n)}"><code>#${Number(n)}</code></a>`
+    : `<a href="${href(data.repo + "/pull/" + Number(n))}"><code>#${Number(n)}</code></a>`;
+  const groupCol = $("group-col");
+  if (groupCol && items.length) groupCol.textContent = data.groupLabel || "Group";
+  // The item list is open on wide screens and one tap away on a phone.
+  const allItems = $("all-items");
+  if (allItems && items.length) {
+    allItems.open = wide;
+    $("all-items-label").textContent = fill(ui.allItems, { n: items.length, items: itemWord(items.length) });
+  }
+  const rows = $("rows");
+  if (rows && items.length) rows.innerHTML = items.map((t) =>
+    `<tr id="t-${slug(t.id)}" data-status="${esc(t.status)}" data-group="${esc(t.group)}"><td class="num">${esc(t.id)}</td><td>${t.planUrl ? `<a href="${href(t.planUrl)}">${rich(t.title)}</a>` : rich(t.title)}</td>` +
+    `<td><span class="pill small s-${slug(t.status)}">${esc(status(t).label)}</span></td>` +
+    `<td>${esc((groups.find((g) => g.id === t.group) || {}).name || t.group)}</td>` +
+    `<td>${rich(t.note)}${(t.prs || []).length ? " " + t.prs.map(prRef).join(" ") : ""}</td></tr>`).join("");
+  else if (rows) rows.replaceChildren();
+
+  const counts = items.reduce((acc, t) => ((acc[t.status] = (acc[t.status] || 0) + 1), acc), {});
+  const filters = $("filters");
+  if (filters && rows && items.length) filters.innerHTML = [["all", `${ui.all} ${items.length}`], ...Object.keys(statuses).filter((s) => counts[s]).map((s) => [s, `${statuses[s].label} ${counts[s]}`])]
+    .map(([key, label]) => `<button type="button" data-filter="${esc(key)}" aria-pressed="${key === "all"}">${esc(label)}</button>`).join("");
+  else if (filters) filters.remove();
+  const applyFilter = (key, groupKey) => {
+    if (!filters || !rows) return;
+    filters.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === key && !groupKey)));
+    rows.querySelectorAll("tr").forEach((tr) => {
+      tr.hidden = groupKey ? tr.dataset.group !== groupKey : key !== "all" && tr.dataset.status !== key;
+    });
+  };
+  if (filters && rows && items.length) filters.addEventListener("click", (e) => {
+    const button = e.target.closest("button");
+    if (button) applyFilter(button.dataset.filter);
+  });
+  if (track && items.length && groups.length) track.addEventListener("click", (e) => {
+    const link = e.target.closest("[data-show-group]");
+    if (!link) return;
+    applyFilter("all", link.dataset.showGroup);
+    if (allItems) allItems.open = true;
+  });
+  // A link to one thing (an item row, a decision, a PR) opens the details that
+  // hold it and lands on it, whatever the filter: on click (the hash may not
+  // change) and on history navigation. A jump to a section opens nothing.
+  const reveal = (hash) => {
+    let id = "";
+    try { id = decodeURIComponent((hash || "").slice(1)); } catch {}
+    const target = id && document.getElementById(id);
+    if (!target || target.matches("main > section, main > .hero, #track")) return;
+    let moved = false;
+    const own = target.matches("details") ? target : target.querySelector(":scope > details");
+    if (own && !own.open) { own.open = true; moved = true; }
+    for (let d = target.parentElement?.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])")) { d.open = true; moved = true; }
+    if (rows && target.closest("tr") && target.hidden) { applyFilter("all"); moved = true; }
+    if (moved) target.scrollIntoView();
+  };
+  document.addEventListener("click", (e) => {
+    const link = e.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute("href"));
+  });
+  window.addEventListener("hashchange", () => reveal(location.hash));
+
+  // PR cards from scripts/pr-facts output (trimmed). Hidden when there are none.
+  // English keeps fixed month names (en-GB writes "Sept"); other languages take their own.
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const lang = document.documentElement.lang || "en";
+  const day = (iso) => {
+    const d = iso && new Date(iso);
+    if (!d) return "";
+    return /^en\b/i.test(lang) ? `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` : d.toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
+  };
+  const checks = (c, failed = []) => {
+    if (!c) return "";
+    const parts = [
+      c.failed && `<span class="bad">${esc(fill(ui.pr.failing, { n: Number(c.failed) }))}${failed.length ? ": " + failed.map(esc).join(", ") : ""}</span>`,
+      c.pending && esc(fill(ui.pr.pending, { n: Number(c.pending) })),
+      c.passed && esc(fill(ui.pr.passed, { n: Number(c.passed) })),
+      c.skipped && esc(fill(ui.pr.skipped, { n: Number(c.skipped) })),
+    ].filter(Boolean);
+    return parts.join(", ") || esc(ui.pr.none);
+  };
+  const STATES = ["OPEN", "DRAFT", "MERGED", "CLOSED"];
+  const prSection = $("prs");
+  const prCards = $("pr-cards");
+  const shown = prs.filter((p) => cardFor[p.number] === p);
+  const limit = data.prCardLimit ?? 9;
+  const stateOf = (p) => (STATES.includes(p.state) ? p.state : "OPEN");
+  const whenOf = (p, state) => state === "MERGED" ? fill(ui.pr.merged, { date: day(p.mergedAt) }) : state === "CLOSED" ? fill(ui.pr.closed, { date: day(p.closedAt) }) : fill(ui.pr.opened, { date: day(p.createdAt) });
+  if (!shown.length || !prCards) prSection?.remove();
+  else {
+    prCards.innerHTML = shown.slice(0, limit).map((p) => {
+    const state = stateOf(p);
+    const carried = items.filter((t) => (t.prs || []).includes(p.number));
+    const when = whenOf(p, state);
+    return `<article class="pr" id="pr-${p.number}">
+      <div class="head"><a class="num" href="${href(p.url)}">#${p.number}</a><span class="pr-state ${state}">${esc(ui.pr[state])}</span><span>${esc(when)}</span></div>
+      <p class="title">${rich(p.title)}</p>
+      <div class="meta"><span>${checks(p.checks, p.failedChecks)}</span>${p.changedFiles ? `<span>${esc(fill(ui.pr.files, { n: Number(p.changedFiles) }))}, +${Number(p.additions)} −${Number(p.deletions)}</span>` : ""}<span><code>${esc(p.headRefName)}</code> → <code>${esc(p.baseRefName)}</code></span></div>
+      ${carried.length ? `<div class="refs">${carried.map((t) => pill(t, "small")).join("")}</div>` : ""}
+    </article>`;
+    }).join("");
+    const rest = shown.slice(limit);
+    if (rest.length) prCards.insertAdjacentHTML("afterend", `<ul class="pr-list">${rest.map((p) => {
+      const state = stateOf(p);
+      return `<li id="pr-${p.number}"><a class="num" href="${href(p.url)}">#${p.number}</a><span class="pr-state ${state}">${esc(ui.pr[state])}</span>` +
+        `<span>${rich(p.title)}</span><span>${esc(whenOf(p, state))}; ${checks(p.checks, p.failedChecks)}</span></li>`;
+    }).join("")}</ul>`);
+  }
+
+  // Decisions: answers stay in this browser and leave it only through "Copy answers".
+  const decide = $("decide");
+  if (!decisions.length) decide?.remove();
+  else if (decide) {
+    const seen = new Set();
+    for (const q of decisions) {
+      if (seen.has(q.id)) console.error(`decisions: duplicate id ${q.id}`);
+      if (!ui.risk[q.risk]) console.error(`decisions: ${q.id} has unknown risk ${q.risk}`);
+      seen.add(q.id);
+    }
+    const optionsOf = (q) => q.options || ui.options;
+    const key = data.answersKey || `plan-overview-answers:${location.pathname}`;
+    // Stored under id and question text, so a reworded question starts unanswered.
+    const stored = (q) => `${q.id} ${plain(q.title)}`;
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
+    let answers = Object.fromEntries(decisions.filter((q) => optionsOf(q).includes(saved[stored(q)])).map((q) => [q.id, saved[stored(q)]]));
+    const save = () => { try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(decisions.filter((q) => answers[q.id]).map((q) => [stored(q), answers[q.id]])))); } catch {} };
+    const cards = $("decision-cards");
+    cards.innerHTML = decisions.map((q) => `<article class="card decision" id="q-${slug(q.id)}" data-qid="${esc(q.id)}">
+      <div class="chips"><span class="chip">${esc(q.id)}</span><span class="chip risk-${slug(q.risk)}">${esc(ui.risk[q.risk] || q.risk)}</span>${q.size ? `<span class="chip">${esc(fill(ui.size, { size: q.size }))}</span>` : ""}</div>
+      <h3>${rich(q.title)}</h3>
+      ${q.ifNothing ? `<p class="if-nothing"><b>${esc(ui.ifNothing)}</b>${rich(q.ifNothing)}</p>` : ""}
+      ${q.detail ? `<details><summary>${esc(ui.more)}</summary><div>${rich(q.detail)}</div></details>` : ""}
+      <fieldset class="answers"><legend class="sr-only">${esc(ui.answer)}, ${esc(q.id)}</legend>${optionsOf(q).map((o) => `<button type="button" aria-pressed="false">${esc(o)}</button>`).join("")}</fieldset>
+    </article>`).join("");
+    const answered = () => decisions.filter((q) => answers[q.id]).length;
+    const render = () => {
+      cards.querySelectorAll(".decision").forEach((c) => c.querySelectorAll(".answers button")
+        .forEach((b) => b.setAttribute("aria-pressed", String(answers[c.dataset.qid] === b.textContent))));
+      $("answer-count").textContent = fill(ui.answered, { n: answered(), total: decisions.length });
+    };
+    cards.addEventListener("click", (e) => {
+      const b = e.target.closest(".answers button");
+      if (!b) return;
+      const id = b.closest(".decision").dataset.qid;
+      if (answers[id] === b.textContent) delete answers[id]; else answers[id] = b.textContent;
+      save();
+      render();
+    });
+    const compose = () => [fill(ui.copyHeading, { title: document.title }),
+      ...decisions.map((q) => `${q.id} ${plain(q.short || q.title)}: ${answers[q.id] || "—"}`),
+      fill(ui.answered, { n: answered(), total: decisions.length })].join("\n");
+    const copy = $("copy-answers"), clear = $("clear-answers"), text = $("answer-text");
+    copy.textContent = ui.copy;
+    clear.textContent = ui.clear;
+    let timer;
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(compose());
+        copy.textContent = ui.copied;
+        clearTimeout(timer);
+        timer = setTimeout(() => { copy.textContent = ui.copy; }, 2000);
+      } catch {
+        // No clipboard (an http:// link, an old browser): show the text to copy by hand.
+        text.value = compose();
+        text.hidden = false;
+        text.select();
+      }
+    });
+    clear.addEventListener("click", () => {
+      if (!confirm(ui.clearConfirm)) return;
+      answers = {};
+      try { localStorage.removeItem(key); } catch {}
+      text.hidden = true;
+      render();
+    });
+    render();
+  }
+
+  // Line totals and file lists from scripts/loc-diff output.
+  const KINDS = ["code", "tests", "docs"];
+  const deletedFiles = loc.filter((f) => f.change === "deleted");
+  if ($("removed")) {
+    if (!loc.length) ["loc-totals", "deleted-files", "loc-files"].forEach((id) => ($(id)?.closest(".table-wrap") || $(id))?.remove());
+    else {
+      for (const f of loc) if (!KINDS.includes(f.kind)) console.error(`loc: ${f.path} has unknown kind ${f.kind}`);
+      const num = (n) => Number(n || 0).toLocaleString(document.documentElement.lang || undefined);
+      const sum = (list) => list.reduce((a, f) => ({ files: a.files + 1, added: a.added + Number(f.added || 0), removed: a.removed + Number(f.removed || 0) }), { files: 0, added: 0, removed: 0 });
+      const row = (label, t, cls = "") => `<tr class="${cls}"><td>${esc(label)}</td><td>${num(t.files)}</td><td class="add">+${num(t.added)}</td><td class="del">−${num(t.removed)}</td></tr>`;
+      $("loc-totals").innerHTML = `<thead><tr>${ui.locHead.map((h) => `<th scope="col">${esc(h)}</th>`).join("")}</tr></thead><tbody>` +
+        KINDS.filter((k) => loc.some((f) => f.kind === k)).map((k) => row(ui.kinds[k], sum(loc.filter((f) => f.kind === k)))).join("") +
+        row(ui.kinds.total, sum(loc), "total") + "</tbody>";
+      const fileLi = (f) => `<li><code>${esc(f.path)}</code> <span class="add">+${num(f.added)}</span> <span class="del">−${num(f.removed)}</span>` +
+        `${ui.change[f.change] ? ` <span class="chip">${esc(ui.change[f.change])}</span>` : ""}</li>`;
+      const list = (label, files) => `<summary>${esc(label)} <span class="count">${files.length}</span></summary><ul class="evidence">${files.map(fileLi).join("")}</ul>`;
+      if (deletedFiles.length) $("deleted-files").innerHTML = list(ui.deletedFiles, deletedFiles);
+      else $("deleted-files")?.remove();
+      const bySize = [...loc].sort((a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || (b.added + b.removed) - (a.added + a.removed));
+      $("loc-files").innerHTML = list(ui.allFiles, bySize);
+    }
+  }
+
+  // Counts in prose and in hand-written lists come from the data, never typed in.
+  const countOf = (spec) => {
+    const [kind, arg] = spec.split(":");
+    if (kind === "items") return items.length;
+    if (kind === "decisions") return decisions.length;
+    if (kind === "files") return loc.length;
+    if (kind === "deleted") return deletedFiles.length;
+    if (kind === "status" && statuses[arg]) return items.filter((t) => t.status === arg).length;
+    if (kind === "group" && groups.some((g) => g.id === arg)) return items.filter((t) => t.group === arg).length;
+    console.error(`data-count: unknown count ${spec}`);
+    return "";
+  };
+  document.querySelectorAll("[data-count]:not(section)").forEach((el) => { el.textContent = countOf(el.dataset.count); });
+  document.querySelectorAll("details > summary > .count:empty").forEach((el) => { el.textContent = el.closest("details").querySelectorAll("li").length; });
+
+  // One list of sections feeds the side rail (desktop) and the sticky nav (narrower screens).
+  const navEntries = [
+    { id: "top-of-page", label: ui.overview },
+    ...[...document.querySelectorAll("main > section[id], main > #track[id]")]
+      .filter((section) => !section.hidden)
+      .map((section) => ({
+        id: section.id,
+        label: section.dataset.nav || section.querySelector("h2")?.textContent.trim() || section.getAttribute("aria-label") || "Section",
+        count: section.dataset.count ? countOf(section.dataset.count) : "",
+      })),
+  ];
+  const link = ({ id, label, count }) => `<li><a href="#${esc(id)}" data-nav-target="${esc(id)}">${esc(label)}${count ? ` <span class="count">${count}</span>` : ""}</a></li>`;
+  const toc = $("toc-links"), bar = $("section-links");
+  if (toc) toc.innerHTML = navEntries.map(link).join("");
+  if (bar) bar.innerHTML = navEntries.slice(1).map(link).join("");
+  const navLinks = [...document.querySelectorAll("[data-nav-target]")];
+  if (navLinks.length) {
+    let current = null;
+    const setActive = (id) => {
+      if (id === current) return;
+      current = id;
+      navLinks.forEach((a) => {
+        if (id && a.dataset.navTarget === id) {
+          a.setAttribute("aria-current", "true");
+          // Keep the current entry in view in the sideways-scrolling bar.
+          if (bar && bar.contains(a)) bar.scrollTo({ left: a.offsetLeft - 16 });
+        } else a.removeAttribute("aria-current");
+      });
+    };
+    const targets = navEntries.map(({ id }) => document.getElementById(id)).filter(Boolean);
+    // A clicked link stays current until the reader scrolls by hand.
+    let pinned = null;
+    const update = () => {
+      const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      const reached = targets.filter((t) => t.getBoundingClientRect().top <= window.innerHeight * 0.3).at(-1) ?? targets[0];
+      setActive((pinned ?? (atBottom ? targets.at(-1) : reached))?.id);
+    };
+    navLinks.forEach((a) => a.addEventListener("click", () => {
+      pinned = document.getElementById(a.dataset.navTarget);
+      update();
+    }));
+    ["wheel", "touchstart", "keydown"].forEach((type) => window.addEventListener(type, () => { pinned = null; }, { passive: true }));
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+  }
+  reveal(location.hash);
+
+  document.querySelectorAll(".slider").forEach((frame) => {
+    const input = frame.parentElement.querySelector('input[type="range"]');
+    if (input) input.addEventListener("input", () => frame.style.setProperty("--split", input.value + "%"));
+  });
+  // Print everything, then give the reader back the page as they left it.
+  let closedBeforePrint = [];
+  window.addEventListener("beforeprint", () => {
+    closedBeforePrint = [...document.querySelectorAll("details:not([open])")];
+    closedBeforePrint.forEach((d) => { d.open = true; });
+  });
+  window.addEventListener("afterprint", () => closedBeforePrint.forEach((d) => { d.open = false; }));
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+[
+  {
+    "width": 393,
+    "scrollWidth": 393,
+    "height": 7828,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 665,
+    "colorScheme": "light",
+    "openWidth": 393,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 393,
+    "scrollWidth": 393,
+    "height": 7828,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 665,
+    "colorScheme": "dark",
+    "openWidth": 393,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 360,
+    "scrollWidth": 360,
+    "height": 8271,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 640,
+    "colorScheme": "light",
+    "openWidth": 360,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 360,
+    "scrollWidth": 360,
+    "height": 8271,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 640,
+    "colorScheme": "dark",
+    "openWidth": 360,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 375,
+    "scrollWidth": 375,
+    "height": 8151,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 548,
+    "colorScheme": "light",
+    "openWidth": 375,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 375,
+    "scrollWidth": 375,
+    "height": 8151,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 548,
+    "colorScheme": "dark",
+    "openWidth": 375,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 412,
+    "scrollWidth": 412,
+    "height": 7711,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 780,
+    "colorScheme": "light",
+    "openWidth": 412,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 412,
+    "scrollWidth": 412,
+    "height": 7711,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 780,
+    "colorScheme": "dark",
+    "openWidth": 412,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 430,
+    "scrollWidth": 430,
+    "height": 7557,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 740,
+    "colorScheme": "light",
+    "openWidth": 430,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "width": 430,
+    "scrollWidth": 430,
+    "height": 7557,
+    "stamp": "22. okt. 2026, 19:20",
+    "stray": false,
+    "viewportHeight": 740,
+    "colorScheme": "dark",
+    "openWidth": 430,
+    "errors": [],
+    "pass": true
+  }
+]

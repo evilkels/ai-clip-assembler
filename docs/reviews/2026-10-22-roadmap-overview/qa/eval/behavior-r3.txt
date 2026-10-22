@@ -1,0 +1,26 @@
+B2 and B3 are **RESOLVED** at 390px and 1440px. C1 and C4 pass their reruns, but **C5 remains incomplete**: five other inline links still fall below the required 44px height. Nothing needs your input; those links need repair before C5 can pass.
+
+- **B2 — RESOLVED:** All 12 standalone table-title links meet 44×44px. Minimum measured size: **59.91×44px** at 390px; **57.94×44px** at 1440px.
+- **B3 — RESOLVED:** All 23 table PR evidence links measure **44×44px** at both widths.
+- **Hit testing — PASS:** All 35 table links pass center and top-edge hit tests at both widths. Actual clicks 1px below the top edge activate representative titles and PR evidence. Title activation was captured as a trusted browser event with external navigation prevented; PR evidence actually navigated to and opened its disclosure.
+- **Other requested target sizes — PASS:** All 22 PR number links, visible status pills, navigation links, 20 decision/action buttons, six filters, and 16 summaries meet both 44px minimums. Phone group bars also pass.
+- **Keyboard — PASS for exercised controls:** Tab reaches the table title and decision button with a visible 3px focus outline. Enter activates titles and PR evidence, toggles disclosures, and selects/clears a decision answer.
+
+**Contract verdicts**
+
+- **C1 — PASS, rerun:** Intro distinguishes released v0.4.0 from unreleased `main` and names v0.5.0 owner checks. Document width equals viewport width: **390/390px** and **1440/1440px**, including all disclosures open and filtered states.
+- **C2 — PASS carried forward; not rerun.**
+- **C3 — PASS carried forward; full persistence/copy/clear suite not rerun.** Keyboard selection/clearing received the smoke check above.
+- **C4 — PASS, rerun:** Filters show **1/4/4/6/1** matching rows; “Visi” restores 16. Repeated selection stays stable. Item pills reveal their row after another filter. Phone group bars open and filter the list.
+- **C5 — FAIL overall; targeted B2/B3 repairs pass.** Section navigation scrolls without opening disclosures; specific item/PR links open their containers, including after reload. Disclosures open/close by pointer and Enter. Portrait image loads with descriptive alt text.
+- **C6 — PASS carried forward; not rerun.** Product QA, NLE imports, real model calls and real iPhone behavior remain out of scope.
+
+**Remaining must-fix:** raise these inline links to at least **44×44px**:
+
+- Release link in intro: **275.83×21px** phone; **310.30×23.5px** desktop.
+- “22.10.2026 auditam”: **157.59×22px**.
+- “Owner checks before tagging”: **221.07×22px**.
+- “Draft v0.5.0 release notes”: **197.20×22px**, visible on phone.
+- “docs/ROADMAP.md”: **128.07×19px**.
+
+Only the contract and browser DOM were inspected. No source, tests, git, reports, or GitHub mutations; the isolated tab was closed.

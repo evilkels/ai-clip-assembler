@@ -1,0 +1,17 @@
+Review responses (round 1)
+
+Must-fix union:
+C1 Links: all local Markdown evidence links now point to canonical GitHub documents and section anchors, including noscript.
+C2 Contrast: accent action text uses the app's dedicated accent-ink pair: white in light, deep rose-black in dark.
+C3 Privacy decision: Q2 displays the complete proposed D18 text with Scripts/results, scope, per-project off and Disconnect, labelled future behavior; approval says Apstiprinu šo tekstu.
+M1 Delivery state: retained the plan-overview skill's core status rule (an item blocked by another unfinished item is waiting). Added explicit data-driven delivery labels in desktop track and phone group bars: code on main vs not started/dependency vs draft/parked. Milestone 7 is now progress because runtime tools partly shipped. Did not turn dependency-blocked future work into planned (planned means unblocked). This addresses the reader ambiguity without violating the skill's status definitions.
+M2 Release checks: Q5 and Ernesto's list now include clean arm64/x64 candidate installs, version/update notice, conditional #101 error/payload scenarios, and #80 reporter follow-up. Milestone 7 separately owns notarized build checks.
+M3 Latvian: atskaņotājs replaces spēlētājs; other suggested language/plural fixes applied.
+M4 Audit numbering: A = October 8 finding, N = October 22 finding. GitHub numbers retain #.
+B1 Touch targets: all linked pills and desktop nav links now have a minimum 44px height; source-blind C5 must be rerun.
+
+Nice-to-have fixes: no-JS empty sections hidden; track gets a named region and h2; fix cards have h3 grouping; decorative track animation removed so final captures show settled pills; 043's visible delivery label says iPhone H1 pending; Q4 includes trial as a historical plan option with availability to confirm; Q6 gives plan-recorded cost and asks to verify it at enrollment; #19 digression removed; #111 audit wording corrected; bracketed milestone refs explained; unrelated save-risk [1b] removed.
+
+Self-review: the draft assigned the Suggested cuts ordering defect to plan 037 without evidence of its introduction. Replaced this with the exact PR #107 symptom and classified it as pre-existing; no claim that 037 introduced it remains.
+
+No public deployment or tunnel: user asked for owner-only page in a PR. Full review reports are retained as review evidence; the distributable page/fonts/shot are the privacy-check scope.

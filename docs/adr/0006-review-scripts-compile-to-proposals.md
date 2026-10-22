@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0006: Review scripts compile to Proposals'
+description: 'The Editor wants the DaVinci Resolve console workflow inside the app: write or paste a short Lua script in the Review chat and have it edit the Timeline.'
+status: draft
+created: 2026-09-29
+decision_status: null
+---
 # 0006: Review scripts compile to Proposals
 
 ## Status

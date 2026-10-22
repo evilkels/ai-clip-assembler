@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Landing page polish and launch backlog
+description: The landing page carries proof, a release-matched download and a measured launch loop, so five target users can download the current build and explain its value without live support.
+status: draft
+created: 2026-07-14
+plan_status: null
+---
 # Landing page polish and launch backlog
 
 The landing page carries proof, a release-matched download and a measured launch

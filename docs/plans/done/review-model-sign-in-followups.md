@@ -1,3 +1,10 @@
+---
+type: Review
+title: Review Model Sign-In — Review Follow-ups
+description: Reconcile those decisions in this plan or the architecture record, verify cited paths and tests still match the implementation, then mark DONE.
+status: draft
+created: 2026-07-21
+---
 # Review Model Sign-In — Review Follow-ups
 
 Status: **DONE (2026-09-10).** The remaining plan/spec reconciliation matches

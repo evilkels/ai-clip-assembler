@@ -1,3 +1,10 @@
+---
+type: Review
+title: Clip Quality, Composition & Review UX Improvements
+description: 'A real 3-video analysis run showed the *output* quality, not runtime, was the weak link: clips felt "cut from the start" because detected scene boundaries were computed but never used for cut points; smoothness scoring was a crude'
+status: draft
+created: 2026-06-15
+---
 # Clip Quality, Composition & Review UX Improvements
 
 **Planned at:** commit `3fdad32`, 2026-06-15. **Status: all 5 phases landed** (2026-06-15). Backend 160 tests green, frontend typecheck clean.

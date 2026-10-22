@@ -1,3 +1,10 @@
+---
+type: Review
+title: iPhone footage checkpoint review — 2026-10-10
+description: The owner requested preservation of the stalled work as-is, a plan/PR status check, and independent tester and code-review agents.
+status: draft
+created: 2026-10-10
+---
 # iPhone footage checkpoint review — 2026-10-10
 
 The owner requested preservation of the stalled work as-is, a plan/PR status check, and independent tester and code-review agents. PR: [#107](https://github.com/evilkels/ai-clip-assembler/pull/107).

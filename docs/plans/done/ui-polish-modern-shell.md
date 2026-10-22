@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Modern professional UI shell'
+description: 'Previous status (retained for history): PARTIAL, and its central library decision is now contradicted by what shipped (reconciled 2026-08-13).'
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Modern professional UI shell
 
 > **CLOSED AS SUPERSEDED (2026-09-02).** This plan prescribed a shadcn/ui and

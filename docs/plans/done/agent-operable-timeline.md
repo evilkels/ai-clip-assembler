@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Agent-Operable Timeline
+description: 'Superseded by: review-visual-editing (pan preview and propose → apply E2E carried over; chat token streaming dropped for v1.0.0).'
+status: draft
+created: 2026-06-19
+plan_status: done
+---
 # Agent-Operable Timeline
 
 Superseded by: [review-visual-editing](../review-visual-editing.md) (pan preview and propose → apply E2E carried over; chat token streaming dropped for v1.0.0).

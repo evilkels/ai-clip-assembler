@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Landing Page Restyle Implementation Plan
+description: 'Rebuild site/index.html to the Claude Design landing handoff: a dark-default (light-toggleable) page whose fold proves the product''s judgement with a six-frame contact sheet of real scored footage, followed by a timeline-ruler divider,'
+status: draft
+created: 2026-09-01
+plan_status: done
+---
 # Landing Page Restyle Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

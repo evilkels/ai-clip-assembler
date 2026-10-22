@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '019: Find more clips'
+description: A Find more button beside each Source Video on the Review Board with two choices, More clips and Longer clips, that appends Candidate Clips from the cached analysis while the Timeline, the Editor's decisions and the Undo History stay
+status: draft
+created: 2026-07-22
+plan_status: null
+---
 # 019: Find more clips
 
 A **Find more** button beside each Source Video on the Review Board with two

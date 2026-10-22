@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 026: Hear source audio in the app'
+description: Every preview in the app is silent by construction, not by choice.
+status: draft
+created: 2026-08-13
+plan_status: done
+---
 # Plan 026: Hear source audio in the app
 
 Status: DONE (2026-08-13) · Shipped in PR #65; user confirmed real-footage QA showed no problems

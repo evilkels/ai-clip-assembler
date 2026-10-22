@@ -1,3 +1,9 @@
+---
+type: Note
+title: Real-Footage Validation Runbook
+description: 'Measure the core workflow against three acceptance criteria: folder to Review Board in under 15 minutes for 30 minutes of 4K/60fps footage, recall of at least 0.70 against manual ground truth, and zero DaVinci Resolve relink prompts.'
+status: draft
+---
 # Real-Footage Validation Runbook
 
 ## Purpose

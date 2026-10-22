@@ -1,3 +1,10 @@
+---
+type: Review
+title: 034 — Review chat timeline scripting (Lua)
+description: In the Review step, the Editor can write or paste a short Lua script in the chat — the way they paste a Lua script into DaVinci Resolve's console — and the Review Agent can answer with one.
+status: draft
+created: 2026-09-29
+---
 # 034 — Review chat timeline scripting (Lua)
 
 Status: 🟢 done — planned 2026-09-29; S1–S6 complete. Branch: `feat/review-chat-scripting`. Decision record:

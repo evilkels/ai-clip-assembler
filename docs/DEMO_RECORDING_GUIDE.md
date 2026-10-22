@@ -1,3 +1,9 @@
+---
+type: Note
+title: Demo Recording Guide
+description: Maintainer runbook for the truthful 45–60s proof-of-work demo in landing-page-polish-and-launch.md.
+status: draft
+---
 # Demo Recording Guide
 
 Maintainer runbook for the truthful 45–60s proof-of-work demo in

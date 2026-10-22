@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Playwriter Electron Frontend Design
+description: Enable Playwriter-driven QA for the Electron frontend by adding a browser-accessible /playwriter route to the same React renderer app and by adding real video previews to the Review and Timeline workflows.
+status: draft
+created: 2026-06-10
+---
 # Playwriter Electron Frontend Design
 
 ## Goal

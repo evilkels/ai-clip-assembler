@@ -1,3 +1,9 @@
+---
+type: Note
+title: 'Handoff: AI Clip Assembler — App Restyle (Import · Review · Timeline · Export · Settings)'
+description: The companion app-reference.dc.html (1.8 MB, fixed 1440px, inline styles) is the authority wherever it and this document disagree.
+status: draft
+---
 <!--
 Supplied by the design owner 2026-09-03 as `design-proper-improvement.zip`
 (`design_handoff_app/README.md`), checked in verbatim below the horizontal rule

@@ -1,3 +1,9 @@
+---
+type: Note
+title: Troubleshooting & FAQ
+description: Common issues when running AI Clip Assembler locally, and how to fix them.
+status: draft
+---
 # Troubleshooting & FAQ
 
 Common issues when running AI Clip Assembler locally, and how to fix them.

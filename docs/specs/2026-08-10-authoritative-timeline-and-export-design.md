@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Authoritative Timeline and Truthful Export Design
+description: The backend owns the Timeline Document, but the main Timeline and Export pages still project it through acceptedOrder and per-Candidate-Clip trims.
+status: draft
+created: 2026-08-10
+---
 # Authoritative Timeline and Truthful Export Design
 
 **Date:** 2026-08-10  

@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Landing Page Editorial Refresh
+description: Approved for implementation on 2026-07-10.
+status: draft
+created: 2026-07-10
+---
 # Landing Page Editorial Refresh
 
 ## Status

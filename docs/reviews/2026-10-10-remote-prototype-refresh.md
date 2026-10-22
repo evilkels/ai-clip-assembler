@@ -1,3 +1,10 @@
+---
+type: Review
+title: Remote View prototype refresh regression — 2026-10-10
+description: The owner's iPhone recording showed a periodic clip-grid flicker in the separately served Remote View prototype.
+status: draft
+created: 2026-10-10
+---
 # Remote View prototype refresh regression — 2026-10-10
 
 ## Symptom and cause

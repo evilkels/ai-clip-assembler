@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 016: Fix edit creation — no duplicate clips, no unusable slivers, agent-influenced selection'
+description: STEPS 1–2 DONE; STEP 3 SUPERSEDED by plan 018; STEP 4 TODO.
+status: draft
+created: 2026-07-22
+plan_status: done
+---
 # Plan 016: Fix edit creation — no duplicate clips, no unusable slivers, agent-influenced selection
 
 > **CLOSED (2026-09-02).** Steps 1-2 shipped and step 3 was superseded by plan

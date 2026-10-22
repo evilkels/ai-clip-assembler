@@ -1,3 +1,9 @@
+---
+type: Note
+title: Docs
+description: Map of this directory.
+status: draft
+---
 # Docs
 
 Map of this directory. One folder per document kind — no nesting beyond this.

@@ -1,3 +1,10 @@
+---
+type: Review
+title: Review Model Sign-In
+description: Editors can authenticate the internal pi_agent Review model with an OpenAI ChatGPT subscription from Settings.
+status: draft
+created: 2026-07-21
+---
 # Review Model Sign-In
 
 Status: DONE (2026-07-19). Automated checks are green; real OAuth/package smoke remains manual QA.

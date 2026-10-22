@@ -1,3 +1,9 @@
+---
+type: Note
+title: Logo Decisions — AI Clip Assembler
+description: Variant A — "Cut the chaos" (precise 3D material
+status: draft
+---
 # Logo Decisions — AI Clip Assembler
 
 **Decision date:** 2026-06-27

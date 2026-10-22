@@ -1,3 +1,10 @@
+---
+type: Review
+title: iPhone Footage End-to-End Test — 2026-10-10
+description: 'Real iPhone footage run through the full Editor flow in the real Electron app: open folder → analysis → Review Board → Timeline → Export (EDL, FCPXML, Resolve XML) with source audio.'
+status: draft
+created: 2026-10-10
+---
 # iPhone Footage End-to-End Test — 2026-10-10
 
 Real iPhone footage run through the full Editor flow in the real Electron app:

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Project Shell Header and Project List Redesign
+description: Put the current project's identity in one place above the whole
+status: draft
+created: 2026-08-12
+plan_status: done
+---
 # Project Shell Header and Project List Redesign
 
 > **Status:** DONE (2026-08-12) at `c186ef4`, with a follow-up row/confirm-dialog

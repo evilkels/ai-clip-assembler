@@ -1,3 +1,9 @@
+---
+type: Note
+title: Roadmap to v1.0.0
+description: The order of work from v0.4.0 to a stable Mac v1.0.0.
+status: draft
+---
 # Roadmap to v1.0.0
 
 The order of work from v0.4.0 to a stable Mac **v1.0.0**. Plans in

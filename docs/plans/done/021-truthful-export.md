@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Truthful Export Implementation Plan
+description: Export the current authoritative Timeline without a legacy pre-export mutation and display the backend's complete result and degradation warnings.
+status: draft
+created: 2026-08-12
+plan_status: done
+---
 # Truthful Export Implementation Plan
 
 > **Status:** DONE (2026-08-10; checkpoints `d232a70`, `8058e1a`, and closure `25b29f0`)

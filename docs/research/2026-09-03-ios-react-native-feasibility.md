@@ -1,3 +1,9 @@
+---
+type: Note
+title: Does AI Clip Assembler have potential as an iPhone app built with React Native?
+description: 'AI Clip Assembler is a local-first macOS app: Electron + React 19 + Tailwind 4 + react-router-dom in the renderer, and a PyInstaller-packaged Python FastAPI backend on 127.0.0.1 that does all analysis (FFmpeg frame extraction and'
+status: draft
+---
 # Does AI Clip Assembler have potential as an iPhone app built with React Native?
 
 **Date:** 2026-09-03

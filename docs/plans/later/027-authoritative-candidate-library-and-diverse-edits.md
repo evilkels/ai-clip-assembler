@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
+description: Make All Clips the clearly stated Candidate Clip authority and
+status: draft
+created: 2026-08-13
+plan_status: null
+---
 # Authoritative Candidate Library And Diverse Suggested Edits Implementation Plan
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Technical SEO Foundation Implementation Plan
+description: Correct the landing page's public claims and add durable search, social-sharing, crawl-discovery, and verification foundations before investing in a larger content program.
+status: draft
+created: 2026-07-19
+plan_status: done
+---
 # Technical SEO Foundation Implementation Plan
 
 > **CLOSED (2026-09-02).** Tasks 1-4 shipped and are enforced by the site

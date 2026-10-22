@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0009: Exports link media by absolute file URL'
+description: Folder-project exports used paths relative to the export file.
+status: draft
+created: 2026-10-08
+decision_status: null
+---
 # 0009: Exports link media by absolute file URL
 
 ## Status

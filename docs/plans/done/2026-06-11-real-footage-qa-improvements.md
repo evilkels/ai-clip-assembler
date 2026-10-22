@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Real-footage QA improvements
+description: Turn real-footage findings into persistent, truthful editing behavior while separating changes that required labeled footage or new product contracts.
+status: draft
+created: 2026-06-11
+plan_status: done
+---
 # Real-footage QA improvements
 
 Status: COMPLETE (2026-06-11). Backend 139 tests, frontend build, 6 Playwright

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Plan 024 implementation notes
+description: Plan task 2 step 5 describes clipindex as "the 1-based item position in the sequence".
+status: draft
+created: 2026-08-13
+plan_status: done
+---
 # Plan 024 implementation notes
 
 ## Writers

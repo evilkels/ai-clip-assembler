@@ -1,3 +1,9 @@
+---
+type: Note
+title: User Guide
+description: AI Clip Assembler turns raw drone/action footage into a tight 1–3 minute cut.
+status: draft
+---
 # User Guide
 
 AI Clip Assembler turns raw drone/action footage into a tight 1–3 minute

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Project = Folder On Disk'
+description: A Project had no concrete on-disk representation.
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Project = Folder On Disk
 
 **Status: CLOSED 2026-09-03 — DONE.** Implementation and automated QA are

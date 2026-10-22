@@ -1,3 +1,9 @@
+---
+type: Note
+title: Domain Docs
+description: How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+status: draft
+---
 # Domain Docs
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.

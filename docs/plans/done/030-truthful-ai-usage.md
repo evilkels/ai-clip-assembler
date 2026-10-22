@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 030: Truthful AI usage — selected vs effective harness, and an independent Review Agent'
+description: 'Superseded by: 038 (its open step 2.3, discoverable consent, is 038 Phases 4–5).'
+status: draft
+created: 2026-09-03
+plan_status: done
+---
 # Plan 030: Truthful AI usage — selected vs effective harness, and an independent Review Agent
 
 Superseded by: [038](../038-ai-connection.md) (its open step 2.3, discoverable consent, is 038 Phases 4–5).

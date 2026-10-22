@@ -1,3 +1,10 @@
+---
+type: Review
+title: Compare-Versions Review UI — Implementation Plan
+description: Rebuild the Review screen so the user compares several complete candidate cuts ("Versions") side-by-side and adopts one, instead of scanning a flat grid of individual clip cards.
+status: draft
+created: 2026-06-21
+---
 # Compare-Versions Review UI — Implementation Plan
 
 **Status:** DONE (2026-06-21). Planned at commit `2d0f918`. Spec (behavioural source of truth): `docs/specs/2026-06-21-compare-versions-review-ui-design.md`.

@@ -1,3 +1,10 @@
+---
+type: Review
+title: 'Plan 007: Make the In-App Review Agent a visual creative curator'
+description: 'The agent was text-only and stateless: raw candidate/timeline JSON, forced into one short sentence, no Frame Samples.'
+status: draft
+created: 2026-06-21
+---
 # Plan 007: Make the In-App Review Agent a visual creative curator
 
 ## Status

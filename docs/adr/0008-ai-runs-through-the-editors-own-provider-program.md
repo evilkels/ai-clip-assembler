@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0008: AI runs through the Editor''s own Claude Code or Codex, which the app never installs'
+description: Accepted (2026-10-08).
+status: draft
+created: 2026-10-08
+decision_status: null
+---
 # 0008: AI runs through the Editor's own Claude Code or Codex, which the app never installs
 
 ## Status

@@ -1,3 +1,9 @@
+---
+type: Note
+title: Manual QA Launch Guide
+description: 'macOS session: import → analyze → review → edit → export, including external MCP and in-app review agents.'
+status: draft
+---
 # Manual QA Launch Guide
 
 macOS session: import → analyze → review → edit → export, including external

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 010: Generate frontend domain types from the backend, killing hand-maintained contract drift'
+description: The same domain entities (clip scores, assembly-profile enum, Version) were hand-declared on both sides of the HTTP boundary plus a manual mapping layer, with nothing failing if a field was missed on one side — the frontend would silently
+status: draft
+created: 2026-07-22
+plan_status: done
+---
 # Plan 010: Generate frontend domain types from the backend, killing hand-maintained contract drift
 
 ## Status

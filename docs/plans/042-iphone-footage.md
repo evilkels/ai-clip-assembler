@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '042: iPhone footage end to end'
+description: A folder of iPhone clips goes from Import to an export that opens at the footage's real frame rate, in shooting order, upright, with every preview sized for vertical video.
+status: draft
+created: 2026-10-10
+plan_status: null
+---
 # 042: iPhone footage end to end
 
 A folder of iPhone clips goes from Import to an export that opens at the

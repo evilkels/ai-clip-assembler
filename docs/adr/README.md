@@ -1,3 +1,9 @@
+---
+type: Note
+title: Architecture Decision Records
+description: One file per decision, numbered (0001-<slug>.md), recording durable, cross-cutting choices with their consequences.
+status: draft
+---
 # Architecture Decision Records
 
 One file per decision, numbered (`0001-<slug>.md`), recording durable,

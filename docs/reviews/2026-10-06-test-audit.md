@@ -1,3 +1,10 @@
+---
+type: Review
+title: Test audit — 2026-10-06
+description: Read-only discovery under the test-audit skill, run as three Codex Sol (gpt-6.1-sol, medium) research lanes against main at 87a2b27.
+status: draft
+created: 2026-10-06
+---
 # Test audit — 2026-10-06
 
 Read-only discovery under the `test-audit` skill, run as three Codex Sol

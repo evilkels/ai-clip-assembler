@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 003: Spike — bundle the FastAPI backend into the packaged Electron app'
+description: npm run dist originally built a DMG with only the Electron shell — the FastAPI backend was a dev-only process, never spawned by Electron.
+status: draft
+created: 2026-06-11
+plan_status: done
+---
 # Plan 003: Spike — bundle the FastAPI backend into the packaged Electron app
 
 ## Status

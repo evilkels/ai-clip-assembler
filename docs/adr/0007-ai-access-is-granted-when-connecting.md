@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0007: AI Access is granted once, when the Editor connects a Provider'
+description: Accepted (2026-10-08).
+status: draft
+created: 2026-10-08
+decision_status: null
+---
 # 0007: AI Access is granted once, when the Editor connects a Provider
 
 ## Status

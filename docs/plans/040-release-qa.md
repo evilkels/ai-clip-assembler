@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '040: Release QA'
+description: Every release passes these human checks on the packaged app before it is tagged.
+status: draft
+created: 2026-10-08
+plan_status: null
+---
 # 040: Release QA
 
 Every release passes these human checks on the packaged app before it is tagged.

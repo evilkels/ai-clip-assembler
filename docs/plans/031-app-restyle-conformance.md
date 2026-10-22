@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 031: App restyle conformance — the sections the build has not caught up to'
+description: The restyle was applied to this codebase in two earlier passes (studio-workflow-redesign and literal-design-conformance), both closed 2026-09-02.
+status: draft
+created: 2026-09-03
+plan_status: done
+---
 # Plan 031: App restyle conformance — the sections the build has not caught up to
 
 Status: PHASE 1 DONE (2026-09-03) · PHASE 4 (SETTINGS) DONE · PHASES 2, 3, 5, 6, 7 TODO · Priority P2 · Effort L · Risk MED · Category UI conformance

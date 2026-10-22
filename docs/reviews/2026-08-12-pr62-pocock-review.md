@@ -1,3 +1,10 @@
+---
+type: Review
+title: 'PR #62 Pocock Review'
+description: Reviewed git diff main...f38b8d1 and git log main..f38b8d1 --oneline.
+status: draft
+created: 2026-08-12
+---
 # PR #62 Pocock Review
 
 Reviewed `git diff main...f38b8d1` and `git log main..f38b8d1 --oneline`.

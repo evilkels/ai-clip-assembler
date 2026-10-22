@@ -1,3 +1,10 @@
+---
+type: Review
+title: Real-Footage QA Review — 2026-06-11
+description: The current analysis wait is acceptable.
+status: draft
+created: 2026-06-11
+---
 # Real-Footage QA Review — 2026-06-11
 
 ## Session

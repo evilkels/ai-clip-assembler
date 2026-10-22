@@ -1,3 +1,10 @@
+---
+type: Review
+title: 'SDD ledger — plan: docs/plans/2026-08-14-studio-workflow-redesign.md'
+description: 'Task 1: complete (commits abc0530..a8a4d7a, review clean for Critical/Important) Deferred Minor for final review: restore the explicit main.left >= sidebar.right overlap guard in project-shell-regressions.spec.ts while retaining full-edge'
+status: draft
+created: 2026-09-02
+---
 # SDD ledger — plan: docs/plans/2026-08-14-studio-workflow-redesign.md
 
 Branch: redesign/studio-workflows

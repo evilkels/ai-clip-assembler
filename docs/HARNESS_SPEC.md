@@ -1,3 +1,10 @@
+---
+type: Spec
+title: AI Harness Interface Specification
+description: Harness input is a JSON payload keyed by project_id and harness_id, carrying per-video metadata (file_id, file_path, duration_sec, fps, resolution, codec), a frames array (timestamp, frame path, motion/blur/brightness/contrast scores,
+status: draft
+created: 2026-05-04
+---
 # AI Harness Interface Specification
 
 ## Design Principles

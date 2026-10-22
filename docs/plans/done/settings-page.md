@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan: Settings Page'
+description: 'One settings surface, two intended scopes: global (~/Library/Application Support/AIClipAssembler/settings.json) and per-project (clipassembler/project.json::settings_overrides, falling back to global).'
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # Plan: Settings Page
 
 **Status: DONE (2026-07-03)** — shipped as the Settings & Diagnostics modal in `frontend/src/renderer/src/components/SettingsModal.tsx` (`8523ed9`) plus theme switching (`cd1ef24`).

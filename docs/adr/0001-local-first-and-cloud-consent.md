@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0001: Local-first processing with explicit per-project cloud consent'
+description: Accepted. The per-project opt-in is superseded by ADR 0007 (2026-10-08); local-first processing by default still stands.
+status: draft
+created: 2026-07-14
+decision_status: null
+---
 # 0001: Local-first processing with explicit per-project cloud consent
 
 ## Status

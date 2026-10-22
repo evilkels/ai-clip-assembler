@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '036: Proper tests and checks'
+description: Every check that guards a PR runs the same way locally, in the pre-commit hook and in CI.
+status: draft
+created: 2026-10-06
+plan_status: null
+---
 # 036: Proper tests and checks
 
 Every check that guards a PR runs the same way locally, in the pre-commit hook

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: React Doctor Triage
+description: Fix the defects react-doctor actually found, and stop treating
+status: draft
+created: 2026-05-30
+plan_status: done
+---
 # React Doctor Triage
 
 Status: **DONE 2026-10-04.** All four defects are fixed (branch

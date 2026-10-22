@@ -1,3 +1,10 @@
+---
+type: Review
+title: Literal design conformance review
+description: This record supersedes the earlier “complete” wording in the studio and landing plans.
+status: draft
+created: 2026-09-01
+---
 # Literal design conformance review
 
 **Date:** 2026-09-02

@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Find More Clips From A Source Video Implementation Plan
+description: Let an editor append additional Candidate Clips from one Source
+status: draft
+created: 2026-08-13
+plan_status: done
+---
 # Find More Clips From A Source Video Implementation Plan
 
 > **CLOSED AS SUPERSEDED (2026-09-02).** Absorbed into

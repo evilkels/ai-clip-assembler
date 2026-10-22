@@ -1,3 +1,11 @@
+---
+type: Plan
+title: '037: Extraction quality'
+description: More and longer Candidate Clips from each Source Video, and Short, Medium and Long drafts that actually use them, with no AI.
+status: draft
+created: 2026-10-08
+plan_status: null
+---
 # 037: Extraction quality
 
 More and longer Candidate Clips from each Source Video, and Short, Medium and

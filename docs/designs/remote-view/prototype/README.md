@@ -1,3 +1,9 @@
+---
+type: Note
+title: Remote View prototype snapshot
+description: This directory preserves the browser assets from the machine-local Remote View prototype.
+status: draft
+---
 # Remote View prototype snapshot
 
 This directory preserves the browser assets from the machine-local Remote View

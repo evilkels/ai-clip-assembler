@@ -1,3 +1,11 @@
+---
+type: Plan
+title: 'Plan 012: Transparent, adjustable clip generation (live re-derive)'
+description: DONE (2026-06-28; re-verified 2026-07-21 at 9a6d56a) — frame scores persist, cached clip re-derive and generation stats are covered by backend tests, controls remain wired through the Import flow established by plan 018 Phase E.
+status: draft
+created: 2026-07-22
+plan_status: done
+---
 # Plan 012: Transparent, adjustable clip generation (live re-derive)
 
 ## Status

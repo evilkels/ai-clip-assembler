@@ -1,3 +1,9 @@
+---
+type: Note
+title: QA Plan
+description: Drone-first acceptance for local import, Manual/Pi scoring, Candidate Clip review, backend-authoritative Timeline editing/agents, and FCPXML/EDL/Resolve XML handoff.
+status: draft
+---
 # QA Plan
 
 Drone-first acceptance for local import, Manual/Pi scoring, Candidate Clip

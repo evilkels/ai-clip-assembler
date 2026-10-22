@@ -1,3 +1,9 @@
+---
+type: Note
+title: 'Issue tracker: plans in `docs/plans/`'
+description: Work for this repo is tracked as Markdown plans in docs/plans/, one file per plan.
+status: draft
+---
 # Issue tracker: plans in `docs/plans/`
 
 Work for this repo is tracked as Markdown **plans** in `docs/plans/`, one file

@@ -1,3 +1,9 @@
+---
+type: Note
+title: MCP Server — controlling the timeline with an external agent
+description: The AI Clip Assembler backend embeds a local MCP Server (Model Context Protocol) while it runs, so an External Agent — Claude Code, Cursor, Codex — can drive the *same* live Timeline Document the GUI is editing.
+status: draft
+---
 # MCP Server — controlling the timeline with an external agent
 
 The AI Clip Assembler backend embeds a local **MCP Server** (Model Context

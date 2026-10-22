@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Connected Review Pipeline Design
+description: Make Review behave as one understandable editing workflow rather than four adjacent surfaces.
+status: draft
+created: 2026-06-21
+---
 # Connected Review Pipeline Design
 
 Date: 2026-06-21 · Status: Approved (shipped) · Owner: Elvijs

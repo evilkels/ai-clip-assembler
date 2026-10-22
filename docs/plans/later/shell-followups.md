@@ -1,3 +1,11 @@
+---
+type: Plan
+title: Shell Follow-ups
+description: 'Parked until after v1.0.0: see ROADMAP.'
+status: draft
+created: 2026-09-02
+plan_status: null
+---
 # Shell Follow-ups
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

@@ -1,3 +1,11 @@
+---
+type: Decision
+title: '0005: Harness and In-App Review Agent are chosen independently, under one consent gate'
+description: Accepted (2026-09-03).
+status: draft
+created: 2026-09-03
+decision_status: null
+---
 # 0005: Harness and In-App Review Agent are chosen independently, under one consent gate
 
 ## Status

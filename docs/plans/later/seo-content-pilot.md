@@ -1,3 +1,11 @@
+---
+type: Plan
+title: SEO content pilot — video culling workflow
+description: 'Parked until after v1.0.0: see ROADMAP.'
+status: draft
+created: 2026-07-19
+plan_status: null
+---
 # SEO content pilot — video culling workflow
 
 Parked until after v1.0.0: see [ROADMAP](../../ROADMAP.md#after-v100).

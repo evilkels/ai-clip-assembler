@@ -1,3 +1,10 @@
+---
+type: Review
+title: Task 3 implementer report
+description: ''
+status: draft
+created: 2026-09-02
+---
 # Task 3 implementer report
 
 ## Scope delivered

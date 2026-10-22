@@ -1,3 +1,9 @@
+---
+type: Note
+title: Brand and Media Prompt Ideas
+description: Use these prompts to generate project media separately.
+status: draft
+---
 # Brand and Media Prompt Ideas
 
 Use these prompts to generate project media separately. Keep generated assets reviewable and commit only the final selected files.

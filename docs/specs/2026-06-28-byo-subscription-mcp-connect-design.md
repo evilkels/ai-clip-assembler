@@ -1,3 +1,10 @@
+---
+type: Spec
+title: 'Design: Bring Your Own Subscription via MCP'
+description: Consumer Claude/ChatGPT subscriptions provide no programmatic API the app can call.
+status: draft
+created: 2026-06-28
+---
 # Design: Bring Your Own Subscription via MCP
 
 Date: 2026-06-28 · Status: Approved, pending implementation plan. Related:

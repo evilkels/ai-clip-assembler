@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Self-Contained macOS Runtime Tools
+description: Approved design; implementation plan pending review.
+status: draft
+created: 2026-07-10
+---
 # Self-Contained macOS Runtime Tools
 
 ## Status

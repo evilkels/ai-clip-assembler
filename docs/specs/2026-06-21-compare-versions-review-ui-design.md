@@ -1,3 +1,10 @@
+---
+type: Spec
+title: Compare-Versions Review UI Design
+description: Turn the Review step from a forms-and-cards surface into a video-forward, creative workspace where the user compares several complete candidate cuts ("versions") of the montage and adopts one, with the agent framed as a creative
+status: draft
+created: 2026-06-21
+---
 # Compare-Versions Review UI Design
 
 Date: 2026-06-21

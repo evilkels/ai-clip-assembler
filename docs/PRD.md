@@ -1,3 +1,10 @@
+---
+type: Spec
+title: 'Product Requirement Document: AI Clip Assembler'
+description: AI Clip Assembler is a local-first desktop video editor that uses AI to automatically identify, extract, and assemble the best segments from raw MP4 footage into polished 1-3 minute videos.
+status: draft
+created: 2026-05-04
+---
 # Product Requirement Document: AI Clip Assembler
 
 ## Overview

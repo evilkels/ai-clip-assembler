@@ -222,14 +222,17 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       const requested = projectId;
       try {
         const snapshot = await applyTimelineOp(requested, operation, args, expectedRevision);
-        if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
+        if (activeProjectRef.current === requested) {
+          reconcileTimelineSnapshot(snapshot);
+          setError(null);
+        }
         return;
       } catch (reason: unknown) {
         const stillActive = activeProjectRef.current === requested;
         if (reason instanceof TimelineRevisionConflictError) {
           if (stillActive) reconcileTimelineSnapshot(reason.detail.current_snapshot);
-          if (expectedRevision !== undefined) throw reason;
         }
+        if (expectedRevision !== undefined) throw reason;
         if (stillActive) {
           setError(reason instanceof Error ? reason.message : 'Timeline operation failed');
           getTimelineDocument(requested)
@@ -515,8 +518,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const include = useCallback(
     (clipId: string) => {
-      setDecisions((prev) => ({ ...prev, [clipId]: 'included' }));
-      setAcceptedOrder((prev) => (prev.includes(clipId) ? prev : [...prev, clipId]));
       void applyTimelineOperation('include', { clip_id: clipId });
     },
     [applyTimelineOperation],
@@ -524,8 +525,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const exclude = useCallback(
     (clipId: string) => {
-      setDecisions((prev) => ({ ...prev, [clipId]: 'excluded' }));
-      setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
       void applyTimelineOperation('exclude', { clip_id: clipId });
     },
     [applyTimelineOperation],
@@ -533,12 +532,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const resetDecision = useCallback(
     (clipId: string) => {
-      setDecisions((prev) => {
-        const next = { ...prev };
-        delete next[clipId];
-        return next;
-      });
-      setAcceptedOrder((prev) => prev.filter((id) => id !== clipId));
       void applyTimelineOperation('reset_decision', { clip_id: clipId });
     },
     [applyTimelineOperation],
@@ -546,15 +539,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const reorderAccepted = useCallback(
     (clipId: string, toIndex: number) => {
-      setAcceptedOrder((prev) => {
-        const from = prev.indexOf(clipId);
-        if (from < 0) return prev;
-        const without = prev.slice();
-        without.splice(from, 1);
-        const target = Math.max(0, Math.min(toIndex, without.length));
-        without.splice(target, 0, clipId);
-        return without;
-      });
       const itemId = itemIdForClip(clipId);
       if (itemId) void applyTimelineOperation('reorder', { item_id: itemId, to_index: toIndex });
     },
@@ -586,7 +570,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       if (ka !== kb) return ka < kb ? -1 : 1;
       return (byId.get(a)?.start_sec ?? 0) - (byId.get(b)?.start_sec ?? 0);
     });
-    setAcceptedOrder(sorted);
     void (async () => {
       for (let index = 0; index < sorted.length; index += 1) {
         const itemId = itemIdForClip(sorted[index]);
@@ -600,7 +583,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const setTrim = useCallback(
     (clipId: string, trim: Trim) => {
-      setTrims((prev) => ({ ...prev, [clipId]: trim }));
       const itemId = itemIdForClip(clipId);
       if (itemId) {
         void applyTimelineOperation('set_bounds', {
@@ -608,6 +590,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
           start_sec: trim.start_sec,
           end_sec: trim.end_sec,
         });
+      } else {
+        setTrims((prev) => ({ ...prev, [clipId]: trim }));
       }
     },
     [applyTimelineOperation, itemIdForClip],
@@ -615,7 +599,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const selectProfile = useCallback(
     (nextProfile: AssemblyProfile) => {
-      setProfile(nextProfile);
       void applyTimelineOperation('set_profile', { profile: nextProfile });
     },
     [applyTimelineOperation],
@@ -623,7 +606,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const selectTargetDuration = useCallback(
     (seconds: number) => {
-      setTargetDuration(seconds);
       void applyTimelineOperation('set_target_duration', { target_duration_sec: seconds });
     },
     [applyTimelineOperation],
@@ -635,12 +617,20 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       const requested = projectId;
       try {
         const snapshot = await undoTimeline(requested, expectedRevision);
-        if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
-      } catch (reason: unknown) {
-        if (reason instanceof TimelineRevisionConflictError && activeProjectRef.current === requested) {
-          reconcileTimelineSnapshot(reason.detail.current_snapshot);
+        if (activeProjectRef.current === requested) {
+          reconcileTimelineSnapshot(snapshot);
+          setError(null);
         }
-        throw reason;
+      } catch (reason: unknown) {
+        if (activeProjectRef.current === requested) {
+          if (reason instanceof TimelineRevisionConflictError) {
+            reconcileTimelineSnapshot(reason.detail.current_snapshot);
+          }
+          if (expectedRevision === undefined) {
+            setError(reason instanceof Error ? reason.message : 'Unable to undo Timeline edit');
+          }
+        }
+        if (expectedRevision !== undefined) throw reason;
       }
     },
     [projectId, reconcileTimelineSnapshot],
@@ -649,8 +639,17 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const redo = useCallback(async () => {
     if (!projectId) return;
     const requested = projectId;
-    const snapshot = await redoTimeline(requested);
-    if (activeProjectRef.current === requested) reconcileTimelineSnapshot(snapshot);
+    try {
+      const snapshot = await redoTimeline(requested);
+      if (activeProjectRef.current === requested) {
+        reconcileTimelineSnapshot(snapshot);
+        setError(null);
+      }
+    } catch (reason: unknown) {
+      if (activeProjectRef.current === requested) {
+        setError(reason instanceof Error ? reason.message : 'Unable to redo Timeline edit');
+      }
+    }
   }, [projectId, reconcileTimelineSnapshot]);
 
   const setCloudAiConsent = useCallback(

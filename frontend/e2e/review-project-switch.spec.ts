@@ -441,3 +441,29 @@ test('a message queued in the previous project is dropped, not delivered to the 
   await rail.getByLabel('Message the AI').fill('BRAVO-FOLLOW-UP');
   await expect(rail.getByRole('button', { name: 'Send' })).toBeEnabled();
 });
+
+
+for (const action of ['op', 'undo', 'redo'] as const) {
+  test(`a failed Timeline ${action} shows the save error and keeps the previous cut`, async ({ page }) => {
+    await stubTwoProjects(page);
+    await page.goto('/#/timeline');
+    await page.getByRole('button', { name: 'Open Bravo Project' }).click();
+    await expectBravoCommitted(page);
+    expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
+    const endpoint = `**/projects/*/timeline/${action}`;
+    await page.route(endpoint, (route) => route.fulfill({
+      status: 500,
+      json: { detail: 'Could not save timeline.json: disk full' },
+    }));
+    if (action === 'op') await page.getByTestId('timeline-clip').first().click();
+    const button = page.getByTestId(action === 'op' ? 'timeline-inspector-remove' : `timeline-${action}`);
+    await button.click();
+    await expect(page.getByRole('alert')).toHaveText('Could not save timeline.json: disk full');
+    expect(await timelineItemIds(page)).toEqual(BRAVO_ITEMS);
+
+    await page.unroute(endpoint);
+    await page.route(endpoint, (route) => route.fulfill({ json: snapshotOf(6, BRAVO_ITEMS) }));
+    await button.click();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+}

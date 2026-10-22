@@ -697,14 +697,17 @@ export async function undoTimeline(projectId: string, expectedRevision?: number)
     if (res.status === 409 && typeof err.detail === 'object') {
       throw new TimelineRevisionConflictError(err.detail as TimelineRevisionConflictDetail);
     }
-    throw new Error(`Undo failed: ${res.status}`);
+    throw new Error(err.detail ?? `Undo failed: ${res.status}`);
   }
   return res.json() as Promise<TimelineSnapshot>;
 }
 
 export async function redoTimeline(projectId: string): Promise<TimelineSnapshot> {
   const res = await fetch(`${backendUrl()}/projects/${projectId}/timeline/redo`, { method: 'POST' });
-  if (!res.ok) throw new Error(`Redo failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? `Redo failed: ${res.status}`);
+  }
   return res.json() as Promise<TimelineSnapshot>;
 }
 

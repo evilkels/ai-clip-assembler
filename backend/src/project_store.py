@@ -2,6 +2,7 @@ import json
 import hashlib
 import os
 import shutil
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,28 @@ UNSAFE_PROJECT_ROOTS = [
     Path("/System"),
     Path("/Applications"),
 ]
+
+
+class ProjectSaveError(OSError):
+    """A project file could not be saved; its previous contents are intact."""
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    temporary = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+        temporary = Path(name)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except OSError as exc:
+        raise ProjectSaveError(f"Could not save {path.name}: {exc}") from exc
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 class ProjectStoreError(Exception):
@@ -195,9 +218,8 @@ def open_project(project_folder: Path) -> ProjectManifest:
 
 
 def write_project_manifest(project_folder: Path, manifest: ProjectManifest) -> None:
-    project_manifest_path(project_folder).write_text(
-        manifest.model_dump_json(indent=2) + "\n",
-        encoding="utf-8",
+    _atomic_write_text(
+        project_manifest_path(project_folder), manifest.model_dump_json(indent=2) + "\n"
     )
 
 
@@ -254,8 +276,7 @@ def write_analysis_results(
         "ai_scoring": ai_scoring,
     }
     path = analysis_results_path(project_folder)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    _atomic_write_text(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_analysis_results(project_folder: Path) -> Optional[dict]:
@@ -285,8 +306,7 @@ def write_frame_scores(project_folder: Path, per_file: dict) -> None:
         "per_file": per_file,
     }
     path = frame_scores_path(project_folder)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    _atomic_write_text(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_frame_scores(project_folder: Path) -> Optional[dict]:
@@ -312,8 +332,7 @@ def review_session_path(project_folder: Path) -> Path:
 
 def write_review_session(project_folder: Path, session: ReviewSession) -> None:
     path = review_session_path(project_folder)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(session.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    _atomic_write_text(path, session.model_dump_json(indent=2) + "\n")
 
 
 def read_review_session(project_folder: Path) -> Optional[ReviewSession]:
@@ -382,8 +401,7 @@ def timeline_document_path(project_folder: Path) -> Path:
 def write_timeline_document(project_folder: Path, document: TimelineDocument) -> None:
     """Persist the backend-authoritative Timeline Document for a project."""
     path = timeline_document_path(project_folder)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(document.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    _atomic_write_text(path, document.model_dump_json(indent=2) + "\n")
 
 
 def read_timeline_document(project_folder: Path) -> Optional[TimelineDocument]:

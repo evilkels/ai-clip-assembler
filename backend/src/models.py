@@ -197,9 +197,9 @@ class Transform(BaseModel):
     in normalized frame units. Validated so a transform can never be degenerate.
     """
 
-    scale: float = 1.0
-    x: float = 0.0
-    y: float = 0.0
+    scale: float = Field(default=1.0, allow_inf_nan=False)
+    x: float = Field(default=0.0, allow_inf_nan=False)
+    y: float = Field(default=0.0, allow_inf_nan=False)
 
     @field_validator("scale")
     @classmethod
@@ -219,9 +219,9 @@ class TimelineItem(BaseModel):
 
     item_id: str
     source_clip_id: str
-    start_sec: float
-    end_sec: float
-    speed: float = 1.0
+    start_sec: float = Field(allow_inf_nan=False)
+    end_sec: float = Field(allow_inf_nan=False)
+    speed: float = Field(default=1.0, allow_inf_nan=False)
     transform: Transform = Field(default_factory=Transform)
 
     @property
@@ -255,7 +255,7 @@ class TimelineDocument(BaseModel):
     revision: int = 0
     items: List[TimelineItem] = Field(default_factory=list)
     profile: Optional[str] = None
-    target_duration_sec: Optional[float] = None
+    target_duration_sec: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
     # Review-board decisions per Candidate Clip ("included" / "excluded").
     # Item presence drives the timeline; this preserves an explicit "rejected"
     # state distinct from "not yet reviewed" so the Review Board can grey it out.

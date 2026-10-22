@@ -191,16 +191,14 @@ function reviewModelAccount(page: Page) {
 
 function diagnostics(reachable: boolean) {
   return {
-    review_model: {
-      binary: { configured: 'pi', resolved: '/usr/local/bin/pi', found: true },
-      provider: 'openai-codex',
-      model: 'gpt-5.4-mini',
-      reachable,
-      elapsed_sec: 0.2,
-      detail: reachable ? 'OK' : 'No API key found for openai-codex',
-      guidance: reachable
-        ? []
-        : ['Open Settings > Connections and sign in to the review model account.'],
+    provider: 'chatgpt',
+    reachable,
+    elapsed_sec: 0.2,
+    failure: reachable ? undefined : {
+      kind: 'signed_out',
+      provider: 'chatgpt',
+      action: 'sign_in',
+      message: 'ChatGPT is signed out. Sign in from Settings › AI.',
     },
   };
 }
@@ -408,22 +406,14 @@ test('explains missing and incompatible Pi installations', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
 });
 
-test('the Diagnostics tab spells out how to fix an unreachable model', async ({ page }) => {
+test('the Diagnostics tab names the failure and opens AI settings', async ({ page }) => {
   await page.route('**/diagnostics', async (route) => {
     await route.fulfill({
       json: {
-        review_model: {
-          binary: { configured: 'pi', resolved: null, found: false },
-          provider: 'openai-codex',
-          model: 'gpt-5.4-mini',
-          reachable: false,
-          elapsed_sec: null,
-          detail: 'pi CLI not found on PATH (pi)',
-          guidance: [
-            'Confirm the CLI exists: run  which pi  in Terminal.',
-            'Link it somewhere the app always looks: /opt/homebrew/bin/pi',
-          ],
-        },
+        provider: 'claude',
+        reachable: false,
+        elapsed_sec: 0.2,
+        failure: { kind: 'signed_out', provider: 'claude', action: 'sign_in', message: 'Claude is signed out. Sign in from Settings › AI.' },
       },
     });
   });
@@ -438,15 +428,13 @@ test('the Diagnostics tab spells out how to fix an unreachable model', async ({ 
   const failureCard = page.getByTestId('diagnostics-result');
   await expect(failureCard).toBeVisible();
   await expect(page.getByText('Not reachable', { exact: true })).toBeVisible();
-  await expect(failureCard).toContainText('Check failed');
-  await expect(failureCard).toContainText('pi CLI not found on PATH (pi)');
-  const guidance = page.getByRole('heading', { name: 'How to fix this' }).locator('..');
-  await expect(guidance.getByRole('listitem')).toHaveCount(2);
-  await expect(guidance).toContainText('which pi');
-  await expect(guidance).toContainText('/opt/homebrew/bin/pi');
+  await expect(failureCard).toContainText('Claude');
+  await expect(failureCard).toContainText('Claude is signed out.');
+  await failureCard.getByRole('button', { name: 'Open AI settings' }).click();
+  await expect(page.getByRole('tab', { name: 'AI assistance' })).toHaveAttribute('aria-selected', 'true');
 });
 
-test('the Diagnostics tab hides the fix-it steps once the model responds', async ({ page }) => {
+test('the Diagnostics tab shows elapsed time once the provider responds', async ({ page }) => {
   await page.route('**/diagnostics', async (route) => {
     await route.fulfill({ json: diagnostics(true) });
   });
@@ -457,5 +445,5 @@ test('the Diagnostics tab hides the fix-it steps once the model responds', async
   await page.getByRole('tab', { name: 'Diagnostics' }).click();
 
   await expect(page.getByText('Reachable', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'How to fix this' })).toHaveCount(0);
+  await expect(page.getByTestId('diagnostics-result')).toContainText('Replied in 0.2s');
 });

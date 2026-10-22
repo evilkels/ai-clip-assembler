@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from src import analysis_service
+from src.ai_engines.messages import make_failure
 from src.clip_assembly import AssemblyPreferences
 from src.frame_extraction import FFmpegError, FFmpegUnavailableError
 from src.models import AssemblyResult, ClipSuggestion, FrameSample, FrameScore, TimelineSequence
@@ -56,6 +57,63 @@ def _clip(clip_id: str, start: float, end: float, score: float) -> ClipSuggestio
         overall_score=score,
         ai_reason=f"Stable {score}/10",
     )
+
+
+def test_resume_ai_scoring_stops_after_first_failure(tmp_path):
+    samples = tmp_path / "samples"
+    samples.mkdir()
+    videos = []
+    per_file = {}
+    clips = []
+    for index in (1, 2):
+        file_id = f"file-{index}"
+        video = _source_video(tmp_path, file_id=file_id)
+        videos.append(video)
+        frame_path = samples / f"{file_id}.jpg"
+        frame_path.write_bytes(b"jpg")
+        per_file[file_id] = {"frames": [FrameScore(
+            timestamp=1, frame_path=str(frame_path), motion_stability=8,
+            smoothness_score=8, sharpness_score=8, exposure_score=8,
+            contrast_score=8, visual_interest_score=0, overall_score=8,
+            blur_score=8, brightness=0.8, contrast=0.8, scene_id=1,
+            is_keyframe=True, turn_rate_deg_per_sec=0,
+        ).model_dump()]}
+        clips.append(ClipSuggestion(
+            clip_id=f"clip-{index}", file_id=file_id, file_name=video["file_name"],
+            start_sec=0, end_sec=2, duration_sec=2, smoothness_score=8,
+            visual_interest_score=0, overall_score=8, ai_reason="Stable",
+        ).model_dump())
+
+    class UsageLimitEngine:
+        provider = "chatgpt"
+
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, _request):
+            self.calls += 1
+            return make_failure("usage_limit", "chatgpt")
+
+    engine = UsageLimitEngine()
+    project = {
+        "videos": videos,
+        "clips": clips,
+        "frame_scores": {"per_file": per_file},
+        "generation_stats": {"per_file": {}},
+        "ai_scoring": {"per_video": [
+            {"file_id": "file-1", "clips_left": 1},
+            {"file_id": "file-2", "clips_left": 1},
+        ]},
+    }
+
+    _results, metadata = analysis_service.resume_ai_scoring(
+        project, samples_path=samples, cache_dir=tmp_path / "cache", engine_fn=lambda: engine,
+    )
+
+    assert engine.calls == 1
+    assert metadata[1]["used_ai"] is False
+    assert metadata[1]["failure"] == metadata[0]["failure"]
+    assert metadata[1]["clips_left"] == 1
 
 
 def _frame(timestamp: float, smoothness: float = 8.0) -> FrameScore:
@@ -152,6 +210,43 @@ def test_run_analysis_pipeline_returns_per_file_outputs(tmp_path):
     assert finalized["timeline"]["source"] == "draft"
     assert finalized["recommendation"]["profile"] == "long_scenic"
     assert finalized["generation_stats"]["totals"]["candidates_kept"] == 3
+
+
+def test_ai_failure_keeps_rule_ranking_and_stops_scoring_later_videos(tmp_path):
+    videos = [_source_video(tmp_path, file_id="file-1"), _source_video(tmp_path, file_id="file-2")]
+    calls = []
+
+    class Engine:
+        provider = "chatgpt"
+        cache_identity = "openai-codex/fake"
+
+        def run(self, _request):
+            calls.append("run")
+            return make_failure("usage_limit", "chatgpt")
+
+    def assemble(file_id, file_name, **_kwargs):
+        clip = _clip(f"clip-{file_id}", 0.0, 3.0, 8.0)
+        clip = clip.model_copy(update={"file_id": file_id, "file_name": file_name})
+        return AssemblyResult(
+            clips=[clip], sequence=TimelineSequence(total_duration_sec=3, clips=[clip.clip_id])
+        )
+
+    result = _run_service(
+        {"project_id": "project-1", "videos": videos, "clips": [], "timeline": None},
+        _request(harness_id="pi_agent"),
+        tmp_path,
+        extract_frames_fn=lambda **_kwargs: [FrameSample(timestamp=1, frame_path="/tmp/frame.jpg")],
+        score_samples_fn=lambda _samples: [_frame(1)],
+        assemble_clips_fn=assemble,
+        engine_fn=lambda: Engine(),
+    )
+
+    assert len(calls) == 1
+    assert [entry["failure"]["kind"] for entry in result.per_video_metadata] == [
+        "usage_limit", "usage_limit"
+    ]
+    assert result.per_video_metadata[1]["used_ai"] is False
+    assert result.per_file_results[0]["clips"][0]["overall_score"] == 8.0
 
 
 def test_finalize_clip_set_carries_generation_stats_for_unanalyzed_files(tmp_path):

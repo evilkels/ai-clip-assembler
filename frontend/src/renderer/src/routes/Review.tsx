@@ -6,6 +6,7 @@ import { SourceClipsPanel } from '../components/SourceClipsPanel';
 import { PreviewAudioControl } from '../components/PreviewAudioControl';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { StatusSurface } from '../components/StatusSurface';
+import { FinishAiScoring } from '../components/FinishAiScoring';
 import { WorkflowHeader } from '../components/WorkflowHeader';
 import { VersionGallery } from '../components/VersionGallery';
 import { VersionApplyDialog } from '../components/VersionApplyDialog';
@@ -97,7 +98,7 @@ export function ReviewPage() {
   }, [clips]);
 
   const fallbackVideos = useMemo(
-    () => harnessMetadata?.per_video?.filter((video) => video.warning) ?? [],
+    () => harnessMetadata?.per_video?.filter((video) => video.failure) ?? [],
     [harnessMetadata],
   );
 
@@ -206,11 +207,11 @@ export function ReviewPage() {
                 </StatusSurface>
               </div>
             ) : null}
-            {harnessMetadata?.warning ? (
+            {harnessMetadata?.failure ? (
               <output data-testid="harness-fallback-notice" className="harness-fallback-notice">
                 <StatusSurface tone="warning" className="harness-fallback-banner">
-                  <strong>Harness Fallback</strong>
-                  <p>{harnessMetadata.warning}</p>
+                  <strong>AI scoring stopped</strong>
+                  <p>{harnessMetadata.failure.message}</p>
                   {fallbackVideos.length > 0 ? (
                     <div>
                       <span className="harness-fallback-label">Affected Source Videos</span>
@@ -221,6 +222,7 @@ export function ReviewPage() {
                       </ul>
                     </div>
                   ) : null}
+                  <FinishAiScoring clipsLeft={harnessMetadata.clips_left ?? 0} />
                 </StatusSurface>
               </output>
             ) : null}

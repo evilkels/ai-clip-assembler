@@ -3612,6 +3612,59 @@ def test_timeline_save_failure_returns_error_and_preserves_state(monkeypatch, tm
         assert client.get(f"/projects/{project_id}/timeline/document").json() == before
 
 
+@pytest.mark.parametrize("number", ["Infinity", "1e400"])
+def test_draft_rejects_non_finite_target_duration(monkeypatch, tmp_path, number):
+    from copy import deepcopy
+    from src.project_store import timeline_document_path
+
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    before = client.get(f"/projects/{project_id}/timeline/document").json()
+    project_before = deepcopy(api.projects[project_id])
+    saved = timeline_document_path(tmp_path).read_bytes()
+
+    response = client.post(
+        f"/projects/{project_id}/draft",
+        content='{"format":"short","target_duration_sec":' + number + '}',
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert "target_duration_sec" in response.json()["detail"]
+    assert client.get(f"/projects/{project_id}/timeline/document").json() == before
+    assert api.projects[project_id] == project_before
+    assert timeline_document_path(tmp_path).read_bytes() == saved
+
+
+def test_proposal_accept_rejects_invalid_operation_values(monkeypatch, tmp_path):
+    from src.project_store import timeline_document_path
+
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+    _op(client, project_id, "include", clip_id="clip-1")
+    controller = api.get_timeline_controller(project_id)
+    monkeypatch.setattr(api, "_proposal_store", api.ProposalStore())
+    proposal = api._proposal_store.create(
+        project_id,
+        controller,
+        message="Set the target duration.",
+        operations=[{"operation": "set_target_duration", "args": {"target_duration_sec": 30}}],
+    )
+    # Stored proposals are revalidated when their operations are replayed.
+    proposal.operations[0]["args"]["target_duration_sec"] = float("inf")
+    before = client.get(f"/projects/{project_id}/timeline/document").json()
+    saved = timeline_document_path(tmp_path).read_bytes()
+
+    response = client.post(f"/projects/{project_id}/proposals/{proposal.proposal_id}/accept")
+
+    assert response.status_code == 422
+    assert "target_duration_sec" in response.json()["detail"]
+    assert client.get(f"/projects/{project_id}/timeline/document").json() == before
+    assert timeline_document_path(tmp_path).read_bytes() == saved
+    assert proposal.status == "pending"
+
+
 @pytest.mark.parametrize("number", ["NaN", "Infinity", "-Infinity", "1e400"])
 @pytest.mark.parametrize("transport", ["http", "mcp"])
 def test_http_and_mcp_reject_non_finite_operation_values(monkeypatch, tmp_path, number, transport):

@@ -932,6 +932,8 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
             status_code=409,
             detail=_revision_conflict_detail(project_id, exc, controller),
         ) from exc
+    except TimelineOpError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     # The authoritative Timeline Document was saved by apply_batch above.
     project["timeline"] = timeline
     return {
@@ -1497,6 +1499,8 @@ async def accept_proposal(project_id: str, proposal_id: str):
             status_code=409,
             detail=_revision_conflict_detail(project_id, exc, controller),
         ) from exc
+    except TimelineOpError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ReviewAgentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _timeline_snapshot(project_id, document)

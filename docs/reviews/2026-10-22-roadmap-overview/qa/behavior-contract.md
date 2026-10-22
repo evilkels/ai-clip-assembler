@@ -1,3 +1,10 @@
+---
+type: Note
+title: Roadmap overview behavior contract
+description: Defines browser acceptance checks for the roadmap overview and its saved answers, navigation, and privacy.
+status: draft
+created: 2026-10-22
+---
 # Overview behavior contract
 
 Target: http://127.0.0.1:8769/ (owner-only local page; no public deployment).

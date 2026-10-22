@@ -44,7 +44,7 @@ Plans awaiting human checks remain active; `done` means closed, including work s
 - [035: Deterministic plan lifecycle](plans/035-deterministic-plan-lifecycle.md) — `plan_status: active` — Plans checkbox-derived plan status, generated index rows, and automatic archival of closed plans.
 - [036: Proper tests and checks](plans/036-proper-tests-and-checks.md) — `plan_status: active` — Aligns local, commit-hook, and CI checks while correcting tests that fail to prove their stated behavior.
 - [037: Extraction quality](plans/037-extraction-quality.md) — `plan_status: active` — Improves deterministic Candidate Clip coverage and length so Short, Medium, and Long drafts use the available footage.
-- [038: AI Connection — honest AI errors, then Claude or ChatGPT through the Editor's own program](plans/038-ai-connection.md) — `plan_status: active` — Plans honest typed AI failures, restricted payloads, and connections through the Editor's own Claude Code or Codex program.
+- [038: AI Connection — honest AI errors, then Claude or ChatGPT through the Editor's own program](plans/038-ai-connection.md) — `plan_status: active` — Phases 1–2 are implemented: typed AI failures and restricted payloads; connections through the Editor's own Claude Code or Codex program remain planned.
 - [039: Story in the edit](plans/039-story.md) — `plan_status: active` — Adds Markers and Story Sections that survive undo and carry story context into exported editing timelines.
 - [040: Release QA](plans/040-release-qa.md) — `plan_status: active` — Collects human checks for Review scripting and keyboard access on each packaged release.
 - [042: iPhone footage end to end](plans/042-iphone-footage.md) — `plan_status: active` — Tracks iPhone frame rates, capture order, orientation, vertical previews, and exports through the complete editing workflow.
@@ -129,6 +129,8 @@ Plans awaiting human checks remain active; `done` means closed, including work s
 
 ## Reviews
 
+- [Repository audit — 2026-10-22](reviews/2026-10-22-repo-audit.md) — Records repository correctness, test, documentation, and release risks with recommended fixes.
+
 - [Real-Footage QA Review — 2026-06-11](reviews/2026-06-11-real-footage-qa-review.md) — Records real-footage QA observations about analysis feedback, clip quality, and the editing workflow.
 - [PR #62 Pocock Review](reviews/2026-08-12-pr62-pocock-review.md) — Reviews PR 62 for repository standards and conformance to the authoritative Timeline and export design.
 - [SDD ledger — plan: docs/plans/2026-08-14-studio-workflow-redesign.md](reviews/2026-08-14-studio-workflow-redesign-sdd/progress.md) — Records studio-redesign task completion, review outcomes, verification evidence, and deferred follow-ups.
@@ -174,6 +176,8 @@ ADRs 0001 and 0005 remain accepted for their surviving decisions; their descript
 ## Design artefacts (HTML)
 
 These HTML files are visual references and reports outside the OKF Markdown page set.
+
+- [Roadmap overview — 2026-10-22](reviews/2026-10-22-roadmap-overview/index.html) — Compares the released baseline with main, tracks roadmap progress, and collects owner decisions.
 
 - [Landing page reference](design/2026-09-01-landing-page-reference.html) — Shows the approved landing-page composition in dark and light themes.
 - [Remote View prototype](designs/remote-view/prototype/index.html) — Provides the preserved browser prototype for remote clip review.

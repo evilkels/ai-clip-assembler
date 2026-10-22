@@ -1,0 +1,27 @@
+Validation completed: C1–C4 and C6 passed; C5 failed on undersized touch targets. Testing used a separate incognito browser tab, read only the contract, and changed no files or remote systems.
+
+**Clause verdicts**
+
+- **C1 — PASS.** At 1280×800 and 390×844, the first screen explains released v0.4.0, unreleased `main` changes, and v0.5.0 owner checks. Document width equalled viewport width at both sizes, including with all disclosures open.
+- **C2 — PASS.** Auto/Gaišs/Tumšs changed appearance with exactly one pressed button. Choices survived reload. Auto followed emulated light and dark system preferences; Gaišs stayed light under a dark preference.
+- **C3 — PASS.** All six questions accepted independent answers and retained them after reload. Repeating Q1’s selection cleared only Q1. Copy produced a readable Latvian Q1–Q6 list. With clipboard unavailable, the visible text field contained exactly the same text. Cancelling Notīrīt preserved answers; confirming it and reloading produced “Atbildēts: 0 no 6.”
+- **C4 — PASS.** Status filters returned 1/4/3/7/1 matching rows; Visi restored all 16. Each of the 16 track pills revealed its matching row after an incompatible filter. At 390px, group bars opened the closed list and correctly isolated the two experiment rows or three research/maintenance rows.
+- **C5 — FAIL.** Section links preserved closed disclosures; specific item and PR links opened their containers. All 16 disclosures toggled with Space and Enter. Visible controls were keyboard-focusable. The portrait image loaded at 850×650 with descriptive Latvian alt text. Touch sizing failed as detailed below.
+- **C6 — PASS for observed activity.** Viewing, answering, refreshing and navigation produced only local image/font requests; no external requests or messages were observed. External and repository-source links were not activated.
+
+**Accepted finding — C5: standalone status links are too short for touch**
+
+Reproduce at 390px width:
+
+1. Navigate to **Iegūts → Kas jau mainījies**.
+2. Inspect the standalone “1 Jāpārbauda kvalitāte” link below “Mērījumi no 037.”
+3. Its clickable rectangle measures **175.77×22.25 CSS pixels**. The other status links in this section also measure **22.25px high**.
+4. Browser hit-testing 2px above the link hits no enclosing link, confirming there is no expanded target.
+
+These standalone controls fail the contract’s touch-sized requirement.
+
+**Limits and blockers**
+
+System clipboard readback was denied with `NotAllowedError`. The normal copy action displayed “Nokopēts”; a temporary browser-only clipboard capture verified the supplied text and its exact equality with the fallback field. No other blockers remained.
+
+Product QA, editing-app imports, authentic model calls and physical iPhone behavior remained **out of scope**. Test answers were cleared and Auto restored.

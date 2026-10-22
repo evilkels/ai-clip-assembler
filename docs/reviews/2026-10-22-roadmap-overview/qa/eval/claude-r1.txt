@@ -1,0 +1,99 @@
+The page is close to ready, but four fixes should come before Ernesto reads it. Two give a wrong picture of where things stand: one amber "Gaida" status covers both code already on `main` and milestones with no code at all, and the v0.5.0 owner checks miss the clean-Mac install and the checks that apply if #101 ships. The other two are a wrong Latvian word used twice and audit finding numbers that look like GitHub PR numbers. Every factual claim I checked against the plans and git history held up. I edited nothing (apart from my own plan-mode notes file) and sent nothing anywhere.
+
+# Review: `docs/reviews/2026-10-22-roadmap-overview/index.html`
+
+**What I checked against sources (all correct):**
+- **Plan 037:** Estepona 5→13 clips, median 3→20 s, 15→185 s covered; Detox Medium 13→240 s, Long 10→333/480 s (`037-extraction-quality.md:118–133`).
+- **Plan 042:** 11/14 code tasks, H1 and H2 open.
+- **Plan 032:** H1–H5 all open.
+- **Plan 041 (on the `feat/remote-view` branch):** 11/36 tasks, and H7 records the owner placing it before v1.0.0 as an experiment.
+- **Q1:** matches review-visual-editing D7, H3, task 3.7 and Phase 5.
+- **Q2:** matches 038 D18, including "audio never sent".
+- **Q3:** matches 038 D8/D9 (Sonnet, the user's Codex default, low effort for scoring).
+- **Q6:** matches 033 H1.
+- **Commits:** `16b2593` is the #100 merge, `2df0169` the #107 merge, `be95328` the #112 merge, and `1bacf0a` is in #107.
+- **Runtime tools:** the staging script predates v0.4.0.
+- **Time:** 18:57 Riga matches 15:57Z.
+- **Screenshot:** `shots/01-review-portrait.png` shows no folder path.
+- **Privacy:** searching the page for personal paths or secrets found nothing.
+
+I did not judge #101/#111/#112 status. I loaded the page at 1440 and 390 px. The full-page captures in `/tmp/aca-overview-check` start mid-page at Q5, so they don't show the first screen; my own captures do.
+
+## Scores
+
+| Area | Score | Evidence |
+|---|---|---|
+| Audience fit / first screen | 4 | The intro paragraph (lede) names v0.4.0, `main` and v0.5.0 clearly, and the track shows above the fold at both widths. But 7 of 16 items show the same amber "Gaida", which blurs the main point (M1). |
+| Conceptual correctness | 3 | The status mixing (M1), v0.5.0 checks placed under milestone 7 (M2) and audit numbering (M4). Everything else is accurate and careful about what is not proven. |
+| Latvian language | 3 | Mostly natural. One wrong word used twice (M3), plus several awkward or ungrammatical phrases (N1–N4). |
+| Privacy and claims | 5 | No paths, secrets or other clients. Private GitHub links are acceptable. Claims are honestly hedged ("nav apliecināti", "nav aizstāti ar CI"). |
+| Structure / accessibility / ARIA / noscript / responsive | 4 | 44 px targets, aria-pressed toggles, fieldset with legend, live region, table becomes cards on phones. Gaps: noscript, a label on a div with no role, skipped heading levels, one contrast failure (N9–N11). |
+| Business realism | 4 | Owner costs and access are mostly right. Q6 leaves out the known 99 USD and Q4 leaves out the free trial (N7). |
+
+## Must-fix
+
+**M1 · Status hides the line between `main` and not started**
+- **Where:** `/Users/elvijs/DEV/personal/ai-clip-assembler/.worktrees/roadmap-overview/docs/reviews/2026-10-22-roadmap-overview/index.html:454-457`, with items at `:560` (1), `:572` (1b), `:615` (3), `:625` (4), `:635` (5), `:654` (7), `:664` (041).
+- **Quote:** `"waiting": {"label": "Gaida", "meaning": "pārbaudi vai atkarību"}`
+- **Problem:** Milestones 1 and 1b have merged code on `main`. 041 is a draft PR. Milestones 3, 4 and 5 have no code. All of them look identical on the track.
+- **Fix:**
+  - Set 3, 4 and 5 to `planned`, like 6 already is.
+  - Set 7 to `progress`, since runtime tools 1.1–1.3 shipped before v0.4.0.
+  - Set 041 to `progress` and keep "draft, apturēts" in its note.
+  - Keep `waiting` only for 1 and 1b, with the meaning `kods main; gaida tavu pārbaudi`.
+- **Knock-on:** the count sentence at `:393` hard-codes singular `plānots` and would read "4 plānots". Write it as `izlaists: N, sagatavoti: N, iesākti: N, gaida: N, plānoti: N`.
+
+**M2 · v0.5.0 owner checks are incomplete, and one is in the wrong place**
+- **Where:** `:422` and the Q5 detail at `:1247`.
+- **Quote:** "Pirms 7. posma nodrošināt Apple dalību un tīru arm64/x64 Mac pārbaudes"
+- **Problem:** Audit §5 check 1 needs candidate DMGs installed on clean arm64 and x64 Macs, plus version and update-notice checks, *before tagging v0.5.0*. Check 5 adds: if #101 is included, test provider unavailable, limit, sign-in and network failures and confirm the allowed payload. Check 3 adds a reply on #80 asking the reporter to retest. Q5 and the Ernesto list cover none of these.
+- **Fix:**
+  - Add to the Ernesto list: "Pirms v0.5.0: uzstādīt kandidāta DMG uz tīra arm64 un x64 Mac, pārbaudīt versiju un atjauninājuma paziņojumu; ja #101 iekļauts, pārbaudīt AI kļūdu gadījumus; pēc Final Cut testa atbildēt #80."
+  - Change the milestone-7 bullet to "…Apple dalību un notarizēta DMG pārbaudi".
+  - Add "tīrs arm64/x64 Mac" and "#101 kļūdu gadījumi (ja iekļauts)" to the Q5 detail.
+
+**M3 · Wrong word: "Spēlētājs" means a game player, not a video player**
+- **Where:** `:405` and `:423`.
+- **Quotes:** "Spēlētājs rāda portreta kadrus pareizā formātā." and "Spēlētāju paredzēts paturēt Proposal Preview."
+- **Fix:** "Atskaņotājs rāda portreta kadrus pareizā formātā." and "Atskaņotāju paredzēts paturēt kā Proposal Preview." Q1 at `:1191` already uses "atskaņotājs".
+
+**M4 · Audit finding numbers look like GitHub numbers**
+- **Where:** `:412`.
+- **Quotes:** "Audita N1 un vecais #4", "Vecais #3/#8/#9/#12", "Audita #5/#6/#11"
+- **Problem:** On a page where #80 and #101 are GitHub issues and PRs, "#3" or "#12" reads as one too.
+- **Fix:** Write them as "8. okt. audita 4. punkts" or with a prefix ("A3/A8/A9/A12, A5/A6/A11"), and explain the prefix once: "A = 8. oktobra audita atradums".
+
+## Nice-to-have
+
+**Language and wording**
+- **N1 · `:392` (lede).** Quote: "Kopš … uzlabota pirmā montāža, eksports un iPhone materiālu apstrāde. Šīs izmaiņas ir `main`, bet vēl nav jaunā izlaidumā. … Ernesto jāpārbauda". Fix: "Kopš … ir uzlabota pirmā montāža, eksports un iPhone materiālu apstrāde. Šīs izmaiņas jau ir `main` zarā, bet vēl nav nevienā izlaidumā. … tev jāpārbauda". The last change keeps the second-person voice used in "tava izvēle".
+- **N2 · `:405` (caption).**
+  - "Izgriezta projekta josla ar personisko mapes ceļu" → "Projekta josla ar personīgo mapes ceļu ir izgriezta".
+  - Drop the unclear "Pēc tam mainās AI kļūdu plūsma, nevis šī priekšskatījuma pārbaude", or replace it with "#101 maina AI kļūdu apstrādi, ne šo priekšskatījumu".
+  - "Nominal 59.94" → "Nominālais 59,94 kadri/s" (Latvian uses a decimal comma).
+- **N3 · `:412`.**
+  - "pārtraukts rakstījums var sabojāt … kļūda nav godīgi redzama" → "pārtraukta saglabāšana var sabojāt saglabāto projektu, un kļūda lietotājam netiek parādīta".
+  - "izlabotiem main" → "izlabotiem `main` zarā".
+- **N4 · `:1324-1327`.** The strings `"{n} izlaisti"` and `"{n} faili"` break at n = 1 (#112 has 1 file). Use `"izlaisti: {n}"` and `"faili: {n}"`.
+- **N5 · `:1190`.** "Noņemšana 3.7 un Phase 5 paliek bloķēta." → "Plāna 3.7. uzdevums un Phase 5 (Versions noņemšana) paliek bloķēti."
+- **N6 · `:426`.** "attālu resursu" → "ārēju resursu".
+
+**Business realism**
+- **N7 · `:1261` (Q6).** "izmaksas jāpārbauda reģistrēšanās brīdī" → "99 USD gadā (roadmap, 033/H1); cenu pārbaudīt reģistrējoties".
+- **N7 · `:1233` (Q4).** Plan 032 H1 (`032:246`) names the 90-day Mac App Store trial. Add it to the detail and add an option such as "Izmantošu 90 dienu izmēģinājumu".
+
+**Small accuracy fixes**
+- **N8a · `:418`.** "Vēsturiskais #19 ir issue par rotāciju, nevis PR." #19 appears nowhere else on the page, so remove the sentence.
+- **N8b · `:423`.** "…nevis auditā minētajai gaidāmajai sapludināšanai" — the audit never mentions #111. Fix: "#101 un #111 stāvoklis seko jaunākajai GitHub nolasīšanai; audits #111 nepiemin."
+- **N8c · `:422`.** The "[2]" and "[1b]" tags are never explained, and "[1b]" is attached to the save-risk step even though N1 and old finding 4 are not milestone 1b. Explain the tags once ("[ ] = roadmap posms") and remove the wrong "[1b]".
+
+**Structure and accessibility**
+- **N9 · `:389` (noscript).** Without JS, `:393` reads "Uzskaitīti  darba bloki:  izlaists, …". The items summary, the Copy/Clear buttons, the track and the PR list are all empty, but the noscript note only mentions the table and decisions. Fix: add `html:not(.js) :is(.status-counts,#decide,#prs,#items,#track){display:none}` and list those sections in the noscript note.
+- **N10a · `:398`.** `<div class="track" aria-label=…>` has no role, so screen readers ignore the label. Add `role="region"` or a screen-reader-only `<h2>`.
+- **N10b · `:1418` and `:411`.** Track groups go h1 → h3, and the fix cards go h2 → h4 with no h3 between.
+- **N11 · `:220`.** In light mode, "Kopēt atbildes" (paper `#f7f7f8` on accent `#e11d48`) is about 4.4:1 at 15 px bold, just under the 4.5:1 minimum. Use `#fff` text or a darker accent such as `#be123c`.
+
+**Links**
+- **N12 · `:410` and `:422`.** The relative links `../2026-10-22-repo-audit.md#owner-checks-before-tagging` and `#draft-v050-release-notes` open as raw Markdown on the local server, where the anchors don't work. Use the `github.com/…/blob/main/docs/reviews/2026-10-22-repo-audit.md#…` form, as the footer already does.
+
+**Verdict:** Fix M1–M4, then ship. The facts are accurate and the privacy is clean; the remaining problems are status categories, the v0.5.0 check list and a few Latvian wording issues.

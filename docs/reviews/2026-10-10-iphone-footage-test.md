@@ -295,3 +295,31 @@ workable; **P3** = cosmetic.
 - Cleanup: `git worktree remove ~/DEV/ai-clip-assembler-wt-iphone-test` and
   delete the two `~/Movies/clip-assembler-test-project-2026-10-10*` folders
   when no longer needed.
+
+
+## Phase 5 retest addendum — 2026-10-10
+
+The stopped tester preserved this run on `main` at `89118ea` after PRs #100, #102, #103, #105 and #106 merged, followed by the Suggested-cut fix at `200d53b` in PR #107. This addendum audits those saved screenshots and exports against the original findings; it does not claim a new physical-device or NLE run. Independent tests on the fix passed (616 backend, 76 main-process), and the complete GitHub gate passed, including browser tests. The saved FCPXML was checked again with `xmllint --noout --dtdvalid FCPXMLv1_10.dtd` and passed.
+
+| Original finding | Retest result and evidence |
+| --- | --- |
+| P1-1 FCPXML DTD failure | Fixed by #100. The [retest FCPXML](2026-10-10-iphone-footage-test/retest/timeline.fcpxml) passes the FCPXML 1.10 DTD. Physical Final Cut Pro import remains H1. |
+| P1-2 VFR exported as true 60p | Fixed by #100/#102. [Import](2026-10-10-iphone-footage-test/retest/01-import.png) shows all four sources at 59.94. FCPXML has `1001/60000s`; [Resolve XML](2026-10-10-iphone-footage-test/retest/timeline.xml) has `60/TRUE` at 1080×1920. |
+| P1-3 transfer-time order | Fixed for source dates and the draft Timeline by #102. Import shows capture times 12:48, 12:52, 13:33 and 13:58. Suggested cuts still began with IMG_1029 on [main](2026-10-10-iphone-footage-test/retest/04-review-board.png); #107 fixes chronological recipes, as shown [after New session](2026-10-10-iphone-footage-test/retest/08-review-fixed-order.png). Punchy remains score-first. |
+| P2-1 relative Resolve media paths | Fixed by #100. The saved XML uses absolute file URLs. Actual Resolve import remains H1. |
+| P2-2 frozen transport total | Fixed by #103. [After retiming](2026-10-10-iphone-footage-test/retest/06-timeline-after-retime.png), the selected 9-second source plays at 0.5× for 18 seconds and both transport and total show 42 seconds. The retained playback→stop→retime browser regression passed in CI. |
+| P2-3 mid-batch source status | Fixed by #103; batch-progress, cancellation and same-name-file regressions passed in the full browser gate. No mid-batch screenshot was included in the preserved retest checkpoint. |
+| P3-1 narrow Thumbs/Compact and wrong extension | Fixed by #103; width, extension and poster-recovery browser regressions passed. The preserved retest screenshot is Table mode, so it does not independently prove those layouts. |
+| UX 1 vertical previews/info-bar overlap | Fixed by #106. The Review and Timeline retest screenshots show portrait players, with the Timeline information bar below the picture. |
+| UX 2 Suggested-cut footer legibility | Partially improved by #106; players are portrait and duration badges were covered by light-theme browser checks. General readability polish remains a judgement for the Editor. |
+| UX 3 Timeline posters/waveforms | Still open as plan 042 task 6.1. The retest Timeline blocks have no posters or waveforms. |
+| UX 4 frame/timecode Trim bounds | Still open as task 6.2; numeric seconds remain visible in the retest inspector. |
+| UX 5 export duration wording | Updated by #105 to “Source media used”; the export-receipt browser checks passed. No Export screenshot is included in the preserved retest checkpoint. |
+| UX 6 Project names and overwrite | Project-based EDL title, FCPXML event/project and Resolve sequence are confirmed in the saved exports (#105). Fixed filenames `timeline.*` and overwrite confirmation are the approved design. Revisioned export filenames remain outside this plan. |
+| UX 7 EDL preselection | Fixed by #105: FCPXML is the default; the export browser regression passed. |
+| UX 8 copy/FPS labels | Fixed by #103/#102. The Import retest shows “upload video files”, “4 sources loaded” and 59.94. The Manual scoring-step copy is covered by CI; not visible in this screenshot. |
+| UX 9 truncated Project names | Still open; the retest sidebar retains truncated names. |
+| UX 10 inconsistent sound default | Still open as task 6.3. |
+| UX 11 candidate badge contrast | Addressed by #106's light-theme badge checks; broad contrast judgement still benefits from human review. |
+
+Human checks H1 (real NLE import) and H2 (real iPhone HEVC/HDR originals), packaged-DMG playback and AI-provider execution remain unverified. The checked Phase 5 task records the retest and its limits; it does not close the later polish or human checks.

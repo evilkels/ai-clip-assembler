@@ -39,6 +39,7 @@ from .models import (
     VersionSet,
 )
 from .app_settings import get_settings
+from .assembly_profiles import PROFILE_DEFAULTS, capture_order_key
 from .pi_cli_harness import REPO_ROOT
 from .project_store import read_review_session, write_review_session
 from .review_state import review_context_fingerprint, sequence_fingerprint
@@ -453,6 +454,7 @@ async def run_review_turn(
     candidate_frames: Optional[List[dict]] = None,
     client_message_id: Optional[str] = None,
     library: Optional[List[dict]] = None,
+    capture_times: Optional[Dict[str, Optional[str]]] = None,
 ) -> dict:
     """Run one agent turn in propose mode.
 
@@ -462,6 +464,8 @@ async def run_review_turn(
     ``{"message", "proposal"}`` (``proposal`` is ``None`` for a chat-only turn).
     An agent script reads ``library``, the complete Candidate Clip library
     (``candidates`` may leave excluded clips out); it defaults to ``candidates``.
+    ``capture_times`` (clip_id → capture time) orders the deterministic
+    fallback Versions and is never sent to the model.
     """
     session = store.session(project_id)
     editor_message = None
@@ -541,7 +545,7 @@ async def run_review_turn(
     if validated_versions or not (source or operations):
         if not validated_versions:
             validated_versions = [
-                version.model_dump() for version in deterministic_versions(bounded_candidates)
+                version.model_dump() for version in deterministic_versions(bounded_candidates, capture_times)
             ]
         payload["version_set"] = VersionSet(
             version_set_id=uuid.uuid4().hex,
@@ -748,8 +752,16 @@ _FALLBACK_RECIPES = (
 )
 
 
-def deterministic_versions(candidates: List[dict]) -> List[CreativeVersion]:
-    """Build the backend-owned deterministic Manual/model-failure Versions."""
+def deterministic_versions(
+    candidates: List[dict], capture_times: Optional[Dict[str, Optional[str]]] = None
+) -> List[CreativeVersion]:
+    """Build the backend-owned deterministic Manual/model-failure Versions.
+
+    Clips are picked by score; a profile whose ordering is chronological then
+    plays them in shooting order. ``capture_times`` maps clip_id to the source's
+    capture time. It stays local: candidates are model input and carry no
+    capture time.
+    """
     usable = [
         candidate
         for candidate in candidates
@@ -767,9 +779,11 @@ def deterministic_versions(candidates: List[dict]) -> List[CreativeVersion]:
         key=lambda candidate: float(candidate.get("overall_score") or 0.0),
         reverse=True,
     )
+    capture_times = capture_times or {}
     versions = []
     for recipe in _FALLBACK_RECIPES:
         items = []
+        picked = []
         for index in range(recipe["count"]):
             candidate = ranked[index % len(ranked)]
             lower = float(candidate["start_sec"])
@@ -787,6 +801,19 @@ def deterministic_versions(candidates: List[dict]) -> List[CreativeVersion]:
                     speed=recipe["speed"],
                 )
             )
+            picked.append(candidate)
+        if PROFILE_DEFAULTS[recipe["profile"]]["ordering"] == "chronological":
+            order = sorted(
+                range(len(items)),
+                key=lambda i: capture_order_key(
+                    {
+                        "source_created_at": capture_times.get(str(picked[i]["clip_id"])),
+                        "file_name": picked[i]["file_name"],
+                        "start_sec": items[i].start_sec,
+                    }
+                ),
+            )
+            items = [items[i] for i in order]
         total = round(
             sum((item.end_sec - item.start_sec) / item.speed for item in items),
             1,

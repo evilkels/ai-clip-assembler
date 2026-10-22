@@ -75,7 +75,7 @@ FORMATS: dict[str, dict] = {
 MAX_SLOWMO_CLIPS = 2
 
 
-def _capture_order_key(clip: dict) -> tuple:
+def capture_order_key(clip: dict) -> tuple:
     """Sort key for chronological (shooting-order) assembly.
 
     Prefers the source file's capture time; falls back to the filename so
@@ -233,7 +233,7 @@ def build_draft_timeline(
     # profiles re-sort into shooting order — by true capture time when available,
     # falling back to filename so single-camera footage still sorts sensibly.
     if ordering != "score_desc":
-        selected.sort(key=_capture_order_key)
+        selected.sort(key=capture_order_key)
     return {
         "source": "draft",
         "profile": profile,

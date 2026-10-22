@@ -1251,6 +1251,14 @@ def _review_inputs(
     return candidates, candidate_frames, agent
 
 
+def _review_capture_times(project_id: str) -> dict:
+    """Capture time per Candidate Clip, for chronological fallback Versions only."""
+    return {
+        str(clip.get("clip_id")): clip.get("source_created_at")
+        for clip in enrich_clips_with_source_metadata(projects[project_id])
+    }
+
+
 async def _run_review_turn(
     project_id: str, user_message: str, client_message_id: Optional[str] = None
 ) -> dict:
@@ -1272,6 +1280,7 @@ async def _run_review_turn(
         client_message_id=client_message_id,
         # Scripts read the whole library, excluded clips included (Script API v1).
         library=get_mcp_server()._list_candidates(project_id),
+        capture_times=_review_capture_times(project_id),
     )
 
 
@@ -1351,6 +1360,7 @@ async def review_kickoff(project_id: str):
             agent=agent,
             record_user_message=False,
             candidate_frames=candidate_frames,
+            capture_times=_review_capture_times(project_id),
         )
 
 

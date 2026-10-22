@@ -1,0 +1,19 @@
+TITLE: clip-assembler-test-project-2026-10-10-retest
+FCM: NON-DROP FRAME
+
+* NOTE: EDL cannot represent Speed; it was flattened. Export FCPXML or Resolve XML to preserve it.
+
+001  AX       AA/V  C        00:00:00:00 00:00:03:00 00:00:00:00 00:00:03:00
+* FROM CLIP NAME: IMG_1022.mov
+
+002  AX       AA/V  C        00:00:00:00 00:00:08:59 00:00:03:00 00:00:11:59
+* FROM CLIP NAME: IMG_1023.mov
+
+003  AX       AA/V  C        00:00:08:59 00:00:11:59 00:00:11:59 00:00:14:59
+* FROM CLIP NAME: IMG_1023.mov
+
+004  AX       AA/V  C        00:00:00:00 00:00:08:00 00:00:14:59 00:00:22:59
+* FROM CLIP NAME: IMG_1028.mov
+
+005  AX       AA/V  C        00:00:00:00 00:00:09:59 00:00:22:59 00:00:32:58
+* FROM CLIP NAME: IMG_1029.mov

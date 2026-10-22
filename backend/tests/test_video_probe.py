@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.assembly_profiles import _capture_order_key
+from src.assembly_profiles import capture_order_key
 from src.models import VideoMetadata
 from src.video_probe import FFprobeUnavailableError, parse_ffprobe_metadata, probe_video
 
@@ -228,7 +228,7 @@ def test_capture_order_uses_quicktime_creationdate_instead_of_transfer_time():
             }
         )
 
-    assert [clip["file_name"] for clip in sorted(clips, key=_capture_order_key)] == [
+    assert [clip["file_name"] for clip in sorted(clips, key=capture_order_key)] == [
         "shot-1.mov",
         "shot-2.mov",
         "shot-3.mov",

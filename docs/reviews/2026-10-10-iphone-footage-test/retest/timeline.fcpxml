@@ -1,0 +1,37 @@
+<fcpxml version="1.10">
+  <resources>
+    <format id="r1" frameDuration="1001/60000s" width="1080" height="1920" />
+    <asset id="a1" name="IMG_1022.mov" start="0s" duration="587587/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10-retest/IMG_1022.mov" />
+    </asset>
+    <asset id="a2" name="IMG_1023.mov" start="0s" duration="797797/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10-retest/IMG_1023.mov" />
+    </asset>
+    <asset id="a3" name="IMG_1028.mov" start="0s" duration="1172171/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10-retest/IMG_1028.mov" />
+    </asset>
+    <asset id="a4" name="IMG_1029.mov" start="0s" duration="651651/60000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="file:///Users/kvertijs/Movies/clip-assembler-test-project-2026-10-10-retest/IMG_1029.mov" />
+    </asset>
+  </resources>
+  <library>
+    <event name="clip-assembler-test-project-2026-10-10-retest">
+      <project name="clip-assembler-test-project-2026-10-10-retest">
+        <sequence format="r1" tcStart="0s" tcFormat="NDF" audioLayout="stereo">
+          <spine>
+            <asset-clip name="IMG_1022.mov" ref="a1" offset="0s" start="0s" duration="180180/60000s" audioRole="dialogue" />
+            <asset-clip name="IMG_1023.mov" ref="a2" offset="180180/60000s" start="0s" duration="1080079/60000s" audioRole="dialogue">
+              <timeMap>
+                <timept time="0s" value="0s" />
+                <timept time="1080079/60000s" value="539539/60000s" />
+              </timeMap>
+            </asset-clip>
+            <asset-clip name="IMG_1023.mov" ref="a2" offset="1260259/60000s" start="539539/60000s" duration="180180/60000s" audioRole="dialogue" />
+            <asset-clip name="IMG_1028.mov" ref="a3" offset="1440439/60000s" start="0s" duration="480480/60000s" audioRole="dialogue" />
+            <asset-clip name="IMG_1029.mov" ref="a4" offset="1920919/60000s" start="0s" duration="599599/60000s" audioRole="dialogue" />
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

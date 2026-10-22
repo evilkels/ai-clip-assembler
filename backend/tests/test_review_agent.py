@@ -740,3 +740,43 @@ async def test_retry_resumes_an_incomplete_turn_without_duplicate_editor_message
     assert [message.message_id for message in store.session("p1").messages].count(
         message_id
     ) == 1
+
+
+def _iphone_candidates():
+    # Real 2026-10-10 iPhone footage: the best-scoring clip was shot last.
+    return [
+        {"clip_id": "c1029", "file_id": "IMG_1029.mov", "file_name": "IMG_1029.mov", "start_sec": 0.0, "end_sec": 10.0, "overall_score": 8.81},
+        {"clip_id": "c1023", "file_id": "IMG_1023.mov", "file_name": "IMG_1023.mov", "start_sec": 0.0, "end_sec": 9.0, "overall_score": 8.08},
+        {"clip_id": "c1022", "file_id": "IMG_1022.mov", "file_name": "IMG_1022.mov", "start_sec": 0.0, "end_sec": 3.0, "overall_score": 6.63},
+        {"clip_id": "c1028", "file_id": "IMG_1028.mov", "file_name": "IMG_1028.mov", "start_sec": 0.0, "end_sec": 8.0, "overall_score": 6.23},
+    ]
+
+
+def test_chronological_versions_play_in_shooting_order_and_punchy_stays_score_first():
+    capture_times = {
+        "c1022": "2026-10-10T09:48:28.000000Z",
+        "c1023": "2026-10-10T09:52:51.000000Z",
+        "c1028": "2026-10-10T10:33:23.000000Z",
+        "c1029": "2026-10-10T10:58:12.000000Z",
+    }
+
+    versions = {v.title: v for v in deterministic_versions(_iphone_candidates(), capture_times)}
+
+    assert [i.file_name for i in versions["Punchy Social Cut"].items] == [
+        "IMG_1029.mov", "IMG_1023.mov", "IMG_1022.mov", "IMG_1028.mov",
+    ]
+    # The three best clips, played in the order they were shot.
+    assert [i.file_name for i in versions["Cinematic Highlight"].items] == [
+        "IMG_1022.mov", "IMG_1023.mov", "IMG_1029.mov",
+    ]
+    assert [i.file_name for i in versions["Long Scenic"].items][:4] == [
+        "IMG_1022.mov", "IMG_1023.mov", "IMG_1028.mov", "IMG_1029.mov",
+    ]
+    for version in versions.values():
+        assert version.sequence_fingerprint == sequence_fingerprint(version.items)
+
+
+def test_chronological_versions_fall_back_to_file_name_without_capture_times():
+    versions = {v.title: v for v in deterministic_versions(_iphone_candidates())}
+
+    assert versions["Long Scenic"].items[0].file_name == "IMG_1022.mov"

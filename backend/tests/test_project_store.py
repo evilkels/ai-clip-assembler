@@ -699,3 +699,68 @@ def test_read_review_session_migrates_v1_bare_versions_without_rewriting(tmp_pat
     version_set = session.messages[0].payload["version_set"]
     assert version_set["versions"][0]["sequence_fingerprint"]
     assert path.read_text(encoding="utf-8") == raw
+
+
+@pytest.mark.parametrize("writer", ["manifest", "results", "frames", "review", "timeline"])
+@pytest.mark.parametrize("failure", ["partial_write", "fsync", "replace"])
+def test_interrupted_save_preserves_previous_file(monkeypatch, tmp_path, writer, failure):
+    from pathlib import Path
+    from src import project_store as store
+
+    folder = tmp_path / "footage"
+    folder.mkdir()
+    (folder / "source.mp4").touch()
+    manifest = store.create_project(folder)
+    writers = {
+        "manifest": (store.project_manifest_path(folder),
+                     lambda: store.write_project_manifest(folder, manifest)),
+        "results": (store.analysis_results_path(folder),
+                    lambda: store.write_analysis_results(
+                        folder, harness_id="manual", clips=[], timeline=None)),
+        "frames": (store.frame_scores_path(folder), lambda: store.write_frame_scores(folder, {})),
+        "review": (store.review_session_path(folder), lambda: store.write_review_session(
+            folder, ReviewSession(session_id="s", updated_at="now"))),
+        "timeline": (store.timeline_document_path(folder), lambda: store.write_timeline_document(
+            folder, TimelineDocument(items=[TimelineItem(
+                item_id="i", source_clip_id="c", start_sec=0, end_sec=3)]))),
+    }
+    path, save = writers[writer]
+    save()
+    previous = path.read_bytes()
+    real_open = Path.open
+    real_fdopen = store.os.fdopen
+
+    class InterruptedFile:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.stream.close()
+
+        def write(self, content):
+            self.stream.write(content[:5])
+            self.stream.flush()
+            raise OSError("interrupted write")
+
+    def interrupted_open(target, mode="r", *args, **kwargs):
+        stream = real_open(target, mode, *args, **kwargs)
+        return InterruptedFile(stream) if "w" in mode else stream
+
+    def fail(*args):
+        raise OSError("interrupted write")
+
+    with monkeypatch.context() as patch:
+        if failure == "partial_write":
+            patch.setattr(Path, "open", interrupted_open)
+            patch.setattr(store.os, "fdopen", lambda *args, **kwargs: InterruptedFile(
+                real_fdopen(*args, **kwargs)))
+        else:
+            patch.setattr(store.os, failure, fail)
+        with pytest.raises(OSError, match="interrupted write"):
+            save()
+    assert path.read_bytes() == previous
+    assert json.loads(path.read_text()) is not None
+    assert not list(path.parent.glob("*.tmp"))

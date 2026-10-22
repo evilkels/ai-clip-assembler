@@ -1,0 +1,9 @@
+**C5 PASS.** Verified at http://127.0.0.1:8769/ in my own tab. No remaining failures or blockers; nothing needed from you.
+
+- **390×844:** all 155 visible controls ≥44×44px; all 16 disclosures open; page width exactly 390px.
+- **1440×900:** all 159 visible controls ≥44×44px; all 16 disclosures open; page width exactly 1440px.
+- **Evidence preserved:** footer disclosure contains v0.4.0, ROADMAP, repo audit, Owner checks before tagging, and Draft v0.5.0 release notes. Each link is 44px high; widths range from 76.27–199.35px.
+- **Interaction verified:** Enter activates table link #91 and opens the correct PR disclosure at both widths. A click 1px below #92’s top edge also opens it. Footer disclosure toggles with Enter and Space.
+- **C1–C4/C6:** previous PASS results carried forward, not rerun.
+
+No source, tests, git, prior reports, or parent workspace accessed or changed. No GitHub mutations or nested agents.

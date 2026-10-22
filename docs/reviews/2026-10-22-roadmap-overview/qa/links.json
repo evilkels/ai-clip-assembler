@@ -65,7 +65,22 @@
     "pass": true
   },
   {
+    "url": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-10-iphone-footage-test.md",
+    "status": "200",
+    "pass": true
+  },
+  {
     "url": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md",
+    "status": "200",
+    "pass": true
+  },
+  {
+    "url": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#draft-v050-release-notes",
+    "status": "200",
+    "pass": true
+  },
+  {
+    "url": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#owner-checks-before-tagging",
     "status": "200",
     "pass": true
   },

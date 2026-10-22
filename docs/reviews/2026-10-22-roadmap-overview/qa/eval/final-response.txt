@@ -1,0 +1,11 @@
+Final review disposition
+
+Codex and Claude independently evaluated the first draft. Claude's verification round confirms every original content/accessibility must-fix resolved, with no unresolved factual or privacy issue. It added the table-title touch target issue; source-blind rounds 2–3 confirmed the original pill fix, then identified table PR links and the remaining inline evidence links.
+
+All table links and PR number links now meet 44x44px. The five prose evidence links were consolidated into the existing footer sources disclosure as full-size links. Their destinations remain available. Source-blind round 4 independently reports C5 PASS: 155 visible controls at 390px and 159 at 1440px, all disclosures open, all targets at least 44x44px; keyboard/deep-link and top-edge click proof passed. No unresolved must-fix remains. C1–C4/C6 passed in earlier rounds; nearby filter/overflow interactions were rerun after target changes.
+
+Other final polish: the phone track now uses one column; multi-item groups expose every item's delivery location; group status labels avoid singular/plural errors; decision choices are shorter while their full questions/details preserve meaning. The phone height stayed under the unchanged 8000px budget. Decorative animation was removed so captures show the settled track.
+
+Evidence: verification.json and page-check.txt give the final page hash, 7878px closed phone height, four page-check renders, ten WebKit checks, 44 working GitHub links, owner-only privacy result and repository checks. All four final page-check screenshots were inspected top to bottom. Final PR state is recorded in final-pr-status.json and was compared against the page data after reviews.
+
+No public tunnel, deployment, release, tag, product-source edit or real NLE/iPhone test was performed. The requested deliverable is the owner-only HTML page and its PR.

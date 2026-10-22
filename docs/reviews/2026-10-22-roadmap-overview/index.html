@@ -371,6 +371,13 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
 .delivery { display:block; font-size:13px; font-weight:500; color:var(--ink-soft); }
 .group .pills { align-content:center; }
 .group .pills .delivery { flex-basis:100%; }
+
+/* Standalone evidence links in the item table also need a complete touch target. */
+#rows a, a.num { display:inline-flex; align-items:center; min-block-size:44px; min-inline-size:44px; }
+
+footer { padding-block:40px 32px; }
+@media(max-width:640px) { .group { grid-template-columns:1fr; padding-block:8px; gap:4px; } section { padding-block-start:28px; } }
+noscript a { display:inline-flex; align-items:center; min-block-size:44px; min-inline-size:44px; }
 </style>
 </head>
 <body>
@@ -381,7 +388,7 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
   <header class="top">
     <span class="brand">AI Clip Assembler</span>
     <div class="top-meta"><span>Īpašnieka pārskats</span>
-      <span>Atjaunots <time data-updated datetime="2026-10-22T16:06:37.005Z">22. okt. 2026, 19:06</time></span>
+      <span>Atjaunots <time data-updated datetime="2026-10-22T16:20:09.512Z">22. okt. 2026, 19:20</time></span>
       <div class="theme" role="group" aria-label="Izskats">
         <button type="button" data-theme-choice="system" aria-pressed="true">Auto</button>
         <button type="button" data-theme-choice="light" aria-pressed="false">Gaišs</button>
@@ -394,7 +401,7 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
 <noscript><p>Darbu josla, statusu skaitļi, lēmumi, PR saraksts un tabula prasa JavaScript. <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md">Lasīt pilno roadmap</a> un <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md">repo auditu</a>.</p></noscript>
     <div class="hero" id="top-of-page">
       <h1>Ceļš līdz v1.0.0</h1>
-      <p class="lede">Kopš <a href="https://github.com/evilkels/ai-clip-assembler/releases/tag/v0.4.0">v0.4.0 izlaiduma 2026. gada 4. oktobrī</a> <strong>ir uzlabota pirmā montāža, eksports un iPhone materiālu apstrāde</strong>. Šīs izmaiņas jau ir <code>main</code> zarā, bet vēl nav nevienā izlaidumā. Nākamais ieteiktais izlaidums ir v0.5.0; pirms tā jānovērš auditā minētie datu saglabāšanas riski un tev jāpārbauda īstie materiāli, Final Cut Pro un Resolve. AI pieslēgšanas vednis un v1.0.0 vēl ir priekšā.</p>
+      <p class="lede">Kopš v0.4.0 izlaiduma 2026. gada 4. oktobrī <strong>ir uzlabota pirmā montāža, eksports un iPhone materiālu apstrāde</strong>. Šīs izmaiņas jau ir <code>main</code> zarā, bet vēl nav nevienā izlaidumā. Nākamais ieteiktais izlaidums ir v0.5.0; pirms tā jānovērš auditā minētie datu saglabāšanas riski un tev jāpārbauda darbs ar īstiem materiāliem un imports Final Cut Pro un Resolve. AI pieslēgšanas vednis un v1.0.0 vēl ir priekšā.</p>
       <p class="status-counts">Darba bloki kopā: <span data-count="items"></span>. Izlaisti: <span data-count="status:live"></span>; sagatavoti: <span data-count="status:built"></span>; iesākti: <span data-count="status:progress"></span>; gaida: <span data-count="status:waiting"></span>; plānoti: <span data-count="status:planned"></span>. Tie nav pabeigtu posmu vai testu skaitļi.</p>
       <ul class="legend" id="legend" aria-label="Statusu nozīme"></ul>
     </div>
@@ -405,14 +412,14 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
     <section id="decide" aria-labelledby="decide-h" data-nav="Lēmumi" data-count="decisions"><h2 id="decide-h">Ernesto, tava izvēle</h2><p class="intro">Atbildes glabājas tikai šajā pārlūkā. Kopē tās ziņā, kad esi gatavs; lapa neko nenosūta. S = stundas, M = dienas, L = nedēļa vai vairāk darba.</p><div id="decision-cards"></div><div class="card answer-bar" id="answer-bar"><p aria-live="polite" id="answer-count"></p><button type="button" class="primary" id="copy-answers"></button><button type="button" id="clear-answers"></button><textarea id="answer-text" readonly hidden aria-label="Atbildes kā teksts"></textarea></div></section>
 
     <section id="done" aria-labelledby="done-h" data-nav="Iegūts" ><h2 id="done-h">Kas jau mainījies</h2><p class="intro">Rezultāti pārbaudīti plānos un sapludinātajos PR. “Sagatavots” attiecas uz <code>main</code>; kvalitātes vērtējums un montāžas lietotņu testi nav aizstāti ar CI.</p><div class="outcomes">
-<article class="outcome"><h3>Pirmā montāža izmanto vairāk materiāla</h3><p>Vairāki nepārklājoši klipi no vienas stabilas epizodes, atsevišķas kvotas katram Source Video un saglabāta formāta maiņa.</p><details><summary>Mērījumi no 037</summary><p>Estepona: 5 → 13 Candidate Clips, mediāna 3 → 20 s, pārklājums 15 → 185 s. Detox: Medium 13 → 240 s; Long 10 → 333 s no 480 s mērķa. Tie ir plāna mērījumi, nevis šodien atkārtots kvalitātes tests.</p></details><div class="refs" data-refs="1"></div></article>
+<article class="outcome"><h3>Pirmā montāža izmanto vairāk materiāla</h3><p>Vairāki nepārklājoši klipi no vienas stabilas epizodes, atsevišķas kvotas katram Source Video un formāta maiņa tagad nonāk Timeline.</p><details><summary>Mērījumi no 037</summary><p>Estepona: 5 → 13 Candidate Clips, mediāna 3 → 20 s, pārklājums 15 → 185 s. Detox: Medium 13 → 240 s; Long 10 → 333 s no 480 s mērķa. Tie ir plāna mērījumi, nevis šodien atkārtots kvalitātes tests.</p></details><div class="refs" data-refs="1"></div></article>
 <article class="outcome"><h3>Eksports saglabā pašreizējo montāžu</h3><p>Tukša Timeline vairs neatdzīvina vecos klipus. FCPXML iziet 1.10 DTD struktūras pārbaudi; mediju saites ir absolūtas.</p><details><summary>Kas vēl jāpierāda</summary><p>032 cilvēka testi ir atvērti. Audits norāda uz jauktu avotu Resolve metadatiem un neizmantotu FCP resursu risku. Savietojamību drīkst solīt tikai pēc īsta importa.</p></details><div class="refs" data-refs="1b"></div></article>
 <article class="outcome wide"><h3>iPhone materiāli paliek pareizā secībā un kadrējumā</h3><p>Nominālais 59,94 kadri/s, uzņemšanas laiks, vertikāli Review un Timeline priekšskatījumi, eksports ar Project nosaukumu un precizēta Import norise.</p><details><summary>Redzēt retesta pierādījumu</summary><figure><img src="shots/01-review-portrait.png" width="850" height="650" alt="Review Suggested cuts ar vertikāliem iPhone klipiem un izvēlētu Short formātu"><figcaption><strong>Review.</strong> 10.10.2026 Electron retests, testa projekts, bez AI; saglabāts ar #107 (<code>1bacf0a</code>). Atskaņotājs rāda portreta kadrus pareizā formātā. Projekta josla ar personīgo mapes ceļu ir izgriezta. Šis attēls nepierāda AI kļūdu apstrādi; īsts HDR un NLE imports nav apliecināti. Vecais stāvoklis nav pievienots, jo nav salīdzināma, droši apgriezta pāra.</figcaption></figure></details><div class="refs" data-refs="1c"></div></article>
 <article class="outcome"><h3>Plāni rāda vienu darbu secību</h3><p>Roadmap, plānu indekss un produkta termini ir saskaņoti. Izlaistās v0.4.0 un <code>main</code> robeža ir pārbaudāma.</p><div class="refs" data-refs="v0.4.0 0"></div></article>
 <article class="outcome"><h3>Eksperiments un izpēte ir skaidri nodalīti</h3><p>#109 salabo tikai prototipa atsvaidzināšanu; #110 ir iOS izpēte. Audits nosauc atlikušos riskus un kandidāta pārbaudes.</p><div class="refs" data-refs="043 iOS audit"></div></article>
 </div></section>
 
-    <section id="fixed" aria-labelledby="fixed-h" data-nav="Riski" ><h2 id="fixed-h">Labojumi un atvērtie riski</h2><p class="intro">Ieraksti seko <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md">22.10.2026 auditam</a>. A = 8. oktobra audita punkts; N = 22. oktobra jaunais atradums. “Izlabots kodā” nenozīmē, ka īpašnieks jau pārbaudījis nākamo DMG.</p>
+    <section id="fixed" aria-labelledby="fixed-h" data-nav="Riski" ><h2 id="fixed-h">Labojumi un atvērtie riski</h2><p class="intro">Ieraksti seko 22.10.2026 auditam. A = 8. oktobra audita punkts; N = 22. oktobra jaunais atradums. “Izlabots kodā” nenozīmē, ka īpašnieks jau pārbaudījis nākamo DMG.</p>
 <details class="card"><summary>Izlabots kodā: eksports un iPhone plūsma</summary><h3>Iepriekš pastāvējušas kļūdas</h3><article class="fix pre-existing"><h4>Final Cut noraidīja XML, bet testi bija zaļi</h4><dl><dt>Iepriekšējā kļūda</dt><dd>#80 un 10.10. retests: <code>asset</code> struktūra neatbilda DTD.</dd><dt>Labojums</dt><dd>#100, <code>16b2593</code>: <code>media-rep</code>, resursu formāti un racionālie laiki.</dd><dt>Pārbaudīts</dt><dd>Plānā 032 fiksēti DTD/golden testi; audits min zaļu Tests run uz <code>2df0169</code>. Final Cut tests vēl jāveic.</dd></dl></article><article class="fix pre-existing"><h4>Suggested cuts neievēroja uzņemšanas secību</h4><dl><dt>Iepriekšējā kļūda</dt><dd>Retestā Cinematic Highlight un Long Scenic sāka ar visaugstāk novērtēto klipu, pat ja tas uzņemts pēdējais.</dd><dt>Labojums</dt><dd>#107, <code>2df0169</code>: hronoloģiskos griezumus kārto pēc capture time, tad klipa sākuma.</dd><dt>Pārbaudīts</dt><dd>PR un 042/5.1 retests ar saglabātu ierakstu; automātiskais Tests run uz šī merge ir zaļš. Daļai profilu saglabājas apzināta score-first atlase.</dd></dl></article></details>
 <details class="card"><summary>Atvērts: saglabāšana un uzticama nodošana</summary><ul class="evidence"><li>Audita N1 un A4: pārtraukta saglabāšana var sabojāt saglabāto projektu, un kļūda lietotājam netiek parādīta. Vispirms jānodrošina atomāra saglabāšana un atjaunošana.</li><li>A3/A8/A9/A12: rederive/rescan un novēlotas atbildes var sajaukt saglabāto stāvokli, projektu vai export receipt.</li><li>A10 un N2–N4: jauktu avotu Resolve metadati, nepareizas skaitļu robežas, nulles kadra eksports un nevajadzīgi FCP resursi prasa labojumus.</li><li>#84 paliek atvērts: grounded visual editing un thematic cut proposals; saistīts ar 4. posmu. #88 (Windows) un #89 (Linux) ir pēc v1.0.0.</li><li id="ai-audit-note">A5/A6/A11 vēl nevar saukt par izlabotiem <code>main</code> zarā, kamēr #101 nav sapludināts un pārbaudīts.</li></ul></details></section>
 
@@ -424,11 +431,11 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
 
     <section id="items" aria-labelledby="items-h" data-nav="Visi" data-count="items"><h2 id="items-h">Visi posmi un darba bloki</h2><p class="intro">Saglabāti roadmap numuri 0–7, arī 1b un 1c. Tabula ietver atsevišķus eksperimenta un dokumentu blokus; statuss aptver arī atvērtos cilvēka testus.</p><details class="all-items" id="all-items"><summary id="all-items-label"></summary><div class="filters" role="group" aria-label="Atlasīt pēc statusa" id="filters"></div><div class="table-wrap"><table><thead><tr><th scope="col">#</th><th scope="col">Darbs</th><th scope="col">Statuss</th><th scope="col" id="group-col">Posms</th><th scope="col">Kur tas ir</th></tr></thead><tbody id="rows"></tbody></table></div></details></section>
 
-    <section id="waiting" aria-labelledby="waiting-h" data-nav="Tālāk" ><h2 id="waiting-h">Nākamās darbības</h2><p class="intro">v0.5.0 ir audita ieteikums, nevis publicēts izlaidums. <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#owner-checks-before-tagging">Owner checks before tagging</a> un <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#draft-v050-release-notes">Draft v0.5.0 release notes</a> ir pilnais saraksts.</p><details class="card"><summary>Darbu secība un īpašnieka pārbaudes</summary><p>Kvadrātiekavās norādīts roadmap posms.</p><div class="waiting"><div><h3>Ieviešanas darbs</h3><ol><li>Pabeigt #101 un pārbaudīt precīzo sapludināto commit [2].</li><li>Novērst audita saglabāšanas un eksporta riskus; vēl nepieskaitīt citu aktīvo zaru darbu pie main.</li><li>Iziet CI un sagatavot abu Mac arhitektūru kandidāta DMG; tikai pēc īpašnieka pārbaudēm gatavot versijas maiņu un tagu.</li><li>Turpināt 3 → 4 → 5; 6 izmanto jau gatavo atlasītāju. 7 parakstīšanas darbu sākt laikus.</li></ol></div><div><h3>Ernesto</h3><ul><li>Iziet 037/H1 un 032/042 īsto materiālu un abu montāžas lietotņu testus [1, 1b, 1c].</li><li>Pārbaudīt save/reopen, rescan, ātrumu, skaņu, kadrējumu un īstu HEVC/HDR pirms v0.5.0.</li><li>Atbildēt uz sešiem lēmumiem; pirms 3. posma piegādes pieņemt Anthropic Commercial Terms (nodoms jau apstiprināts).</li><li>Pirms v0.5.0 uzstādīt kandidāta DMG tīrā arm64 un x64 Mac, pārbaudīt versiju un atjauninājuma paziņojumu. Ja #101 iekļauts, pārbaudīt AI kļūdas un datu robežu; pēc Final Cut testa atbildēt #80 ar lūgumu atkārtot pārbaudi.</li><li>Pirms 7. posma nodrošināt Apple dalību un notarizēta DMG pārbaudi. Sponsora saite un papildu testa materiāli paliek īpašnieka darbības ārpus koda.</li></ul></div></div></details>
+    <section id="waiting" aria-labelledby="waiting-h" data-nav="Tālāk" ><h2 id="waiting-h">Nākamās darbības</h2><p class="intro">v0.5.0 ir audita ieteikums, nevis publicēts izlaidums. Owner checks before tagging un Draft v0.5.0 release notes ir pilnais saraksts.</p><details class="card"><summary>Darbu secība un īpašnieka pārbaudes</summary><p>Kvadrātiekavās norādīts roadmap posms.</p><div class="waiting"><div><h3>Ieviešanas darbs</h3><ol><li>Pabeigt #101 un pārbaudīt precīzo sapludināto commit [2].</li><li>Novērst audita saglabāšanas un eksporta riskus; vēl nepieskaitīt citu aktīvo zaru darbu pie main.</li><li>Sagaidīt zaļu CI un sagatavot abu Mac arhitektūru kandidāta DMG; tikai pēc īpašnieka pārbaudēm gatavot versijas maiņu un tagu.</li><li>Turpināt 3. → 4. → 5. posmu; 6. posms izmanto jau gatavo atlasītāju. 7. posma parakstīšanas darbu sākt laikus.</li></ol></div><div><h3>Ernesto</h3><ul><li>Iziet 037/H1 un 032/042 īsto materiālu un abu montāžas lietotņu testus [1, 1b, 1c].</li><li>Pārbaudīt save/reopen, rescan, ātrumu, skaņu, kadrējumu un īstu HEVC/HDR pirms v0.5.0.</li><li>Atbildēt uz sešiem lēmumiem; pirms 3. posma piegādes pieņemt Anthropic Commercial Terms (nodoms jau apstiprināts).</li><li>Pirms v0.5.0 uzstādīt kandidāta DMG uz tīriem arm64 un x64 Mac datoriem, pārbaudīt versiju un atjauninājuma paziņojumu. Ja #101 iekļauts, pārbaudīt AI kļūdas un datu robežu; pēc Final Cut testa atbildēt #80 ar lūgumu atkārtot pārbaudi.</li><li>Pirms 7. posma nodrošināt Apple dalību un notarizēta DMG pārbaudi. Sponsora saite un papildu testa materiāli paliek īpašnieka darbības ārpus koda.</li></ul></div></div></details>
 <details class="card"><summary>Kur avoti atšķiras un ko vēl nesolām</summary><ul class="evidence"><li>032 nosaukums sola atveramu eksportu, bet cilvēka H1–H5 ir tukši un #80 atvērts. Tādēļ 1b ir “Gaida”.</li><li>042 vairāki sapludināti PR nav visa plāna beigas: 11/14, Phase 6 un abi cilvēka uzdevumi paliek.</li><li id="snapshot-difference">Audits fiksē 2df0169; #101 un #111 stāvoklis šajā lapā seko jaunākajai GitHub nolasīšanai, audits #111 nepiemin.</li><li>Roadmap 4. posma nosaukums paliek spēkā; Versions noņemšana joprojām ir īpašnieka jautājums. Atskaņotāju paredzēts paturēt kā Proposal Preview.</li><li>#108 eksperimentam īpašnieks devis vietu pirms v1.0.0, bet tas nav ierakstīts roadmap 0–7 tabulā. #109 nav šī eksperimenta piegāde.</li><li>Native iOS memo un OKF dokumentu profils nav lietotnes funkcijas. Runtime tools daļa bija jau v0.4.0; v1.0.0 uzticamības solījums vēl nav izpildīts.</li></ul></details></section>
   </main>
 
-  <footer><p>Avots: <a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md">docs/ROADMAP.md</a>, saskaņots 08.10.2026; lasīts no <code>be95328</code> un salīdzināts ar <code>origin/main</code> 22.10.2026 (atšķirību nebija). Pārbaudīti PR, issues un <code>git log v0.4.0..origin/main</code>; jaunā izlaiduma vai produkcijas pārbaude nav veikta.</p><details><summary>Plāni un pierādījumi</summary><ul class="link-list"><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md">0 · Baseline</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/037-extraction-quality.md">1 · A first cut worth keeping, without AI</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/032-valid-fcpxml-and-nle-verification.md">1b · Exports that open</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/042-iphone-footage.md">1c · iPhone footage end to end</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md">2 · Honest AI errors</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md">3 · Connect Claude or ChatGPT</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/review-visual-editing.md">4 · The AI edits like a Resolve console</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/039-story.md">5 · Story in the edit</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/019-clip-library-generation-and-expansion.md">6 · Find more clips</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/033-in-app-updates-and-a-trusted-build.md">7 · Trusted release</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/043-remote-prototype-refresh.md">043 · Remote View prototype refresh stability</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md">audit · Repo audit 2026-10-22</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/feat/remote-view/docs/plans/041-remote-view.md">041 · Remote View (draft zars)</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-10-iphone-footage-test.md">iPhone retesta pilnais ieraksts</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/actions/runs/39805366014">Audita minētais CI uz 2df0169</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/80">#80 · Final Cut importa retests</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/84">#84 · Grounded visual editing</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/88">#88 · Windows</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/89">#89 · Linux</a></li></ul></details><p>Īpašnieka vajadzībām. Nav analītikas vai ārēju resursu; atbildes paliek pārlūkā. Ja plāns un pārbaudāmais ieraksts atšķiras, lapa seko ierakstam un to pasaka. Laiks: Europe/Riga.</p></footer>
+  <footer><p>Avots: docs/ROADMAP.md, saskaņots 08.10.2026; lasīts no <code>be95328</code> un salīdzināts ar <code>origin/main</code> 22.10.2026 (atšķirību nebija). Pārbaudīti PR, issues un <code>git log v0.4.0..origin/main</code>; jaunā izlaiduma vai produkcijas pārbaude nav veikta.</p><details><summary>Plāni un pierādījumi</summary><ul class="link-list"><li><a href="https://github.com/evilkels/ai-clip-assembler/releases/tag/v0.4.0">v0.4.0 · izlaists 04.10.2026</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#owner-checks-before-tagging">Owner checks before tagging</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md#draft-v050-release-notes">Draft v0.5.0 release notes</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/ROADMAP.md">0 · Baseline</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/037-extraction-quality.md">1 · A first cut worth keeping, without AI</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/032-valid-fcpxml-and-nle-verification.md">1b · Exports that open</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/042-iphone-footage.md">1c · iPhone footage end to end</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md">2 · Honest AI errors</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/038-ai-connection.md">3 · Connect Claude or ChatGPT</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/review-visual-editing.md">4 · The AI edits like a Resolve console</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/039-story.md">5 · Story in the edit</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/019-clip-library-generation-and-expansion.md">6 · Find more clips</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/033-in-app-updates-and-a-trusted-build.md">7 · Trusted release</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/plans/043-remote-prototype-refresh.md">043 · Remote View prototype refresh stability</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md">audit · Repo audit 2026-10-22</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/feat/remote-view/docs/plans/041-remote-view.md">041 · Remote View (draft zars)</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-10-iphone-footage-test.md">iPhone retesta pilnais ieraksts</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/actions/runs/39805366014">Audita minētais CI uz 2df0169</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/80">#80 · Final Cut importa retests</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/84">#84 · Grounded visual editing</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/88">#88 · Windows</a></li><li><a href="https://github.com/evilkels/ai-clip-assembler/issues/89">#89 · Linux</a></li></ul></details><p>Īpašnieka vajadzībām. Nav analītikas vai ārēju resursu; atbildes paliek pārlūkā. Ja plāns un pārbaudāmais ieraksts atšķiras, lapa seko ierakstam un to pasaka. Laiks: Europe/Riga.</p></footer>
   </div>
 </div>
 </div>
@@ -553,6 +560,9 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
       "prs": [
         91,
         92,
+        93,
+        94,
+        95,
         96,
         97,
         98
@@ -733,7 +743,7 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
         112
       ],
       "planUrl": "https://github.com/evilkels/ai-clip-assembler/blob/main/docs/reviews/2026-10-22-repo-audit.md",
-      "delivery": "Audita dokuments main"
+      "delivery": "Dokuments main"
     }
   ],
   "prs": [
@@ -814,9 +824,9 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
       "deletions": 0,
       "changedFiles": 1,
       "checks": {
-        "passed": 0,
+        "passed": 1,
         "failed": 0,
-        "pending": 1,
+        "pending": 0,
         "skipped": 0
       },
       "failedChecks": []
@@ -1253,9 +1263,9 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
       "ifNothing": "1b un #80 nevar saņemt īsta importa apstiprinājumu.",
       "detail": "032/H1–H3 plānā minēts 90 dienu izmēģinājums vai aizņemts Mac; pieejamību pārbaudi pirms lietošanas. Pieraksti Final Cut un lietotnes versiju. DTD pārbaude viena pati neapliecina mediju, skaņas, ātruma un kadrējuma atbilstību.",
       "options": [
-        "Pārbaudīšu savā Mac",
-        "Pārbaudīšu izmēģinājuma iespēju",
-        "Nodrošināšu citu Mac"
+        "Mans Mac",
+        "Izmēģinājums",
+        "Cits Mac"
       ]
     },
     {
@@ -1265,11 +1275,11 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
       "risk": "high",
       "size": "M",
       "ifNothing": "v0.5.0 nedrīkst vēl marķēt kā gatavu.",
-      "detail": "2026-10-22 auditā: pēc bloķējošo labojumu pārbaudes uzstādīt kandidāta DMG tīrā arm64 un x64 Mac, pārbaudīt lietotnes/backend versiju un atjauninājuma paziņojumu; iziet īstu drone/iPhone H.264 un HEVC/HDR materiālu, save/reopen, Final Cut un Resolve importa, pārvietotas mapes un Lua/keyboard testus. Ja #101 ir izlaidumā, pārbaudīt nepieejamu Provider, usage limit, sign-in un tīkla kļūdas, saglabātus agrākos ieteikumus un atļauto nosūtāmo datu kopu. Pēc Final Cut testa atbildēt #80 ar pārbaudītā izlaiduma norādi un lūgumu retestēt. Šī atbilde nepalaiž tagošanu.",
+      "detail": "2026-10-22 auditā: pēc bloķējošo labojumu pārbaudes uzstādīt kandidāta DMG uz tīriem arm64 un x64 Mac datoriem, pārbaudīt lietotnes/backend versiju un atjauninājuma paziņojumu; pārbaudīt ar īstu drona/iPhone H.264 un HEVC/HDR materiālu, save/reopen, Final Cut un Resolve importa, pārvietotas mapes un Lua/keyboard testus. Ja #101 ir izlaidumā, pārbaudīt nepieejamu Provider, usage limit, sign-in un tīkla kļūdas, saglabātus agrākos ieteikumus un atļauto nosūtāmo datu kopu. Pēc Final Cut testa atbildēt #80 ar pārbaudītā izlaiduma norādi un lūgumu retestēt. Izvēle šajā lapā neizveido izlaidumu vai tagu.",
       "options": [
-        "Ieplānošu pārbaudes",
+        "Ieplānošu",
         "Vēlāk",
-        "Vajadzīga palīdzība sagatavošanā"
+        "Vajag palīdzību"
       ]
     },
     {
@@ -1281,7 +1291,7 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
       "ifNothing": "Parakstīšana un notarizācija paliek bloķēta.",
       "detail": "033/H1 un roadmap paredz īpašnieka dalību: plānā norādīti 99 USD gadā, cenu pārbaudi reģistrējoties. Sertifikāti un CI konfigurācija nāk pēc tam.",
       "options": [
-        "Nodrošināšu pirms 7. posma",
+        "Nodrošināšu",
         "Vēlāk",
         "Jāapspriež"
       ]
@@ -1427,7 +1437,7 @@ html:not(.js) :is(.status-counts,#decide,#prs,#items,#track) { display:none; }
   const groupBar = (g, inGroup) => {
     const counts = Object.keys(statuses).map((k) => [k, inGroup.filter((t) => t.status === k).length]).filter(([, n]) => n);
     return `<a class="bar" href="#items" data-show-group="${esc(g.id)}"><span class="segs">${counts.map(([k, n]) => `<span class="s-${slug(k)}" style="flex:${n};background:var(--dot)"></span>`).join("")}</span>` +
-      `<small>${inGroup.length} ${esc(itemWord(inGroup.length))}: ${counts.map(([k, n]) => `${n} ${esc(statuses[k].label)}`).join(", ")}${inGroup.length===1 && inGroup[0].delivery ? `<span class="delivery">${esc(inGroup[0].delivery)}</span>` : ""}</small></a>`;
+      `<small>${inGroup.length} ${esc(itemWord(inGroup.length))}: ${counts.map(([k, n]) => `${esc(statuses[k].label)}: ${n}`).join(", ")}${inGroup.filter(t=>t.delivery).map(t=>`<span class="delivery">${inGroup.length>1 ? esc(t.id)+": " : ""}${esc(t.delivery)}</span>`).join("")}</small></a>`;
   };
   let i = 0;
   const track = $("track");

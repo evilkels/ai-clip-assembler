@@ -23,7 +23,7 @@ from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
 from typing import Awaitable, Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .models import TimelineDocument, TimelineItem, Transform
 
@@ -128,6 +128,24 @@ def _require_source(sources: Sources, clip_id: str) -> SourceClip:
     return source
 
 
+def _finite_number(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TimelineOpError(f"{field} must be a finite number")
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise TimelineOpError(f"{field} must be finite") from exc
+    if not math.isfinite(number):
+        raise TimelineOpError(f"{field} must be finite")
+    return number
+
+
+def _item_index(value: object, field: str, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+        raise TimelineOpError(f"{field} must be an integer in [0, {maximum}]")
+    return value
+
+
 # --- operations -------------------------------------------------------------
 #
 # Each handler mutates its owned ``doc`` in place and returns it.
@@ -143,6 +161,8 @@ def _add_item(
     at_index: Optional[int] = None,
 ) -> TimelineDocument:
     source = _require_source(sources, source_clip_id)
+    if at_index is not None:
+        at_index = _item_index(at_index, "at_index", len(doc.items))
     item = TimelineItem(
         item_id=_new_item_id(),
         source_clip_id=source_clip_id,
@@ -167,6 +187,7 @@ def _split_item(
 ) -> TimelineDocument:
     index = _find_index(doc, item_id)
     item = doc.items[index]
+    at_sec = _finite_number(at_sec, "at_sec")
     if not (item.start_sec < at_sec < item.end_sec):
         raise TimelineOpError(
             f"split point {at_sec} must lie strictly within "
@@ -189,6 +210,8 @@ def _set_bounds(
     index = _find_index(doc, item_id)
     item = doc.items[index]
     source = _require_source(sources, item.source_clip_id)
+    start_sec = _finite_number(start_sec, "start_sec")
+    end_sec = _finite_number(end_sec, "end_sec")
     clamped_start = max(0.0, start_sec)
     clamped_end = min(source.source_duration_sec, end_sec)
     if clamped_end <= clamped_start:
@@ -204,10 +227,7 @@ def _set_bounds(
 
 def _reorder(doc: TimelineDocument, sources: Sources, *, item_id: str, to_index: int) -> TimelineDocument:
     index = _find_index(doc, item_id)
-    if not (0 <= to_index < len(doc.items)):
-        raise TimelineOpError(
-            f"to_index {to_index} out of range [0, {len(doc.items) - 1}]"
-        )
+    to_index = _item_index(to_index, "to_index", len(doc.items) - 1)
     item = doc.items.pop(index)
     doc.items.insert(to_index, item)
     return doc
@@ -215,6 +235,7 @@ def _reorder(doc: TimelineDocument, sources: Sources, *, item_id: str, to_index:
 
 def _set_speed(doc: TimelineDocument, sources: Sources, *, item_id: str, speed: float) -> TimelineDocument:
     index = _find_index(doc, item_id)
+    speed = _finite_number(speed, "speed")
     if speed <= 0:
         raise TimelineOpError("speed must be > 0")
     doc.items[index] = doc.items[index].model_copy(update={"speed": speed})
@@ -224,8 +245,10 @@ def _set_speed(doc: TimelineDocument, sources: Sources, *, item_id: str, speed: 
 def _set_transform(doc: TimelineDocument, sources: Sources, *, item_id: str, transform) -> TimelineDocument:
     index = _find_index(doc, item_id)
     try:
-        resolved = transform if isinstance(transform, Transform) else Transform.model_validate(transform)
-    except Exception as exc:  # pydantic ValidationError → uniform op error
+        resolved = Transform.model_validate(
+            transform.model_dump() if isinstance(transform, Transform) else transform
+        )
+    except ValidationError as exc:  # pydantic ValidationError → uniform op error
         raise TimelineOpError(f"invalid transform: {exc}") from exc
     doc.items[index] = doc.items[index].model_copy(update={"transform": resolved})
     return doc
@@ -254,6 +277,8 @@ def _reset_decision(doc: TimelineDocument, sources: Sources, *, clip_id: str) ->
 
 
 def _set_profile(doc: TimelineDocument, sources: Sources, *, profile: Optional[str]) -> TimelineDocument:
+    if profile is not None and not isinstance(profile, str):
+        raise TimelineOpError("profile must be a string or null")
     doc.profile = profile
     return doc
 
@@ -261,8 +286,10 @@ def _set_profile(doc: TimelineDocument, sources: Sources, *, profile: Optional[s
 def _set_target_duration(
     doc: TimelineDocument, sources: Sources, *, target_duration_sec: Optional[float]
 ) -> TimelineDocument:
-    if target_duration_sec is not None and target_duration_sec <= 0:
-        raise TimelineOpError("target_duration_sec must be > 0")
+    if target_duration_sec is not None:
+        target_duration_sec = _finite_number(target_duration_sec, "target_duration_sec")
+        if target_duration_sec <= 0:
+            raise TimelineOpError("target_duration_sec must be > 0")
     doc.target_duration_sec = target_duration_sec
     return doc
 
@@ -281,15 +308,13 @@ def _replace_timeline(
             source_clip_id = spec["source_clip_id"]
             requested_start = spec["start_sec"]
             requested_end = spec["end_sec"]
-            start_value = float(requested_start)
-            end_value = float(requested_end)
-            speed = float(spec.get("speed", 1.0))
+            start_value = _finite_number(requested_start, f"items[{index}].start_sec")
+            end_value = _finite_number(requested_end, f"items[{index}].end_sec")
+            speed = _finite_number(spec.get("speed", 1.0), f"items[{index}].speed")
         except (KeyError, TypeError, ValueError) as exc:
             raise TimelineOpError(f"invalid item {index}: {exc}") from exc
         if not isinstance(source_clip_id, str) or not source_clip_id:
             raise TimelineOpError(f"item {index} source_clip_id must be a non-empty string")
-        if not all(math.isfinite(value) for value in (start_value, end_value, speed)):
-            raise TimelineOpError(f"item {index} bounds and speed must be finite")
         source = _require_source(sources, source_clip_id)
         start = max(0.0, start_value)
         end = min(source.source_duration_sec, end_value)
@@ -372,6 +397,7 @@ def apply_operation_in_place(
 
 
 OnChange = Callable[[TimelineDocument], Awaitable[None]]
+Persist = Callable[[TimelineDocument], None]
 
 
 class TimelineController:
@@ -380,8 +406,9 @@ class TimelineController:
     ``apply`` / ``undo`` / ``redo`` each run under a per-project async write lock
     that serializes the whole mutate-and-notify critical section, so two writers
     (the GUI and an external agent) cannot interleave mid-operation. After every
-    state change the optional ``on_change`` hook fires under the same lock — this
-    is where A2 wires persistence + the SSE ``timeline-changed`` event.
+    transition is saved through ``persist`` before live state or history changes.
+    The optional ``on_change`` hook then fires under the same lock to publish the
+    SSE ``timeline-changed`` event.
     """
 
     def __init__(
@@ -391,11 +418,13 @@ class TimelineController:
         *,
         history_limit: int = DEFAULT_HISTORY_LIMIT,
         on_change: Optional[OnChange] = None,
+        persist: Optional[Persist] = None,
     ) -> None:
         self._document = document
         self._sources = sources
         self._history_limit = history_limit
         self._on_change = on_change
+        self._persist = persist
         self._undo: List[TimelineDocument] = []
         self._redo: List[TimelineDocument] = []
         self._lock = asyncio.Lock()
@@ -441,11 +470,17 @@ class TimelineController:
         Caller must already hold ``self._lock`` and must ``await self._notify()``
         once afterwards, so a transition is exactly one revision + one event.
         """
-        stamped = new_document.model_copy(update={"revision": self._next_revision()})
+        stamped = self._save_next_revision(new_document)
         self._push_undo(self._document)
         self._document = stamped
         if clear_redo:
             self._redo.clear()
+        return stamped
+
+    def _save_next_revision(self, document: TimelineDocument) -> TimelineDocument:
+        stamped = document.model_copy(update={"revision": self._next_revision()})
+        if self._persist is not None:
+            self._persist(stamped)
         return stamped
 
     async def apply(
@@ -497,11 +532,12 @@ class TimelineController:
             self._check_revision(expected_revision)
             if not self._undo:
                 return self._document
+            restored = self._save_next_revision(self._undo[-1])
             self._redo.append(self._document)
-            restored = self._undo.pop()
+            self._undo.pop()
             # Restore prior *content* but advance the revision: a counter that
             # rewound would falsely read as a base another writer already saw.
-            self._document = restored.model_copy(update={"revision": self._next_revision()})
+            self._document = restored
             await self._notify()
             return self._document
 
@@ -509,9 +545,10 @@ class TimelineController:
         async with self._lock:
             if not self._redo:
                 return self._document
+            restored = self._save_next_revision(self._redo[-1])
             self._push_undo(self._document)
-            restored = self._redo.pop()
-            self._document = restored.model_copy(update={"revision": self._next_revision()})
+            self._redo.pop()
+            self._document = restored
             await self._notify()
             return self._document
 

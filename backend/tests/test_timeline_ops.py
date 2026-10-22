@@ -840,3 +840,62 @@ def test_nested_seeded_item_ids_restore_the_outer_seed():
     assert inner == uuid.uuid5(_ITEM_ID_NAMESPACE, "inner:0").hex
     # The outer sequence resumes where it left off rather than restarting.
     assert second == uuid.uuid5(_ITEM_ID_NAMESPACE, "outer:1").hex
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+@pytest.mark.parametrize("operation,field,args", [
+    ("set_speed", "speed", {"item_id": "item-1"}),
+    ("set_bounds", "start_sec", {"item_id": "item-1", "end_sec": 5}),
+    ("set_bounds", "end_sec", {"item_id": "item-1", "start_sec": 2}),
+    ("split_item", "at_sec", {"item_id": "item-1"}),
+    ("set_target_duration", "target_duration_sec", {}),
+    ("set_profile", "profile", {}),
+    ("set_transform", "scale", {"item_id": "item-1"}),
+    ("set_transform", "x", {"item_id": "item-1"}),
+    ("set_transform", "y", {"item_id": "item-1"}),
+])
+def test_operations_reject_non_finite_values_before_mutation(value, operation, field, args):
+    from src.timeline_ops import apply_operation_in_place
+
+    document = TimelineDocument(items=[make_item()])
+    previous = document.model_dump()
+    arguments = {**args, **({"transform": {field: value}} if operation == "set_transform"
+                           else {field: value})}
+    sources = make_sources(("clip-a", 2, 5, 10))
+    for apply in (apply_operation, apply_operation_in_place):
+        with pytest.raises(TimelineOpError, match=field):
+            apply(document, sources, operation, **arguments)
+        assert document.model_dump() == previous
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+@pytest.mark.parametrize("field", ["start_sec", "end_sec", "speed", "scale", "x", "y", "target_duration_sec"])
+def test_timeline_models_reject_values_that_cannot_round_trip(field, value):
+    payload = TimelineDocument(items=[make_item()]).model_dump()
+    if field == "target_duration_sec":
+        payload[field] = value
+    elif field in ("scale", "x", "y"):
+        payload["items"][0]["transform"][field] = value
+    else:
+        payload["items"][0][field] = value
+    with pytest.raises(ValidationError, match=field):
+        TimelineDocument.model_validate(payload)
+
+
+@pytest.mark.parametrize("operation,field,args", [
+    ("set_target_duration", "target_duration_sec", {"target_duration_sec": 0}),
+    ("set_target_duration", "target_duration_sec", {"target_duration_sec": -1}),
+    ("set_speed", "speed", {"item_id": "item-1", "speed": "NaN"}),
+    ("set_speed", "speed", {"item_id": "item-1", "speed": True}),
+    ("set_bounds", "end_sec", {"item_id": "item-1", "start_sec": 2, "end_sec": "Infinity"}),
+    ("reorder", "to_index", {"item_id": "item-1", "to_index": 0.5}),
+    ("add_item", "at_index", {"source_clip_id": "clip-a", "at_index": -1}),
+])
+def test_operations_reject_out_of_domain_numbers(operation, field, args):
+    from src.timeline_ops import apply_operation_in_place
+
+    document = TimelineDocument(items=[make_item()])
+    previous = document.model_dump()
+    with pytest.raises(TimelineOpError, match=field):
+        apply_operation_in_place(document, make_sources(("clip-a", 2, 5, 10)), operation, **args)
+    assert document.model_dump() == previous

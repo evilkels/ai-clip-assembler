@@ -6,6 +6,7 @@ timeline assembly, and editor export files.
 """
 
 import asyncio
+from copy import deepcopy
 import json
 import logging
 import os
@@ -21,7 +22,7 @@ from typing import List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 # Load repo-root .env before harness imports: PI_* are read at import time.
@@ -58,6 +59,7 @@ from .project_store import (
     NoSourceVideosFoundError,
     ProjectFolderNotWritableError,
     ProjectNotFoundError,
+    ProjectSaveError,
     ProjectStoreError,
     UnsafeProjectFolderError,
     create_or_open_project as create_or_open_folder_project,
@@ -105,6 +107,13 @@ app = FastAPI(
     version=APP_VERSION,
     description="Local-first video analysis and AI clip assembly backend",
 )
+
+
+@app.exception_handler(ProjectSaveError)
+async def project_save_error(_request: Request, exc: ProjectSaveError):
+    logger.warning("%s", exc)
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -759,7 +768,6 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
         if file_id not in analyzed_file_ids
     }
     merged_frame_scores.update(pipeline.per_file_frames)
-    projects[project_id]["frame_scores"] = {"per_file": merged_frame_scores}
     if projects[project_id].get("project_folder"):
         write_frame_scores(Path(projects[project_id]["project_folder"]), merged_frame_scores)
     finalized = _finalize_clip_set(
@@ -769,6 +777,7 @@ def run_analysis_pipeline(project_id: str, request: AnalysisRequest) -> dict:
             request.harness_id, pipeline.per_video_metadata
         ),
         preserve_manual_timeline=True,
+        frame_scores={"per_file": merged_frame_scores},
     )
     ranked_clips = finalized["clips"]
     effective_harness = projects[project_id]["harness_id"]
@@ -811,20 +820,27 @@ def _finalize_clip_set(
     *,
     effective_harness_id: str,
     preserve_manual_timeline: bool,
+    frame_scores: Optional[dict] = None,
 ) -> dict:
+    working = {**projects[project_id], "clips": deepcopy(projects[project_id].get("clips", []))}
+    if frame_scores is not None:
+        working["frame_scores"] = frame_scores
     finalized = analysis_service.finalize_clip_set(
-        projects[project_id],
+        working,
         per_file_results,
         preserve_manual_timeline=preserve_manual_timeline,
         enrich_clips=enrich_clips_with_source_metadata,
     )
-    ranked_clips = finalized["clips"]
-    projects[project_id]["clips"] = ranked_clips
-    projects[project_id]["timeline"] = finalized["timeline"]
-    projects[project_id]["harness_id"] = effective_harness_id
-    projects[project_id]["generation_stats"] = finalized["generation_stats"]
+    updates = {
+        "clips": finalized["clips"],
+        "timeline": finalized["timeline"],
+        "harness_id": effective_harness_id,
+        "generation_stats": finalized["generation_stats"],
+    }
+    if frame_scores is not None:
+        updates["frame_scores"] = frame_scores
+    persist_project_results(project_id, updates=updates)
     invalidate_timeline_controller(project_id)
-    persist_project_results(project_id)
     return finalized
 
 
@@ -843,7 +859,7 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
 
     resolved_clips = resolve_timeline_clips(project, request.clips)
     total_duration_sec = round(sum(clip["duration_sec"] for clip in resolved_clips), 3)
-    project["timeline"] = {
+    timeline = {
         "source": "manual",
         "clips": resolved_clips,
         "decisions": request.decisions,
@@ -851,8 +867,8 @@ async def update_timeline(project_id: str, request: TimelineUpdateRequest):
         "target_duration_sec": request.target_duration_sec,
         "total_duration_sec": total_duration_sec,
     }
+    persist_project_results(project_id, updates={"timeline": timeline})
     invalidate_timeline_controller(project_id)
-    persist_project_results(project_id)
     return {
         "project_id": project_id,
         "clips": resolved_clips,
@@ -916,8 +932,8 @@ async def regenerate_draft(project_id: str, request: DraftRequest):
             status_code=409,
             detail=_revision_conflict_detail(project_id, exc, controller),
         ) from exc
+    # The authoritative Timeline Document was saved by apply_batch above.
     project["timeline"] = timeline
-    persist_project_results(project_id)
     return {
         "project_id": project_id,
         "profile": profile,
@@ -1068,14 +1084,10 @@ def _initial_timeline_document(project: dict, sources: dict[str, SourceClip]) ->
 
 
 def _write_timeline_for_project(project: dict, document: TimelineDocument) -> None:
-    project["timeline_document"] = document.model_dump()
     folder = project.get("project_folder")
     if folder:
-        try:
-            write_timeline_document(Path(folder), document)
-        except OSError as exc:
-            project_id = project.get("project_id", "unknown")
-            logger.warning("Could not persist timeline document for %s: %s", project_id, exc)
+        write_timeline_document(Path(folder), document)
+    project["timeline_document"] = document.model_dump()
 
 
 _timeline_lifecycle = TimelineLifecycle(
@@ -1769,24 +1781,25 @@ def ensure_export_can_write(file_path: Path, overwrite: bool) -> None:
         )
 
 
-def persist_project_results(project_id: str) -> None:
+def persist_project_results(project_id: str, *, updates: Optional[dict] = None) -> None:
     """Write clips + timeline to <project>/clipassembler/analysis/results.json
-    so re-opening a folder project restores the Review Board. No-op for
-    legacy upload projects, which have no folder to persist into."""
+    so re-opening a folder project restores the Review Board. Apply pending
+    in-memory updates only after saving; upload projects only update memory."""
     project = projects.get(project_id)
-    if not project or not project.get("project_folder"):
+    if project is None:
         return
-    try:
+    pending = {**project, **(updates or {})}
+    if pending.get("project_folder"):
         write_analysis_results(
-            Path(project["project_folder"]),
-            harness_id=project.get("harness_id") or "manual",
-            clips=project.get("clips", []),
-            timeline=project.get("timeline"),
-            generation_stats=project.get("generation_stats"),
-            ai_scoring=project.get("ai_scoring"),
+            Path(pending["project_folder"]),
+            harness_id=pending.get("harness_id") or "manual",
+            clips=pending.get("clips", []),
+            timeline=pending.get("timeline"),
+            generation_stats=pending.get("generation_stats"),
+            ai_scoring=pending.get("ai_scoring"),
         )
-    except OSError as exc:
-        logger.warning("Could not persist analysis results for %s: %s", project_id, exc)
+    if updates:
+        project.update(updates)
 
 
 def project_work_dir(project_id: str) -> Path:

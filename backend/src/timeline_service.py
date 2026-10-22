@@ -96,7 +96,8 @@ class TimelineLifecycle:
             controller = TimelineController(
                 document,
                 sources,
-                on_change=self._make_on_change(project_id),
+                persist=lambda document: self._document_writer(project, document),
+                on_change=self._broker.publisher(project_id),
             )
             self._controllers[project_id] = controller
         else:
@@ -127,15 +128,3 @@ class TimelineLifecycle:
 
     def unsubscribe(self, project_id: str, queue: "asyncio.Queue[dict]") -> None:
         self._broker.unsubscribe(project_id, queue)
-
-    def _make_on_change(self, project_id: str) -> OnChange:
-        async def on_change(document: TimelineDocument) -> None:
-            project = self._project_lookup(project_id)
-            if project is not None:
-                self._document_writer(project, document)
-            await self._broker.publish(
-                project_id,
-                {"type": TIMELINE_CHANGED, "version": document.version},
-            )
-
-        return on_change

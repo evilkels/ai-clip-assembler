@@ -3566,3 +3566,105 @@ def test_enrich_clips_refreshes_capture_time_from_source_metadata():
 
     assert clips[0]["source_created_at"] == "2026-10-10T10:58:12.000000Z"
     assert clips[1]["source_created_at"] == "2026-10-10T16:02:53.000000Z"
+
+
+@pytest.mark.parametrize("operation", ["set_speed", "undo", "redo", "batch"])
+def test_timeline_save_failure_returns_error_and_preserves_state(monkeypatch, tmp_path, operation):
+    from src import project_store
+
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+    initial = _op(client, project_id, "include", clip_id="clip-1").json()["document"]
+    item_id = initial["items"][0]["item_id"]
+    if operation == "redo":
+        client.post(f"/projects/{project_id}/timeline/undo")
+    before = client.get(f"/projects/{project_id}/timeline/document").json()
+    saved = project_store.timeline_document_path(tmp_path).read_bytes()
+    cached = api.projects[project_id]["timeline_document"]
+    events = api._timeline_lifecycle.subscribe(project_id)
+
+    def fail(*args):
+        raise OSError("disk full")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(project_store.os, "fsync", fail)
+        if operation == "set_speed":
+            response = _op(client, project_id, operation, item_id=item_id, speed=2)
+        elif operation == "batch":
+            response = client.post(f"/projects/{project_id}/draft", json={"format": "short"})
+        else:
+            response = client.post(f"/projects/{project_id}/timeline/{operation}")
+    assert response.status_code == 500
+    assert "save" in response.json()["detail"].lower()
+    assert "disk full" in response.json()["detail"]
+    assert client.get(f"/projects/{project_id}/timeline/document").json() == before
+    assert api.projects[project_id]["timeline_document"] == cached
+    assert project_store.timeline_document_path(tmp_path).read_bytes() == saved
+    assert events.empty()
+    api._timeline_lifecycle.unsubscribe(project_id, events)
+    # Retrying undo/redo must still find the same history entry.
+    if operation in ("undo", "redo"):
+        retry = client.post(f"/projects/{project_id}/timeline/{operation}")
+        assert retry.status_code == 200
+        assert bool(retry.json()["document"]["items"]) == (operation == "redo")
+    api.invalidate_timeline_controller(project_id)
+    if operation not in ("undo", "redo"):
+        assert client.get(f"/projects/{project_id}/timeline/document").json() == before
+
+
+@pytest.mark.parametrize("number", ["NaN", "Infinity", "-Infinity", "1e400"])
+@pytest.mark.parametrize("transport", ["http", "mcp"])
+def test_http_and_mcp_reject_non_finite_operation_values(monkeypatch, tmp_path, number, transport):
+    from src.project_store import read_timeline_document
+
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+    document = _op(client, project_id, "include", clip_id="clip-1").json()["document"]
+    item_id = document["items"][0]["item_id"]
+    if transport == "http":
+        response = client.post(
+            f"/projects/{project_id}/timeline/op",
+            content='{"operation":"set_speed","args":{"item_id":"' + item_id
+                    + '","speed":' + number + '}}',
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 422
+        assert "speed" in response.json()["detail"]
+    else:
+        response = client.post("/mcp", content=(
+            '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":'
+            '{"name":"set_speed","arguments":{"project_id":"' + project_id
+            + '","item_id":"' + item_id + '","speed":' + number + '}}}'
+        ), headers={"Content-Type": "application/json"})
+        assert response.json()["result"]["isError"] is True
+        assert "speed" in response.json()["result"]["content"][0]["text"]
+    assert client.get(f"/projects/{project_id}/timeline/document").json()["document"] == document
+    assert read_timeline_document(tmp_path).model_dump() == document
+
+
+@pytest.mark.parametrize("path", ["legacy_timeline", "rederive"])
+def test_results_save_failure_keeps_previous_project_in_memory_and_on_disk(monkeypatch, tmp_path, path):
+    from copy import deepcopy
+    from src import project_store
+
+    client, project_id = _seed_analyzed_project(monkeypatch, tmp_path)
+    api.projects[project_id]["project_folder"] = str(tmp_path)
+    api.projects[project_id]["frame_scores"] = {"per_file": {}}
+    api.persist_project_results(project_id)
+    before = deepcopy(api.projects[project_id])
+    saved = project_store.analysis_results_path(tmp_path).read_bytes()
+
+    def fail(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(project_store.os, "replace", fail)
+    if path == "legacy_timeline":
+        response = client.put(f"/projects/{project_id}/timeline", json={
+            "clips": [{"clip_id": "clip-1", "start_sec": 1, "end_sec": 3}],
+        })
+    else:
+        response = client.post(f"/projects/{project_id}/clips/rederive", json={})
+    assert response.status_code == 500
+    assert "Could not save results.json" in response.json()["detail"]
+    assert api.projects[project_id] == before
+    assert project_store.analysis_results_path(tmp_path).read_bytes() == saved

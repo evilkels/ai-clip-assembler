@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from typing import Callable, List, Optional
 
+from .project_store import ProjectSaveError
 from .timeline_ops import OPERATIONS, TimelineController, TimelineOpError
 
 
@@ -148,6 +149,8 @@ class TimelineMCPServer:
                 clip_id = args.get("clip_id")
                 return _text_result(self._list_frame_paths(project_id, clip_id))
             return _text_result(f"unknown tool: {name}", is_error=True)
+        except ProjectSaveError as exc:
+            return _text_result(str(exc), is_error=True)
         except TimelineOpError as exc:
             return _text_result(str(exc), is_error=True)
         except KeyError as exc:
